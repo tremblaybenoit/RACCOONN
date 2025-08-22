@@ -1,0 +1,19 @@
+# Note: The order of defaults determines the order in which configs override each other.
+defaults:
+  - data: default
+  - hydra: default
+  - paths: default
+  - model: default
+  - trainer: default
+  - callbacks: default
+  - logger: default
+  - _self_
+
+# Task name. Note that it determines the output directory path
+task_name: "default"  # Experiment
+task_seed: 3210  # For reproducibility
+
+paths:
+  task_dir: "../forward_outputs"
+  run_id: "version_001"
+  data_dir: "../../GOES_ML-main/Data"

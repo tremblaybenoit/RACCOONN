@@ -1,0 +1,16 @@
+# Lightning module
+_target_: pytorch_lightning.Trainer
+
+# Accelerator
+accelerator: cpu
+devices: 1
+
+# Epochs
+min_epochs: 1  # To prevent early stopping
+max_epochs: 1
+
+# Perform a validation loop every N training epochs
+check_val_every_n_epoch: 1
+
+# Logging frequency
+log_every_n_steps: 100

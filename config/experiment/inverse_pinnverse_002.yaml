@@ -1,0 +1,111 @@
+# @package _global_
+# Experiment-specific Hydra structure
+
+# Overriding default structure
+defaults:
+  - override /data: default
+  - override /paths: default
+  - override /hydra: default
+  - override /model: inverse_pinnverse
+  - override /trainer: cpu
+  - override /callbacks: default
+  - override /logger: default
+
+# All parameters below will be merged with parameters from default configurations set above.
+# This allows you to overwrite only specified parameters
+
+# Task name. Note that it determines the output directory path
+task_name: "pinnverse_operator"  # Experiment
+
+# Run id (unique identifier for the run)
+paths:
+  task_dir: "../inverse_outputs"
+  run_id: "version_002"
+  data_dir: "../../GOES_ML-main/Data"
+
+# Trainer configuration
+trainer:
+  min_epochs: 1  # To prevent early stopping
+  max_epochs: 10  # Number of epochs
+
+# Model parameters
+model:
+  _target_: inverse.model.model.PINNverseOperator
+  optimizer:
+    weight_decay: 0.0005  # Weight decay for the optimizer
+  loss_func:
+    _target_: inverse.model.loss.ForwardCRPS2  # Load loss function
+    _partial_: false  # Partial instantiation for callable
+  activation:
+    _target_: forward.model.activation.Sine
+    _partial_: true
+  # Positional encoding
+  positional_encoding:
+    _target_: inverse.model.encoding.GaussianPositionalEncoding
+    _partial_: true
+    num_freqs: 20
+  # Parameters
+  parameters:
+    data:
+      n_levels: 127  # Number of output levels
+      n_pressure: 0  # Number of pressure levels
+    architecture:
+      n_neurons: 128  # Number of neurons in the hidden layers
+      n_layers: 4  # Number of hidden layers
+      dropout: 0.1  # Dropout rate
+
+# Data location
+data:
+  _target_: inverse.model.data_loader.PINNversionsDataloader
+  batch_size: 32  # Batch size
+  sets:
+    train:
+      path: ${data.dir}/Test2
+      # hofx only contains half of the outputs, so I'm loading my complete outputs
+      hofx:
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${data.sets.train.path}/hofx_lightning.npy
+    valid:
+      path: ${data.dir}/Test2
+      # hofx only contains half of the outputs, so I'm loading my complete outputs
+      hofx:
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${data.sets.valid.path}/hofx_lightning.npy
+    test:
+      path: ${data.dir}/Test2
+      # hofx only contains half of the outputs, so I'm loading my complete outputs
+      hofx:
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${data.sets.test.path}/hofx_lightning.npy
+      results:
+        hofx:
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${paths.checkpoint_dir}/${task_name}_test_hofx.npy
+          load:
+            _target_: numpy.load
+            _args_:
+              - ${paths.checkpoint_dir}/${task_name}_test_hofx.npy
+        prof:
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${paths.checkpoint_dir}/${task_name}_test_prof.npy
+          load:
+            _target_: numpy.load
+            _args_:
+              - ${paths.checkpoint_dir}/${task_name}_test_prof.npy
+
+# Logger
+logger:
+  offline: True  # Save logs to file
+  ui: True  # Open the logger UIs
