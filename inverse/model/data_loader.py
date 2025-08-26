@@ -385,71 +385,93 @@ class MultiVarDataloader(BaseDataloader):
         dataset = {}
         for p, prof_type in enumerate(data['prof_type']):
             # Store coordinates
-            for coord, coord_config in data['coordinates'].items():
-                f_norm = instantiate(coord_config['normalization']) if hasattr(coord_config, 'normalization') else identity
-                if coord in ['lat', 'lon', 'scans']:
-                    dataset[prof_type][coord] = f_norm(coordinates[coord][data['split']])
-                elif coord == 'pressure':
-                    dataset[prof_type][coord] = np.tile(f_norm(0.01*np.array(instantiate(coord_config['load']), dtype=np.float64))[self.prof_filter],
-                                                             (len(data['split']), 1))
+            for var, config in (data['coordinates'] + data['targets'] if hasattr(data, 'targets') else None).items():
+                f_norm = instantiate(config['normalization']) if hasattr(config, 'normalization') else identity
+                if var in ['lat', 'lon', 'scans']:
+                    dataset[prof_type][var] = f_norm(coordinates[var])
+                elif var == 'pressure':
+                    dataset[prof_type][var] = f_norm(0.01*np.array(instantiate(config['load']), dtype=np.float64))
+                    if hasattr(data, 'filters'):
+                        if 'prof_filter' in data['filters'] and self.prof_filter is not None:
+                            prof_filter = self.prof_filter[0, self.sets['train']['targets']['prof']['type'].index(prof_type)]
+                            dataset[prof_type][var] = dataset[prof_type][var][prof_filter]
+                        if 'prof_filter' in data['filters']:
+                            prof_filter = np.array(instantiate(config['load']), dtype=bool)[0, self.sets['train']['targets']['prof']['type'].index(prof_type)]
+                            dataset[prof_type][var] = dataset[prof_type][var][prof_filter]
                 else:
-                    dataset[prof_type][coord] = f_norm(np.array(instantiate(coord_config['load']), dtype=np.float64)[data['split']])
-            # If available, store targets
-            if hasattr(data, 'targets'):
-                for target, target_config in data['targets'].items():
+                    dataset[prof_type][var] = f_norm(np.array(instantiate(config['load']), dtype=np.float64))
+                # Apply split
+                if hasattr(data, 'split'):
+                    split = data['split'] if self.cloud_filter is None else self.cloud_filter[data['split']]
+                    dataset[prof_type][var] = dataset[prof_type][var][split] if var != 'pressure' else dataset[prof_type][var]
 
-        # Inputs
-        x = {}
-        for input in inputs:
-            f_norm = instantiate(self.sets[stage][input]['normalization']) \
-                if hasattr(self.sets[stage][input], 'normalization') else identity
-            if input in ['lat', 'lon', 'scans']:
-                x[input] = f_norm(coordinates[input][self.sets[stage]['split']['start']:self.sets[stage]['split']['end']])
-            elif input == 'pressure':
-                x[input] = np.tile(f_norm(0.01*np.array(instantiate(self.sets[stage][input]['load']), dtype=np.float64)),
-                                   (self.sets[stage]['split']['end']-self.sets[stage]['split']['start'], 1))
-            else:
-                x[input] = f_norm(np.array(instantiate(self.sets[stage][input]['load']), dtype=np.float64)
-                                  [self.sets[stage]['split']['start']:self.sets[stage]['split']['end']])
-        # If clrsky is True, filter inputs based on clrsky mask
-        if self.clrsky_filter:
-            for key in x.keys():
-                x[key] = x[key][self.index_cloudy[self.sets[stage]['split']['start']:self.sets[stage]['split']['end']]]
+        # Store variables
+        vars = {**(data['filters'] if hasattr(data, 'filters') else {}),
+                **data['coordinates'],
+                **(data['targets'] if hasattr(data, 'targets') else {})}
+        if hasattr(data, 'split'):
+            split = data['split']
+            if hasattr(data['filters'], 'cloud_filter'):
+                cloud_filter = np.array(instantiate(data['filters']['cloud_filter']['load']), dtype=bool)
 
-        # TODO: Verify which normalization function to use for background
-        # If outputs include background, compute it
-        if 'background' in outputs:
-            # Compute background
-            var = 'prof_norm' if 'prof_norm' in self.sets[stage] else 'prof'
-            # Load the profile data and apply normalization
-            f_norm = instantiate(self.sets[stage][var]['normalization']) \
-                if hasattr(self.sets[stage][var], 'normalization') else identity
-            xt = f_norm(np.array(instantiate(self.sets[stage][var]['load']), dtype=np.float64))
-            xb = (np.zeros_like(xt[self.sets[stage]['split']['start']:self.sets[stage]['split']['end']]) +
-                  np.nanmean(xt[self.index_cloudy], axis=0, keepdims=True))  # Compute mean and replace NaN with 0
-            xb_err = np.zeros_like(xb) + np.nanstd(xt[self.index_cloudy], axis=0, keepdims=True)  # TODO: Fix axis
-            background = {'background': xb, 'background_err': xb_err}
-        else:
-            background = None
-
-        # Outputs
-        y = {}
-        if outputs is not None:
-            for output in outputs:
-                if background is not None and output in ['background', 'background_err']:
-                    y[output] = background[output]
-                elif output == 'prof_mask':
-                    y[output] = np.tile(self.prof_mask.astype(np.float64),
-                                        (self.sets[stage]['split']['end'] - self.sets[stage]['split']['start'], 1, 1))
+        for p, prof_type in enumerate(data['prof_type']):
+            for var, config in vars.items():
+                f_norm = instantiate(config['normalization']) if hasattr(config, 'normalization') else identity
+                if var in ['lat', 'lon', 'scans']:
+                    dataset[prof_type][var] = f_norm(coordinates[var])
+                elif var == 'pressure':
+                    dataset[prof_type][var] = f_norm(0.01*np.array(instantiate(config['load']), dtype=np.float64))
+                    if hasattr(dataset, 'prof_filter'):
+                        prof_filter = np.array(instantiate(config['load']), dtype=bool)[0, self.sets['train']['targets']['prof']['type'].index(prof_type)]
+                        if self.prof_filter:
+                            dataset[prof_type][var] = dataset[prof_type][var][prof_filter]
                 else:
-                    f_norm = instantiate(self.sets[stage][output]['normalization']) \
-                        if hasattr(self.sets[stage][output], 'normalization') else identity
-                    y[output]= f_norm(np.array(instantiate(self.sets[stage][output]['load']), dtype=np.float64)
-                                      [self.sets[stage]['split']['start']:self.sets[stage]['split']['end']])
-            # If clrsky is True, filter outputs based on clrsky mask
-            if self.clrsky_filter:
-                for key in y.keys():
-                    y[key] = y[key][self.index_cloudy[self.sets[stage]['split']['start']:self.sets[stage]['split']['end']]]
+                    dataset[prof_type][var] = f_norm(np.array(instantiate(config['load']), dtype=np.float64))
+                # Apply split
+                if hasattr(data, 'split'):
+                    split = data['split'] if self.cloud_filter is None else self.cloud_filter[data['split']]
+                    dataset[prof_type][var] = dataset[prof_type][var][split] if var != 'pressure' else dataset[prof_type][var]
 
-            return CRTMDataset(x, y)
-        return CRTMDataset(x)
+        return VarDataset(dataset)
+
+
+class VarDataset(Dataset):
+    """Lazy loader for the inverse dataset."""
+
+    def __init__(self, x: dict) -> None:
+        """Initialize the lazy loader.
+
+        Parameters
+        ----------
+        x : dict. Dictionary containing the data.
+
+        Returns
+        -------
+        None.
+        """
+
+        # Store data
+        self.x = x
+
+    def __len__(self) -> int:
+        """ Get the length of the dataset.
+
+        Returns
+        -------
+        int. Length of the dataset.
+        """
+        # Return the length of the first input tensor
+        first_profile = next(iter(self.x.values()))
+        first_var = next(iter(first_profile.values()))
+        return len(first_var)
+
+    def __getitem__(self, idx: int) -> Union[tuple, dict]:
+        """ Get data
+
+        Returns
+        -------
+        Dataset object.
+        """
+
+        # Get the data at the specified index
+        return {k: {kk: vv[idx] if kk != 'pressure' else vv for kk, vv in v.items()} for k, v in self.x.items()}

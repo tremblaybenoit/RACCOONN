@@ -90,6 +90,13 @@ vars:
       _target_: numpy.load
       _args_:
         - ${paths.data_dir}/Test2/pressure.npy
+  background: ${data.vars.prof}  # Using the same variable as 'prof' for now; TODO: Change if needed
+  pressure_filter:
+    load:
+      TBD.
+  cloud_filter:
+    load:
+      TBD.
 
 
 # Preparation steps to be executed before training or evaluation.
@@ -108,9 +115,9 @@ loader:
   num_workers: 1  # Number of workers for data loading
   cloud_filter: true  # Use cloud filter to remove clear sky data
   prof_filter: true  # Use profile filter to remove profiles with zero variance
-  prof_type: ${data.vars.prof.type}  # Type of profile to use
-  coordinates: ['lat', 'lon', 'scans', 'pressure']
-  targets: ['prof', 'surf', 'meta', 'hofx']
+  # prof_type: ${data.vars.prof.type}  # Type of profile to use
+  # coordinates: ['lat', 'lon', 'scans', 'pressure']
+  # targets: ['prof', 'surf', 'meta', 'hofx']
   sets:
     split:
       train: 0:256608
@@ -198,7 +205,9 @@ loader:
         lon: ${data.vars.lon}
         scans: ${data.vars.scans}
         pressure: ${data.vars.pressure}
-        # TODO: Add pressure_filter?
+      filters:
+        cloud: ${data.vars.cloud_filter}
+        pressure: ${data.vars.pressure_filter}
       targets:
         prof: ${data.vars.prof}
         surf: ${data.vars.surf}
@@ -210,11 +219,13 @@ loader:
       split: 256608:341240
       prof_type: ${data.loader.train.prof_type}
       coordinates: ${data.loader.train.coordinates}
+      filters: ${data.loader.train.filters}
       targets: ${data.loader.train.targets}
     test:
       split: 341240:426872
       prof_type: ${data.loader.train.prof_type}
       coordinates: ${data.loader.train.coordinates}
+      filters: ${data.loader.train.filters}
       targets: ${data.loader.train.targets}
       results:
         hofx:
