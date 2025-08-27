@@ -190,6 +190,27 @@ def min_max(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transfor
                       stats['min'].min(axis=axis, keepdims=True), inverse_transform=not inverse_transform)
 
 
+def max(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform: bool = False, axis=None)
+    -> Union[np.ndarray, torch.Tensor]:
+    """ Divide dataset by its maximum value.
+
+        Parameters
+        ----------
+        data: arr or tensor. Contains data to transform.
+        stats: arr or tensor. Statistics of the data.
+        inverse_transform: bool. False for normalization, True for unnormalization.
+        axis: int or None. Axis along which to normalize. If None, normalize across all dimensions.
+
+        Returns
+        -------
+        data_transform: arr or tensor. Transformed dataset.
+    """
+    if axis is None:
+        return multiplication(data, stats['max'], inverse_transform=not inverse_transform)
+    else:
+        return multiplication(data, stats['max'].max(axis=axis, keepdims=True), inverse_transform=not inverse_transform)
+
+
 def median(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform: bool = False) \
            -> Union[np.ndarray, torch.Tensor]:
     """ Divide dataset by its median.

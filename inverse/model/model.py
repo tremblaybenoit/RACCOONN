@@ -7,6 +7,7 @@ from forward.model.model import BaseModel
 from forward.utilities.instantiators import instantiate
 from forward.data.transformations import NormalizeProfiles
 from inverse.data.transformations import identity
+from copy import deepcopy
 
 
 class InverseEmulator(LightningModule):
@@ -203,6 +204,14 @@ class PINNverseOperator(BaseModel):
                 for i, var in enumerate(self.prof_vars):
                     self.log(f"{stage}_loss_model_{i}_{var}", loss['model'][:, i, :].mean(), on_epoch=True, prog_bar=False,
                              logger=True)
+        # Log boundary conditions loss
+        if 'bcs' in loss.keys():
+            self.log(f"{stage}_loss_bcs", loss['bcs'].mean(), on_epoch=True, prog_bar=True, logger=True)
+            # Log individual profile variables
+            if loss['bcs'].ndim == 3:
+                for i, var in enumerate(self.prof_vars):
+                    self.log(f"{stage}_loss_bcs_{i}_{var}", loss['bcs'][:, i, :].mean(), on_epoch=True, prog_bar=False,
+                             logger=True)
         # Log observation loss
         if 'obs' in loss.keys():
             self.log(f"{stage}_loss_obs", loss['obs'].mean(), on_epoch=True, prog_bar=True, logger=True)
@@ -353,7 +362,6 @@ class PINNverseOperatorMulti(PINNverseOperator):
                          clip=clip, parameters=parameters, log_valid=log_valid)
 
         # Replace the single model with a list of models, one per profile type
-        from copy import deepcopy
         self.models = nn.ModuleList([
             self._build_model(
                 positional_encoding, activation_in, activation_out, self._patch_profiles(deepcopy(parameters))
@@ -426,7 +434,6 @@ class PINNverseOperatorMulti2(PINNverseOperator):
                          clip=clip, parameters=parameters, log_valid=log_valid)
 
         # Replace the single model with a list of models, one per profile type
-        from copy import deepcopy
         self.models = nn.ModuleList([
             self._build_model(
                 positional_encoding, activation_in, activation_out, self._patch_profiles(deepcopy(parameters))
@@ -452,8 +459,7 @@ class PINNverseOperatorMulti2(PINNverseOperator):
         y: tensor. Outputs: predicted profiles for all types, concatenated.
         """
         # Concatenate inputs
-        inputs = torch.cat((x['lat'].view(-1, 1), x['lon'].view(-1, 1), x['scans'].view(-1, 1),
-                            x['pressure'].view(-1, 1)), dim=-1)
+        inputs = torch.cat([v.view(-1, 1) for v in x.values()], dim=-1)
         # Apply positional encoding
         encoded_inputs = self.positional_encoding(inputs)
         # Each model predicts its profile type
@@ -480,7 +486,7 @@ class PINNverseOperatorMulti2(PINNverseOperator):
                     for k, v in x.items()}
         return torch.cat([output.view(-1, 1, n_levels) for output in self.forward(x_vector)], dim=1)
 
-    def base_step(self, batch: tuple[dict, dict], batch_nb: int, stage: str) -> torch.Tensor:
+    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
         """ Perform training/validation/test step.
 
             Parameters
@@ -494,130 +500,14 @@ class PINNverseOperatorMulti2(PINNverseOperator):
             Loss value: tensor.
         """
 
-        # Extract data from batch
-        coordinates, target = batch
-
         # Compute profiles
-        prof_norm = self._retrieve_profiles(coordinates)
+        prof_norm = self._retrieve_profiles(batch['coordinates'])
         prof_pred = self.unnormalize_profiles(prof_norm)
 
         # Compute loss function
-        loss, bt_pred = self.loss_func(prof_norm, prof_pred, target)
+        loss, bt_pred = self.loss_func(prof_norm, prof_pred, batch['targets'])
 
         # Logging
-        self._logging(coordinates, target, stage, loss, prof_norm, bt_pred)
-
-        return loss['total']
-
-
-class PINNverseOperatorMulti3(PINNverseOperator):
-    """Physics-Informed Neural Network (PINN) inverse model with one neural network per profile type."""
-
-    def __init__(self, optimizer: DictConfig = None, loss_func: Callable = None, lr_scheduler: DictConfig = None,
-                 positional_encoding: Callable = None, activation_in: Callable = None, activation_out: Callable = None,
-                 transform: Callable = None, inverse_transform: Callable = None, clip: Callable = None,
-                 parameters: DictConfig = None, log_valid: bool = False):
-        """
-        Initialize model.
-
-        Parameters
-        ----------
-        optimizer: Callable. Optimizer for the model.
-        loss_func: Callable. Loss function for the model.
-        lr_scheduler: Callable. Learning rate scheduler for the model.
-        positional_encoding: Callable. Function for the positional encoding.
-        activation_in: Callable. Activation function (in).
-        activation_out: Callable. Activation function (out).
-        transform: Callable. Normalization transformation.
-        inverse_transform: Callable. Unnormalization transformation.
-        clip: Callable. Clipping function for the model outputs.
-        parameters: DictConfig. Configuration for the model parameters.
-        log_valid: bool. Whether to log validation results.
-
-        Returns
-        -------
-        None.
-        """
-
-        # Inherit all attributes and logic from PINNverseOperator
-        super().__init__(optimizer=optimizer, loss_func=loss_func, lr_scheduler=lr_scheduler,
-                         positional_encoding=positional_encoding, activation_in=activation_in,
-                         activation_out=activation_out, transform=transform, inverse_transform=inverse_transform,
-                         clip=clip, parameters=parameters, log_valid=log_valid)
-
-        # Replace the single model with a list of models, one per profile type
-        from copy import deepcopy
-        self.models = nn.ModuleList([
-            self._build_model(
-                positional_encoding, activation_in, activation_out, self._patch_profiles(deepcopy(parameters))
-            )
-            for _ in range(self.n_profiles)
-        ])
-
-    def _patch_profiles(self, parameters):
-        """Set n_profiles=1 in parameters for sub-model construction."""
-        parameters.data.n_profiles = 1
-        return parameters
-
-    def forward(self, x: dict) -> dict:
-        """
-        Process per-profile inputs and return outputs as a list.
-        x: dict of dicts, e.g. {'prof_0': {...}, 'prof_1': {...}, ...}
-        Returns: list of outputs per profile type.
-        """
-        outputs = {}
-        for i, (prof_type, prof_x) in enumerate(x.items()):
-            inputs = torch.cat((
-                prof_x['lat'].view(-1, 1),
-                prof_x['lon'].view(-1, 1),
-                prof_x['scans'].view(-1, 1),
-                prof_x['pressure'].view(-1, 1)
-            ), dim=-1)
-            encoded_inputs = self.positional_encoding(inputs)
-            outputs[prof_type] = self.models[i](encoded_inputs)
-        return outputs
-
-    def _retrieve_profiles(self, x: dict) -> torch.Tensor:
-        """
-        Retrieve atmospheric profiles for each profile type.
-        Returns: concatenated tensor of profiles [batch, n_profiles, n_levels].
-        """
-        profiles = []
-        for i, (prof_type, prof_x) in enumerate(x.items()):
-            n_levels = prof_x['pressure'].shape[-1]
-            x_vector = {
-                k: v.repeat_interleave(n_levels, dim=0) if k != 'pressure' else prof_x['pressure'].reshape(-1, 1)
-                for k, v in prof_x.items()
-            }
-            out = self.forward({prof_type: x_vector})[0]
-            profiles.append(out.view(-1, 1, n_levels))
-        return torch.cat(profiles, dim=1)
-
-    def base_step(self, batch: tuple[dict, dict], batch_nb: int, stage: str) -> torch.Tensor:
-        """ Perform training/validation/test step.
-
-            Parameters
-            ----------
-            batch: tensor. Batch from the training set.
-            batch_nb: int. Index of the batch out of the training set.
-            stage: str. Current operation: "train", "valid", or "test".
-
-            Returns
-            -------
-            Loss value: tensor.
-        """
-
-        # Extract data from batch
-        coordinates, target = batch
-
-        # Compute profiles
-        prof_norm = self._retrieve_profiles(coordinates)
-        prof_pred = self.unnormalize_profiles(prof_norm)
-
-        # Compute loss function
-        loss, bt_pred = self.loss_func(prof_norm, prof_pred, target)
-
-        # Logging
-        self._logging(coordinates, target, stage, loss, prof_norm, bt_pred)
+        self._logging(batch['coordinates'], batch['targets'], stage, loss, prof_norm, bt_pred)
 
         return loss['total']

@@ -36,7 +36,7 @@ parameters:
       _target_: numpy.loadtxt
       _args_:
         - forward/data/normalization/surfmin.txt
-    statistics: ${data.sets.preparation.statistics.output.data}  # Path to statistics file
+    statistics: ${data.preparation.statistics.output}  # Path to statistics file
     meta_norm:
       meta_cos_vars: [6]
       meta_scale_factor: 180

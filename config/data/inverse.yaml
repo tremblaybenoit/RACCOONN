@@ -15,17 +15,7 @@ vars:
       _target_: numpy.load
       _args_:
         - ${paths.data_dir}/Test2/prof.npy
-    normalization:
-      _target_: forward.data.transformations.NormalizeProfiles
-      _partial_: false
-      profmax:
-        _target_: numpy.loadtxt
-        _args_:
-          - forward/data/normalization/prof_div.txt
-      profmin:
-        _target_: numpy.loadtxt
-        _args_:
-          - forward/data/normalization/prof_m.txt
+    normalization: ${model.transform}
   surf:
     type: ['Ice area fraction', 'Land area fraction', 'Land type', 'Leaf area index', 'Soil temperature',
            'Snow area fraction', 'Snow thickness', 'Soil temperature',
@@ -90,13 +80,31 @@ vars:
       _target_: numpy.load
       _args_:
         - ${paths.data_dir}/Test2/pressure.npy
-  background: ${data.vars.prof}  # Using the same variable as 'prof' for now; TODO: Change if needed
+  background:
+    load:
+      _target_: inverse.data.covariance.spatiotemporal_mean
+      _args_:
+        - ${data.vars.prof.load}
+    normalization: ${data.vars.prof.normalization}
+  background_err:
+    load:
+      _target_: inverse.data.covariance.compute_err
+      _args_:
+        - ${data.vars.prof.load}
+        - ${data.vars.background.load}
+      normalization:
+        _target_: forward.data.transformations.max
+        _partial_: true
   pressure_filter:
     load:
-      TBD.
+      _target_: inverse.data.filters.pressure_filter
+      _args_:
+        - ${data.vars.prof.load}
   cloud_filter:
     load:
-      TBD.
+      _target_: inverse.data.filters.cloud_filter
+      _args_:
+        - ${data.vars.prof.load}
 
 
 # Preparation steps to be executed before training or evaluation.
@@ -106,6 +114,23 @@ preparation:
     output:
       path: ${paths.data_dir}/normalization/stats.pkl
       type: file
+  covariance:
+    model:
+      input:
+        prof: ${data.vars.prof}
+        background: ${data.vars.background}
+        cloud_filter: ${data.loader.sets.split.cloud_filter}
+        pressure_filter: ${data.vars.pressure_filter}
+      output:
+        path: ${paths.data_dir}/normalization/model_covariance_cloud_filter_pressure_filter.npy
+        type: file
+    observation:
+      input:
+          hofx: ${data.vars.hofx}
+          cloud_filter: ${data.loader.sets.split.cloud_filter}
+      output:
+        path: ${paths.data_dir}/normalization/observation_covariance_cloud_filter.npy
+        type: file
 
 
 # Configuration for the data loader that handles the dataset splits.
@@ -113,17 +138,12 @@ loader:
   _target_: forward.model.data_loader.VarDataloader
   batch_size: 32  # Batch size for training
   num_workers: 1  # Number of workers for data loading
-  cloud_filter: true  # Use cloud filter to remove clear sky data
-  prof_filter: true  # Use profile filter to remove profiles with zero variance
-  # prof_type: ${data.vars.prof.type}  # Type of profile to use
-  # coordinates: ['lat', 'lon', 'scans', 'pressure']
-  # targets: ['prof', 'surf', 'meta', 'hofx']
   sets:
     split:
       train: 0:256608
       valid: 256608:341240
       test: 341240:426872
-    prof_type: ${data.vars.prof.type}  # Type of profile to use
+      cloud_filter: ${data.vars.cloud_filter}
     coordinates:
       lat: ${data.vars.lat}
       lon: ${data.vars.lon}
@@ -134,121 +154,68 @@ loader:
       surf: ${data.vars.surf}
       meta: ${data.vars.meta}
       hofx: ${data.vars.hofx}
+      background: ${data.vars.background}
+    # outputs:
 
 
 # Configuration for the data loader that handles the dataset splits.
-loader:
-  _target_: forward.model.data_loader.VarDataloader
-  batch_size: 32  # Batch size for training
-  num_workers: 1  # Number of workers for data loading
-  cloud_filter: true  # Use cloud filter to remove clear sky data
-  prof_filter: true  # Use profile filter to remove profiles with zero variance
-  prof_type: ${data.vars.prof.type}  # Type of profile to use
-  coordinates: ['lat', 'lon', 'scans', 'pressure']
-  targets: ['prof', 'surf', 'meta', 'hofx']
-  sets:
-    train:
-      split: 0:256608
-      vars:
-        lat: ${data.vars.lat}
-        lon: ${data.vars.lon}
-        scans: ${data.vars.scans}
-        pressure: ${data.vars.pressure}
-        prof: ${data.vars.prof}
-        surf: ${data.vars.surf}
-        meta: ${data.vars.meta}
-        hofx: ${data.vars.hofx}
-    valid:
-      split: 256608:341240
-      vars: ${data.loader.train.vars}
-    test:
-      split: 341240:426872
-      vars: ${data.loader.train.vars}
-      results:
-        hofx:
-          save:
-            _target_: numpy.save
-            _partial_: true
-            _args_:
-              - ${paths.checkpoint_dir}/${task_name}_test_hofx.npy
-          load:
-            _target_: numpy.load
-            _args_:
-              - ${paths.checkpoint_dir}/${task_name}_test_hofx.npy
-          normalization: ${vars.hofx.normalization}
-        prof:
-          save:
-            _target_: numpy.save
-            _partial_: true
-            _args_:
-              - ${paths.checkpoint_dir}/${task_name}_test_prof.npy
-          load:
-            _target_: numpy.load
-            _args_:
-              - ${paths.checkpoint_dir}/${task_name}_test_prof.npy
-
-
-# Configuration for the data loader that handles the dataset splits.
-loader:
-  _target_: forward.model.data_loader.VarDataloader
-  dir: ${data.dir}  # Directory where the data is stored
-  batch_size: 32  # Batch size for training
-  num_workers: 1  # Number of workers for data loading
-  cloud_filter: true  # Use cloud filter to remove clear sky data
-  prof_filter: true  # Use profile filter to remove profiles with zero variance
-  sets:
-    train:
-      split: 0:256608
-      prof_type: ${data.vars.prof.type}  # Type of profile to use
-      coordinates:
-        lat: ${data.vars.lat}
-        lon: ${data.vars.lon}
-        scans: ${data.vars.scans}
-        pressure: ${data.vars.pressure}
-      filters:
-        cloud: ${data.vars.cloud_filter}
-        pressure: ${data.vars.pressure_filter}
-      targets:
-        prof: ${data.vars.prof}
-        surf: ${data.vars.surf}
-        meta: ${data.vars.meta}
-        hofx: ${data.vars.hofx}
-        # TODO: Add to vars
-        background: ${data.vars.background}
-    valid:
-      split: 256608:341240
-      prof_type: ${data.loader.train.prof_type}
-      coordinates: ${data.loader.train.coordinates}
-      filters: ${data.loader.train.filters}
-      targets: ${data.loader.train.targets}
-    test:
-      split: 341240:426872
-      prof_type: ${data.loader.train.prof_type}
-      coordinates: ${data.loader.train.coordinates}
-      filters: ${data.loader.train.filters}
-      targets: ${data.loader.train.targets}
-      results:
-        hofx:
-          save:
-            _target_: numpy.save
-            _partial_: true
-            _args_:
-              - ${paths.checkpoint_dir}/${task_name}_test_hofx.npy
-          load:
-            _target_: numpy.load
-            _args_:
-              - ${paths.checkpoint_dir}/${task_name}_test_hofx.npy
-          normalization: ${vars.hofx.normalization}
-        prof:
-          save:
-            _target_: numpy.save
-            _partial_: true
-            _args_:
-              - ${paths.checkpoint_dir}/${task_name}_test_prof.npy
-          load:
-            _target_: numpy.load
-            _args_:
-              - ${paths.checkpoint_dir}/${task_name}_test_prof.npy
-    pred:
-      prof_type: ${data.vars.prof.type}  # Type of profile to use
-      coordinates: ${data.loader.train.coordinates}
+# loader:
+#   _target_: forward.model.data_loader.VarDataloader
+#   batch_size: 32  # Batch size for training
+#   num_workers: 1  # Number of workers for data loading
+#   sets:
+#     train:
+#       split:
+#         range: 0:256608
+#         cloud_filter: ${data.vars.cloud_filter}
+#       prof_type: ${data.vars.prof.type}  # Type of profile to use
+#       coordinates:
+#         lat: ${data.vars.lat}
+#         lon: ${data.vars.lon}
+#         scans: ${data.vars.scans}
+#         pressure: ${data.vars.pressure}
+#       targets:
+#         prof: ${data.vars.prof}
+#         surf: ${data.vars.surf}
+#         meta: ${data.vars.meta}
+#         hofx: ${data.vars.hofx}
+#         background: ${data.vars.background}
+#     valid:
+#       split:
+#         range: 256608:341240
+#         cloud_filter: ${data.loader.sets.train.split.cloud_filter}
+#       prof_type: ${data.loader.train.prof_type}
+#       coordinates: ${data.loader.train.coordinates}
+#       targets: ${data.loader.train.targets}
+#     test:
+#       split:
+#         range: 341240:426872
+#         cloud_filter: ${data.loader.sets.train.split.cloud_filter}
+#       prof_type: ${data.loader.train.prof_type}
+#       coordinates: ${data.loader.train.coordinates}
+#       targets: ${data.loader.train.targets}
+#       results:
+#         hofx:
+#           save:
+#             _target_: numpy.save
+#             _partial_: true
+#             _args_:
+#               - ${paths.checkpoint_dir}/${task_name}_test_hofx.npy
+#           load:
+#             _target_: numpy.load
+#             _args_:
+#               - ${paths.checkpoint_dir}/${task_name}_test_hofx.npy
+#           normalization: ${vars.hofx.normalization}
+#         prof:
+#           save:
+#             _target_: numpy.save
+#             _partial_: true
+#             _args_:
+#               - ${paths.checkpoint_dir}/${task_name}_test_prof.npy
+#           load:
+#             _target_: numpy.load
+#             _args_:
+#               - ${paths.checkpoint_dir}/${task_name}_test_prof.npy
+#     pred:
+#       prof_type: ${data.vars.prof.type}  # Type of profile to use
+#       coordinates: ${data.loader.train.coordinates}

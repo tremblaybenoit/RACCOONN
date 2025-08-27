@@ -501,18 +501,21 @@ class ForwardVar3(Forward):
 
 class VarLoss(torch.nn.Module):
     """ Universal loss module that combines observation and model losses. """
-    def __init__(self, loss_obs: Callable, loss_model: Callable = None, lambda_obs: float=1.0, lambda_model: float=1.0,
-                 forward_prof_norm: Callable=None, prof_mask: bool=False, sanity_check: bool=False):
+    def __init__(self, loss_obs: Callable, loss_model: Callable = None, loss_bcs: Callable = None,
+                 lambda_obs: float=1.0, lambda_model: float=1.0, lambda_bcs: float=1.0,
+                 forward_prof_norm: Callable=None, prof_mask: Callable=None, sanity_check: bool=False):
         """ Initialize the variational loss module.
 
         Parameters
         ----------
         loss_obs: Callable or ListConfig. Loss function(s) for observations.
         loss_model: Callable or ListConfig. Loss function(s) for model predictions.
+        loss_bcs: Callable or ListConfig. Loss function(s) for boundary conditions.
         lambda_obs: float. Weight for the observation loss.
         lambda_model: float. Weight for the model loss.
+        lambda_bcs: float. Weight for the boundary condition loss.
         forward_prof_norm: Callable. Function to apply normalization to profiles before the forward model.
-        prof_mask: bool. If True, apply a mask to the profiles before computing losses.
+        prof_mask: Callable. Function to generate a mask for the profile levels to include in the model loss.
         sanity_check: bool. If True, perform a sanity check on the observation losses.
 
         Returns
@@ -524,13 +527,13 @@ class VarLoss(torch.nn.Module):
         # Forward model
         self.forward_model = ForwardModel(forward_prof_norm=forward_prof_norm)
         # Loss terms
-        self.loss_obs, self.loss_model = loss_obs, loss_model
+        self.loss_obs, self.loss_model, self.loss_bcs = loss_obs, loss_model, loss_bcs
         # Weighting factors for the losses
-        self.lambda_obs, self.lambda_model = lambda_obs, lambda_model
+        self.lambda_obs, self.lambda_model, self.lambda_bcs = lambda_obs, lambda_model, lambda_bcs
+        # Pressure mask per profile type
+        self.prof_mask = torch.Tensor(prof_mask) if prof_mask is not None else None
         # Sanity check flag
         self.sanity_check = sanity_check
-        # Profile mask flag
-        self.prof_mask = prof_mask
 
     def __call__(self, prof_norm, prof_pred, target) -> tuple[dict, torch.Tensor]:
         """ Compute the combined loss between predicted profiles and target data.
@@ -548,13 +551,13 @@ class VarLoss(torch.nn.Module):
         """
 
         # Mask
-        if self.prof_mask and 'prof_mask' in target:
+        if self.prof_mask is not None:
             prof_mask = target['prof_mask'].to(prof_pred.device)
         else:
-            prof_mask = torch.ones_like(prof_pred, dtype=torch.float32, device=prof_pred.device)
+            prof_mask = torch.ones_like(prof_pred, dtype=torch.bool, device=prof_pred.device)
 
         # Compute the forward model output
-        bt_pred = self.forward_model(prof_mask*prof_pred+(1.-prof_mask)*target['prof'], target)
+        bt_pred = self.forward_model(prof_pred, target)
 
         # Initialize loss dictionary
         loss = {'total': torch.tensor(0.0, dtype=torch.float32, device=prof_pred.device)}
@@ -570,11 +573,17 @@ class VarLoss(torch.nn.Module):
         # Model losses: Some model losses may require additional inputs
         if self.loss_model is not None:
             if getattr(getattr(self.loss_model, "func", self.loss_model), "__name__", None) == 'diagonal_quadratic_form':
-                loss['model'] = self.loss_model(prof_norm*prof_mask, target['prof_norm']*prof_mask, target['background_err'])
+                loss['model'] = self.loss_model(prof_norm[:, prof_mask], target['prof_norm'][:, prof_mask], target['background_err'])
             else:
-                loss['model'] = self.loss_model(prof_norm*prof_mask, target['prof_norm']*prof_mask)
+                loss['model'] = self.loss_model(prof_norm[:, prof_mask], target['prof_norm'][:, prof_mask])
             # Total
             loss['total'] += self.lambda_model * torch.nanmean(loss['model'])
+
+        # Boundary condition losses (where the variance is zero)
+        if self.loss_bcs is not None:
+            loss['bcs'] = self.loss_bcs(prof_norm[:, ~prof_mask], target['prof_norm'][:, ~prof_mask])
+            # Total
+            loss['total'] += self.lambda_bcs * torch.nanmean(loss['bcs'])
 
         # Sanity check
         if self.sanity_check:
