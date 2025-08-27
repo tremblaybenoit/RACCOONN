@@ -62,7 +62,6 @@ parameters:
         _target_: numpy.loadtxt
         _args_:
           - forward/data/normalization/prof_m.txt
-    sanity_check: false  # Sanity check for the loss function
     pressure_filter:  ${data.vars.pressure_filter.load}  # Mask zero-variance pressure levels
 
 # Positional encoding

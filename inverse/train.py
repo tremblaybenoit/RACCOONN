@@ -161,9 +161,10 @@ class InverseOperator:
 
         # Evaluate on test set
         logger.info("Running against test set...")
-        results = self.trainer.test(self.model, self.data_loader)
+        _ = self.trainer.test(self.model, self.data_loader)
 
         # Save test results to file
+        # TODO: Fix path to save files
         logger.info("Saving results to file...")
         if hasattr(self.config.data.sets.test.results, 'hofx'):
             save_function = instantiate(self.config.data.sets.test.results.hofx.save)

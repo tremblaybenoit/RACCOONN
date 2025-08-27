@@ -1,11 +1,7 @@
 import torch
 import os
 import numpy as np
-from typing import Callable, Union
-from omegaconf import ListConfig
-
-import inverse
-
+from typing import Callable
 try:
     from inverse.utilities.forward import CRTMForward
     from forward.utilities.logic import get_config_path
@@ -114,7 +110,7 @@ def wasserstein_2_normal(mu_pred, sigma_pred, mu_target, sigma_target):
     return torch.sqrt((mu_pred - mu_target) ** 2 + (sigma_pred - sigma_target) ** 2)
 
 
-def crps1(pred, target, version=0):
+def crps(pred, target, version=0):
     """
     Compute the Continuous Ranked Probability Score (CRPS) loss function.
     This function computes the CRPS for a normal distribution defined by
@@ -166,7 +162,7 @@ class ForwardModel(torch.nn.Module):
 
         Parameters
         ----------
-        prof_norm: Callable. Function to apply normalization to profiles before the forward model.
+        forward_prof_norm: Callable. Function to apply normalization to profiles before the forward model.
 
         Returns
         -------
@@ -214,296 +210,11 @@ class ForwardModel(torch.nn.Module):
         return forward_pred
 
 
-class Forward(torch.nn.Module):
-    """ Forward loss module."""
-    def __init__(self):
-        """ Initialize the Forward module.
-
-        Parameters
-        ----------
-        None.
-
-        Returns
-        -------
-        None.
-        """
-        super().__init__()
-
-        # Loss function
-        self.forward = forward
-
-    def to(self, device):
-        """ Move the module to a specified device.
-
-        Parameters
-        ----------
-        device: torch.device. Device to move the module to.
-        """
-        if hasattr(self.forward, 'to'):
-            self.forward = self.forward.to(device)
-        return self
-
-
-class ForwardMSE(Forward):
-    """ Forward MSE loss module."""
-    def __init__(self):
-        """ Initialize the ForwardMSE module."""
-        super().__init__()
-
-    def __call__(self, forward_in: tuple[torch.Tensor, ...], target):
-        """ Compute Wasserstein-2 distance loss between a forward-modeled prediction and target.
-
-        Parameters
-        ----------
-        forward_in: tuple[torch.Tensor, ...]. Input tensor for the forward model.
-        target: torch.Tensor. Target tensor.
-
-        Returns
-        -------
-        loss: torch.Tensor. Wasserstein-2 distance loss between the forward-modeled prediction and the target.
-        """
-
-        # If the forward model is not available, raise an ImportError
-        if forward is None:
-            raise ImportError("CRTM forward model is not available. Please install the required package.")
-
-        # Apply the forward model to the prediction
-        pred_forward = self.forward(forward_in)
-
-        # Compute MSE loss, accounting for NaN values in the target data
-        return (pred_forward - target) ** 2, pred_forward
-
-
-class ForwardVar(Forward):
-
-    def __init__(self, lambda_b: float = 1.0, lambda_o: float = 1.0):
-        """ Initialize the variance loss module.
-
-        Parameters
-        ----------
-        lambda_b: float. Weight for the background loss.
-        lambda_o: float. Weight for the observation loss.
-        """
-        super().__init__()
-
-        # Parameters for the loss function
-        self.lambda_b = lambda_b
-        self.lambda_o = lambda_o
-
-    def __call__(self, forward_in: tuple[torch.Tensor, ...], prof_pred: torch.Tensor, target: dict):
-        """ Compute variance loss between a prediction and target.
-
-        Parameters
-        ----------
-        forward_in: torch.Tensor. Input tensor for the forward model.
-        prof_pred: torch.Tensor. Predicted profile tensor.
-        target: dict. Dictionary containing target tensors.
-
-        Returns
-        -------
-        loss: torch.Tensor. Variance loss between the prediction and the target.
-        pred_forward: torch.Tensor. Forward-modeled prediction.
-        obs_loss: torch.Tensor. Observation loss component.
-        background_loss: torch.Tensor. Background loss component.
-        """
-
-        # Loss dictionary
-        loss = {'total': torch.tensor(0.0, dtype=torch.float32, device=prof_pred.device), }
-
-        # Apply the forward model to the predicted profiles
-        bt_pred = self.forward(forward_in)
-
-        # Compute observation loss
-        # if self.lambda_o != 0.0:
-        # Extract means and standard deviations from the prediction and target
-        mu_bt_pred, sigma_bt_pred = bt_pred[:, :10], bt_pred[:, 10:]
-        mu_bt_target, sigma_bt_target = target['hofx'][:, :10], target['hofx'][:, 10:]
-
-        # Perform matrix multiplication (assuming a diagonal covariance matrix)
-        loss['obs'] = (mu_bt_target - mu_bt_pred) ** 2 / (sigma_bt_target ** 2 + torch.finfo(torch.float32).eps)
-
-        # Add to total loss
-        loss['total'] += self.lambda_o * torch.nanmean(loss['obs'])
-
-        # Compute model loss
-        # if self.lambda_b != 0.0:
-        # Perform matrix multiplication (assuming a diagonal covariance matrix)
-        # loss['model'] = (prof_pred - target['background']) ** 2 / (target['background_err'] ** 2 + torch.finfo(torch.float32).eps)
-        loss['model'] = (prof_pred - target['background']) ** 2 / (target['background_err'] ** 2 + torch.finfo(torch.float32).eps)
-
-        # Add to total loss
-        loss['total'] += self.lambda_b * torch.nanmean(loss['model'])
-
-        return loss, bt_pred
-
-
-class ForwardVar2(Forward):
-
-    def __init__(self, b_inv: np.ndarray, lambda_b: float=1.0, lambda_o: float=1.0):
-        """ Initialize the variance loss module.
-
-        Parameters
-        ----------
-        b_inv: np.ndarray. Inverse of the background covariance matrix.
-        lambda_b: float. Weight for the background loss.
-        lambda_o: float. Weight for the observation loss.
-        """
-        super().__init__()
-
-        # Parameters for the loss function
-        self.lambda_b = lambda_b
-        self.lambda_o = lambda_o
-        self.b_inv = torch.tensor(b_inv, dtype=torch.float32)
-
-    def __call__(self, forward_in: tuple[torch.Tensor, ...], prof_pred: torch.Tensor, target: dict):
-        """ Compute variance loss between a prediction and target.
-
-        Parameters
-        ----------
-        forward_in: torch.Tensor. Input tensor for the forward model.
-        prof_pred: torch.Tensor. Predicted profile tensor.
-        target: dict. Dictionary containing target tensors.
-
-        Returns
-        -------
-        loss: torch.Tensor. Variance loss between the prediction and the target.
-        pred_forward: torch.Tensor. Forward-modeled prediction.
-        obs_loss: torch.Tensor. Observation loss component.
-        background_loss: torch.Tensor. Background loss component.
-        """
-
-        # Loss dictionary
-        loss = {'total': torch.tensor(0.0, dtype=torch.float32, device=prof_pred.device), }
-
-        # Apply the forward model to the predicted profiles
-        bt_pred = self.forward(forward_in)
-
-        # Compute observation loss
-        # if self.lambda_o != 0.0:
-
-        # Extract means and standard deviations from the prediction and target
-        mu_bt_pred, sigma_bt_pred = bt_pred[:, :10], bt_pred[:, 10:]
-        mu_bt_target, sigma_bt_target = target['hofx'][:, :10], target['hofx'][:, 10:]
-
-        # Perform matrix multiplication (assuming a diagonal covariance matrix)
-        loss['obs'] = (mu_bt_target - mu_bt_pred) ** 2 / (sigma_bt_target ** 2 + torch.finfo(torch.float32).eps)
-
-        # Add to total loss
-        loss['total'] += self.lambda_o * torch.nanmean(loss['obs'])
-
-        # Compute model loss
-        # if self.lambda_b != 0.0:
-
-        # Perform matrix multiplication
-        dx = (prof_pred - target['background']).reshape(target['background'].shape[0], -1)
-        loss['model'] = torch.nanmean(torch.einsum('bi,ij,bj->b', dx, self.b_inv, dx))
-
-        # Add to total loss
-        loss['total'] += self.lambda_b * loss['model']
-
-        return loss, bt_pred
-
-    def to(self, device):
-        """ Move the module to a specified device.
-
-        Parameters
-        ----------
-        device: torch.device. Device to move the module to.
-        """
-        if hasattr(self.forward, 'to'):
-            self.forward = self.forward.to(device)
-        self.b_inv = self.b_inv.to(device)
-        return self
-
-
-class ForwardVar3(Forward):
-
-    def __init__(self, b_inv: np.ndarray, r_inv: np.ndarray, lambda_b: float=1.0, lambda_o: float=1.0):
-        """ Initialize the variance loss module.
-
-        Parameters
-        ----------
-        b_inv: np.ndarray. Inverse of the background covariance matrix.
-        r_inv: np.ndarray. Inverse of the observation covariance matrix.
-        lambda_b: float. Weight for the background loss.
-        lambda_o: float. Weight for the observation loss.
-        """
-        super().__init__()
-
-        # Parameters for the loss function
-        self.lambda_b = lambda_b
-        self.lambda_o = lambda_o
-        self.b_inv = torch.tensor(b_inv, dtype=torch.float32)
-        self.r_inv = torch.tensor(r_inv, dtype=torch.float32)
-
-    def __call__(self, forward_in: tuple[torch.Tensor, ...], prof_pred: torch.Tensor, target: dict):
-        """ Compute variance loss between a prediction and target.
-
-        Parameters
-        ----------
-        forward_in: torch.Tensor. Input tensor for the forward model.
-        prof_pred: torch.Tensor. Predicted profile tensor.
-        target: dict. Dictionary containing target tensors.
-
-        Returns
-        -------
-        loss: torch.Tensor. Variance loss between the prediction and the target.
-        pred_forward: torch.Tensor. Forward-modeled prediction.
-        obs_loss: torch.Tensor. Observation loss component.
-        background_loss: torch.Tensor. Background loss component.
-        """
-
-        # Loss dictionary
-        loss = {'total': torch.tensor(0.0, dtype=torch.float32, device=prof_pred.device),}
-
-        # Apply the forward model to the predicted profiles
-        bt_pred = self.forward(forward_in)
-
-        # Compute observation loss
-        # if self.lambda_o != 0.0:
-
-        # Extract means and standard deviations from the prediction and target
-        mu_bt_pred, sigma_bt_pred = bt_pred[:, :10], bt_pred[:, 10:]
-        mu_bt_target, sigma_bt_target = target['hofx'][:, :10], target['hofx'][:, 10:]
-
-        # Perform matrix multiplication
-        dy = (mu_bt_pred - mu_bt_target).reshape(mu_bt_target.shape[0], -1)
-        loss['obs'] = torch.nanmean(torch.einsum('bi,ij,bj->b', dy, self.r_inv, dy))
-
-        # Add to total loss
-        loss['total'] += self.lambda_o * loss['obs']
-
-        # Compute model loss
-        # if self.lambda_b != 0.0:
-
-        # Perform matrix multiplication
-        dx = (prof_pred - target['prof']).reshape(target['background'].shape[0], -1)
-        loss['model'] = torch.nanmean(torch.einsum('bi,ij,bj->b', dx, self.b_inv, dx))
-
-        # Add to total loss
-        loss['total'] += self.lambda_b * loss['model']
-
-        return loss, bt_pred
-
-    def to(self, device):
-        """ Move the module to a specified device.
-
-        Parameters
-        ----------
-        device: torch.device. Device to move the module to.
-        """
-        if hasattr(self.forward, 'to'):
-            self.forward = self.forward.to(device)
-        self.b_inv = self.b_inv.to(device)
-        self.r_inv = self.r_inv.to(device)
-        return self
-
-
 class VarLoss(torch.nn.Module):
     """ Universal loss module that combines observation and model losses. """
     def __init__(self, loss_obs: Callable, loss_model: Callable = None, loss_bcs: Callable = None,
                  lambda_obs: float=1.0, lambda_model: float=1.0, lambda_bcs: float=1.0,
-                 forward_prof_norm: Callable=None, prof_mask: Callable=None, sanity_check: bool=False):
+                 forward_prof_norm: Callable=None, pressure_filter: Callable=None, sanity_check: bool=False):
         """ Initialize the variational loss module.
 
         Parameters
@@ -515,7 +226,7 @@ class VarLoss(torch.nn.Module):
         lambda_model: float. Weight for the model loss.
         lambda_bcs: float. Weight for the boundary condition loss.
         forward_prof_norm: Callable. Function to apply normalization to profiles before the forward model.
-        prof_mask: Callable. Function to generate a mask for the profile levels to include in the model loss.
+        pressure_filter: Callable. Function to generate a mask for the profile levels to include in the model loss.
         sanity_check: bool. If True, perform a sanity check on the observation losses.
 
         Returns
@@ -531,7 +242,7 @@ class VarLoss(torch.nn.Module):
         # Weighting factors for the losses
         self.lambda_obs, self.lambda_model, self.lambda_bcs = lambda_obs, lambda_model, lambda_bcs
         # Pressure mask per profile type
-        self.prof_mask = torch.Tensor(prof_mask) if prof_mask is not None else None
+        self.pressure_filter = torch.Tensor(pressure_filter) if pressure_filter is not None else None
         # Sanity check flag
         self.sanity_check = sanity_check
 
@@ -551,10 +262,10 @@ class VarLoss(torch.nn.Module):
         """
 
         # Mask
-        if self.prof_mask is not None:
-            prof_mask = target['prof_mask'].to(prof_pred.device)
+        if self.pressure_filter is not None:
+            pressure_filter = self.pressure_filter
         else:
-            prof_mask = torch.ones_like(prof_pred, dtype=torch.bool, device=prof_pred.device)
+            pressure_filter = torch.ones_like(prof_pred, dtype=torch.bool, device=prof_pred.device)
 
         # Compute the forward model output
         bt_pred = self.forward_model(prof_pred, target)
@@ -573,31 +284,26 @@ class VarLoss(torch.nn.Module):
         # Model losses: Some model losses may require additional inputs
         if self.loss_model is not None:
             if getattr(getattr(self.loss_model, "func", self.loss_model), "__name__", None) == 'diagonal_quadratic_form':
-                loss['model'] = self.loss_model(prof_norm[:, prof_mask], target['prof_norm'][:, prof_mask], target['background_err'])
+                loss['model'] = self.loss_model(prof_norm[:, pressure_filter], target['prof'][:, pressure_filter], target['prof_increment'])
             else:
-                loss['model'] = self.loss_model(prof_norm[:, prof_mask], target['prof_norm'][:, prof_mask])
+                loss['model'] = self.loss_model(prof_norm[:, pressure_filter], target['prof'][:, pressure_filter])
             # Total
             loss['total'] += self.lambda_model * torch.nanmean(loss['model'])
 
         # Boundary condition losses (where the variance is zero)
-        if self.loss_bcs is not None:
-            loss['bcs'] = self.loss_bcs(prof_norm[:, ~prof_mask], target['prof_norm'][:, ~prof_mask])
+        if self.loss_bcs is not None and self.pressure_filter is not None:
+            loss['bcs'] = self.loss_bcs(prof_norm[:, ~pressure_filter], target['prof_norm'][:, ~pressure_filter])
             # Total
             loss['total'] += self.lambda_bcs * torch.nanmean(loss['bcs'])
-
-        # Sanity check
-        if self.sanity_check:
-            bt_pred_from_target = self.forward_model(target['prof'], target)
-            if getattr(getattr(self.loss_obs, "func", self.loss_obs), "__name__", None) == 'diagonal_quadratic_form':
-                loss['sanity_check'] = self.loss_obs(bt_pred_from_target[:, :10], target['hofx'][:, :10], target['hofx'][:, 10:])
-            else:
-                loss['sanity_check'] = self.loss_obs(bt_pred_from_target, target['hofx'])
-            bt_pred_from_target = None
 
         return loss, bt_pred
 
     def to(self, device):
         super().to(device)
+        # Forward model
         if hasattr(self.forward_model, 'to'):
             self.forward_model = self.forward_model.to(device)
+        # Pressure filter
+        if self.pressure_filter is not None and hasattr(self.pressure_filter, 'to'):
+            self.pressure_filter = self.pressure_filter.to(device)
         return self

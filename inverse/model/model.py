@@ -148,11 +148,9 @@ class PINNverseOperator(BaseModel):
         """
 
         # Concatenate inputs
-        inputs = torch.cat((x['lat'].view(-1, 1), x['lon'].view(-1, 1), x['scans'].view(-1, 1),
-                            x['pressure'].view(-1, 1)), dim=-1)
+        inputs = torch.cat([v.view(-1, 1) for v in x.values()], dim=-1)
         # Apply positional encoding
         encoded_inputs = self.positional_encoding(inputs)
-
         # Pass through the model
         profiles = self.model(encoded_inputs)
         # Reshape profiles to match the expected output shape
@@ -215,13 +213,6 @@ class PINNverseOperator(BaseModel):
             if loss['obs'].ndim == 2:
                 for i in range(bt_pred.shape[1] // 2):
                     self.log(f"{stage}_loss_obs_{i}", loss['obs'][:, i].mean(), on_epoch=True, prog_bar=False, logger=True)
-        # Log sanity check loss
-        if 'sanity_check' in loss.keys():
-            self.log(f"{stage}_loss_sanity_check", loss['sanity_check'].mean(), on_epoch=True, prog_bar=True, logger=True)
-            # Log individual radiance channels
-            if loss['sanity_check'].ndim == 2:
-                for i in range(bt_pred.shape[1] // 2):
-                    self.log(f"{stage}_loss_sanity_check_{i}", loss['sanity_check'][:, i].mean(), on_epoch=True, prog_bar=False, logger=True)
 
         # If testing, return predictions in addition to loss
         if stage == 'test':
@@ -232,21 +223,20 @@ class PINNverseOperator(BaseModel):
             # Store validation outputs
             self.valid_results['bt_target'].append(y['hofx'].detach().cpu().numpy())
             self.valid_results['bt_pred'].append(bt_pred.detach().cpu().numpy())
-            self.valid_results['prof_target'].append(y['prof'].detach().cpu().numpy()) if 'prof_norm' not in y else (
-                self.valid_results['prof_target'].append(y['prof_norm'].detach().cpu().numpy()))
+            self.valid_results['prof_target'].append(y['prof'].detach().cpu().numpy())
             self.valid_results['prof_pred'].append(prof_pred.detach().cpu().numpy())
             self.valid_results['pressure'].append(x['pressure'].detach().cpu().numpy())
             # Store background and background error if available
-            if 'background' in y:
-                self.valid_results['background'].append(y['background'].detach().cpu().numpy())
-            if 'background_err' in y:
-                self.valid_results['background_err'].append(y['background_err'].detach().cpu().numpy())
+            if 'prof_background' in y:
+                self.valid_results['prof_background'].append(y['prof_background'].detach().cpu().numpy())
+            if 'prof_increment' in y:
+                self.valid_results['prof_increment'].append(y['prof_increment'].detach().cpu().numpy())
         else:
             # Compute L2 norm of the model parameters
             l2_norm = sum((p ** 2).sum() for p in self.parameters() if p.requires_grad)
             self.log(f"{stage}_l2_norm", l2_norm, on_epoch=True, prog_bar=False, logger=True)
 
-    def base_step(self, batch: tuple[dict, dict], batch_nb: int, stage: str) -> torch.Tensor:
+    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
         """ Perform training/validation/test step.
 
             Parameters
@@ -260,21 +250,15 @@ class PINNverseOperator(BaseModel):
             Loss value: tensor.
         """
 
-        # Extract data from batch
-        x, y = batch
-
-        # TODO: Verify handling of mask, clipping, normalization, and unnormalization
-
         # Compute profiles
-        mask = (torch.sigmoid(1e6 * y['prof']) - 0.5) * 2
-        prof_pred_norm = self._retrieve_profiles(x)
-        prof_pred = self.unnormalize_profiles(prof_pred_norm)*mask
+        prof_norm = self._retrieve_profiles(batch['coordinates'])
+        prof_pred = self.unnormalize_profiles(prof_norm)
 
         # Compute loss function
-        loss, bt_pred = self.loss_func((self.normalize_crtm_profiles(prof_pred), x['surf'], x['meta']), prof_pred_norm, y)
+        loss, bt_pred = self.loss_func(prof_norm, prof_pred, batch['targets'])
 
         # Logging
-        self._logging(x, y, stage, loss, prof_pred_norm, bt_pred)
+        self._logging(batch['coordinates'], batch['targets'], stage, loss, prof_norm, bt_pred)
 
         return loss['total']
 
@@ -315,86 +299,14 @@ class PINNverseOperator(BaseModel):
                     if isinstance(v, torch.Tensor):
                         d[k] = v.to(device)
         # Move normalization modules if needed
-        for attr in ['normalize_profiles', 'unnormalize_profiles', 'normalize_crtm_profiles']:
+        for attr in ['normalize_profiles', 'unnormalize_profiles']:
             norm = getattr(self, attr, None)
             if hasattr(norm, 'to'):
                 setattr(self, attr, norm.to(device))
         return self
 
 
-class PINNverseOperatorMulti(PINNverseOperator):
-    """Physics-Informed Neural Network (PINN) inverse model with one neural network per profile type."""
-
-    def __init__(self, optimizer: DictConfig = None, loss_func: Callable = None, lr_scheduler: DictConfig = None,
-                 positional_encoding: Callable = None, activation_in: Callable = None, activation_out: Callable = None,
-                 transform: Callable = None, inverse_transform: Callable = None, clip: Callable = None,
-                 parameters: DictConfig = None, log_valid: bool = False):
-        """
-        Initialize model.
-
-        Parameters
-        ----------
-        optimizer: Callable. Optimizer for the model.
-        loss_func: Callable. Loss function for the model.
-        lr_scheduler: Callable. Learning rate scheduler for the model.
-        positional_encoding: Callable. Function for the positional encoding.
-        activation_in: Callable. Activation function (in).
-        activation_out: Callable. Activation function (out).
-        transform: Callable. Normalization transformation.
-        inverse_transform: Callable. Unnormalization transformation.
-        clip: Callable. Clipping function for the model outputs.
-        parameters: DictConfig. Configuration for the model parameters.
-        log_valid: bool. Whether to log validation results.
-
-        Returns
-        -------
-        None.
-        """
-
-        # Inherit all attributes and logic from PINNverseOperator
-        super().__init__(optimizer=optimizer, loss_func=loss_func, lr_scheduler=lr_scheduler,
-                         positional_encoding=positional_encoding, activation_in=activation_in,
-                         activation_out=activation_out, transform=transform, inverse_transform=inverse_transform,
-                         clip=clip, parameters=parameters, log_valid=log_valid)
-
-        # Replace the single model with a list of models, one per profile type
-        self.models = nn.ModuleList([
-            self._build_model(
-                positional_encoding, activation_in, activation_out, self._patch_profiles(deepcopy(parameters))
-            )
-            for _ in range(self.n_profiles)
-        ])
-
-    def _patch_profiles(self, parameters):
-        """Set n_profiles=1 in parameters for sub-model construction."""
-        parameters.data.n_profiles = 1
-        return parameters
-
-    def forward(self, x: dict) -> torch.Tensor:
-        """
-        Pass forward through all neural networks, one per profile type.
-
-        Parameters
-        ----------
-        x: dict. Inputs: latitude, longitude, surface, and the metadata.
-
-        Returns
-        -------
-        y: tensor. Outputs: predicted profiles for all types, concatenated.
-        """
-        # Concatenate inputs
-        inputs = torch.cat((x['lat'].view(-1, 1), x['lon'].view(-1, 1), x['scans'].view(-1, 1),
-                            x['pressure'].view(-1, 1)), dim=-1)
-        # Apply positional encoding
-        encoded_inputs = self.positional_encoding(inputs)
-        # Each model predicts its profile type
-        outputs = [model(encoded_inputs) for model in self.models]
-
-        # Concatenate outputs along the last dimension
-        return torch.cat(outputs, dim=-1)
-
-
-class PINNverseOperatorMulti2(PINNverseOperator):
+class PINNverseOperators(PINNverseOperator):
     """Physics-Informed Neural Network (PINN) inverse model with one neural network per profile type."""
 
     def __init__(self, optimizer: DictConfig = None, loss_func: Callable = None, lr_scheduler: DictConfig = None,
@@ -454,14 +366,13 @@ class PINNverseOperatorMulti2(PINNverseOperator):
         -------
         y: tensor. Outputs: predicted profiles for all types, concatenated.
         """
+
         # Concatenate inputs
         inputs = torch.cat([v.view(-1, 1) for v in x.values()], dim=-1)
         # Apply positional encoding
         encoded_inputs = self.positional_encoding(inputs)
         # Each model predicts its profile type
         outputs = [model(encoded_inputs) for model in self.models]
-
-        # Concatenate outputs along the last dimension
         return outputs
 
     def _retrieve_profiles(self, x: dict):
@@ -481,29 +392,3 @@ class PINNverseOperatorMulti2(PINNverseOperator):
         x_vector = {k: v.repeat_interleave(n_levels, dim=0) if k != 'pressure' else x['pressure'].reshape(-1, 1)
                     for k, v in x.items()}
         return torch.cat([output.view(-1, 1, n_levels) for output in self.forward(x_vector)], dim=1)
-
-    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
-        """ Perform training/validation/test step.
-
-            Parameters
-            ----------
-            batch: tensor. Batch from the training set.
-            batch_nb: int. Index of the batch out of the training set.
-            stage: str. Current operation: "train", "valid", or "test".
-
-            Returns
-            -------
-            Loss value: tensor.
-        """
-
-        # Compute profiles
-        prof_norm = self._retrieve_profiles(batch['coordinates'])
-        prof_pred = self.unnormalize_profiles(prof_norm)
-
-        # Compute loss function
-        loss, bt_pred = self.loss_func(prof_norm, prof_pred, batch['targets'])
-
-        # Logging
-        self._logging(batch['coordinates'], batch['targets'], stage, loss, prof_norm, bt_pred)
-
-        return loss['total']
