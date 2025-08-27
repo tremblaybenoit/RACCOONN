@@ -3,6 +3,11 @@
 
 # Location of the data directory  # TODO: Maybe remove this line
 dir: ${paths.data_dir}
+dtype:
+  numpy:
+    _target_: numpy.float64  # Data type for arrays
+  torch:
+    _target_: torch.float64  # Data type for tensors
 
 
 # Configuration for the variables used in the data loader.
@@ -15,7 +20,15 @@ vars:
       _target_: numpy.load
       _args_:
         - ${paths.data_dir}/Test2/prof.npy
-    normalization: ${model.transform}
+    normalization:
+      _target_: inverse.data.transformations.min_max
+      _partial_: true
+      stats:
+        _target_: inverse.data.statistics.read_statistics_var
+        _args_:
+          - ${data.preparation.statistics.output.path}
+          - 'prof'
+      axis: null  # Axis for normalization
   surf:
     type: ['Ice area fraction', 'Land area fraction', 'Land type', 'Leaf area index', 'Soil temperature',
            'Snow area fraction', 'Snow thickness', 'Soil temperature',
@@ -56,15 +69,18 @@ vars:
     load:
       _target_: numpy.load
       _args_:
-        - ${paths.data_dir}/Test2/hofx.npy
-    normalization:
-      _target_: forward.data.transformations.identity
-      _partial_: true
+        - ${paths.data_dir}/Test2/hofx_lightning.npy
   lat:
     load:
       _target_: numpy.load
       _args_:
         - ${paths.data_dir}/Test2/lat.npy
+    normalization:
+      _target_: inverse.data.transformations.min_max
+      _partial_: true
+      stats:
+        min: -90.0
+        max: 90.0
   lon:
     load:
       _target_: numpy.load
@@ -75,59 +91,74 @@ vars:
       _target_: numpy.loadtxt
       _args_:
         - ${paths.data_dir}/Test2/scans.txt
+    normalization:
+      _target_: inverse.data.transformations.min_max
+      _partial_: true
+      stats:
+        min: 9.0
+        max: 180.0
+        mean: 88.57895
+        stdev: 54.53759
   pressure:
     load:
       _target_: numpy.load
       _args_:
         - ${paths.data_dir}/Test2/pressure.npy
-  background:
+    normalization:
+      _target_: inverse.data.transformations.min_max
+      _partial_: true
+      stats:
+        min: 0.012935171
+        max: 928.14125
+        mean: 386.31695
+        stdev: 344.8104
+  hofx_innovation:
     load:
-      _target_: inverse.data.covariance.spatiotemporal_mean
-      _args_:
-        - ${data.vars.prof.load}
+      _target_: inverse.data.covariance.innovation_uncertainty
+      data: ${data.vars.hofx.load}
+  prof_background:
+    load:
+      _target_: inverse.data.covariance.background_climatology
+      data: ${data.vars.prof.load}
+      cloud_filter: ${data.vars.cloud_filter.load}
     normalization: ${data.vars.prof.normalization}
-  background_err:
+  prof_increment:  # Note: It applies normalization to the data as specified in the data configuration.
     load:
-      _target_: inverse.data.covariance.compute_err
-      _args_:
-        - ${data.vars.prof.load}
-        - ${data.vars.background.load}
-      normalization:
-        _target_: forward.data.transformations.max
-        _partial_: true
+      _target_: inverse.data.covariance.background_increment
+      config_true: ${data.vars.prof}
+      config_background: ${data.vars.prof_background}
   pressure_filter:
     load:
       _target_: inverse.data.filters.pressure_filter
-      _args_:
-        - ${data.vars.prof.load}
+      prof: ${data.vars.prof.load}
   cloud_filter:
     load:
       _target_: inverse.data.filters.cloud_filter
-      _args_:
-        - ${data.vars.prof.load}
+      prof: ${data.vars.prof.load}
 
 
 # Preparation steps to be executed before training or evaluation.
 preparation:
   statistics:
-    input: ${data.vars}
+    input:
+      vars: ${data.vars}
+      cloud_filter: ${data.vars.cloud_filter}
     output:
-      path: ${paths.data_dir}/normalization/stats.pkl
+      path: ${paths.data_dir}/normalization/stats_cloud_filter.pkl
       type: file
   covariance:
     model:
       input:
-        prof: ${data.vars.prof}
-        background: ${data.vars.background}
-        cloud_filter: ${data.loader.sets.split.cloud_filter}
+        err: ${data.vars.prof_increment}
+        cloud_filter: ${data.vars.cloud_filter}
         pressure_filter: ${data.vars.pressure_filter}
       output:
         path: ${paths.data_dir}/normalization/model_covariance_cloud_filter_pressure_filter.npy
         type: file
     observation:
       input:
-          hofx: ${data.vars.hofx}
-          cloud_filter: ${data.loader.sets.split.cloud_filter}
+        err: ${data.vars.hofx_innovation}
+        cloud_filter: ${data.vars.cloud_filter}
       output:
         path: ${paths.data_dir}/normalization/observation_covariance_cloud_filter.npy
         type: file
@@ -154,68 +185,6 @@ loader:
       surf: ${data.vars.surf}
       meta: ${data.vars.meta}
       hofx: ${data.vars.hofx}
-      background: ${data.vars.background}
+      prof_background: ${data.vars.prof_background}
+      prof_increment: ${data.vars.prof_increment}
     # outputs:
-
-
-# Configuration for the data loader that handles the dataset splits.
-# loader:
-#   _target_: forward.model.data_loader.VarDataloader
-#   batch_size: 32  # Batch size for training
-#   num_workers: 1  # Number of workers for data loading
-#   sets:
-#     train:
-#       split:
-#         range: 0:256608
-#         cloud_filter: ${data.vars.cloud_filter}
-#       prof_type: ${data.vars.prof.type}  # Type of profile to use
-#       coordinates:
-#         lat: ${data.vars.lat}
-#         lon: ${data.vars.lon}
-#         scans: ${data.vars.scans}
-#         pressure: ${data.vars.pressure}
-#       targets:
-#         prof: ${data.vars.prof}
-#         surf: ${data.vars.surf}
-#         meta: ${data.vars.meta}
-#         hofx: ${data.vars.hofx}
-#         background: ${data.vars.background}
-#     valid:
-#       split:
-#         range: 256608:341240
-#         cloud_filter: ${data.loader.sets.train.split.cloud_filter}
-#       prof_type: ${data.loader.train.prof_type}
-#       coordinates: ${data.loader.train.coordinates}
-#       targets: ${data.loader.train.targets}
-#     test:
-#       split:
-#         range: 341240:426872
-#         cloud_filter: ${data.loader.sets.train.split.cloud_filter}
-#       prof_type: ${data.loader.train.prof_type}
-#       coordinates: ${data.loader.train.coordinates}
-#       targets: ${data.loader.train.targets}
-#       results:
-#         hofx:
-#           save:
-#             _target_: numpy.save
-#             _partial_: true
-#             _args_:
-#               - ${paths.checkpoint_dir}/${task_name}_test_hofx.npy
-#           load:
-#             _target_: numpy.load
-#             _args_:
-#               - ${paths.checkpoint_dir}/${task_name}_test_hofx.npy
-#           normalization: ${vars.hofx.normalization}
-#         prof:
-#           save:
-#             _target_: numpy.save
-#             _partial_: true
-#             _args_:
-#               - ${paths.checkpoint_dir}/${task_name}_test_prof.npy
-#           load:
-#             _target_: numpy.load
-#             _args_:
-#               - ${paths.checkpoint_dir}/${task_name}_test_prof.npy
-#     pred:
-#       prof_type: ${data.vars.prof.type}  # Type of profile to use
-#       coordinates: ${data.loader.train.coordinates}

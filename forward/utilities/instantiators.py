@@ -1,4 +1,4 @@
-from typing import List, Union, Callable
+from typing import List, Union, Callable, Any
 import hydra
 from pytorch_lightning import Callback
 from pytorch_lightning.loggers import Logger
@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def instantiate(config: Union[DictConfig, Callable], **kwargs):
+def instantiate(config: Any, **kwargs):
     """ Instantiate data module or module from config.
 
         Parameters
@@ -44,12 +44,8 @@ def instantiate(config: Union[DictConfig, Callable], **kwargs):
 
         # If not partial, return the callable object
         return config(**kwargs)
-
-    # If neither DictConfig nor callable object is provided
     else:
-        # Log error
-        logger.error("Config must be a DictConfig or a callable object!")
-        raise TypeError("Config must be a DictConfig or a callable object!")
+        return config
 
 
 def instantiate_list(config_list: DictConfig, obj_type: str, **kwargs) -> List[Union[Callback, Logger]]:

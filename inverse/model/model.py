@@ -82,10 +82,6 @@ class PINNverseOperator(BaseModel):
         self.normalize_profiles = transform
         self.unnormalize_profiles = inverse_transform
         # Normalize profiles prior to inputting to CRTM emulator
-        self.stats_crtm_profiles = {'min': torch.tensor(parameters.data.prof_min, dtype=torch.float64),
-                                    'max': torch.tensor(parameters.data.prof_max, dtype=torch.float64)}
-        self.normalize_crtm_profiles = NormalizeProfiles(self.stats_crtm_profiles['min'], self.stats_crtm_profiles['max'],
-                                                         inverse_transform=False)
 
         # Model architecture
         self.n_profiles = parameters.data.n_profiles
@@ -110,7 +106,7 @@ class PINNverseOperator(BaseModel):
         """
 
         # Positional encoding
-        d_input = (parameters.data.n_lat + parameters.data.n_lon + parameters.data.n_scans + parameters.data.n_pressure + parameters.data.n_clrsky)
+        d_input = (parameters.data.n_lat + parameters.data.n_lon + parameters.data.n_scans + parameters.data.n_pressure + parameters.data.n_cloud)
         self.positional_encoding = instantiate(positional_encoding, d_input=d_input)
         # Input layer
         self.d_in = nn.Linear(self.positional_encoding.d_output, parameters.architecture.n_neurons)

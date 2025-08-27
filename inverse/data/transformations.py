@@ -190,8 +190,8 @@ def min_max(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transfor
                       stats['min'].min(axis=axis, keepdims=True), inverse_transform=not inverse_transform)
 
 
-def max(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform: bool = False, axis=None)
-    -> Union[np.ndarray, torch.Tensor]:
+def max(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform: bool = False, axis=None)\
+        -> Union[np.ndarray, torch.Tensor]:
     """ Divide dataset by its maximum value.
 
         Parameters
@@ -288,5 +288,3 @@ def clip(data: Union[np.ndarray, torch.Tensor], stats: Dict) \
         min_value = min_value.expand_as(data)
         max_value = max_value.expand_as(data)
         return torch.clamp(data, min=min_value, max=max_value)
-    else:
-        raise TypeError("Unsupported data type. Expected numpy array or torch tensor.")

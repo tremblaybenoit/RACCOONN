@@ -177,31 +177,24 @@ def compute_statistics(config: DictConfig, variables: List[str]) -> None:
         None.
     """
 
-    # Filter clearsky or not
-    clrsky = None
-    if hasattr(config, 'clrsky_filter'):
-        if config.clrsky_filter:
-            # Load profiles
-            prof = np.array(instantiate(config.input.data['prof'].load)).astype(np.float32)
-            # Find indices of clear-sky profiles
-            clrsky = np.logical_and(prof[:, 5, :].sum(axis=1) == 0, prof[:, 6, :].sum(axis=1) == 0)
-            clrsky = np.logical_and(clrsky, prof[:, 7, :].sum(axis=1) == 0)
+    # Filter out clearsky or not
+    cloud_filter = instantiate(config['input']['cloud_filter']['load']) if hasattr(config['input'], 'cloud_filter') else None
 
     # Compute statistics per variable
     stats = {}
     # Loop sequentially for memory efficiency (over speed)
     for v, variable in enumerate(variables):
         # Load data
-        data = np.array(instantiate(config.input.data[variable].load)).astype(np.float32)
+        data = np.array(instantiate(config.input.vars[variable].load)).astype(np.float32)
         # Compute statistics per height
         logger.info(f"Computing statistics of variable {variable} ({v + 1}/{len(variables)})...")
-        if variable in ['prof', 'surf', 'meta', 'hofx'] and clrsky is not None:
-            stats[variable] = statistics(data[~clrsky, ...], axis=0)
+        if variable in ['prof', 'surf', 'meta', 'hofx'] and cloud_filter is not None:
+            stats[variable] = statistics(data[cloud_filter, ...], axis=0)
         else:
             stats[variable] = statistics(data, axis=0)
 
     # Save statistics to file
-    with open(config.output.data.path, 'wb') as file:
+    with open(config.output.path, 'wb') as file:
         # noinspection PyTypeChecker
         pickle.dump(stats, file)
     # Clear memory
@@ -225,10 +218,10 @@ def main(config: DictConfig) -> None:
     """
 
     # If statistics is part of the radiance preparation steps:
-    if hasattr(config.data.sets.preparation, "statistics"):
+    if hasattr(config.data.preparation, "statistics"):
         logger.info("Computing statistics of data...")
         # Compute radiance statistics per filter per instrument
-        compute_statistics(config.data.sets.preparation.statistics,
+        compute_statistics(config.data.preparation.statistics,
                            variables=['prof', 'surf', 'meta', 'hofx', 'lat', 'lon', 'scans', 'pressure'])
 
     return

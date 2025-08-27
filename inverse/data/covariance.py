@@ -4,17 +4,32 @@ from omegaconf import DictConfig
 from forward.utilities.instantiators import instantiate
 from forward.utilities.logic import get_config_path
 from inverse.utilities.plot import plot_map, save_plot, flexible_gridspec
-import os
 from inverse.data.transformations import identity
 
 
-def spatiotemporal_mean(prof: np.ndarray, cloud_filter: np.ndarray=None, axis: int=0, keepdims: bool=True) \
+def innovation_uncertainty(data: np.ndarray) -> np.ndarray:
+    """ Return uncertainy estimation of the radiance data.
+
+        Parameters
+        ----------
+        data: np.ndarray. Radiances of shape (n_samples, n_channels).
+
+        Returns
+        -------
+        np.ndarray. Spatiotemporal standard deviation of the dataset.
+    """
+
+    # Return the standard deviation (last 10 values)
+    return data[:, 10:]
+
+
+def background_climatology(data: np.ndarray, cloud_filter: np.ndarray=None, axis: int=0, keepdims: bool=True) \
         -> np.ndarray:
     """ Compute spatiotemporal mean of a given dataset.
 
         Parameters
         ----------
-        prof: np.ndarray. Input profiles of shape (n_samples, n_profiles, n_levels).
+        data: np.ndarray. Input profiles of shape (n_samples, n_profiles, n_levels).
         cloud_filter: np.ndarray or None. Boolean mask to filter out clear-sky profiles.
         axis: int or tuple of int. Axis or axes along which the means are computed.
         keepdims: bool. If True, the reduced axes are left in the result as dimensions with size one.
@@ -26,144 +41,83 @@ def spatiotemporal_mean(prof: np.ndarray, cloud_filter: np.ndarray=None, axis: i
 
     # Apply cloud filter if provided
     if cloud_filter is not None:
-        prof = prof[cloud_filter]
+        data = data[cloud_filter]
 
     # Compute mean
-    return np.mean(prof, axis=axis, keepdims=keepdims).astype(np.float64)
+    return np.mean(data, axis=axis, keepdims=keepdims).astype(np.float64)
 
 
-def compute_err(xt: np.ndarray, xb: np.ndarray, cloud_filter: np.ndarray=None) -> np.ndarray:
+def background_increment(config_true: DictConfig, config_background: DictConfig,
+                         cloud_filter: np.ndarray=None) -> np.ndarray:
     """ Compute error between ground truth and background.
 
         Parameters
         ----------
-        xt: np.ndarray. Ground truth profiles of shape (n_samples, n_profiles, n_levels).
-        xb: np.ndarray. Background profiles of shape (n_samples, n_profiles, n_levels).
+        config_true: DictConfig. Configuration for the ground truth dataset.
+        config_background: DictConfig. Configuration for the background dataset.
+        cloud_filter: np.ndarray or None. Boolean mask to filter out clear-sky profiles.
 
         Returns
         -------
         np.ndarray. Error between ground truth and background.
     """
 
-    # Apply cloud filter if provided
-    if cloud_filter is not None:
-        xb = xb[cloud_filter] if xb.shape[0] == xt.shape[0] else xb
-        xt = xt[cloud_filter]
-
-    return (xb - xt).astype(np.float64)
-
-# TODO: Make generic covariance matrix function with ground truth, background, and error inputs
-# TODO: Decide on computation of error in the context of observations
-def r_covariance_matrix(config: DictConfig, plot_flag: bool = True) -> None:
-    """ Compute statistics of a given dataset.
-
-        Parameters
-        ----------
-        config: DictConfig. Main hydra configuration file containing all model hyperparameters.
-        plot_flag: bool. If True, plot the covariance matrix.
-
-        Returns
-        -------
-        None.
-    """
-
-    # Ground truth
-    f_norm = instantiate(config['input']['hofx']['normalization']) \
-        if hasattr(config['input']['hofx'], 'normalization') else identity
-    yt = f_norm(np.array(instantiate(config['input']['hofx']['load']), dtype=np.float64))
-
-    # Simulated observations
-    f_norm = instantiate(config['input']['hofx']['normalization']) \
-        if hasattr(config['input']['hofx'], 'normalization') else identity
-    yb = f_norm(np.array(instantiate(config['input']['hofx']['load']), dtype=np.float64))
-
-    # Cloud filter
-    if hasattr(config['input'], 'cloud_filter'):
-        cloud_filter = instantiate(config['input']['cloud_filter']['load'])
-        yb = yb[cloud_filter] if yb.shape[0] == yt.shape[0] else yb
-        yt = yt[cloud_filter]
-
-    # Compute error
-    y_err = yt - yb
-    rr = np.cov(y_err - np.mean(y_err, axis=0), rowvar=False)
-    rr_inv = np.linalg.inv(rr).astype(np.float32)
-
-    # Save statistics to file
-    filename = config['output']['path']
-    np.save(config['output']['path'], rr_inv)
-
-    # Plot covariance matrix if required
-    if plot_flag:
-        # From n_profiles, determine optimal layout for flexible_gridspec
-        n_rows, n_cols = 1, 1
-        # Create a flexible gridspec
-        list_cols = [n_cols for _ in range(n_rows)]
-        fig, get_axes = flexible_gridspec(list_cols, cell_width=4, cell_height=4)
-        ax = get_axes(0, 0)
-        # Plot covariance matrix
-        plot_map(ax, rr_inv, title=f"Covariance matrix of profiles", img_range=(-1000, 1000), plt_origin='upper')
-        save_plot(fig, filename=filename.replace('.npy', '.png'))
-
-    return
-
-
-def b_covariance_matrix(config: DictConfig, plot_flag: bool=True) -> None:
-    """ Compute statistics of a given dataset.
-
-        Parameters
-        ----------
-        config: DictConfig. Main hydra configuration file containing all model hyperparameters.
-        plot_flag: bool. If True, plot the covariance matrix.
-
-        Returns
-        -------
-        None.
-    """
-
-    # Ground truth
-    f_norm = instantiate(config['input']['prof']['normalization']) \
-        if hasattr(config['input']['prof'], 'normalization') else identity
-    xt = f_norm(np.array(instantiate(config['input']['prof']['load']), dtype=np.float32))
+    # Truth
+    f_norm = config_true['normalization'] if hasattr(config_true, 'normalization') else identity
+    xt = f_norm(np.array(config_true['load'], dtype=np.float64))
 
     # Background
-    f_norm = instantiate(config['input']['background']['normalization']) \
-        if hasattr(config['input']['background'], 'normalization') else identity
-    xb = f_norm(np.array(instantiate(config['input']['background']['load']), dtype=np.float32))
+    f_norm = config_background['normalization'] if hasattr(config_background, 'normalization') else identity
+    xb = f_norm(np.array(config_background['load'], dtype=np.float64))
+
+    # Apply cloud filter if provided
+    if cloud_filter is not None:
+        xt = xt[cloud_filter] if xt.shape[0] == xb.shape[0] else xt
+        xb = xb[cloud_filter]
+
+    return xt - xb
+
+
+def covariance_matrix(config: DictConfig, plot_flag: bool=True, recenter: bool=True) -> None:
+    """ Compute statistics of a given dataset.
+
+        Parameters
+        ----------
+        config: DictConfig. Main hydra configuration file containing all model hyperparameters.
+        plot_flag: bool. If True, plot the covariance matrix.
+        recenter: bool. If True, recenter the error by removing the mean.
+
+        Returns
+        -------
+        None.
+    """
+
+    # Error
+    f_norm = instantiate(config['input']['err']['normalization']) \
+        if hasattr(config['input']['err'], 'normalization') else identity
+    err = f_norm(np.array(instantiate(config['input']['err']['load']), dtype=np.float64))
 
     # Cloud filter
     if hasattr(config['input'], 'cloud_filter'):
         cloud_filter = instantiate(config['input']['cloud_filter']['load'])
-        xb = xb[cloud_filter] if xb.shape[0] == xt.shape[0] else xb
-        xt = xt[cloud_filter]
+        err = err[cloud_filter]
 
-    # Pressure filter
-    if hasattr(config['input'], 'pressure_filter'):
-        breakpoint()
-        pressure_filter = instantiate(config['input']['pressure_filter']['load'])
-        xb = xb[:, pressure_filter]
-        xt = xt[:, pressure_filter]
-
-    # Compute error
-    xb_err = xb - xt
-
-    # Background error
-    f_norm = instantiate(config['input']['background_err']['normalization']) \
-        if hasattr(config['input']['background_err'], 'normalization') else identity
-    xb_err = f_norm(np.array(instantiate(config['input']['background_err']['load']), dtype=np.float64))
-
-    # Pressure filter
+    # Pressure filter (background only)
     if hasattr(config['input'], 'pressure_filter'):
         pressure_filter = instantiate(config['input']['pressure_filter']['load'])
-        xb_err = xb_err[:, pressure_filter]
+        err = err[:, pressure_filter]
 
     # Compute covariance matrix
-    bb = np.cov(xb_err.reshape(xt.shape[0], -1) - np.mean(xb_err, axis=0).reshape(1, -1), rowvar=False)
+    if recenter:
+        cov = np.cov(err.reshape(err.shape[0], -1) - np.mean(err, axis=0).reshape(1, -1), rowvar=False)
+    else:
+        cov = np.cov(err.reshape(err.shape[0], -1), rowvar=False)
     # Compute inverse covariance matrix
-    bb_inv = np.linalg.inv(bb).astype(np.float64)
+    cov_inv = np.linalg.inv(cov).astype(np.float64)
 
     # Save statistics to file
     filename = config['output']['path']
-    np.save(config['output']['path'], bb_inv)
+    np.save(config['output']['path'], cov_inv)
 
     # Plot covariance matrix if required
     if plot_flag:
@@ -174,7 +128,7 @@ def b_covariance_matrix(config: DictConfig, plot_flag: bool=True) -> None:
         fig, get_axes = flexible_gridspec(list_cols, cell_width=4, cell_height=4)
         ax = get_axes(0, 0)
         # Plot covariance matrix
-        plot_map(ax, bb_inv, title=f"Covariance matrix of profiles", img_range=(-1000, 1000), plt_origin='upper')
+        plot_map(ax, cov_inv, title=f"Covariance matrix of profiles", img_range=(-10000, 10000), plt_origin='upper')
         save_plot(fig, filename=filename.replace('.npy', '.png'))
 
     return
@@ -194,9 +148,11 @@ def main(config: DictConfig) -> None:
     None.
     """
 
-    # Compute background covariance matrix
-    b_covariance_matrix(config.data.preparation.covariance.model)
-    r_covariance_matrix(config.data.preparation.covariance.observation)
+    # Compute model and observation covariance matrices
+    if hasattr(config.data.preparation.covariance, 'model'):
+        covariance_matrix(config.data.preparation.covariance.model)
+    if hasattr(config.data.preparation.covariance, 'observation'):
+        covariance_matrix(config.data.preparation.covariance.observation)
 
     return
 
