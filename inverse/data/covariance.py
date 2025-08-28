@@ -5,6 +5,12 @@ from forward.utilities.instantiators import instantiate
 from forward.utilities.logic import get_config_path
 from inverse.utilities.plot import plot_map, save_plot, flexible_gridspec
 from inverse.data.transformations import identity
+import os
+import logging
+
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 
 def innovation_uncertainty(data: np.ndarray) -> np.ndarray:
@@ -93,34 +99,42 @@ def covariance_matrix(config: DictConfig, plot_flag: bool=True, recenter: bool=T
     """
 
     # Error
-    f_norm = instantiate(config['input']['err']['normalization']) \
-        if hasattr(config['input']['err'], 'normalization') else identity
-    err = f_norm(np.array(instantiate(config['input']['err']['load']), dtype=np.float64))
+    logger.info("Loading data...")
+    f_norm = instantiate(config['input']['vars']['err']['normalization']) \
+        if hasattr(config['input']['vars']['err'], 'normalization') else identity
+    err = f_norm(np.array(instantiate(config['input']['vars']['err']['load']), dtype=np.float64))
 
     # Cloud filter
     if hasattr(config['input'], 'cloud_filter'):
+        logger.info("Applying cloud filter...")
         cloud_filter = instantiate(config['input']['cloud_filter']['load'])
         err = err[cloud_filter]
 
     # Pressure filter (background only)
     if hasattr(config['input'], 'pressure_filter'):
+        logger.info("Applying pressure filter...")
         pressure_filter = instantiate(config['input']['pressure_filter']['load'])
         err = err[:, pressure_filter]
 
     # Compute covariance matrix
     if recenter:
+        logger.info("Computing covariance matrix with recentered data...")
         cov = np.cov(err.reshape(err.shape[0], -1) - np.mean(err, axis=0).reshape(1, -1), rowvar=False)
     else:
+        logger.info("Computing covariance matrix...")
         cov = np.cov(err.reshape(err.shape[0], -1), rowvar=False)
     # Compute inverse covariance matrix
+    logger.info("Computing inverse covariance matrix...")
     cov_inv = np.linalg.inv(cov).astype(np.float64)
 
     # Save statistics to file
-    filename = config['output']['path']
-    np.save(config['output']['path'], cov_inv)
+    logger.info("Saving inverse covariance matrix to file...")
+    save_func = instantiate(config['output']['save'])
+    save_func(cov_inv)
 
     # Plot covariance matrix if required
     if plot_flag:
+        logger.info("Plotting inverse covariance matrix...")
         # From n_profiles, determine optimal layout for flexible_gridspec
         n_rows, n_cols = 1, 1
         # Create a flexible gridspec
@@ -129,7 +143,7 @@ def covariance_matrix(config: DictConfig, plot_flag: bool=True, recenter: bool=T
         ax = get_axes(0, 0)
         # Plot covariance matrix
         plot_map(ax, cov_inv, title=f"Covariance matrix of profiles", img_range=(-10000, 10000), plt_origin='upper')
-        save_plot(fig, filename=filename.replace('.npy', '.png'))
+        save_plot(fig, filename=os.path.splitext(config['output']['path'])[0] + '.png')
 
     return
 
@@ -149,10 +163,12 @@ def main(config: DictConfig) -> None:
     """
 
     # Compute model and observation covariance matrices
-    if hasattr(config.data.preparation.covariance, 'model'):
-        covariance_matrix(config.data.preparation.covariance.model)
-    if hasattr(config.data.preparation.covariance, 'observation'):
-        covariance_matrix(config.data.preparation.covariance.observation)
+    if hasattr(config.data.preparation, 'covariance_model'):
+        logger.info("Computing model covariance matrix...")
+        covariance_matrix(config.data.preparation.covariance_model)
+    if hasattr(config.data.preparation, 'covariance_observation'):
+        logger.info("Computing observation covariance matrix...")
+        covariance_matrix(config.data.preparation.covariance_observation)
 
     return
 

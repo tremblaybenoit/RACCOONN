@@ -1,4 +1,4 @@
-from typing import Union, Dict, List
+from typing import Union
 import numpy as np
 import pickle
 import torch
@@ -13,7 +13,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def read_statistics(filename: str, tensor: bool = False) -> Dict:
+def read_statistics(filename: str, tensor: bool = False) -> dict:
     """ Read statistics from a file.
 
         Parameters
@@ -39,7 +39,7 @@ def read_statistics(filename: str, tensor: bool = False) -> Dict:
     return stats
 
 
-def read_statistics_var(filename: str, var: str, tensor: bool = False) -> Dict:
+def read_statistics_var(filename: str, var: str, tensor: bool = False) -> dict:
     """ Read statistics of a specific variable from a file.
 
         Parameters
@@ -65,8 +65,8 @@ def read_statistics_var(filename: str, var: str, tensor: bool = False) -> Dict:
     return stats
 
 
-def combine_statistics(stats: List[Dict[str, Union[np.ndarray, int]]]) \
-        -> Dict[str, Union[np.ndarray, torch.Tensor]]:
+def combine_statistics(stats: list[dict[str, Union[np.ndarray, int]]]) \
+        -> dict[str, Union[np.ndarray, torch.Tensor]]:
     """ Combine statistics of multiple datasets based on the mathematical definition of mean, var, stdev, etc.
         The datasets make come from different sources, e.g. different instruments, different heights, etc.
         Thus, they may have been computed from a different number of samples.
@@ -98,45 +98,8 @@ def combine_statistics(stats: List[Dict[str, Union[np.ndarray, int]]]) \
     return combined_stats
 
 
-def statistics_positive(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = None) \
-        -> Dict[str, Union[np.ndarray, torch.Tensor]]:
-    """ Compute statistics of a given dataset for non-zero values (unless it's all zeros).
-
-        Parameters
-        ----------
-        data: np.ndarray or torch.Tensor. Dataset to compute statistics on.
-        axis: int or tuple. Axis to compute statistics along.
-
-        Returns
-        -------
-        Dictionary containing statistics of the dataset.
-    """
-
-    # Convert torch tensor to numpy array
-    if isinstance(data, torch.Tensor):
-        data = data.cpu().numpy()
-
-    # Replace zeros with NaN to avoid computing statistics on them
-    data = np.where(data <= 0, np.nan, data)
-
-    # Create dictionary to store statistics
-    stats = {"mean": np.nanmean(data, axis=axis), "stdev": np.nanstd(data, axis=axis),
-             "min": np.nanmin(data, axis=axis), "max": np.nanmax(data, axis=axis),
-             "median": np.nanmedian(data, axis=axis), "variance": np.nanvar(data, axis=axis),
-             "n_samples": np.sum(~np.isnan(data), axis=axis)}
-
-    # If all values are zero at a given position in stats, set them to zero
-    for key in stats:
-        # Identify positions where all values are NaN
-        nan_positions = np.isnan(stats[key])
-        stats[key][nan_positions] = 0
-
-    # Compute statistics
-    return stats
-
-
 def statistics(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = None) \
-        -> Dict[str, Union[np.ndarray, torch.Tensor]]:
+        -> dict[str, Union[np.ndarray, torch.Tensor]]:
     """ Compute statistics of a given dataset.
 
         Parameters
@@ -163,14 +126,12 @@ def statistics(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = 
     return stats
 
 
-def compute_statistics(config: DictConfig, variables: List[str]) -> None:
+def compute_statistics(config: DictConfig) -> None:
     """ Compute statistics of a given dataset.
 
         Parameters
         ----------
         config: DictConfig. Main hydra configuration file containing all model hyperparameters.
-        variables: List[str]. List of variables to compute statistics for
-                   (e.g. ['prof', 'surf', 'meta', 'hofx', 'lat', 'lon', 'scans', 'pressure']).
 
         Returns
         -------
@@ -182,6 +143,7 @@ def compute_statistics(config: DictConfig, variables: List[str]) -> None:
 
     # Compute statistics per variable
     stats = {}
+    variables = list(config.input.vars.keys())
     # Loop sequentially for memory efficiency (over speed)
     for v, variable in enumerate(variables):
         # Load data
@@ -189,11 +151,13 @@ def compute_statistics(config: DictConfig, variables: List[str]) -> None:
         # Compute statistics per height
         logger.info(f"Computing statistics of variable {variable} ({v + 1}/{len(variables)})...")
         if variable in ['prof', 'surf', 'meta', 'hofx'] and cloud_filter is not None:
+            logger.info("Applying cloud filter...")
             stats[variable] = statistics(data[cloud_filter, ...], axis=0)
         else:
             stats[variable] = statistics(data, axis=0)
 
     # Save statistics to file
+    logger.info(f"Saving statistics to file {config.output.path}...")
     with open(config.output.path, 'wb') as file:
         # noinspection PyTypeChecker
         pickle.dump(stats, file)
@@ -221,8 +185,7 @@ def main(config: DictConfig) -> None:
     if hasattr(config.data.preparation, "statistics"):
         logger.info("Computing statistics of data...")
         # Compute radiance statistics per filter per instrument
-        compute_statistics(config.data.preparation.statistics,
-                           variables=['prof', 'surf', 'meta', 'hofx', 'lat', 'lon', 'scans', 'pressure'])
+        compute_statistics(config.data.preparation.statistics)
 
     return
 

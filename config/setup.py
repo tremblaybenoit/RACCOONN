@@ -124,7 +124,7 @@ def setup_directories_from_hydra(config_path, config_name, overrides=None, verbo
         verbose=verbose
     )
     paths_config = hydra_config['paths']
-    dirs = ['task_dir', 'output_dir', 'checkpoint_dir', 'log_dir', 'run_dir']
+    dirs = ['task_dir', 'output_dir', 'checkpoint_dir', 'log_dir', 'run_dir', 'data_dir']
 
     # Create directories based on the paths configuration
     for dir in dirs:

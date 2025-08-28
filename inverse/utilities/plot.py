@@ -1058,42 +1058,5 @@ def fig_rmse_bars(target, pred, clrsky, figname=None, channels=None, height=0.3,
 
 if __name__ == "__main__":
 
-    ex_path = "E:\\Data\\ISSI_Team_Flows\\Matthias\\SSD_25x8Mm_16_pdmp_1_ISSI_Flows\\2D"  # os.path.abspath("../E/Data/ISSI_Team_Flows/Matthias/SSD_25x8Mm_16_pdmp_1_ISSI_Flows/2D/")
-    ex_slice_type = 'yz'
-    ex_slice = [192]  # [192, 400]
-    ex_iter = [15000]  # [0, 3900, 4200]
-    ex_vars = ['I500', 'Bz']  # ['I500', 'vx', 'vy', 'vz', 'Bx', 'By', 'Bz']
-    ex_x_min, ex_x_max, ex_y_min, ex_y_max = 0, 1536, 0, 1536
-
-    # Initialize the dataset
-    # dataset = MURaMQSDataset(ex_path, dataset=ex_slice_type)
-
-    # Measure slice_reader
-    # data1 = dataset.read(ex_iter, ex_slice, ex_vars,
-    #                      x_min=ex_x_min, x_max=ex_x_max, y_min=ex_y_min, y_max=ex_y_max)
-    # vx = data1[0, :, :, 0, 1]
-    # vy = data1[0, :, :, 0, 2]
-    # vz = data1[0, :, :, 0, 3]
-    # ic = (data1[0, :, :, 0, 0]-np.mean(data1[0, :, :, 0, 0]))/np.std(data1[0, :, :, 0, 0])
-    # bz = data1[0, :, :, 0, 1]
-    # Make a perturbed version of bz
-    # ic2 = (100+0.1 * np.random.randn(*ic.shape))*ic
-
-    # breakpoint()
-
-    # Plotting example
-    # figure, get_axes = flexible_gridspec([2, 1])  # 2 columns in the first row, 1 in the second
-
-    # Second subplot: scatter_density
-    # ax0 = get_axes(0, 0)
-    # scatterplot(figure, ax0, ic, ic2, projection='scatter_density', title='Density Scatter', fit=True, xy_symmetric=False,
-    #             x_range=(-3, 3))
-
-    # ax2 = get_axes(0, 1)
-    # plot_map(ax2, data1[0, :, :, 0, 0], cb_cmap='hot')
-
-    # ax1 = get_axes(1, 0)
-    # scatterplot(figure, ax1, bz, 3.0 * bz, projection='scatter_density', title='Density Scatter', fit=True)
-    # plot_map(ax1, bz, img_range=(-100, 100), cb_cmap='Greys_r')
-
-    # save_plot(figure, filename='plotting_example.png')
+    print("No example currently implemented for this module.")
+    

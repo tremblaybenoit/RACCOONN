@@ -7,7 +7,7 @@ try:
     from forward.utilities.logic import get_config_path
     # Initialize CRTM forward model
     checkpoint_path = os.path.abspath(os.path.join(os.path.dirname(__name__), 'forward/model/checkpoints/model.ckpt'))
-    config_path = os.path.join(get_config_path(), 'model/default.yaml')
+    config_path = os.path.join(get_config_path(), 'model/forward_emulator.yaml')
     forward = CRTMForward(checkpoint_path=checkpoint_path, config_path=config_path)
 except (ImportError, FileNotFoundError, Exception) as e:
     print(f"Error loading CRTM forward model: {e}")

@@ -1,9 +1,9 @@
 # Note: The order of defaults determines the order in which configs override each other.
 defaults:
-  - data: default
+  - data: forward
   - hydra: default
   - paths: default
-  - model: default
+  - model: forward_emulator
   - trainer: default
   - callbacks: default
   - logger: default
