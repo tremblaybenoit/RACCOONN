@@ -164,13 +164,12 @@ class InverseOperator:
         _ = self.trainer.test(self.model, self.data_loader)
 
         # Save test results to file
-        # TODO: Fix path to save files
         logger.info("Saving results to file...")
-        if hasattr(self.config.data.sets.test.results, 'hofx'):
-            save_function = instantiate(self.config.data.sets.test.results.hofx.save)
+        if hasattr(self.config.data.loader.stage.test.results, 'hofx'):
+            save_function = instantiate(self.config.data.loader.stage.test.results.hofx.save)
             save_function(self.model.test_results['hofx'])
-        if hasattr(self.config.data.sets.test.results, 'prof'):
-            save_function = instantiate(self.config.data.sets.test.results.prof.save)
+        if hasattr(self.config.data.loader.stage.test.results, 'prof'):
+            save_function = instantiate(self.config.data.loader.stage.test.results.prof.save)
             save_function(self.model.test_results['prof'])
 
     def predict(self, data_config: DictConfig) -> np.ndarray:

@@ -171,9 +171,10 @@ class PINNverseOperator(BaseModel):
         n_levels = x['pressure'].shape[-1]
         x_vector = {k: v.repeat_interleave(n_levels, dim=0) if k != 'pressure' else x['pressure'].reshape(-1, 1)
                     for k, v in x.items()}
-        return self.forward(x_vector).view(-1, n_levels, self.n_prof).transpose(1, 2)
+        prof = self.forward(x_vector).view(-1, n_levels, self.n_prof).transpose(1, 2)
+        return prof if self.clip is None else self.clip(prof)
 
-    def _logging(self, stage: str, loss: dict, coords: dict, obs: dict, prof: torch.Tensor, hofx: torch.Tensor) -> None:
+    def _logging(self, stage: str, loss: dict, coords: dict, obs: dict, pred: dict) -> None:
         """ Log training/validation/test metrics.
 
             Parameters
@@ -182,8 +183,7 @@ class PINNverseOperator(BaseModel):
             loss: dict. Dictionary containing the loss components.
             coords: dict. Input coordinates.
             obs: dict. Observations.
-            prof: tensor. Predicted profiles.
-            hofx: tensor. Predicted observations.
+            pred: dict. Predictions.
 
             Returns
             -------
@@ -205,25 +205,27 @@ class PINNverseOperator(BaseModel):
         if 'obs' in loss:
             self.log(f"{stage}_loss_obs", loss['obs'].mean(), on_epoch=True, prog_bar=True, logger=True)
             if loss['obs'].ndim == 2:
-                for i in range(hofx.shape[1] // 2):
+                for i in range(pred['hofx'].shape[1] // 2):
                     self.log(f"{stage}_loss_obs_{i}", loss['obs'][:, i].mean(), on_epoch=True, prog_bar=False,
                              logger=True)
 
         # If testing, return predictions in addition to loss
         if stage == 'test':
             # Store test outputs
-            for k, v in {'prof': prof, 'hofx': hofx}.items():
+            for k, v in {'prof': pred['prof'], 'hofx': pred['hofx']}.items():
                 self.test_results[k].append(v.detach().cpu().numpy())
         elif stage == 'valid' and self.log_valid:
             # Store validation outputs
-            for k, v in {'prof_target': obs['prof'], 'prof_pred': prof,
-                         'hofx_target': obs['hofx'], 'hofx_pred': hofx,
+            for k, v in {'prof_target': obs['prof'], 'prof_pred': pred['prof'],
+                         'prof_norm_target': obs['prof_norm'], 'prof_norm_pred': pred['prof_norm'],
+                         'hofx_target': obs['hofx'], 'hofx_pred': pred['hofx'],
                          'pressure': coords['pressure']}.items():
                 self.valid_results[k].append(v.detach().cpu().numpy())
-            # Store background and background error if available
-            for k in ['prof_background', 'prof_increment']:
-                if k in obs:
-                    self.valid_results[k].append(obs[k].detach().cpu().numpy())
+            # Store background if available
+            if 'prof_background' in obs:
+                for k, v in {'prof_background': obs['prof_background'],
+                             'prof_norm_background': obs['prof_norm_background']}.items():
+                    self.valid_results[k].append(v.detach().cpu().numpy())
         else:
             # Compute L2 norm of the model parameters
             l2_norm = sum((p ** 2).sum() for p in self.parameters() if p.requires_grad)
@@ -244,16 +246,34 @@ class PINNverseOperator(BaseModel):
         """
 
         # Compute profiles
-        prof_norm = self._retrieve_prof(batch['coords'])
-        prof_pred = self.unnormalize_prof(prof_norm)
+        pred = {'prof_norm': self._retrieve_prof(batch['coords'])}
+        pred['prof'] = self.unnormalize_prof(pred['prof_norm'])
 
         # Compute loss function
-        loss, hofx_pred = self.loss_func(prof_norm, prof_pred, batch['obs'])
+        loss, pred['hofx'] = self.loss_func(pred, batch['obs'])
 
         # Logging
-        self._logging(stage, loss, batch['coords'], batch['obs'], prof_norm, hofx_pred)
+        self._logging(stage, loss, batch['coords'], batch['obs'], pred)
 
         return loss['total']
+
+    def predict_step(self, batch: dict, batch_idx: int, dataloader_idx: int = 0) -> torch.Tensor:
+        """ Perform prediction step.
+
+            Parameters
+            ----------
+            batch: tensor. Batch from the prediction set.
+            batch_idx: int. Index of the batch out of the prediction set.
+            dataloader_idx: int. Index of the dataloader.
+
+            Returns
+            -------
+            Predicted profiles: tensor.
+        """
+
+        # Compute profiles
+        pred = self._retrieve_prof(batch['coords'])
+        return self.unnormalize_prof(pred)
 
     def on_validation_epoch_end(self):
         """ Callback to log validation results at the end of each validation epoch.
@@ -385,4 +405,5 @@ class PINNverseOperators(PINNverseOperator):
         n_levels = x['pressure'].shape[-1]
         x_vector = {k: v.repeat_interleave(n_levels, dim=0) if k != 'pressure' else x['pressure'].reshape(-1, 1)
                     for k, v in x.items()}
-        return torch.cat([output.view(-1, 1, n_levels) for output in self.forward(x_vector)], dim=1)
+        prof = torch.cat([output.view(-1, 1, n_levels) for output in self.forward(x_vector)], dim=1)
+        return prof if self.clip is None else self.clip(prof)

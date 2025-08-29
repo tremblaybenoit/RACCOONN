@@ -41,8 +41,6 @@ def load_coords(config: DictConfig, split: np.ndarray = None) -> dict:
     x['lat'] = np.tile(x['lat'], n_scans)
     x['lon'] = np.tile(x['lon'], n_scans)
     x['scans'] = np.repeat(x['scans'], n_coords, axis=0)
-    # Pressure levels (in hPa). We maintain the original shape (n_levels,) and tile when needed
-    x['pressure'] = 0.01 * x['pressure']
 
     # Apply split if available
     if split is not None:

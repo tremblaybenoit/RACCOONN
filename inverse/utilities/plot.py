@@ -5,7 +5,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.colors import LinearSegmentedColormap
 import mpl_scatter_density
 from  forward.evaluation.metrics import rmse
-from typing import Union
+from typing import Union, Callable
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
@@ -30,7 +30,7 @@ white_viridis = LinearSegmentedColormap.from_list('white_viridis',
 
 def flexible_gridspec(row_col_counts: list[int], cell_width: float=4.0, cell_height: float=4.0,
                       left: float=0.8, right: float=0.8, bottom: float=0.58, top: float=0.42) \
-        -> tuple[plt.Figure, callable]:
+        -> tuple[plt.Figure, Callable]:
     """ Create a figure with the flexible grid layout.
 
     Parameters
@@ -845,6 +845,7 @@ def fig_vertical_profiles(target: np.ndarray, pred: np.ndarray, y: np.ndarray=No
     y : np.ndarray, optional. Vertical levels. If None, levels will be generated as 0, 1, ..., n_levels-1.
     y_label : Union[list[str, ...], str], optional. Labels for the vertical levels. If None, default labels will be used.
     title : str, optional. Title for the plots. If None, default titles will be used.
+    x_range : tuple, optional. Range for the x-axis. If None, computed from data.
 
     Returns
     -------
@@ -878,7 +879,7 @@ def fig_vertical_profiles(target: np.ndarray, pred: np.ndarray, y: np.ndarray=No
     return fig
 
 
-def fig_vertical_profiles_background(target: np.ndarray, pred: np.ndarray, background: np.ndarray, background_err: np.ndarray,
+def fig_vertical_profiles_background(target: np.ndarray, pred: np.ndarray, background: np.ndarray,
                                      y: np.ndarray = None, y_label: Union[list, str] = None, title: Union[list, str] = None,
                                      x_range=None):
     """
@@ -890,9 +891,9 @@ def fig_vertical_profiles_background(target: np.ndarray, pred: np.ndarray, backg
     pred : np.ndarray. Prediction data to plot. Shape should be (n_samples, n_profiles, n_levels).
     title : str, optional. Title for the plots. If None, default titles will be used.
     background : np.ndarray. Background data to plot. Shape should be (n_samples, n_profiles, n_levels).
-    background_err : np.ndarray. Background error data to plot. Shape should be (n_samples, n_profiles, n_levels).
     y : np.ndarray, optional. Vertical levels. If None, levels will be generated as 0, 1, ..., n_levels-1.
     y_label : Union[list[str, ...], str], optional. Labels for the vertical levels. If None, default labels will be used.
+    x_range : tuple, optional. Range for the x-axis. If None, computed from data.
 
     Returns
     -------
@@ -920,7 +921,7 @@ def fig_vertical_profiles_background(target: np.ndarray, pred: np.ndarray, backg
         # Plot the vertical profile for each channel
         plot_title = f'Vertical profile #{i + 1}' if title is None else title[i]
         plot_vertical_profiles(ax, np.stack([background[:, i, :], target[:, i, :], pred[:, i, :]], axis=1),
-                               err=np.stack([background_err[:, i, :].mean(axis=0), target[:, i, :].std(axis=0),
+                               err=np.stack([background[:, i, :].std(axis=0), target[:, i, :].std(axis=0),
                                              pred[:, i, :].std(axis=0)], axis=0), y=y, y_label=y_label,
                                title=plot_title, color = [colors['green'], colors['blue'], colors['orange']],
                                label=['Background', 'Target', 'Prediction'], x_label='Profile value (units)',
@@ -1012,6 +1013,20 @@ def fig_rmse_bars(target, pred, clrsky, figname=None, channels=None, height=0.3,
 
     Parameters
     ----------
+    target : numpy.ndarray. Target data. Shape should be (n_samples, n_channels).
+    pred : numpy.ndarray. Prediction data. Shape should be (n_samples, n_channels).
+    clrsky : numpy.ndarray. Boolean array indicating clear sky samples. Shape should be (n_samples,).
+    figname : str or None. If provided, the figure will be saved to this filename.
+    channels : list or None. List of channel indices to plot. If None, defaults to channels 7 to 16.
+    height : float. Height of the bars. Default is 0.3.
+    colors : list or None. List of colors for the bars. If None, defaults to ['#D81B60', '#1E88E5'].
+    labels : list or None. List of labels for the bars. If None, defaults to ['Cloudy', 'Clear Sky'].
+    x_range : list or None. List of x-axis ranges for the two plots. If None, defaults to [None, None].
+    y_label : list or None. List of y-axis labels for the two plots. If None, defaults to ['Channels', 'Channels'].
+    x_label : list or None. List of x-axis labels for the two plots.
+              If None, defaults to ['RMSE (K)', 'RMSE (Standard Deviations)']. Default is None.
+    title : list or None. List of titles for the two plots.
+            If None, defaults to ['(a) Forward model errors', '(b) Normalized forward model errors'].
 
     Returns
     -------

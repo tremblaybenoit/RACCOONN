@@ -121,10 +121,10 @@ vars:
       _target_: inverse.data.transformations.min_max
       _partial_: true
       stats:
-        min: 0.012935171
-        max: 928.14125
-        mean: 386.31695
-        stdev: 344.8104
+        min: 1.2935171
+        max: 92814.125
+        mean: 38631.695
+        stdev: 34481.04
   hofx_innovation:
     load:
       _target_: inverse.data.covariance.innovation_uncertainty
@@ -216,12 +216,16 @@ loader:
         pressure: ${data.vars.pressure}
       prof_type: ${data.vars.prof.type}
       obs:
-        prof: ${data.vars.prof}
+        prof_norm: ${data.vars.prof}
+        prof_norm_background: ${data.vars.prof_background}
+        prof_norm_increment: ${data.vars.prof_increment}
+        prof:
+          load: ${data.vars.prof.load}
+        prof_background:
+          load: ${data.vars.prof_background.load}
         surf: ${data.vars.surf}
         meta: ${data.vars.meta}
         hofx: ${data.vars.hofx}
-        prof_background: ${data.vars.prof_background}
-        prof_increment: ${data.vars.prof_increment}
     valid:
       _target_: inverse.model.data_loader.InverseCRTMDataset
       split: 256608:341240
@@ -237,15 +241,26 @@ loader:
       prof_type: ${data.loader.stage.train.prof_type}
       obs: ${data.loader.stage.train.obs}
       results:
-        path: ${paths.run_dir}/test_set.npy
-        save:
-          _target_: numpy.save
-          _args_:
-            - ${data.loader.stage.test.results.path}
-        load:
-          _target_: numpy.load
-          _args_:
-            - ${data.loader.stage.test.results.path}
+        prof:
+          path: ${paths.run_dir}/test_prof.npy
+          save:
+            _target_: numpy.save
+            _args_:
+              - ${data.loader.stage.test.results.prof.path}
+          load:
+            _target_: numpy.load
+            _args_:
+              - ${data.loader.stage.test.results.prof.path}
+        hofx:
+          path: ${paths.run_dir}/test_hofx.npy
+          save:
+            _target_: numpy.save
+            _args_:
+              - ${data.loader.stage.test.results.hofx.path}
+          load:
+            _target_: numpy.load
+            _args_:
+              - ${data.loader.stage.test.results.hofx.path}
     pred:
       _target_: inverse.model.data_loader.InverseCRTMDataset
       coords: ${data.loader.stage.train.coords}
