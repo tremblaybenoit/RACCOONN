@@ -5,7 +5,6 @@ from omegaconf import DictConfig
 from pytorch_lightning import LightningModule
 from forward.model.model import BaseModel
 from forward.utilities.instantiators import instantiate
-from forward.data.transformations import NormalizeProfiles
 from inverse.data.transformations import identity
 from copy import deepcopy
 
@@ -67,8 +66,8 @@ class PINNverseOperator(BaseModel):
         # Initialize empty lists for validation and test results
         if self.log_valid:
             self.valid_results = {
-                'bt_target': [],
-                'bt_pred': [],
+                'hofx_target': [],
+                'hofx_pred': [],
                 'prof_target': [],
                 'prof_pred': [],
                 'pressure': [],
@@ -79,14 +78,14 @@ class PINNverseOperator(BaseModel):
 
         # Normalization transformations
         self.clip = clip if clip is not None else identity
-        self.normalize_profiles = transform
-        self.unnormalize_profiles = inverse_transform
+        self.normalize_prof = transform
+        self.unnormalize_prof = inverse_transform
         # Normalize profiles prior to inputting to CRTM emulator
 
         # Model architecture
-        self.n_profiles = parameters.data.n_profiles
+        self.n_prof = parameters.data.n_prof
         self.n_levels = parameters.data.n_levels
-        self.prof_vars = parameters.data.prof_vars
+        self.prof_vars = parameters.data.prof_vars  # TODO: Handle this differently
         self.model = self._build_model(positional_encoding, activation_in, activation_out, parameters)
 
     def _build_model(self, positional_encoding: Callable, activation_in: Callable, activation_out: Callable,
@@ -113,7 +112,7 @@ class PINNverseOperator(BaseModel):
         self.activation_in = instantiate(activation_in)
         self.dropout_in = nn.Dropout(parameters.architecture.dropout)
         # Output layer
-        self.d_out = nn.Linear(parameters.architecture.n_neurons, parameters.data.n_profiles*parameters.data.n_levels)
+        self.d_out = nn.Linear(parameters.architecture.n_neurons, parameters.data.n_prof*parameters.data.n_levels)
         self.activation_out = instantiate(activation_out)
 
         # Model architecture
@@ -144,7 +143,7 @@ class PINNverseOperator(BaseModel):
 
             Returns
             -------
-            y: tensor. Outputs: predicted profiles, surface, and metadata.
+            y: tensor. Outputs: predicted profiles.
         """
 
         # Concatenate inputs
@@ -154,9 +153,9 @@ class PINNverseOperator(BaseModel):
         # Pass through the model
         profiles = self.model(encoded_inputs)
         # Reshape profiles to match the expected output shape
-        return profiles.view(-1, self.n_profiles, 1)
+        return profiles.view(-1, self.n_prof, 1)
 
-    def _retrieve_profiles(self, x: dict):
+    def _retrieve_prof(self, x: dict):
         """ Retrieve atmospheric profile over multiple pressure levels.
 
             Parameters
@@ -172,15 +171,19 @@ class PINNverseOperator(BaseModel):
         n_levels = x['pressure'].shape[-1]
         x_vector = {k: v.repeat_interleave(n_levels, dim=0) if k != 'pressure' else x['pressure'].reshape(-1, 1)
                     for k, v in x.items()}
-        return self.forward(x_vector).view(-1, n_levels, self.n_profiles).transpose(1, 2)
+        return self.forward(x_vector).view(-1, n_levels, self.n_prof).transpose(1, 2)
 
-    def _logging(self, x: dict, y: dict, stage: str, loss: dict, prof_pred: torch.Tensor, bt_pred: torch.Tensor) -> None:
+    def _logging(self, stage: str, loss: dict, coords: dict, obs: dict, prof: torch.Tensor, hofx: torch.Tensor) -> None:
         """ Log training/validation/test metrics.
 
             Parameters
             ----------
-            loss: tensor. Loss value.
             stage: str. Current operation: "train", "valid", or "test".
+            loss: dict. Dictionary containing the loss components.
+            coords: dict. Input coordinates.
+            obs: dict. Observations.
+            prof: tensor. Predicted profiles.
+            hofx: tensor. Predicted observations.
 
             Returns
             -------
@@ -188,49 +191,39 @@ class PINNverseOperator(BaseModel):
         """
 
         # Log total loss
-        if 'total' in loss.keys():
+        if 'total' in loss:
             self.log(f"{stage}_loss", loss['total'], on_epoch=True, prog_bar=True, logger=True)
-        # Log profile loss
-        if 'model' in loss.keys():
-            self.log(f"{stage}_loss_model", loss['model'].mean(), on_epoch=True, prog_bar=True, logger=True)
-            # Log individual profile variables
-            if loss['model'].ndim == 3:
-                for i, var in enumerate(self.prof_vars):
-                    self.log(f"{stage}_loss_model_{i}_{var}", loss['model'][:, i, :].mean(), on_epoch=True, prog_bar=False,
-                             logger=True)
-        # Log boundary conditions loss
-        if 'bcs' in loss.keys():
-            self.log(f"{stage}_loss_bcs", loss['bcs'].mean(), on_epoch=True, prog_bar=True, logger=True)
-            # Log individual profile variables
-            if loss['bcs'].ndim == 3:
-                for i, var in enumerate(self.prof_vars):
-                    self.log(f"{stage}_loss_bcs_{i}_{var}", loss['bcs'][:, i, :].mean(), on_epoch=True, prog_bar=False,
-                             logger=True)
+        # Log profile and boundary condition losses
+        for key in ['model', 'bcs']:
+            if key in loss:
+                self.log(f"{stage}_loss_{key}", loss[key].mean(), on_epoch=True, prog_bar=True, logger=True)
+                if loss[key].ndim == 3:
+                    for i, var in enumerate(self.prof_vars):
+                        self.log(f"{stage}_loss_{key}_{i}_{var}", loss[key][:, i, :].mean(), on_epoch=True,
+                                 prog_bar=False, logger=True)
         # Log observation loss
-        if 'obs' in loss.keys():
+        if 'obs' in loss:
             self.log(f"{stage}_loss_obs", loss['obs'].mean(), on_epoch=True, prog_bar=True, logger=True)
-            # Log individual radiance channels
             if loss['obs'].ndim == 2:
-                for i in range(bt_pred.shape[1] // 2):
-                    self.log(f"{stage}_loss_obs_{i}", loss['obs'][:, i].mean(), on_epoch=True, prog_bar=False, logger=True)
+                for i in range(hofx.shape[1] // 2):
+                    self.log(f"{stage}_loss_obs_{i}", loss['obs'][:, i].mean(), on_epoch=True, prog_bar=False,
+                             logger=True)
 
         # If testing, return predictions in addition to loss
         if stage == 'test':
             # Store test outputs
-            self.test_results['prof'].append(prof_pred.detach().cpu().numpy())
-            self.test_results['hofx'].append(bt_pred.detach().cpu().numpy())
+            for k, v in {'prof': prof, 'hofx': hofx}.items():
+                self.test_results[k].append(v.detach().cpu().numpy())
         elif stage == 'valid' and self.log_valid:
             # Store validation outputs
-            self.valid_results['bt_target'].append(y['hofx'].detach().cpu().numpy())
-            self.valid_results['bt_pred'].append(bt_pred.detach().cpu().numpy())
-            self.valid_results['prof_target'].append(y['prof'].detach().cpu().numpy())
-            self.valid_results['prof_pred'].append(prof_pred.detach().cpu().numpy())
-            self.valid_results['pressure'].append(x['pressure'].detach().cpu().numpy())
+            for k, v in {'prof_target': obs['prof'], 'prof_pred': prof,
+                         'hofx_target': obs['hofx'], 'hofx_pred': hofx,
+                         'pressure': coords['pressure']}.items():
+                self.valid_results[k].append(v.detach().cpu().numpy())
             # Store background and background error if available
-            if 'prof_background' in y:
-                self.valid_results['prof_background'].append(y['prof_background'].detach().cpu().numpy())
-            if 'prof_increment' in y:
-                self.valid_results['prof_increment'].append(y['prof_increment'].detach().cpu().numpy())
+            for k in ['prof_background', 'prof_increment']:
+                if k in obs:
+                    self.valid_results[k].append(obs[k].detach().cpu().numpy())
         else:
             # Compute L2 norm of the model parameters
             l2_norm = sum((p ** 2).sum() for p in self.parameters() if p.requires_grad)
@@ -251,14 +244,14 @@ class PINNverseOperator(BaseModel):
         """
 
         # Compute profiles
-        prof_norm = self._retrieve_profiles(batch['coordinates'])
-        prof_pred = self.unnormalize_profiles(prof_norm)
+        prof_norm = self._retrieve_prof(batch['coords'])
+        prof_pred = self.unnormalize_prof(prof_norm)
 
         # Compute loss function
-        loss, bt_pred = self.loss_func(prof_norm, prof_pred, batch['targets'])
+        loss, hofx_pred = self.loss_func(prof_norm, prof_pred, batch['obs'])
 
         # Logging
-        self._logging(batch['coordinates'], batch['targets'], stage, loss, prof_norm, bt_pred)
+        self._logging(stage, loss, batch['coords'], batch['obs'], prof_norm, hofx_pred)
 
         return loss['total']
 
@@ -299,7 +292,7 @@ class PINNverseOperator(BaseModel):
                     if isinstance(v, torch.Tensor):
                         d[k] = v.to(device)
         # Move normalization modules if needed
-        for attr in ['normalize_profiles', 'unnormalize_profiles']:
+        for attr in ['normalize_prof', 'unnormalize_prof']:
             norm = getattr(self, attr, None)
             if hasattr(norm, 'to'):
                 setattr(self, attr, norm.to(device))
@@ -346,12 +339,13 @@ class PINNverseOperators(PINNverseOperator):
             self._build_model(
                 positional_encoding, activation_in, activation_out, self._patch_profiles(deepcopy(parameters))
             )
-            for _ in range(self.n_profiles)
+            for _ in range(self.n_prof)
         ])
 
+    @staticmethod
     def _patch_profiles(self, parameters):
-        """Set n_profiles=1 in parameters for sub-model construction."""
-        parameters.data.n_profiles = 1
+        """Set n_prof=1 in parameters for sub-model construction."""
+        parameters.data.n_prof = 1
         return parameters
 
     def forward(self, x: dict) -> list:
@@ -375,7 +369,7 @@ class PINNverseOperators(PINNverseOperator):
         outputs = [model(encoded_inputs) for model in self.models]
         return outputs
 
-    def _retrieve_profiles(self, x: dict):
+    def _retrieve_prof(self, x: dict):
         """ Retrieve atmospheric profile over multiple pressure levels.
 
             Parameters

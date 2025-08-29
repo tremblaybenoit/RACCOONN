@@ -24,7 +24,7 @@ parameters:
     n_lat: 1
     n_lon: 1
     n_scans: 1
-    n_profiles: 9
+    n_prof: 9
     n_levels: 1
     n_pressure: 1
     n_cloud: 0

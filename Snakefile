@@ -20,7 +20,10 @@ hydra_config = read_hydra_as_dict(config_path=hydra_config_path, config_name=hyd
 # Data configuration file (from Snakemake config file)
 vars_config = hydra_config["data"]["vars"]
 prep_config = hydra_config["data"]["preparation"]
-loader_config = hydra_config["data"]["loader"]
+train_config = hydra_config["data"]["loader"]["train"]
+valid_config = hydra_config["data"]["loader"]["valid"]
+test_config = hydra_config["data"]["loader"]["test"]
+pred_config = hydra_config["data"]["loader"]["pred"]
 # Paths configuration file (from Snakemake config file)
 paths_config = hydra_config["paths"]
 # Callback configuration file (from Snakemake config file)
@@ -93,8 +96,8 @@ if 'covariance_model' in prep_config or 'covariance_observation' in prep_config:
 # Training step
 rule train:
     input:
-        [loader_config['coordinates'][var]['path'] if 'path' in loader_config['coordinates'][var] else None for var in loader_config['coordinates']],
-        [loader_config['targets'][var]['path'] if 'path' in loader_config['targets'][var] else None for var in loader_config['targets']],
+        [train_config['coords'][var]['path'] if 'path' in train_config['coords'][var] else None for var in train_config['coords']],
+        [train_config['obs'][var]['path'] if 'path' in train_config['obs'][var] else None for var in train_config['obs']],
         [prep_config[step_name]['output']['path'] for step_name in prep_config]
     params:
         config_name = hydra_config_name,

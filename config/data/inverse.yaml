@@ -204,22 +204,59 @@ loader:
   _target_: inverse.model.data_loader.InverseDataloader
   batch_size: 32  # Batch size for training
   num_workers: 1  # Number of workers for data loading
-  sets:
-    split:
-      train: 0:256608
-      valid: 256608:341240
-      test: 341240:426872
-      cloud_filter: ${data.vars.cloud_filter}
-    coordinates:
-      lat: ${data.vars.lat}
-      lon: ${data.vars.lon}
-      scans: ${data.vars.scans}
-      pressure: ${data.vars.pressure}
-    targets:
-      prof: ${data.vars.prof}
-      surf: ${data.vars.surf}
-      meta: ${data.vars.meta}
-      hofx: ${data.vars.hofx}
-      prof_background: ${data.vars.prof_background}
-      prof_increment: ${data.vars.prof_increment}
-    # outputs:
+  stage:
+    train:
+      _target_: inverse.model.data_loader.InverseCRTMDataset
+      split: 0:256608
+      cloud_filter: ${data.vars.cloud_filter.load}
+      coords:
+        lat: ${data.vars.lat}
+        lon: ${data.vars.lon}
+        scans: ${data.vars.scans}
+        pressure: ${data.vars.pressure}
+      prof_type: ${data.vars.prof.type}
+      obs:
+        prof: ${data.vars.prof}
+        surf: ${data.vars.surf}
+        meta: ${data.vars.meta}
+        hofx: ${data.vars.hofx}
+        prof_background: ${data.vars.prof_background}
+        prof_increment: ${data.vars.prof_increment}
+    valid:
+      _target_: inverse.model.data_loader.InverseCRTMDataset
+      split: 256608:341240
+      cloud_filter: ${data.loader.stage.train.cloud_filter}
+      coords: ${data.loader.stage.train.coords}
+      prof_type: ${data.loader.stage.train.prof_type}
+      obs: ${data.loader.stage.train.obs}
+    test:
+      _target_: inverse.model.data_loader.InverseCRTMDataset
+      split: 341240:426872
+      cloud_filter: ${data.loader.stage.train.cloud_filter}
+      coords: ${data.loader.stage.train.coords}
+      prof_type: ${data.loader.stage.train.prof_type}
+      obs: ${data.loader.stage.train.obs}
+      results:
+        path: ${paths.run_dir}/test_set.npy
+        save:
+          _target_: numpy.save
+          _args_:
+            - ${data.loader.stage.test.results.path}
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${data.loader.stage.test.results.path}
+    pred:
+      _target_: inverse.model.data_loader.InverseCRTMDataset
+      coords: ${data.loader.stage.train.coords}
+      prof_type: ${data.loader.stage.train.prof_type}
+      results:
+        path: ${paths.run_dir}/pred_set.npy
+        save:
+          _target_: numpy.save
+          _args_:
+            - ${data.loader.stage.pred.results.path}
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${data.loader.stage.pred.results.path}
