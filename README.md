@@ -44,6 +44,9 @@ The graph of the RACCOONN workflow is the following:
 The RACCOON project documentation is available at https://raccoonn.readthedocs.io/.
 
 # References and Acknowledgements
+- The forward model was translated from Keras to Pytorch Lightning from the following paper and repository: 
+  - Paper by Howard et al. (2025): https://www.arxiv.org/abs/2504.16192.
+  - Repository: https://zenodo.org/records/13963758.
 - Inspiration for the PyTorch Lightning + Hydra framework comes from the following repositories: 
   - Lightning-Hydra-Template: https://github.com/ashleve/lightning-hydra-template.
   - Anemoi framework by ECMWF: https://github.com/ecmwf/anemoi-core.
