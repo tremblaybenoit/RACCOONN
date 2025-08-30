@@ -69,12 +69,12 @@ def background_increment(config_true: DictConfig, config_background: DictConfig,
     """
 
     # Truth
-    f_norm = config_true['normalization'] if hasattr(config_true, 'normalization') else identity
-    xt = f_norm(np.array(config_true['load'], dtype=np.float64))
+    f_norm = config_true.normalization if hasattr(config_true, 'normalization') else identity
+    xt = f_norm(np.array(config_true.load, dtype=np.float64))
 
     # Background
-    f_norm = config_background['normalization'] if hasattr(config_background, 'normalization') else identity
-    xb = f_norm(np.array(config_background['load'], dtype=np.float64))
+    f_norm = config_background.normalization if hasattr(config_background, 'normalization') else identity
+    xb = f_norm(np.array(config_background.load, dtype=np.float64))
 
     # Apply cloud filter if provided
     if cloud_filter is not None:
@@ -100,20 +100,20 @@ def covariance_matrix(config: DictConfig, plot_flag: bool=True, recenter: bool=T
 
     # Error
     logger.info("Loading data...")
-    f_norm = instantiate(config['input']['vars']['err']['normalization']) \
-        if hasattr(config['input']['vars']['err'], 'normalization') else identity
-    err = f_norm(np.array(instantiate(config['input']['vars']['err']['load']), dtype=np.float64))
+    f_norm = instantiate(config.input.vars.err.normalization) \
+        if hasattr(config.input.vars.err, 'normalization') else identity
+    err = f_norm(np.array(instantiate(config.input.vars.err.load), dtype=np.float64))
 
     # Cloud filter
     if hasattr(config['input'], 'cloud_filter'):
         logger.info("Applying cloud filter...")
-        cloud_filter = instantiate(config['input']['cloud_filter']['load'])
+        cloud_filter = instantiate(config.input.cloud_filter.load)
         err = err[cloud_filter]
 
     # Pressure filter (background only)
     if hasattr(config['input'], 'pressure_filter'):
         logger.info("Applying pressure filter...")
-        pressure_filter = instantiate(config['input']['pressure_filter']['load'])
+        pressure_filter = instantiate(config.input.pressure_filter.load)
         err = err[:, pressure_filter]
 
     # Compute covariance matrix
@@ -129,7 +129,7 @@ def covariance_matrix(config: DictConfig, plot_flag: bool=True, recenter: bool=T
 
     # Save statistics to file
     logger.info("Saving inverse covariance matrix to file...")
-    save_func = instantiate(config['output']['save'])
+    save_func = instantiate(config.output.save)
     save_func(cov_inv)
 
     # Plot covariance matrix if required
@@ -143,7 +143,7 @@ def covariance_matrix(config: DictConfig, plot_flag: bool=True, recenter: bool=T
         ax = get_axes(0, 0)
         # Plot covariance matrix
         plot_map(ax, cov_inv, title=f"Covariance matrix of profiles", img_range=(-10000, 10000), plt_origin='upper')
-        save_plot(fig, filename=os.path.splitext(config['output']['path'])[0] + '.png')
+        save_plot(fig, filename=os.path.splitext(config.output.path)[0] + '.png')
 
     return
 

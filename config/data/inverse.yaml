@@ -176,6 +176,7 @@ preparation:
       path: ${paths.data_dir}/normalization/model_covariance_cloud_filter_pressure_filter.npy
       save:
         _target_: numpy.save
+        _partial_: true
         _args_:
           - ${data.preparation.covariance_model.output.path}
       load:
@@ -191,6 +192,7 @@ preparation:
       path: ${paths.data_dir}/normalization/observation_covariance_cloud_filter.npy
       save:
         _target_: numpy.save
+        _partial_: true
         _args_:
           - ${data.preparation.covariance_observation.output.path}
       load:
