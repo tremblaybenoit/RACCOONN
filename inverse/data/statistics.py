@@ -33,7 +33,7 @@ def read_statistics(filename: str, tensor: bool = False) -> dict:
     # Convert statistics to torch tensors if required
     if tensor:
         # Loop through each variable in stats and convert numpy arrays to torch tensors
-        stats = {var: {key: torch.tensor(value, dtype=torch.float32) if isinstance(value, np.ndarray) else value
+        stats = {var: {key: torch.tensor(value, dtype=torch.float64) if isinstance(value, np.ndarray) else value
                        for key, value in var_stats.items()} for var, var_stats in stats.items()}
 
     return stats
@@ -58,22 +58,21 @@ def read_statistics_var(filename: str, var: str, tensor: bool = False) -> dict:
 
     # Convert statistics to torch tensors if required
     if tensor:
-        stats = {key: torch.tensor(value, dtype=torch.float32) if isinstance(value, np.ndarray) else value
+        stats = {key: torch.tensor(value, dtype=torch.float64) if isinstance(value, np.ndarray) else value
                  for key, value in stats.items()}
 
     # Return statistics for the specified variable
     return stats
 
 
-def combine_statistics(stats: list[dict[str, Union[np.ndarray, int]]]) \
-        -> dict[str, Union[np.ndarray, torch.Tensor]]:
+def combine_statistics(stats: list[dict[str, Union[np.ndarray, int]]]) -> dict[str, np.ndarray]:
     """ Combine statistics of multiple datasets based on the mathematical definition of mean, var, stdev, etc.
         The datasets make come from different sources, e.g. different instruments, different heights, etc.
         Thus, they may have been computed from a different number of samples.
 
         Parameters
         ----------
-        stats: List[Dict[str, Union[np.ndarray, torch.Tensor]]]. List of statistics of different datasets.
+        stats: List[Dict[str, Union[np.ndarray, int]]]. List of statistics of different datasets.
 
         Returns
         -------
@@ -139,7 +138,8 @@ def compute_statistics(config: DictConfig) -> None:
     """
 
     # Filter out clearsky or not
-    cloud_filter = instantiate(config['input']['cloud_filter']['load']) if hasattr(config['input'], 'cloud_filter') else None
+    logger.info("Loadging cloud filter, if available...")
+    cloud_filter = instantiate(config.input.cloud_filter.load) if hasattr(config.input, 'cloud_filter') else None
 
     # Compute statistics per variable
     stats = {}
@@ -147,7 +147,7 @@ def compute_statistics(config: DictConfig) -> None:
     # Loop sequentially for memory efficiency (over speed)
     for v, variable in enumerate(variables):
         # Load data
-        data = np.array(instantiate(config.input.vars[variable].load)).astype(np.float32)
+        data = np.array(instantiate(config.input.vars[variable].load)).astype(np.float64)
         # Compute statistics per height
         logger.info(f"Computing statistics of variable {variable} ({v + 1}/{len(variables)})...")
         if variable in ['prof', 'surf', 'meta', 'hofx'] and cloud_filter is not None:
@@ -157,7 +157,7 @@ def compute_statistics(config: DictConfig) -> None:
             stats[variable] = statistics(data, axis=0)
 
     # Save statistics to file
-    logger.info(f"Saving statistics to file {config.output.path}...")
+    logger.info(f"Saving statistics to file {config.output.path}.")
     with open(config.output.path, 'wb') as file:
         # noinspection PyTypeChecker
         pickle.dump(stats, file)
@@ -181,10 +181,9 @@ def main(config: DictConfig) -> None:
     None.
     """
 
-    # If statistics is part of the radiance preparation steps:
+    # If statistics is part of the preparation steps:
     if hasattr(config.data.preparation, "statistics"):
         logger.info("Computing statistics of data...")
-        # Compute radiance statistics per filter per instrument
         compute_statistics(config.data.preparation.statistics)
 
     return

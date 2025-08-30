@@ -29,16 +29,18 @@ To execute the workflow using a specified number of cores (e.g., 1):
 snakemake --cores 1 
 ```
 
-To draw a directed acyclic graph (DAG) of the workflow as an image (e.g., dag.svg):
+To draw a directed acyclic graph (DAG) of the workflow as an image (e.g., dag.png) with left-to-right orientation (Grankdir=LR):
 
 ```bash
-snakemake --rulegraph raccoonn | dot -Tsvg > dag.svg
+snakemake --rulegraph inverse --config hydra-experiment=pinnverse_operators | dot -Tpng > dag.png  -Grankdir=LR
 ```
+Replace "--rulegraph" with "--dag" to draw dashed bounding boxes around the completed steps.
 
-The graph of the RACCOONN workflow is the following: 
+The graph of the RACCOONN workflow is the following (for the pinnverse_operators experiment): 
 <p align="center">
-<img src="dag.svg" alt="RACCOONN pipeline" height="300">
+<img src="dag.png" alt="RACCOONN pipeline" height="300">
 </p>
+
 
 # Documentation
 The RACCOON project documentation is available at https://raccoonn.readthedocs.io/.

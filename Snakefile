@@ -20,10 +20,10 @@ hydra_config = read_hydra_as_dict(config_path=hydra_config_path, config_name=hyd
 # Data configuration file (from Snakemake config file)
 vars_config = hydra_config["data"]["vars"]
 prep_config = hydra_config["data"]["preparation"]
-train_config = hydra_config["data"]["loader"]["train"]
-valid_config = hydra_config["data"]["loader"]["valid"]
-test_config = hydra_config["data"]["loader"]["test"]
-pred_config = hydra_config["data"]["loader"]["pred"]
+train_config = hydra_config["data"]["loader"]["stage"]["train"]
+valid_config = hydra_config["data"]["loader"]["stage"]["valid"]
+test_config = hydra_config["data"]["loader"]["stage"]["test"]
+pred_config = hydra_config["data"]["loader"]["stage"]["pred"]
 # Paths configuration file (from Snakemake config file)
 paths_config = hydra_config["paths"]
 # Callback configuration file (from Snakemake config file)
@@ -43,12 +43,12 @@ rule inverse:
 #########################################################################################################
 
 # Data download
-rule data_download:
+rule download:
     params:
         config_name=hydra_config_name,
         experiment=f"+experiment={hydra_experiment}" if hydra_experiment is not None else ""
     output:
-        [vars_config[var]['path'] for var in vars_config]
+        [vars_config[var]['path'] for var in vars_config if 'path' in vars_config[var]]
     shell:
         """
         python -m forward.utilities.download \
@@ -60,7 +60,8 @@ rule data_download:
 if 'statistics' in prep_config:
     rule statistics:
         input:
-            [prep_config['statistics']['input']['vars'][var]['path'] for var in prep_config['statistics']['input']['vars']]
+            [prep_config['statistics']['input']['vars'][var]['path'] if 'path' in prep_config['statistics']['input']['vars'][var] else None
+             for var in prep_config['statistics']['input']['vars']]
         params:
             config_name = hydra_config_name,
             experiment = f"+experiment={hydra_experiment}" if hydra_experiment is not None else ""
@@ -75,10 +76,9 @@ if 'statistics' in prep_config:
 
 # Preparation: Covariance matrices
 if 'covariance_model' in prep_config or 'covariance_observation' in prep_config:
-    rule covariance_matrices:
+    rule error_covariance:
         input:
-            prof = prep_config['statistics']['input']['vars']['prof']['load']['path'],
-            hofx = prep_config['statistics']['input']['vars']['hofx']['load']['path'] if 'covariance_observation' in prep_config else None,
+            [prep_config['statistics']['input']['vars'][var]['path'] for var in (['prof', 'hofx'] if 'covariance_observation' in prep_config else [])],
             stats = prep_config['statistics']['output']['path']
         params:
             config_name = hydra_config_name,
@@ -96,8 +96,8 @@ if 'covariance_model' in prep_config or 'covariance_observation' in prep_config:
 # Training step
 rule train:
     input:
-        [train_config['coords'][var]['path'] if 'path' in train_config['coords'][var] else None for var in train_config['coords']],
-        [train_config['obs'][var]['path'] if 'path' in train_config['obs'][var] else None for var in train_config['obs']],
+        [train_config['coords'][var]['path'] for var in train_config['coords'] if 'path' in train_config['coords'][var]],
+        [train_config['obs'][var]['path'] for var in train_config['obs'] if 'path' in train_config['obs'][var]],
         [prep_config[step_name]['output']['path'] for step_name in prep_config]
     params:
         config_name = hydra_config_name,
