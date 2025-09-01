@@ -205,11 +205,17 @@ preparation:
 loader:
   _target_: inverse.model.data_loader.InverseDataloader
   batch_size: 32  # Batch size for training
-  num_workers: 1  # Number of workers for data loading
+  num_workers: 0  # Number of workers for data loading
+  persistent_workers: false  # Keep workers alive between epochs
   stage:
     train:
       _target_: inverse.model.data_loader.InverseCRTMDataset
-      split: 0:256608
+      _recursive_: false
+      split:
+        _target_: numpy.arange
+        _args_:
+          - 0
+          - 256608
       cloud_filter: ${data.vars.cloud_filter.load}
       coords:
         lat: ${data.vars.lat}
@@ -230,14 +236,24 @@ loader:
         hofx: ${data.vars.hofx}
     valid:
       _target_: inverse.model.data_loader.InverseCRTMDataset
-      split: 256608:341240
+      _recursive_: false
+      split:
+        _target_: numpy.arange
+        _args_:
+          - 256608
+          - 341240
       cloud_filter: ${data.loader.stage.train.cloud_filter}
       coords: ${data.loader.stage.train.coords}
       prof_type: ${data.loader.stage.train.prof_type}
       obs: ${data.loader.stage.train.obs}
     test:
       _target_: inverse.model.data_loader.InverseCRTMDataset
-      split: 341240:426872
+      _recursive_: false
+      split:
+        _target_: numpy.arange
+        _args_:
+          - 341240
+          - 426872
       cloud_filter: ${data.loader.stage.train.cloud_filter}
       coords: ${data.loader.stage.train.coords}
       prof_type: ${data.loader.stage.train.prof_type}
@@ -247,6 +263,7 @@ loader:
           path: ${paths.run_dir}/test_prof.npy
           save:
             _target_: numpy.save
+            _partial_: true
             _args_:
               - ${data.loader.stage.test.results.prof.path}
           load:
@@ -257,6 +274,7 @@ loader:
           path: ${paths.run_dir}/test_hofx.npy
           save:
             _target_: numpy.save
+            _partial_: true
             _args_:
               - ${data.loader.stage.test.results.hofx.path}
           load:
@@ -265,12 +283,14 @@ loader:
               - ${data.loader.stage.test.results.hofx.path}
     pred:
       _target_: inverse.model.data_loader.InverseCRTMDataset
+      _recursive_: false
       coords: ${data.loader.stage.train.coords}
       prof_type: ${data.loader.stage.train.prof_type}
       results:
         path: ${paths.run_dir}/pred_set.npy
         save:
           _target_: numpy.save
+          _partial_: true
           _args_:
             - ${data.loader.stage.pred.results.path}
         load:

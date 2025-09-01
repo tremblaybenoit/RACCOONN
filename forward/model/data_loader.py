@@ -10,13 +10,14 @@ from forward.data.transformations import identity
 
 class BaseDataloader(pl.LightningDataModule):
     def __init__(self, batch_size: int = 32, num_workers: int = None,
-                 pin_memory: bool = True, shuffle: bool = True) -> None:
+                 persistent_workers: bool = True, pin_memory: bool = True, shuffle: bool = True) -> None:
         """ Dataloader for the CRTM dataset.
 
         Parameters
         ----------
         batch_size : int. Batch size for the dataloader.
         num_workers : int. Number of workers for the dataloader.
+        persistent_workers : bool. If True, the data loader will keep workers alive between epochs.
         pin_memory : bool. If True, the data loader will copy Tensors into CUDA pinned memory before returning them.
         shuffle : bool. If True, the data loader will shuffle the data at every epoch.
 
@@ -30,6 +31,8 @@ class BaseDataloader(pl.LightningDataModule):
 
         # Number of cpus
         self.num_workers = num_workers if num_workers is not None else os.cpu_count() // 2
+        # Persistent workers for faster data loading
+        self.persistent_workers = persistent_workers
         # Neural network training batch size
         self.batch_size = batch_size
         # Pin memory for faster data transfer
@@ -56,7 +59,7 @@ class BaseDataloader(pl.LightningDataModule):
 
         """
         return DataLoader(self.ds_train, batch_size=self.batch_size, num_workers=self.num_workers,
-                          pin_memory=self.pin_memory, persistent_workers=True, shuffle=self.shuffle)
+                          pin_memory=self.pin_memory, persistent_workers=self.persistent_workers, shuffle=self.shuffle)
 
     def val_dataloader(self) -> DataLoader:
         """ Load validation set.
@@ -71,7 +74,7 @@ class BaseDataloader(pl.LightningDataModule):
 
         """
         return DataLoader(self.ds_valid, batch_size=self.batch_size, num_workers=self.num_workers,
-                          pin_memory=self.pin_memory, persistent_workers=True)
+                          pin_memory=self.pin_memory, persistent_workers=self.persistent_workers)
 
     def test_dataloader(self) -> DataLoader:
         """ Load test set.
@@ -86,7 +89,7 @@ class BaseDataloader(pl.LightningDataModule):
 
         """
         return DataLoader(self.ds_test, batch_size=self.batch_size, num_workers=self.num_workers,
-                          pin_memory=self.pin_memory, persistent_workers=True)
+                          pin_memory=self.pin_memory, persistent_workers=self.persistent_workers)
 
     def predict_dataloader(self) -> DataLoader:
         """ Load prediction set.
@@ -101,7 +104,7 @@ class BaseDataloader(pl.LightningDataModule):
 
         """
         return DataLoader(self.ds_pred, batch_size=self.batch_size, num_workers=self.num_workers,
-                          pin_memory=self.pin_memory, persistent_workers=True)
+                          pin_memory=self.pin_memory, persistent_workers=self.persistent_workers)
 
 
 class CRTMDataloader(BaseDataloader):

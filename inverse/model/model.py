@@ -70,9 +70,11 @@ class PINNverseOperator(BaseModel):
                 'hofx_pred': [],
                 'prof_target': [],
                 'prof_pred': [],
+                'prof_norm_target': [],
+                'prof_norm_pred': [],
+                'prof_background': [],
+                'prof_norm_background': [],
                 'pressure': [],
-                'background': [],
-                'background_err': [],
             }
         self.test_results['prof'] = []
 
@@ -305,12 +307,6 @@ class PINNverseOperator(BaseModel):
         """
 
         super().to(device)
-        # Move all tensors in stats dicts to the device
-        for d in [self.stats_crtm_profiles]:
-            if isinstance(d, dict):
-                for k, v in d.items():
-                    if isinstance(v, torch.Tensor):
-                        d[k] = v.to(device)
         # Move normalization modules if needed
         for attr in ['normalize_prof', 'unnormalize_prof']:
             norm = getattr(self, attr, None)

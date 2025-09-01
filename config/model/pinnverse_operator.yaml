@@ -36,31 +36,31 @@ parameters:
     dropout: 0.1  # Dropout rate
 
 # Loss term(s)
-  loss_func:
-    _target_: inverse.model.loss.VarLoss # Load loss function
-    _partial_: false  # Partial instantiation for callable
-    forward_model:
-      _target_: inverse.model.loss.ForwardModel
-      prof_norm:
-        _target_: forward.data.transformations.NormalizeProfiles
-        profmax:
-          _target_: numpy.loadtxt
-          _args_:
-            - forward/data/normalization/prof_div.txt
+loss_func:
+  _target_: inverse.model.loss.VarLoss # Load loss function
+  _partial_: false  # Partial instantiation for callable
+  forward_model:
+    _target_: inverse.model.loss.ForwardModel
+    prof_norm:
+      _target_: forward.data.transformations.NormalizeProfiles
+      profmax:
+        _target_: numpy.loadtxt
+        _args_:
+          - forward/data/normalization/prof_div.txt
       profmin:
         _target_: numpy.loadtxt
         _args_:
           - forward/data/normalization/prof_m.txt
-    lambda_obs: 1.  # Weight for observation error in the observation space
-    lambda_model: 1.  # Weight for background error
-    lambda_bcs: 1.  # Weight for boundary conditions error
-    loss_obs:
-      _target_: inverse.model.loss.mse
-    loss_model:
-      _target_: inverse.model.loss.mse
-    loss_bcs:
-      _target_: inverse.model.loss.mse
-    pressure_filter:  ${data.vars.pressure_filter.load}  # Mask zero-variance pressure levels
+  lambda_obs: 1.  # Weight for observation error in the observation space
+  lambda_model: 1.  # Weight for background error
+  lambda_bcs: 1.  # Weight for boundary conditions error
+  loss_obs:
+    _target_: inverse.model.loss.mse
+  loss_model:
+    _target_: inverse.model.loss.mse
+  loss_bcs:
+    _target_: inverse.model.loss.mse
+  pressure_filter:  ${data.vars.pressure_filter.load}  # Mask zero-variance pressure levels
 
 # Positional encoding
 positional_encoding:

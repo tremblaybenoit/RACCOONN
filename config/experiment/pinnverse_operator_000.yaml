@@ -28,6 +28,16 @@ trainer:
   min_epochs: 1  # To prevent early stopping
   max_epochs: 32  # Number of epochs
 
+# Data configuration
+data:
+  loader:
+    stage:
+      train:
+        obs:
+          prof_norm_background: ${data.vars.prof}
+          prof_background:
+            load: ${data.vars.prof.load}
+
 # Model parameters
 model:
   _target_: inverse.model.model.PINNverseOperator
@@ -57,32 +67,31 @@ model:
       n_layers: 4  # Number of hidden layers
       dropout: 0.1  # Dropout rate
 
-    # Loss term(s)
-    loss_func:
-      _target_: inverse.model.loss.VarLoss # Load loss function
-      _partial_: false  # Partial instantiation for callable
-      forward_model:
-        _target_: inverse.model.loss.ForwardModel
-        prof_norm:
-          _target_: forward.data.transformations.NormalizeProfiles
-          profmax:
-            _target_: numpy.loadtxt
-            _args_:
-              - forward/data/normalization/prof_div.txt
+  # Loss term(s)
+  loss_func:
+    _target_: inverse.model.loss.VarLoss # Load loss function
+    forward_model:
+      _target_: inverse.model.loss.ForwardModel
+      prof_norm:
+        _target_: forward.data.transformations.NormalizeProfiles
+        profmax:
+          _target_: numpy.loadtxt
+          _args_:
+            - forward/data/normalization/prof_div.txt
         profmin:
           _target_: numpy.loadtxt
           _args_:
             - forward/data/normalization/prof_m.txt
-      lambda_obs: 0.  # Weight for observation error in the observation space
-      lambda_model: 1.  # Weight for background error
-      lambda_bcs: 1.  # Weight for boundary conditions error
-      loss_obs:
-        _target_: inverse.model.loss.mse
-      loss_model:
-        _target_: inverse.model.loss.mse
-      loss_bcs:
-        _target_: inverse.model.loss.mse
-      pressure_filter: ${data.vars.pressure_filter.load}  # Mask zero-variance pressure levels
+    lambda_obs: 0.  # Weight for observation error in the observation space
+    lambda_model: 1.  # Weight for background error
+    lambda_bcs: 1.  # Weight for boundary conditions error
+    loss_obs:
+      _target_: inverse.model.loss.MSE
+    loss_model:
+      _target_: inverse.model.loss.MSE
+    loss_bcs:
+      _target_: inverse.model.loss.MSE
+    pressure_filter: ${data.vars.pressure_filter.load}  # Mask zero-variance pressure levels
 
   # Positional encoding
   positional_encoding:

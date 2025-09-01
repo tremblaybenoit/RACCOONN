@@ -74,7 +74,7 @@ class InverseOperator:
 
         # Data loader
         logger.info("Initializing data loader...")
-        self.data_loader = instantiate(data_config)
+        self.data_loader = instantiate(data_config.loader)
         # Generate training/validation/test sets
         self.data_loader.setup(stage=stage)
 

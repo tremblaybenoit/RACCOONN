@@ -51,7 +51,7 @@ class FigureLogger(Callback):
         prof_norm_err = (prof_norm_pred - prof_norm_target)**2
         # Pressure_levels
         pressure_levels = 0.01*(
-            instantiate(trainer.datamodule.sets.train.pressure.normalization, inverse_transform=True)
+            instantiate(trainer.datamodule.stage.valid.obs.pressure.normalization, inverse_transform=True)
             (model.valid_results['pressure'][0][0]))
         # Cloud mask
         clrsky = np.logical_and(prof_target[:, 5, :].sum(axis=1) == 0, prof_target[:, 6, :].sum(axis=1) == 0)
@@ -62,7 +62,7 @@ class FigureLogger(Callback):
 
         # Profiles
         if 'prof_background' in model.valid_results and len(model.valid_results['prof_background']) > 0:
-           prof_background = np.concatenate(model.valid_results['background'], axis=0)
+           prof_background = np.concatenate(model.valid_results['prof_background'], axis=0)
            figs.append(fig_vertical_profiles_background(prof_target, prof_pred, prof_background, y=pressure_levels, y_label='Pressure (hPa)',
                                                    title=[f"Epoch {current_epoch:02d} - {prof_label} profiles" for prof_label in prof_labels]))
         else:

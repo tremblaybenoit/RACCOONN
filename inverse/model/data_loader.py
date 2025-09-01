@@ -35,7 +35,7 @@ def load_coords(config: DictConfig, split: np.ndarray = None) -> dict:
     # Extract number of coordinate points and number of scans
     if 'lat' not in config or 'lon' not in config or 'scans' not in config:
         raise ValueError("Coordinates 'lat', 'lon', and 'scans' must be provided in the configuration.")
-    n_coords, n_scans = config['lat'].shape[0], config['scans'].shape[0]
+    n_coords, n_scans = x['lat'].shape[0], x['scans'].shape[0]
 
     # Repeat or tile lat, lon and t to match the number of samples (n_coords * n_timesteps)
     x['lat'] = np.tile(x['lat'], n_scans)
@@ -44,9 +44,12 @@ def load_coords(config: DictConfig, split: np.ndarray = None) -> dict:
 
     # Apply split if available
     if split is not None:
-        for c in x['coords']:
-            if x['coords'][c].shape[0] == len(split):
-                x['coords'][c] = x['coords'][c][split]
+        breakpoint()
+        for c in x:
+            breakpoint()
+            if x[c].shape[0] == len(split):
+                breakpoint()
+                x[c] = x[c][split]
 
     return x
 
@@ -82,7 +85,8 @@ def load_obs(config: DictConfig, split: np.ndarray = None) -> dict:
 
 
 class InverseDataloader(BaseDataloader):
-    def __init__(self, stage: DictConfig, batch_size: int = 32, num_workers: int = None, pin_memory: bool = True) -> None:
+    def __init__(self, stage: DictConfig, batch_size: int = 32, num_workers: int = None,
+                 persistent_workers: bool = True, pin_memory: bool = True) -> None:
         """ Dataloader for the CRTM dataset.
 
         Parameters
@@ -90,6 +94,7 @@ class InverseDataloader(BaseDataloader):
         stage: DictConfig. Configuration object for the dataset at each stage (train, valid, test, pred).
         batch_size : int. Batch size for the dataloader.
         num_workers : int. Number of workers for the dataloader.
+        persistent_workers : bool. If True, the data loader will not shutdown the worker processes after a dataset has been consumed.
         pin_memory : bool. If True, the data loader will copy Tensors into CUDA pinned memory before returning them.
 
         Returns
@@ -98,7 +103,7 @@ class InverseDataloader(BaseDataloader):
         """
 
         #  Class inheritance
-        super().__init__(batch_size=batch_size, num_workers=num_workers, pin_memory=pin_memory)
+        super().__init__(batch_size=batch_size, num_workers=num_workers, persistent_workers=persistent_workers, pin_memory=pin_memory)
 
         # Data sets
         self.stage = stage
@@ -118,13 +123,13 @@ class InverseDataloader(BaseDataloader):
         # Load datasets
         if stage == 'train':
             # Training/validation data
-            self.ds_train, self.ds_valid = self.stage['train'], self.stage['valid']
+            self.ds_train, self.ds_valid = self.stage.train, self.stage.valid
         elif stage == 'test':
             # Test/prediction data
-            self.ds_test = self.stage[stage]
+            self.ds_test = self.stage.test
         elif stage == 'pred':
             # Prediction data
-            self.ds_pred = self.stage[stage]
+            self.ds_pred = self.stage.pred
 
 
 class InverseDataset(Dataset):
@@ -166,23 +171,23 @@ class InverseDataset(Dataset):
         """
 
         # Get the data at the specified index
-        return {k: {kk: vv[idx] if kk.shape[0] != self.__len__() else vv
+        return {k: {kk: vv[idx] if vv.shape[0] == self.__len__() else vv
                     for kk, vv in v.items()} for k, v in self.x.items()}
 
 
 class InverseCRTMDataset(InverseDataset):
     """Lazy loader for the inverse dataset."""
 
-    def __init__(self, coords: DictConfig, prof_type: ListConfig, split: np.ndarray = None, cloud_filter: np.ndarray = None,
-                 obs: DictConfig = None, results: DictConfig = None) -> None:
+    def __init__(self, coords: DictConfig, prof_type: ListConfig, split: DictConfig = None,
+                 cloud_filter: DictConfig = None, obs: DictConfig = None, results: DictConfig = None) -> None:
         """Initialize the lazy loader.
 
         Parameters
         ----------
         coords : DictConfig. Configuration object for the coordinates.
         prof_type : ListConfig. List of profile types to load.
-        split : np.ndarray. Array of indices for the specified stage.
-        cloud_filter : np.ndarray or None. Boolean mask to filter out clear-sky profiles.
+        split : DictConfig. Indices for the specified stage.
+        cloud_filter : DictConfig. Boolean mask to filter out clear-sky profiles.
         obs : DictConfig. Configuration object for the variables.
         results : DictConfig. Configuration object for the results.
 
@@ -198,11 +203,14 @@ class InverseCRTMDataset(InverseDataset):
         self.results = results
 
         # Extract splitting
-        if split is not None and cloud_filter is not None:
-            split = cloud_filter[split]
+        split = instantiate(split) if split is not None else None
+        if cloud_filter is not None:
+            cloud_filter = instantiate(cloud_filter)
+            split = split[cloud_filter[split]] if split is not None else np.where(cloud_filter)[0]
 
         # Load coordinates
         x = {'coords': load_coords(coords, split=split)}
+
         # Load variables (if provided)
         if obs is not None:
             x['obs'] = load_obs(obs, split=split)

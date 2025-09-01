@@ -19,8 +19,8 @@ def cloud_filter(prof: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, tor
         clrsky = (prof[:, 5, :].sum(dim=1) == 0) & (prof[:, 6, :].sum(dim=1) == 0)
         clrsky = clrsky & (prof[:, 7, :].sum(dim=1) == 0)
     else:
-        clrsky = np.logical_and(prof[:, 5, :].sum(axis=1) == 0, prof[:, 6, :].sum(axis=1) == 0)
-        clrsky = np.logical_and(clrsky, prof[:, 7, :].sum(axis=1) == 0)
+        clrsky = np.logical_and(prof[:, 5, :].sum(axis=1) == 0, prof[:, 6, :].sum(axis=1) == 0,
+                                prof[:, 7, :].sum(axis=1) == 0)
 
     return ~clrsky
 

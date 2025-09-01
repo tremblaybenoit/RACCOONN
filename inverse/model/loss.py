@@ -29,6 +29,42 @@ def mse(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     return (pred - target) ** 2
 
 
+class MSE(torch.nn.Module):
+    """ Mean Squared Error loss module."""
+    def __init__(self):
+        """ Initialize the MSE module.
+
+        Returns
+        -------
+        None.
+        """
+        super().__init__()
+
+    def to(self, device):
+        """ Move the module to a specified device.
+
+        Parameters
+        ----------
+        device: torch.device. Device to move the module to.
+        """
+        super().to(device)
+        return self
+
+    def __call__(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        """ Compute the mean squared error between predicted and target tensors.
+
+        Parameters
+        ----------
+        pred: torch.Tensor. Predicted tensor.
+        target: torch.Tensor. True values.
+
+        Returns
+        -------
+        torch.Tensor. Mean squared error over the batch.
+        """
+        return mse(pred, target)
+
+
 def quadratic_form(pred: torch.Tensor, target: torch.Tensor, matrix: torch.Tensor) -> torch.Tensor:
     """ Compute the quadratic form of the difference between predicted and target tensors.
 
@@ -110,6 +146,47 @@ def diagonal_quadratic_form(pred: torch.Tensor, target: torch.Tensor, diag: torc
     return mse(pred/(diag + eps), target/(diag + eps))
 
 
+class DiagonalQuadraticForm(torch.nn.Module):
+    """ Diagonal quadratic form loss module."""
+    def __init__(self):
+        """ Initialize the DiagonalQuadraticForm module.
+
+        Parameters
+        ----------
+        None.
+
+        Returns
+        -------
+        None.
+        """
+        super().__init__()
+
+    def to(self, device):
+        """ Move the module to a specified device.
+
+        Parameters
+        ----------
+        device: torch.device. Device to move the module to.
+        """
+        super().to(device)
+        return self
+
+    def __call__(self, pred: torch.Tensor, target: torch.Tensor, diag: torch.Tensor) -> torch.Tensor:
+        """ Compute the diagonal quadratic form of the difference between predicted and target tensors.
+
+        Parameters
+        ----------
+        pred: torch.Tensor. Predicted tensor.
+        target: torch.Tensor. True values.
+        diag: torch.Tensor. Diagonal elements of the matrix to compute the quadratic form with.
+
+        Returns
+        -------
+        torch.Tensor. Diagonal quadratic form of the difference between predicted and target tensors.
+        """
+        return diagonal_quadratic_form(pred, target, diag)
+
+
 def kl_divergence_normal(mu_pred, sigma_pred, mu_target, sigma_target):
     """
     Compute the KL divergence between two normal distributions.
@@ -134,6 +211,49 @@ def kl_divergence_normal(mu_pred, sigma_pred, mu_target, sigma_target):
     return torch.log(sigma_target / sigma_pred) + (var_pred + (mu_pred - mu_target) ** 2) / (2 * var_target) - 0.5
 
 
+class KLDivNormal(torch.nn.Module):
+    """ KL divergence loss module."""
+    def __init__(self):
+        """ Initialize the KLDivNormal module.
+
+        Returns
+        -------
+        None.
+        """
+        super().__init__()
+
+    def to(self, device):
+        """ Move the module to a specified device.
+
+        Parameters
+        ----------
+        device: torch.device. Device to move the module to.
+        """
+        super().to(device)
+        return self
+
+    def __call__(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        """ Compute the KL divergence between predicted and target normal distributions.
+
+        Parameters
+        ----------
+        pred: torch.Tensor. Tensor containing predictions: [mean, std].
+        target: torch.Tensor. True values.
+
+        Returns
+        -------
+        torch.Tensor. Mean KL divergence over the batch.
+        """
+
+        # Split input
+        mu_pred = pred[:, :10]
+        sigma_pred = pred[:, 10:]
+        mu_target = target[:, :10]
+        sigma_target = target[:, 10:]
+
+        return kl_divergence_normal(mu_pred, sigma_pred, mu_target, sigma_target)
+
+
 def wasserstein_2_normal(mu_pred, sigma_pred, mu_target, sigma_target):
     """
     Compute the Wasserstein-2 distance between two normal distributions.
@@ -150,6 +270,49 @@ def wasserstein_2_normal(mu_pred, sigma_pred, mu_target, sigma_target):
     wasserstein_distance: torch.Tensor. Wasserstein-2 distance between the predicted and target normal distributions.
     """
     return torch.sqrt((mu_pred - mu_target) ** 2 + (sigma_pred - sigma_target) ** 2)
+
+
+class Wasserstein2Normal(torch.nn.Module):
+    """ Wasserstein-2 distance loss module."""
+    def __init__(self):
+        """ Initialize the Wasserstein2Normal module.
+
+        Returns
+        -------
+        None.
+        """
+        super().__init__()
+
+    def to(self, device):
+        """ Move the module to a specified device.
+
+        Parameters
+        ----------
+        device: torch.device. Device to move the module to.
+        """
+        super().to(device)
+        return self
+
+    def __call__(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        """ Compute the Wasserstein-2 distance between predicted and target normal distributions.
+
+        Parameters
+        ----------
+        pred: torch.Tensor. Tensor containing predictions: [mean, std].
+        target: torch.Tensor. True values.
+
+        Returns
+        -------
+        torch.Tensor. Mean Wasserstein-2 distance over the batch.
+        """
+
+        # Split input
+        mu_pred = pred[:, :10]
+        sigma_pred = pred[:, 10:]
+        mu_target = target[:, :10]
+        sigma_target = target[:, 10:]
+
+        return wasserstein_2_normal(mu_pred, sigma_pred, mu_target, sigma_target)
 
 
 def crps(pred, target, version=0):
@@ -195,6 +358,47 @@ def crps(pred, target, version=0):
     pphi = 0.5 * (1.0 + torch.erf(loc / np.sqrt(2.0)))
     # Compute the CRPS for each input/target pair
     return torch.sqrt(var_pred) * (loc * (2. * pphi - 1.) + 2 * phi - 1. / np.sqrt(np.pi))
+
+
+class CRPS(torch.nn.Module):
+    """ Continuous Ranked Probability Score loss module."""
+    def __init__(self, version=0):
+        """ Initialize the CRPS module.
+
+        Parameters
+        ----------
+        version: int. Version of the CRPS calculation to use (0 or 1 or 2).
+
+        Returns
+        -------
+        None.
+        """
+        super().__init__()
+        self.version = version
+
+    def to(self, device):
+        """ Move the module to a specified device.
+
+        Parameters
+        ----------
+        device: torch.device. Device to move the module to.
+        """
+        super().to(device)
+        return self
+
+    def __call__(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        """ Compute the Continuous Ranked Probability Score between predicted and target normal distributions.
+
+        Parameters
+        ----------
+        pred: torch.Tensor. Tensor containing predictions: [mean, std].
+        target: torch.Tensor. True values.
+
+        Returns
+        -------
+        torch.Tensor. Mean CRPS over the batch.
+        """
+        return crps(pred, target, version=self.version)
 
 
 class ForwardModel(torch.nn.Module):
@@ -256,7 +460,7 @@ class VarLoss(torch.nn.Module):
     """ Universal loss module that combines observation and model losses. """
     def __init__(self, forward_model: Callable, loss_obs: Callable, loss_model: Callable = None, loss_bcs: Callable = None,
                  lambda_obs: float=1.0, lambda_model: float=1.0, lambda_bcs: float=1.0,
-                 pressure_filter: np.ndarray=None, sanity_check: bool=False):
+                 pressure_filter: np.ndarray=None):
         """ Initialize the variational loss module.
 
         Parameters
@@ -269,7 +473,6 @@ class VarLoss(torch.nn.Module):
         lambda_model: float. Weight for the model loss.
         lambda_bcs: float. Weight for the boundary condition loss.
         pressure_filter: Callable. Function to generate a mask for the profile levels to include in the model loss.
-        sanity_check: bool. If True, perform a sanity check on the observation losses.
 
         Returns
         -------
@@ -285,8 +488,6 @@ class VarLoss(torch.nn.Module):
         self.lambda_obs, self.lambda_model, self.lambda_bcs = lambda_obs, lambda_model, lambda_bcs
         # Pressure mask per profile type
         self.pressure_filter = torch.from_numpy(pressure_filter) if pressure_filter is not None else None
-        # Sanity check flag
-        self.sanity_check = sanity_check
 
     def __call__(self, pred: dict, target: dict) -> tuple[dict, torch.Tensor]:
         """ Compute the combined loss between predicted profiles and target data.
