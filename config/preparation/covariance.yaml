@@ -1,0 +1,34 @@
+covariance_model:
+  input:
+    vars:
+      err: ${data.vars.prof_increment}
+    cloud_filter: ${data.vars.cloud_filter}
+    pressure_filter: ${data.vars.pressure_filter}
+  output:
+    path: ${paths.data_dir}/normalization/model_covariance_cloud_filter_pressure_filter.npy
+    save:
+      _target_: numpy.save
+      _partial_: true
+      _args_:
+        - ${preparation.covariance_model.output.path}
+    load:
+      _target_: numpy.load
+      _args_:
+        - ${preparation.covariance_model.output.path}
+
+covariance_obs:
+  input:
+    vars:
+      err: ${data.vars.hofx_innovation}
+    cloud_filter: ${data.vars.cloud_filter}
+  output:
+    path: ${paths.data_dir}/normalization/observation_covariance_cloud_filter.npy
+    save:
+      _target_: numpy.save
+      _partial_: true
+      _args_:
+        - ${preparation.covariance_obs.output.path}
+    load:
+      _target_: numpy.load
+      _args_:
+        - ${preparation.covariance_obs.output.path}

@@ -4,9 +4,11 @@
 # Overriding default structure
 defaults:
   - override /data: inverse
+  - override /preparation: default
+  - override /loader: inverse_train  # Training only
   - override /paths: default
   - override /hydra: default
-  - override /model: pinnverse_operator
+  - override /model: inverse_operator
   - override /trainer: gpu
   - override /callbacks: default
   - override /logger: default
@@ -29,14 +31,13 @@ trainer:
   max_epochs: 32  # Number of epochs
 
 # Data configuration
-data:
-  loader:
-    stage:
-      train:
-        obs:
-          prof_norm_background: ${data.vars.prof}
-          prof_background:
-            load: ${data.vars.prof.load}
+loader:
+  stage:
+    train:
+      obs:
+        prof_norm_background: ${data.vars.prof}
+        prof_background:
+          load: ${data.vars.prof.load}
 
 # Model parameters
 model:

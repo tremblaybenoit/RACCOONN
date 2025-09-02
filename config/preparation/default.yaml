@@ -1,0 +1,4 @@
+defaults:
+  - statistics
+  - covariance
+  - _self_

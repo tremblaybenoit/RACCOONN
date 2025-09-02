@@ -1,6 +1,8 @@
 # Note: The order of defaults determines the order in which configs override each other.
 defaults:
   - data: forward
+  - preparation: default
+  - loader: inverse_train  # Training only
   - hydra: default
   - paths: default
   - model: forward_emulator

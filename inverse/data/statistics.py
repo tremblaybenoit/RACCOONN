@@ -182,9 +182,9 @@ def main(config: DictConfig) -> None:
     """
 
     # If statistics is part of the preparation steps:
-    if hasattr(config.data.preparation, "statistics"):
+    if hasattr(config.preparation, "statistics"):
         logger.info("Computing statistics of data...")
-        compute_statistics(config.data.preparation.statistics)
+        compute_statistics(config.preparation.statistics)
 
     return
 

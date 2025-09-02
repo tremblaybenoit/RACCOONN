@@ -1,0 +1,14 @@
+statistics:
+  input:
+    vars:
+      prof: ${data.vars.prof}
+      surf: ${data.vars.surf}
+      meta: ${data.vars.meta}
+      hofx: ${data.vars.hofx}
+      lat: ${data.vars.lat}
+      lon: ${data.vars.lon}
+      scans: ${data.vars.scans}
+      pressure: ${data.vars.pressure}
+    cloud_filter: ${data.vars.cloud_filter}
+  output:
+    path: ${paths.data_dir}/normalization/stats_cloud_filter.pkl

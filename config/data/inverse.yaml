@@ -6,16 +6,7 @@ download:
   dir: ${paths.data_dir}
   url: "https://zenodo.org/record/1482223/files/GOES-16_ML_Training_Testing_Data.zip?download=1"
 
-
-# TODO: Add option to fix dtype for numpy and torch
-# dtype:
-#   numpy:
-#     _target_: numpy.float64  # Data type for arrays
-#   torch:
-#     _target_: torch.float64  # Data type for tensors
-
-
-# Configuration for the variables used in the data loader.
+# Configuration for the variables used in the dataset.
 vars:
   prof:
     type: ['Air temperature', 'Water vapor mixing ratio', 'Cloud ice mass', 'Cloud water mass', 'Snow mass',
@@ -32,7 +23,7 @@ vars:
       stats:
         _target_: inverse.data.statistics.read_statistics_var
         _args_:
-          - ${data.preparation.statistics.output.path}
+          - ${preparation.statistics.output.path}
           - 'prof'
       axis: null  # Axis for normalization
   surf:
@@ -148,152 +139,3 @@ vars:
     load:
       _target_: inverse.data.filters.cloud_filter
       prof: ${data.vars.prof.load}
-
-
-# Preparation steps to be executed before training or evaluation.
-preparation:
-  statistics:
-    input:
-      vars:
-        prof: ${data.vars.prof}
-        surf: ${data.vars.surf}
-        meta: ${data.vars.meta}
-        hofx: ${data.vars.hofx}
-        lat: ${data.vars.lat}
-        lon: ${data.vars.lon}
-        scans: ${data.vars.scans}
-        pressure: ${data.vars.pressure}
-      cloud_filter: ${data.vars.cloud_filter}
-    output:
-      path: ${paths.data_dir}/normalization/stats_cloud_filter.pkl
-  covariance_model:
-    input:
-      vars:
-        err: ${data.vars.prof_increment}
-      cloud_filter: ${data.vars.cloud_filter}
-      pressure_filter: ${data.vars.pressure_filter}
-    output:
-      path: ${paths.data_dir}/normalization/model_covariance_cloud_filter_pressure_filter.npy
-      save:
-        _target_: numpy.save
-        _partial_: true
-        _args_:
-          - ${data.preparation.covariance_model.output.path}
-      load:
-        _target_: numpy.load
-        _args_:
-          - ${data.preparation.covariance_model.output.path}
-  covariance_observation:
-    input:
-      vars:
-        err: ${data.vars.hofx_innovation}
-      cloud_filter: ${data.vars.cloud_filter}
-    output:
-      path: ${paths.data_dir}/normalization/observation_covariance_cloud_filter.npy
-      save:
-        _target_: numpy.save
-        _partial_: true
-        _args_:
-          - ${data.preparation.covariance_observation.output.path}
-      load:
-        _target_: numpy.load
-        _args_:
-          - ${data.preparation.covariance_observation.output.path}
-
-
-# Configuration for the data loader that handles the dataset splits.
-loader:
-  _target_: inverse.model.data_loader.InverseDataloader
-  batch_size: 32  # Batch size for training
-  num_workers: 0  # Number of workers for data loading
-  persistent_workers: false  # Keep workers alive between epochs
-  stage:
-    train:
-      _target_: inverse.model.data_loader.InverseCRTMDataset
-      _recursive_: false
-      split:
-        _target_: numpy.arange
-        _args_:
-          - 0
-          - 256608
-      cloud_filter: ${data.vars.cloud_filter.load}
-      coords:
-        lat: ${data.vars.lat}
-        lon: ${data.vars.lon}
-        scans: ${data.vars.scans}
-        pressure: ${data.vars.pressure}
-      prof_type: ${data.vars.prof.type}
-      obs:
-        prof_norm: ${data.vars.prof}
-        prof_norm_background: ${data.vars.prof_background}
-        prof_norm_increment: ${data.vars.prof_increment}
-        prof:
-          load: ${data.vars.prof.load}
-        prof_background:
-          load: ${data.vars.prof_background.load}
-        surf: ${data.vars.surf}
-        meta: ${data.vars.meta}
-        hofx: ${data.vars.hofx}
-    valid:
-      _target_: inverse.model.data_loader.InverseCRTMDataset
-      _recursive_: false
-      split:
-        _target_: numpy.arange
-        _args_:
-          - 256608
-          - 341240
-      cloud_filter: ${data.loader.stage.train.cloud_filter}
-      coords: ${data.loader.stage.train.coords}
-      prof_type: ${data.loader.stage.train.prof_type}
-      obs: ${data.loader.stage.train.obs}
-    test:
-      _target_: inverse.model.data_loader.InverseCRTMDataset
-      _recursive_: false
-      split:
-        _target_: numpy.arange
-        _args_:
-          - 341240
-          - 426872
-      cloud_filter: ${data.loader.stage.train.cloud_filter}
-      coords: ${data.loader.stage.train.coords}
-      prof_type: ${data.loader.stage.train.prof_type}
-      obs: ${data.loader.stage.train.obs}
-      results:
-        prof:
-          path: ${paths.run_dir}/test_prof.npy
-          save:
-            _target_: numpy.save
-            _partial_: true
-            _args_:
-              - ${data.loader.stage.test.results.prof.path}
-          load:
-            _target_: numpy.load
-            _args_:
-              - ${data.loader.stage.test.results.prof.path}
-        hofx:
-          path: ${paths.run_dir}/test_hofx.npy
-          save:
-            _target_: numpy.save
-            _partial_: true
-            _args_:
-              - ${data.loader.stage.test.results.hofx.path}
-          load:
-            _target_: numpy.load
-            _args_:
-              - ${data.loader.stage.test.results.hofx.path}
-    pred:
-      _target_: inverse.model.data_loader.InverseCRTMDataset
-      _recursive_: false
-      coords: ${data.loader.stage.train.coords}
-      prof_type: ${data.loader.stage.train.prof_type}
-      results:
-        path: ${paths.run_dir}/pred_set.npy
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${data.loader.stage.pred.results.path}
-        load:
-          _target_: numpy.load
-          _args_:
-            - ${data.loader.stage.pred.results.path}

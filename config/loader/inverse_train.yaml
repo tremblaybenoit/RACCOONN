@@ -1,0 +1,77 @@
+defaults:
+  - inverse
+
+stage:
+  train:
+    _target_: inverse.model.data_loader.InverseCRTMDataset
+    _recursive_: false
+    split:
+      _target_: numpy.arange
+      _args_:
+        - 0
+        - 256608
+    cloud_filter: ${data.vars.cloud_filter.load}
+    coords:
+      lat: ${data.vars.lat}
+      lon: ${data.vars.lon}
+      scans: ${data.vars.scans}
+      pressure: ${data.vars.pressure}
+    prof_type: ${data.vars.prof.type}
+    obs:
+      prof_norm: ${data.vars.prof}
+      prof_norm_background: ${data.vars.prof_background}
+      prof_norm_increment: ${data.vars.prof_increment}
+      prof:
+        load: ${data.vars.prof.load}
+      prof_background:
+        load: ${data.vars.prof_background.load}
+      surf: ${data.vars.surf}
+      meta: ${data.vars.meta}
+      hofx: ${data.vars.hofx}
+  valid:
+    _target_: inverse.model.data_loader.InverseCRTMDataset
+    _recursive_: false
+    split:
+      _target_: numpy.arange
+      _args_:
+        - 256608
+        - 341240
+    cloud_filter: ${loader.stage.train.cloud_filter}
+    coords: ${loader.stage.train.coords}
+    prof_type: ${loader.stage.train.prof_type}
+    obs: ${loader.stage.train.obs}
+  test:
+    _target_: inverse.model.data_loader.InverseCRTMDataset
+    _recursive_: false
+    split:
+      _target_: numpy.arange
+      _args_:
+        - 341240
+        - 426872
+    cloud_filter: ${loader.stage.train.cloud_filter}
+    coords: ${loader.stage.train.coords}
+    prof_type: ${loader.stage.train.prof_type}
+    obs: ${loader.stage.train.obs}
+    results:
+      prof:
+        path: ${paths.run_dir}/test_prof.npy
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${loader.stage.test.results.prof.path}
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${loader.stage.test.results.prof.path}
+      hofx:
+        path: ${paths.run_dir}/test_hofx.npy
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${loader.stage.test.results.hofx.path}
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${loader.stage.test.results.hofx.path}

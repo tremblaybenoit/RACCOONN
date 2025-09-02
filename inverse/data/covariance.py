@@ -163,12 +163,12 @@ def main(config: DictConfig) -> None:
     """
 
     # Compute model and observation covariance matrices
-    if hasattr(config.data.preparation, 'covariance_model'):
+    if hasattr(config.preparation, 'covariance_model'):
         logger.info("Computing model covariance matrix...")
-        covariance_matrix(config.data.preparation.covariance_model)
-    if hasattr(config.data.preparation, 'covariance_observation'):
+        covariance_matrix(config.preparation.covariance_model)
+    if hasattr(config.preparation, 'covariance_observation'):
         logger.info("Computing observation covariance matrix...")
-        covariance_matrix(config.data.preparation.covariance_observation)
+        covariance_matrix(config.preparation.covariance_observation)
 
     return
 

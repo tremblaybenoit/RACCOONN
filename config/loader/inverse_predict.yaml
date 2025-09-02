@@ -1,0 +1,20 @@
+defaults:
+  - inverse
+
+stage:
+  predict:
+    _target_: inverse.model.data_loader.InverseCRTMDataset
+    _recursive_: false
+    coords: ${data.loader.stage.train.coords}
+    prof_type: ${data.loader.stage.train.prof_type}
+    results:
+      path: ${paths.run_dir}/predict_set.npy
+      save:
+        _target_: numpy.save
+        _partial_: true
+        _args_:
+          - ${data.loader.stage.predict.results.path}
+      load:
+        _target_: numpy.load
+        _args_:
+          - ${data.loader.stage.predict.results.path}

@@ -4,6 +4,8 @@
 # Overriding default structure
 defaults:
   - override /data: inverse
+  - override /preparation: inverse
+  - override /loader: inverse
   - override /paths: default
   - override /hydra: default
   - override /model: pinnverse_operator
