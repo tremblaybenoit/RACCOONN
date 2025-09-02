@@ -9,11 +9,7 @@ Clone the following repository:
 ```bash
 git clone https://github.com/tremblaybenoit/RACCOONN.git
 ```
-RACCOONN was developed in the PyTorch Lightning framework. To set up a virtual environment containing all dependencies:
-```bash
-conda create -n raccoonn
-pip install -r requirements.txt --break-system-packages
-```
+RACCOONN was developed in the PyTorch Lightning framework and uses Hydra for flexibility.
 
 # Usage
 To ensure reproducibility, RACCOONN relies heavily on the ["Snakemake workflow management system"](https://snakemake.readthedocs.io/en/stable/). 
@@ -29,10 +25,10 @@ To execute the workflow using a specified number of cores (e.g., 1):
 snakemake --cores 1 
 ```
 
-To draw a directed acyclic graph (DAG) of the workflow as an image (e.g., dag.png) with left-to-right orientation (Grankdir=LR):
+To draw a directed acyclic graph (DAG) of the workflow (e.g., dag.mmd):
 
 ```bash
-snakemake --dag mermaid-js --config hydra-experiment=pinnverse_operator_000 > dag.mmd -Grankdir=LR
+snakemake --rulegraph mermaid-js --config hydra-experiment=pinnverse_operator_000 > dag.mmd
 ```
 Replace "--rulegraph" with "--dag" to draw dashed bounding boxes around the completed steps.
 
