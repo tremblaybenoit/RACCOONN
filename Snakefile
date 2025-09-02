@@ -18,9 +18,10 @@ setup_directories_from_hydra(config_path=hydra_config_path, config_name=hydra_co
 hydra_config = read_hydra_as_dict(config_path=hydra_config_path, config_name=hydra_config_name,
                                   overrides=f"+experiment={hydra_experiment}")
 # Data configuration file (from Snakemake config file)
-vars_config = hydra_config["data"]["vars"]
-prep_config = hydra_config["preparation"]
-stage_config = hydra_config["loader"]["stage"]
+data_config = hydra_config.get("data", {})
+vars_config = data_config.get("vars", {})
+prep_config = hydra_config.get("preparation", {})
+stage_config = hydra_config.get("loader", {}).get("stage", {})
 # Paths configuration file (from Snakemake config file)
 paths_config = hydra_config["paths"]
 # Callback configuration file (from Snakemake config file)
@@ -30,31 +31,37 @@ checkpoint_config = hydra_config["callbacks"]["model_checkpoint"]
 # TARGET
 #########################################################################################################
 
-# Inverse model
+# Train model and get test results (if applicable)
 rule model_train:
     input:
         checkpoint = f"{checkpoint_config['dirpath']}/{checkpoint_config['filename']}.ckpt",
-        test_results = [stage_config['test']['results'][output]['path']
-                        for output in stage_config['test']['results']] if 'test' in stage_config else ''
+        test_out = [stage_config['test']['results'][output]['path']
+                    for output in stage_config['test']['results']] if 'test' in stage_config else ''
 
 # TODO: Untested.
-rule model_predict:
-    input:
-        checkpoint = f"{checkpoint_config['dirpath']}/{checkpoint_config['filename']}.ckpt",
-        pred_results = [stage_config['predict']['results'][output]['path']
-                        for output in stage_config['predict']['results']] if 'predict' in stage_config else ''
+# Make predictions with the trained model
+if 'predict' in stage_config:
+    rule model_predict:
+        input:
+            # Model checkpoint
+            checkpoint = f"{checkpoint_config['dirpath']}/{checkpoint_config['filename']}.ckpt",
+            # Prediction results
+            pred_out = [stage_config['predict']['results'][output]['path']
+                        for output in stage_config['predict']['results']]
 
 #########################################################################################################
 # RULES
 #########################################################################################################
 
 # Data download
-rule download:
+rule data:
     params:
+        # Hydra configuration
         config_name=hydra_config_name,
         experiment=f"+experiment={hydra_experiment}" if hydra_experiment is not None else ""
     output:
-        [vars_config[var]['path'] for var in vars_config if 'path' in vars_config[var]]
+        # Downloaded data
+        data = [var['path'] for var in vars_config.values() if 'path' in var]
     shell:
         """
         python -m forward.utilities.download \
@@ -64,15 +71,18 @@ rule download:
 
 # Preparation: Statistics
 if 'statistics' in prep_config:
+    statistics_config = prep_config['statistics']
     rule statistics:
         input:
-            [prep_config['statistics']['input']['vars'][var]['path'] if 'path' in prep_config['statistics']['input']['vars'][var] else None
-             for var in prep_config['statistics']['input']['vars']]
+            # Coordinates and observations
+            data = [var['path'] for var in statistics_config['input']['vars'].values() if 'path' in var]
         params:
+            # Hydra configuration
             config_name = hydra_config_name,
             experiment = f"+experiment={hydra_experiment}" if hydra_experiment is not None else ""
         output:
-            out = prep_config['statistics']['output']['path']
+            # Data statistics
+            out = statistics_config['output']['path']
         shell:
             """
             python -m inverse.data.preparation.statistics \
@@ -82,16 +92,22 @@ if 'statistics' in prep_config:
 
 # Preparation: Covariance matrices
 if 'covariance_model' in prep_config or 'covariance_obs' in prep_config:
+    steps = []
+    if 'covariance_model' in prep_config:
+        steps.append('covariance_model')
+    if 'covariance_obs' in prep_config:
+        steps.append('covariance_obs')
     rule error_covariance:
         input:
-            [prep_config['statistics']['input']['vars'][var]['path'] for var in (['prof', 'hofx'] if 'covariance_obs' in prep_config else [])],
-            stats = prep_config['statistics']['output']['path']
+            # Data statistics
+            statistics = prep_config['statistics']['output']['path']
         params:
+            # Hydra configuration
             config_name = hydra_config_name,
             experiment = f"+experiment={hydra_experiment}" if hydra_experiment is not None else ""
         output:
-            out_model = prep_config['covariance_model']['output']['path'] if 'covariance_model' in prep_config else None,
-            out_observation = prep_config['covariance_obs']['output']['path'] if 'covariance_obs' in prep_config else None,
+            # Output covariance matrices
+            out = [prep_config[step]['output']['path'] for step in steps if 'path' in prep_config[step]['output']]
         shell:
             """
             python -m inverse.data.preparation.covariance \
@@ -101,17 +117,23 @@ if 'covariance_model' in prep_config or 'covariance_obs' in prep_config:
 
 # Training step
 if 'train' in stage_config:
+    train_config = stage_config['train']
+    valid_config = stage_config['valid']
     rule train:
         input:
-            [stage_config['train']['coords'][var]['path'] for var in stage_config['train']['coords'] if 'path' in stage_config['train']['coords'][var]],
-            [stage_config['train']['obs'][var]['path'] for var in stage_config['train']['obs'] if 'path' in stage_config['train']['obs'][var]],
-            [stage_config['valid']['coords'][var]['path'] for var in stage_config['valid']['coords'] if 'path' in stage_config['valid']['coords'][var]],
-            [stage_config['valid']['obs'][var]['path'] for var in stage_config['valid']['obs'] if 'path' in stage_config['valid']['obs'][var]],
-            [prep_config[step_name]['output']['path'] for step_name in prep_config]
+            # Input coordinates and observations
+            train_coords = [var['path'] for var in train_config['coords'].values() if 'path' in var],
+            train_obs = [var['path'] for var in train_config['obs'].values() if 'path' in var],
+            valid_coords = [var['path'] for var in valid_config['coords'].values() if 'path' in var],
+            valid_obs = [var['path'] for var in valid_config['obs'].values() if 'path' in var],
+            # Data statistics and other preparation outputs
+            preparation = [prep_config[step_name]['output']['path'] for step_name in prep_config]
         params:
+            # Hydra configuration
             config_name = hydra_config_name,
             experiment = f"+experiment={hydra_experiment}" if hydra_experiment is not None else ""
         output:
+            # Model checkpoint
             checkpoint = f"{paths_config['checkpoint_dir']}/{checkpoint_config['filename']}.ckpt"
         shell:
             """
@@ -122,18 +144,23 @@ if 'train' in stage_config:
 
 # Test step
 if 'test' in stage_config:
+    test_config = stage_config['test']
     rule test:
         input:
-            [stage_config['test']['coords'][var]['path'] for var in stage_config['test']['coords'] if 'path' in stage_config['test']['coords'][var]],
-            [stage_config['test']['obs'][var]['path'] for var in stage_config['test']['obs'] if 'path' in stage_config['test']['obs'][var]],
-            [prep_config[step_name]['output']['path'] for step_name in prep_config],
+            # Input coordinates and observations
+            test_coords = [var['path'] for var in test_config['coords'].values() if 'path' in var],
+            test_obs = [var['path'] for var in test_config['obs'].values() if 'path' in var],
+            # Data statistics and other preparation outputs
+            preparation = [prep_config[step_name]['output']['path'] for step_name in prep_config],
+            # Model checkpoint
             checkpoint = f"{paths_config['checkpoint_dir']}/{checkpoint_config['filename']}.ckpt"
         params:
+            # Hydra configuration
             config_name = hydra_config_name,
             experiment = f"+experiment={hydra_experiment}" if hydra_experiment is not None else ""
         output:
-            results = [stage_config['test']['results'][output]['path']
-                       for output in stage_config['test']['results']] if 'test' in stage_config else ''
+            # Output results
+            test_out = [var['path'] for var in test_config['results'].values()]
         shell:
             """
             python -m inverse.test \
@@ -143,17 +170,22 @@ if 'test' in stage_config:
 
 # Prediction step
 if 'predict' in stage_config:
+    predict_config = stage_config['predict']
     rule predict:
         input:
-            [stage_config['pred']['coords'][var]['path'] for var in stage_config['pred']['coords'] if 'path' in stage_config['pred']['coords'][var]],
+            # Input coordinates
+            predict_coords = [var['path'] for var in predict_config['coords'].values() if 'path' in var],
+            # Data statistics
             statistics = prep_config['statistics']['output']['path'],
+            # Model checkpoint
             checkpoint = f"{paths_config['checkpoint_dir']}/{checkpoint_config['filename']}.ckpt"
         params:
+            # Hydra configuration
             config_name = hydra_config_name,
             experiment = f"+experiment={hydra_experiment}" if hydra_experiment is not None else ""
         output:
-            results = [stage_config['test']['results'][output]['path']
-                       for output in stage_config['test']['results']] if 'test' in stage_config else ''
+            # Output results
+            predict_out = [var['path'] for var in predict_config['results'].values()]
         shell:
             """
             python -m inverse.predict \

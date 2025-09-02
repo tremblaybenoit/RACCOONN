@@ -1,5 +1,8 @@
+# Statistics of the dataset
 statistics:
+  # What the method needs as input
   input:
+    # Variables
     vars:
       prof: ${data.vars.prof}
       surf: ${data.vars.surf}
@@ -9,6 +12,9 @@ statistics:
       lon: ${data.vars.lon}
       scans: ${data.vars.scans}
       pressure: ${data.vars.pressure}
+    # Cloud filter: Consider only cloudy data, if not null (None)
     cloud_filter: ${data.vars.cloud_filter}
+  # What the method produces as output (pickle file)
   output:
+    # Path to save/load the statistics
     path: ${paths.data_dir}/normalization/stats_cloud_filter.pkl

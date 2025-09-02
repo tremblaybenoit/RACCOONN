@@ -32,14 +32,38 @@ snakemake --cores 1
 To draw a directed acyclic graph (DAG) of the workflow as an image (e.g., dag.png) with left-to-right orientation (Grankdir=LR):
 
 ```bash
-snakemake --rulegraph inverse --config hydra-experiment=pinnverse_operators | dot -Tpng > dag.png  -Grankdir=LR
+snakemake --dag mermaid-js --config hydra-experiment=pinnverse_operator_000 > dag.mmd -Grankdir=LR
 ```
 Replace "--rulegraph" with "--dag" to draw dashed bounding boxes around the completed steps.
 
 The graph of the RACCOONN workflow is the following (for the pinnverse_operators experiment): 
-<p align="center">
-<img src="dag.png" alt="RACCOONN pipeline" height="300">
-</p>
+
+```mermaid
+---
+title: RACCOONN training workflow
+---
+flowchart TB
+	id1[train]
+	id2[data]
+	id3[statistics]
+	id4[error_covariance]
+	id5[test]
+
+	style id1 fill:#57ADD9,stroke-width:2px,color:#333333
+	style id2 fill:#D95757,stroke-width:2px,color:#333333,stroke-dasharray: 5 5
+	style id3 fill:#57D957,stroke-width:2px,color:#333333,stroke-dasharray: 5 5
+	style id4 fill:#D9AD57,stroke-width:2px,color:#333333,stroke-dasharray: 5 5
+	style id5 fill:#57D9AD,stroke-width:2px,color:#333333
+	id2 --> id1
+	id3 --> id1
+	id4 --> id1
+	id2 --> id3
+	id3 --> id4
+	id2 --> id5
+	id3 --> id5
+	id4 --> id5
+	id1 --> id5
+```
 
 
 # Documentation

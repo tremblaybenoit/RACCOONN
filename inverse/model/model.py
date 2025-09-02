@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from typing import Callable
+from typing import Callable, ListConfig
 from omegaconf import DictConfig
 from pytorch_lightning import LightningModule
 from forward.model.model import BaseModel
@@ -35,8 +35,7 @@ class PINNverseOperator(BaseModel):
     """Class for the Physics-Informed Neural Network (PINN) inverse model."""
     def __init__(self, optimizer: DictConfig = None, loss_func: Callable = None, lr_scheduler: DictConfig = None,
                  positional_encoding: Callable = None, activation_in: Callable = None, activation_out: Callable = None,
-                 transform: Callable = None, inverse_transform: Callable = None, clip: Callable = None,
-                 parameters: DictConfig = None, log_valid: bool = False):
+                 transform_out: ListConfig = None, parameters: DictConfig = None, log_valid: bool = False):
         """ Initialize model.
 
         Parameters
@@ -47,9 +46,7 @@ class PINNverseOperator(BaseModel):
         positional_encoding: Callable. Function for the positional encoding.
         activation_in: Callable. Activation function (in).
         activation_out: Callable. Activation function (out).
-        transform: Callable. Normalization transformation.
-        inverse_transform: Callable. Unnormalization transformation.
-        clip: Callable. Clipping function for the model outputs.
+        transform_out: ListConfig. List of functions to apply to the model output.
         parameters: DictConfig. Configuration for the model parameters.
         log_valid: bool. Whether to log validation results.
 
@@ -79,10 +76,7 @@ class PINNverseOperator(BaseModel):
         self.test_results['prof'] = []
 
         # Normalization transformations
-        self.clip = clip if clip is not None else identity
-        self.normalize_prof = transform
-        self.unnormalize_prof = inverse_transform
-        # Normalize profiles prior to inputting to CRTM emulator
+        self.transform_out = transform_out if transform_out is not None else [identity]
 
         # Model architecture
         self.n_prof = parameters.data.n_prof
@@ -174,7 +168,7 @@ class PINNverseOperator(BaseModel):
         x_vector = {k: v.repeat_interleave(n_levels, dim=0) if k != 'pressure' else x['pressure'].reshape(-1, 1)
                     for k, v in x.items()}
         prof = self.forward(x_vector).view(-1, n_levels, self.n_prof).transpose(1, 2)
-        return prof if self.clip is None else self.clip(prof)
+        return prof
 
     def _logging(self, stage: str, loss: dict, coords: dict, obs: dict, pred: dict) -> None:
         """ Log training/validation/test metrics.
@@ -249,7 +243,9 @@ class PINNverseOperator(BaseModel):
 
         # Compute profiles
         pred = {'prof_norm': self._retrieve_prof(batch['coords'])}
-        pred['prof'] = self.unnormalize_prof(pred['prof_norm'])
+        # Apply output transformations
+        for t, transform in enumerate(self.transform_out):
+            pred['prof'] = transform(pred['prof']) if t > 0 else transform(pred['prof_norm'])
 
         # Compute loss function
         loss, pred['hofx'] = self.loss_func(pred, batch['obs'])
@@ -274,8 +270,11 @@ class PINNverseOperator(BaseModel):
         """
 
         # Compute profiles
-        pred = self._retrieve_prof(batch['coords'])
-        return self.unnormalize_prof(pred)
+        prof = self._retrieve_prof(batch['coords'])
+        # Apply output transformations
+        for transform in self.transform_out:
+            prof = transform(prof)
+        return prof
 
     def on_validation_epoch_end(self):
         """ Callback to log validation results at the end of each validation epoch.
@@ -320,8 +319,7 @@ class PINNverseOperators(PINNverseOperator):
 
     def __init__(self, optimizer: DictConfig = None, loss_func: Callable = None, lr_scheduler: DictConfig = None,
                  positional_encoding: Callable = None, activation_in: Callable = None, activation_out: Callable = None,
-                 transform: Callable = None, inverse_transform: Callable = None, clip: Callable = None,
-                 parameters: DictConfig = None, log_valid: bool = False):
+                 inverse_transform: Callable = None, clip: Callable = None, parameters: DictConfig = None, log_valid: bool = False):
         """
         Initialize model.
 
@@ -333,7 +331,6 @@ class PINNverseOperators(PINNverseOperator):
         positional_encoding: Callable. Function for the positional encoding.
         activation_in: Callable. Activation function (in).
         activation_out: Callable. Activation function (out).
-        transform: Callable. Normalization transformation.
         inverse_transform: Callable. Unnormalization transformation.
         clip: Callable. Clipping function for the model outputs.
         parameters: DictConfig. Configuration for the model parameters.
@@ -347,7 +344,7 @@ class PINNverseOperators(PINNverseOperator):
         # Inherit all attributes and logic from PINNverseOperator
         super().__init__(optimizer=optimizer, loss_func=loss_func, lr_scheduler=lr_scheduler,
                          positional_encoding=positional_encoding, activation_in=activation_in,
-                         activation_out=activation_out, transform=transform, inverse_transform=inverse_transform,
+                         activation_out=activation_out, inverse_transform=inverse_transform,
                          clip=clip, parameters=parameters, log_valid=log_valid)
 
         # Replace the single model with a list of models, one per profile type
