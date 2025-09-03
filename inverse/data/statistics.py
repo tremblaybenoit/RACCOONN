@@ -13,12 +13,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def read_statistics(filename: str, tensor: bool = False) -> dict:
+def read_statistics(path: str, tensor: bool = False) -> dict:
     """ Read statistics from a file.
 
         Parameters
         ----------
-        filename: str. Path to the file containing statistics.
+        path: str. Path to the file containing statistics.
         tensor: bool. If True, returns statistics as torch tensors, otherwise as numpy arrays.
 
         Returns
@@ -27,7 +27,7 @@ def read_statistics(filename: str, tensor: bool = False) -> dict:
     """
 
     # Load statistics from file
-    with open(filename, 'rb') as file:
+    with open(path, 'rb') as file:
         stats = pickle.load(file)
 
     # Convert statistics to torch tensors if required
@@ -39,12 +39,12 @@ def read_statistics(filename: str, tensor: bool = False) -> dict:
     return stats
 
 
-def read_statistics_var(filename: str, var: str, tensor: bool = False) -> dict:
+def read_statistics_var(path: str, var: str, tensor: bool = False) -> dict:
     """ Read statistics of a specific variable from a file.
 
         Parameters
         ----------
-        filename: str. Path to the file containing statistics.
+        path: str. Path to the file containing statistics.
         var: str. Variable to read statistics for.
         tensor: bool. If True, returns statistics as torch tensors, otherwise as numpy arrays.
 
@@ -54,7 +54,7 @@ def read_statistics_var(filename: str, var: str, tensor: bool = False) -> dict:
     """
 
     # Load statistics from file
-    stats = read_statistics(filename)[var]
+    stats = read_statistics(path)[var]
 
     # Convert statistics to torch tensors if required
     if tensor:

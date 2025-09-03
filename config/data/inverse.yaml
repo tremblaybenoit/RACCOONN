@@ -24,7 +24,7 @@ vars:
       stats:
         _target_: inverse.data.statistics.read_statistics_var
         _args_:
-          - ${preparation.statistics.output.path}
+          - ${data.statistics.path}
           - 'prof'
       axis: null  # Axis for normalization
   surf:

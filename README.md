@@ -1,5 +1,5 @@
 # RACCOONN: Retrieval of Atmospheric Conditions Computed using Observations, Optimization, and Neural Networks. 
-RACCOONN leverages deep learning to retrieve thermodynamic profiles of the atmosphere directly from raw radiance observations, with or without knowledge of the prior state. In other words, this project aims to generate a 
+RACCOONN leverages deep learning to retrieve thermodynamic profiles of the atmosphere from raw radiance observations, with or without knowledge of the prior state. In other words, this project aims to generate a 
 deep learning inverse observation operator that would enable the assimilation of additional radiances in the form of thermodynamic profiles.
 
 # Installation
@@ -25,10 +25,10 @@ To execute the workflow using a specified number of cores (e.g., 1):
 snakemake --cores 1 
 ```
 
-To draw a directed acyclic graph (DAG) of the workflow (e.g., dag.mmd):
+To draw a directed acyclic graph (DAG) of the training workflow (e.g., dag.mmd of rule "test""):
 
 ```bash
-snakemake --rulegraph mermaid-js --config hydra-experiment=pinnverse_operator_000 > dag.mmd
+snakemake test --rulegraph mermaid-js --config hydra-experiment=pinnverse_operator_000 > dag.mmd
 ```
 Replace "--rulegraph" with "--dag" to draw dashed bounding boxes around the completed steps.
 
@@ -39,26 +39,25 @@ The graph of the RACCOONN workflow is the following (for the pinnverse_operators
 title: RACCOONN training workflow
 ---
 flowchart TB
+	id0[test]
 	id1[train]
-	id2[data]
-	id3[statistics]
-	id4[error_covariance]
-	id5[test]
-
-	style id1 fill:#57ADD9,stroke-width:2px,color:#333333
-	style id2 fill:#D95757,stroke-width:2px,color:#333333,stroke-dasharray: 5 5
-	style id3 fill:#57D957,stroke-width:2px,color:#333333,stroke-dasharray: 5 5
-	style id4 fill:#D9AD57,stroke-width:2px,color:#333333,stroke-dasharray: 5 5
-	style id5 fill:#57D9AD,stroke-width:2px,color:#333333
-	id2 --> id1
-	id3 --> id1
+	id2[statistics_data]
+	id3[data]
+	id4[covariance_model]
+	id5[covariance_obs]
+	style id0 fill:#57D9C6,stroke-width:2px,color:#333333
+	style id1 fill:#57A1D9,stroke-width:2px,color:#333333
+	style id2 fill:#57D97C,stroke-width:2px,color:#333333
+	style id3 fill:#C6D957,stroke-width:2px,color:#333333
+	style id4 fill:#D95757,stroke-width:2px,color:#333333
+	style id5 fill:#D9A157,stroke-width:2px,color:#333333
+	id1 --> id0
+	id5 --> id1
 	id4 --> id1
-	id2 --> id3
-	id3 --> id4
+	id2 --> id1
+	id3 --> id2
+	id2 --> id4
 	id2 --> id5
-	id3 --> id5
-	id4 --> id5
-	id1 --> id5
 ```
 
 

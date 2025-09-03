@@ -71,49 +71,87 @@ rule data:
 
 # Preparation: Statistics
 if 'statistics' in prep_config:
-    statistics_config = prep_config['statistics']
-    rule statistics:
-        input:
-            # Coordinates and observations
-            data = [var['path'] for var in statistics_config['input']['vars'].values() if 'path' in var]
-        params:
-            # Hydra configuration
-            config_name = hydra_config_name,
-            experiment = f"+experiment={hydra_experiment}" if hydra_experiment is not None else ""
-        output:
-            # Data statistics
-            out = statistics_config['output']['path']
-        shell:
-            """
-            python -m inverse.data.preparation.statistics \
-            --config-name={params.config_name} \
-            {params.experiment}
-            """
+    # Multiple steps (e.g., for different data sources)
+    for step, statistics_config in prep_config['statistics'].items():
+        rule:
+            name: f"statistics_{step}"
+            input:
+                # Coordinates and observations
+                data = [var['path'] for var in statistics_config['input']['vars'].values() if 'path' in var]
+            params:
+                # Hydra configuration
+                config_name = hydra_config_name,
+                experiment = f"+experiment={hydra_experiment}" if hydra_experiment is not None else ""
+            output:
+                # Data statistics
+                out = statistics_config['output']['path']
+            shell:
+                """
+                python -m inverse.data.preparation.statistics \
+                --config-name={params.config_name} \
+                {params.experiment}
+                """
 
 # Preparation: Covariance matrices
-if 'covariance_model' in prep_config or 'covariance_obs' in prep_config:
-    steps = []
-    if 'covariance_model' in prep_config:
-        steps.append('covariance_model')
-    if 'covariance_obs' in prep_config:
-        steps.append('covariance_obs')
-    rule error_covariance:
-        input:
-            # Data statistics
-            statistics = prep_config['statistics']['output']['path']
-        params:
-            # Hydra configuration
-            config_name = hydra_config_name,
-            experiment = f"+experiment={hydra_experiment}" if hydra_experiment is not None else ""
-        output:
-            # Output covariance matrices
-            out = [prep_config[step]['output']['path'] for step in steps if 'path' in prep_config[step]['output']]
-        shell:
-            """
-            python -m inverse.data.preparation.covariance \
-            --config-name={params.config_name} \
-            {params.experiment}
-            """
+if 'covariance' in prep_config:
+
+    def covariance_inputs(cov_config):
+        """ Helper function to get input files for covariance calculation
+
+            Parameters:
+            cov_config (dict): Covariance configuration dictionary.
+
+            Returns:
+            list: List of input file paths.
+        """
+        # Initialize input list
+        inputs = []
+        # Add variable files and statistics file if present
+        if 'input' in cov_config and 'vars' in cov_config['input']:
+            # Variables
+            for var in cov_config['input']['vars'].values():
+                # Only add if 'path' key exists
+                if 'path' in var:
+                    # Add variable file
+                    inputs.append(var['path'])
+                    # Check normalization file
+                    if 'normalization' in var and 'stats' in var['normalization']:
+                        # Add normalization file if it is among the arguments of the normalization function
+                        inputs.append(var['normalization']['stats']['_args_'][0])
+                else:
+                    # If the variable is derived from others, add those dependencies
+                    for var_dependency in var.get('load', {}):
+                        # Add dependency file if 'path' key exists
+                        if 'path' in var_dependency:
+                            inputs.append(var_dependency['path'])
+                        # Check normalization file
+                        if 'normalization' in var_dependency and 'stats' in var_dependency['normalization']:
+                            # Add normalization file if it is among the arguments of the normalization function
+                            inputs.append(var_dependency['normalization']['stats']['_args_'][0])
+
+        return inputs
+
+    # Multiple steps (e.g., for model and observations)
+    for step, covariance_config in prep_config['covariance'].items():
+        rule:
+            name: f"covariance_{step}"
+            input:
+                # Data statistics
+                # data = covariance_inputs(covariance_config)
+                statistics = [prep_config['statistics'][var]['output']['path'] for var in prep_config['statistics']],
+            params:
+                # Hydra configuration
+                config_name = hydra_config_name,
+                experiment = f"+experiment={hydra_experiment}" if hydra_experiment is not None else ""
+            output:
+                # Output covariance matrices
+                out = covariance_config['output']['path']
+            shell:
+                """
+                python -m inverse.data.preparation.covariance \
+                --config-name={params.config_name} \
+                {params.experiment}
+                """
 
 # Training step
 if 'train' in stage_config:
@@ -122,12 +160,13 @@ if 'train' in stage_config:
     rule train:
         input:
             # Input coordinates and observations
-            train_coords = [var['path'] for var in train_config['coords'].values() if 'path' in var],
-            train_obs = [var['path'] for var in train_config['obs'].values() if 'path' in var],
-            valid_coords = [var['path'] for var in valid_config['coords'].values() if 'path' in var],
-            valid_obs = [var['path'] for var in valid_config['obs'].values() if 'path' in var],
+            # train_coords = [var['path'] for var in train_config['coords'].values() if 'path' in var],
+            # train_obs = [var['path'] for var in train_config['obs'].values() if 'path' in var],
+            # valid_coords = [var['path'] for var in valid_config['coords'].values() if 'path' in var],
+            # valid_obs = [var['path'] for var in valid_config['obs'].values() if 'path' in var],
             # Data statistics and other preparation outputs
-            preparation = [prep_config[step_name]['output']['path'] for step_name in prep_config]
+            preparation = [prep_config[step][substep]['output']['path'] for step in prep_config
+                           for substep in prep_config[step]],
         params:
             # Hydra configuration
             config_name = hydra_config_name,
@@ -148,10 +187,11 @@ if 'test' in stage_config:
     rule test:
         input:
             # Input coordinates and observations
-            test_coords = [var['path'] for var in test_config['coords'].values() if 'path' in var],
-            test_obs = [var['path'] for var in test_config['obs'].values() if 'path' in var],
+            # test_coords = [var['path'] for var in test_config['coords'].values() if 'path' in var],
+            # test_obs = [var['path'] for var in test_config['obs'].values() if 'path' in var],
             # Data statistics and other preparation outputs
-            preparation = [prep_config[step_name]['output']['path'] for step_name in prep_config],
+            # preparation = [prep_config[step][substep]['output']['path'] for step in prep_config
+            #                for substep in prep_config[step]],
             # Model checkpoint
             checkpoint = f"{paths_config['checkpoint_dir']}/{checkpoint_config['filename']}.ckpt"
         params:
@@ -176,7 +216,7 @@ if 'predict' in stage_config:
             # Input coordinates
             predict_coords = [var['path'] for var in predict_config['coords'].values() if 'path' in var],
             # Data statistics
-            statistics = prep_config['statistics']['output']['path'],
+            statistics = prep_config['statistics']['data']['output']['path'],
             # Model checkpoint
             checkpoint = f"{paths_config['checkpoint_dir']}/{checkpoint_config['filename']}.ckpt"
         params:

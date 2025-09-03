@@ -3,11 +3,11 @@
 
 # Overriding default structure
 defaults:
+  - override /paths: default
+  - override /hydra: default
   - override /data: inverse
   - override /preparation: default
   - override /loader: inverse_train  # Training only
-  - override /paths: default
-  - override /hydra: default
   - override /model: pinnverse_operator
   - override /trainer: gpu
   - override /callbacks: default
