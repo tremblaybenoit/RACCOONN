@@ -1,7 +1,7 @@
 # Error covariance matrices
 covariance:
   # Error covariance matrix in model space
-  model:
+  B:
     # Function
     _target_: inverse.data.covariance.covariance_matrix
     _recursive_: false  # Do not instantiate nested objects
@@ -24,15 +24,15 @@ covariance:
         _target_: numpy.save
         _partial_: true
         _args_:
-          - ${preparation.covariance.model.output.path}
+          - ${preparation.covariance.B.output.path}
       # Load function
       load:
         _target_: numpy.load
         _args_:
-          - ${preparation.covariance.model.output.path}
+          - ${preparation.covariance.B.output.path}
 
   # Error covariance matrix in observation space
-  obs:
+  R:
     # Function
     _target_: inverse.data.covariance.covariance_matrix
     _recursive_: false  # Do not instantiate nested objects
@@ -53,9 +53,9 @@ covariance:
         _target_: numpy.save
         _partial_: true
         _args_:
-          - ${preparation.covariance.obs.output.path}
+          - ${preparation.covariance.R.output.path}
       # Load function
       load:
         _target_: numpy.load
         _args_:
-          - ${preparation.covariance.obs.output.path}
+          - ${preparation.covariance.R.output.path}

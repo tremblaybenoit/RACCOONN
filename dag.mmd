@@ -6,8 +6,8 @@ flowchart TB
 	id1[train]
 	id2[statistics_data]
 	id3[data]
-	id4[covariance_model]
-	id5[covariance_obs]
+	id4[covariance_B]
+	id5[covariance_R]
 	style id0 fill:#57D9C6,stroke-width:2px,color:#333333
 	style id1 fill:#57A1D9,stroke-width:2px,color:#333333
 	style id2 fill:#57D97C,stroke-width:2px,color:#333333
@@ -15,9 +15,9 @@ flowchart TB
 	style id4 fill:#D95757,stroke-width:2px,color:#333333
 	style id5 fill:#D9A157,stroke-width:2px,color:#333333
 	id1 --> id0
-	id5 --> id1
 	id4 --> id1
 	id2 --> id1
+	id5 --> id1
 	id3 --> id2
 	id2 --> id4
 	id2 --> id5

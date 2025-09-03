@@ -21,4 +21,4 @@ statistics:
       cloud_filter: ${data.vars.cloud_filter}
     # What the method produces as output (pickle file)
     output:
-      path: ${data.statistics.path}
+      path: ${paths.data_dir}/normalization/stats_cloud_filter.pkl

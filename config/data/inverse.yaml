@@ -3,10 +3,6 @@ download:
   dir: ${paths.data_dir}
   url: "https://zenodo.org/record/1482223/files/GOES-16_ML_Training_Testing_Data.zip?download=1"
 
-# Statistics of the dataset
-statistics:
-  path: ${paths.data_dir}/normalization/stats_cloud_filter.pkl
-
 # Configuration for the variables used in the dataset
 vars:
   prof:
@@ -24,7 +20,7 @@ vars:
       stats:
         _target_: inverse.data.statistics.read_statistics_var
         _args_:
-          - ${data.statistics.path}
+          - ${preparation.statistics.data.output.path}
           - 'prof'
       axis: null  # Axis for normalization
   surf:
@@ -81,14 +77,24 @@ vars:
       _target_: inverse.data.transformations.min_max
       _partial_: true
       stats:
-        min: -90.0
-        max: 90.0
+        _target_: inverse.data.statistics.read_statistics_var
+        _args_:
+          - ${preparation.statistics.data.output.path}
+          - 'lat'
   lon:
     path: ${paths.data_dir}/Test2/lon.npy
     load:
       _target_: numpy.load
       _args_:
         - ${data.vars.lon.path}
+    normalization:
+      _target_: inverse.data.transformations.min_max
+      _partial_: true
+      stats:
+        _target_: inverse.data.statistics.read_statistics_var
+        _args_:
+          - ${preparation.statistics.data.output.path}
+          - 'lon'
   scans:
     path: ${paths.data_dir}/Test2/scans.txt
     load:
@@ -99,10 +105,10 @@ vars:
       _target_: inverse.data.transformations.min_max
       _partial_: true
       stats:
-        min: 9.0
-        max: 180.0
-        mean: 88.57895
-        stdev: 54.53759
+        _target_: inverse.data.statistics.read_statistics_var
+        _args_:
+          - ${preparation.statistics.data.output.path}
+          - 'scans'
   pressure:
     path: ${paths.data_dir}/Test2/pressure.npy
     load:
@@ -113,10 +119,10 @@ vars:
       _target_: inverse.data.transformations.min_max
       _partial_: true
       stats:
-        min: 1.2935171
-        max: 92814.125
-        mean: 38631.695
-        stdev: 34481.04
+        _target_: inverse.data.statistics.read_statistics_var
+        _args_:
+          - ${preparation.statistics.data.output.path}
+          - 'pressure'
   hofx_innovation:
     load:
       _target_: inverse.data.covariance.innovation_uncertainty
