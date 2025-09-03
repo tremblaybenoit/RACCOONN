@@ -125,12 +125,13 @@ def statistics(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = 
     return stats
 
 
-def compute_statistics(config: DictConfig) -> None:
+def compute_statistics(input: DictConfig, output: DictConfig) -> None:
     """ Compute statistics of a given dataset.
 
         Parameters
         ----------
-        config: DictConfig. Main hydra configuration file containing all model hyperparameters.
+        input: DictConfig. Main hydra configuration file containing all model hyperparameters.
+        output: DictConfig. Main hydra configuration file containing all model hyperparameters.
 
         Returns
         -------
@@ -139,15 +140,15 @@ def compute_statistics(config: DictConfig) -> None:
 
     # Filter out clearsky or not
     logger.info("Loadging cloud filter, if available...")
-    cloud_filter = instantiate(config.input.cloud_filter.load) if hasattr(config.input, 'cloud_filter') else None
+    cloud_filter = instantiate(input.cloud_filter.load) if hasattr(input, 'cloud_filter') else None
 
     # Compute statistics per variable
     stats = {}
-    variables = list(config.input.vars.keys())
+    variables = list(input.vars.keys())
     # Loop sequentially for memory efficiency (over speed)
     for v, variable in enumerate(variables):
         # Load data
-        data = np.array(instantiate(config.input.vars[variable].load)).astype(np.float64)
+        data = np.array(instantiate(input.vars[variable].load)).astype(np.float64)
         # Compute statistics per height
         logger.info(f"Computing statistics of variable {variable} ({v + 1}/{len(variables)})...")
         if variable in ['prof', 'surf', 'meta', 'hofx'] and cloud_filter is not None:
@@ -157,8 +158,8 @@ def compute_statistics(config: DictConfig) -> None:
             stats[variable] = statistics(data, axis=0)
 
     # Save statistics to file
-    logger.info(f"Saving statistics to file {config.output.path}.")
-    with open(config.output.path, 'wb') as file:
+    logger.info(f"Saving statistics to file {output.path}.")
+    with open(output.path, 'wb') as file:
         # noinspection PyTypeChecker
         pickle.dump(stats, file)
     # Clear memory
@@ -183,8 +184,9 @@ def main(config: DictConfig) -> None:
 
     # If statistics is part of the preparation steps:
     if hasattr(config.preparation, "statistics"):
-        logger.info("Computing statistics of data...")
-        compute_statistics(config.preparation.statistics)
+        for dataset, config_statistics in config.preparation.statistics.items():
+            logger.info(f"Computing statistics of {dataset} set")
+            instantiate(config_statistics)
 
     return
 

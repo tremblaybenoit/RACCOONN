@@ -1,12 +1,13 @@
-# Note: This configuration file is for the ***inverse*** model.
-
-
-# Configuration to download the training and testing data.
+# Configuration to download the training and testing data
 download:
   dir: ${paths.data_dir}
   url: "https://zenodo.org/record/1482223/files/GOES-16_ML_Training_Testing_Data.zip?download=1"
 
-# Configuration for the variables used in the dataset.
+# Statistics of the dataset
+statistics:
+  path: ${paths.data_dir}/normalization/stats_cloud_filter.pkl
+
+# Configuration for the variables used in the dataset
 vars:
   prof:
     type: ['Air temperature', 'Water vapor mixing ratio', 'Cloud ice mass', 'Cloud water mass', 'Snow mass',

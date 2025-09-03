@@ -1,53 +1,61 @@
-# Error covariance matrix in model space
-covariance_model:
-  # What the method needs as input
-  input:
-    # Variables
-    vars:
-      # Increment estimates for the profile variables
-      err: ${data.vars.prof_increment}
-    # Cloud filter: Consider only cloudy data, if not null (None)
-    cloud_filter: ${data.vars.cloud_filter}
-    # Pressure filter: Consider only pressure levels with non-zero variance
-    pressure_filter: ${data.vars.pressure_filter}
-  # What the method produces as output
-  output:
-    # File path to save/load the covariance matrix
-    path: ${paths.data_dir}/normalization/model_covariance_cloud_filter_pressure_filter.npy
-    # Save function
-    save:
-      _target_: numpy.save
-      _partial_: true
-      _args_:
-        - ${preparation.covariance_model.output.path}
-    # Load function
-    load:
-      _target_: numpy.load
-      _args_:
-        - ${preparation.covariance_model.output.path}
+# Error covariance matrices
+covariance:
+  # Error covariance matrix in model space
+  model:
+    # Function
+    _target_: inverse.data.covariance.covariance_matrix
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Variables
+      vars:
+        # Increment estimates for the profile variables
+        err: ${data.vars.prof_increment}
+      # Cloud filter: Consider only cloudy data, if not null (None)
+      cloud_filter: ${data.vars.cloud_filter}
+      # Pressure filter: Consider only pressure levels with non-zero variance
+      pressure_filter: ${data.vars.pressure_filter}
+    # What the method produces as output
+    output:
+      # File path to save/load the covariance matrix
+      path: ${paths.data_dir}/normalization/model_covariance_cloud_filter_pressure_filter.npy
+      # Save function
+      save:
+        _target_: numpy.save
+        _partial_: true
+        _args_:
+          - ${preparation.covariance_model.output.path}
+      # Load function
+      load:
+        _target_: numpy.load
+        _args_:
+          - ${preparation.covariance_model.output.path}
 
-# Error covariance matrix in observation space
-covariance_obs:
-  # What the method needs as input
-  input:
-    # Variables
-    vars:
-      # Innovation estimates for the observation variables
-      err: ${data.vars.hofx_innovation}
-    # Cloud filter: Consider only cloudy data, if not null (None)
-    cloud_filter: ${data.vars.cloud_filter}
-  # What the method produces as output
-  output:
-    # File path to save/load the covariance matrix
-    path: ${paths.data_dir}/normalization/observation_covariance_cloud_filter.npy
-    # Save function
-    save:
-      _target_: numpy.save
-      _partial_: true
-      _args_:
-        - ${preparation.covariance_obs.output.path}
-    # Load function
-    load:
-      _target_: numpy.load
-      _args_:
-        - ${preparation.covariance_obs.output.path}
+  # Error covariance matrix in observation space
+  obs:
+    # Function
+    _target_: inverse.data.covariance.covariance_matrix
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Variables
+      vars:
+        # Innovation estimates for the observation variables
+        err: ${data.vars.hofx_innovation}
+      # Cloud filter: Consider only cloudy data, if not null (None)
+      cloud_filter: ${data.vars.cloud_filter}
+    # What the method produces as output
+    output:
+      # File path to save/load the covariance matrix
+      path: ${paths.data_dir}/normalization/observation_covariance_cloud_filter.npy
+      # Save function
+      save:
+        _target_: numpy.save
+        _partial_: true
+        _args_:
+          - ${preparation.covariance_obs.output.path}
+      # Load function
+      load:
+        _target_: numpy.load
+        _args_:
+          - ${preparation.covariance_obs.output.path}
