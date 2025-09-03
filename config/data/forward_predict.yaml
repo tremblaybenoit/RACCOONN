@@ -1,0 +1,5 @@
+# Configuration for the variables used in the dataset, as a function of the stage
+
+# Prediction set
+predict:  # Uses the same data as testing but saves predictions to a different location
+  <<: ${forward_train.test}
