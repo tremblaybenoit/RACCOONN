@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from typing import Callable, ListConfig
-from omegaconf import DictConfig
+from typing import Callable
+from omegaconf import DictConfig, ListConfig
 from pytorch_lightning import LightningModule
 from forward.model.model import BaseModel
 from forward.utilities.instantiators import instantiate
@@ -73,7 +73,8 @@ class PINNverseOperator(BaseModel):
                 'prof_norm_background': [],
                 'pressure': [],
             }
-        self.test_results['prof'] = []
+        # Test results
+        self.test_results = {'hofx': [], 'prof': []}
 
         # Normalization transformations
         self.transform_out = transform_out if transform_out is not None else [identity]
@@ -170,15 +171,15 @@ class PINNverseOperator(BaseModel):
         prof = self.forward(x_vector).view(-1, n_levels, self.n_prof).transpose(1, 2)
         return prof
 
-    def _logging(self, stage: str, loss: dict, coords: dict, obs: dict, pred: dict) -> None:
+    def _logging(self, stage: str, loss: dict, input: dict, target: dict, pred: dict) -> None:
         """ Log training/validation/test metrics.
 
             Parameters
             ----------
             stage: str. Current operation: "train", "valid", or "test".
             loss: dict. Dictionary containing the loss components.
-            coords: dict. Input coordinates.
-            obs: dict. Observations.
+            input: dict. Input coordinates.
+            target: dict. Observations.
             pred: dict. Predictions.
 
             Returns
@@ -212,15 +213,15 @@ class PINNverseOperator(BaseModel):
                 self.test_results[k].append(v.detach().cpu().numpy())
         elif stage == 'valid' and self.log_valid:
             # Store validation outputs
-            for k, v in {'prof_target': obs['prof'], 'prof_pred': pred['prof'],
-                         'prof_norm_target': obs['prof_norm'], 'prof_norm_pred': pred['prof_norm'],
-                         'hofx_target': obs['hofx'], 'hofx_pred': pred['hofx'],
-                         'pressure': coords['pressure']}.items():
+            for k, v in {'prof_target': target['prof'], 'prof_pred': pred['prof'],
+                         'prof_norm_target': target['prof_norm'], 'prof_norm_pred': pred['prof_norm'],
+                         'hofx_target': target['hofx'], 'hofx_pred': pred['hofx'],
+                         'pressure': input['pressure']}.items():
                 self.valid_results[k].append(v.detach().cpu().numpy())
             # Store background if available
-            if 'prof_background' in obs:
-                for k, v in {'prof_background': obs['prof_background'],
-                             'prof_norm_background': obs['prof_norm_background']}.items():
+            if 'prof_background' in target:
+                for k, v in {'prof_background': target['prof_background'],
+                             'prof_norm_background': target['prof_norm_background']}.items():
                     self.valid_results[k].append(v.detach().cpu().numpy())
         else:
             # Compute L2 norm of the model parameters
@@ -242,16 +243,16 @@ class PINNverseOperator(BaseModel):
         """
 
         # Compute profiles
-        pred = {'prof_norm': self._retrieve_prof(batch['coords'])}
+        pred = {'prof_norm': self._retrieve_prof(batch['input'])}
         # Apply output transformations
         for t, transform in enumerate(self.transform_out):
             pred['prof'] = transform(pred['prof']) if t > 0 else transform(pred['prof_norm'])
 
         # Compute loss function
-        loss, pred['hofx'] = self.loss_func(pred, batch['obs'])
+        loss, pred['hofx'] = self.loss_func(pred, batch['target'])
 
         # Logging
-        self._logging(stage, loss, batch['coords'], batch['obs'], pred)
+        self._logging(stage, loss, batch['input'], batch['target'], pred)
 
         return loss['total']
 
@@ -270,7 +271,7 @@ class PINNverseOperator(BaseModel):
         """
 
         # Compute profiles
-        prof = self._retrieve_prof(batch['coords'])
+        prof = self._retrieve_prof(batch['input'])
         # Apply output transformations
         for transform in self.transform_out:
             prof = transform(prof)
@@ -319,9 +320,8 @@ class PINNverseOperators(PINNverseOperator):
 
     def __init__(self, optimizer: DictConfig = None, loss_func: Callable = None, lr_scheduler: DictConfig = None,
                  positional_encoding: Callable = None, activation_in: Callable = None, activation_out: Callable = None,
-                 inverse_transform: Callable = None, clip: Callable = None, parameters: DictConfig = None, log_valid: bool = False):
-        """
-        Initialize model.
+                 transform_out: ListConfig = None, parameters: DictConfig = None, log_valid: bool = False):
+        """ Initialize model.
 
         Parameters
         ----------
@@ -331,8 +331,7 @@ class PINNverseOperators(PINNverseOperator):
         positional_encoding: Callable. Function for the positional encoding.
         activation_in: Callable. Activation function (in).
         activation_out: Callable. Activation function (out).
-        inverse_transform: Callable. Unnormalization transformation.
-        clip: Callable. Clipping function for the model outputs.
+        transform_out: ListConfig. List of functions to apply to the model output.
         parameters: DictConfig. Configuration for the model parameters.
         log_valid: bool. Whether to log validation results.
 
@@ -344,8 +343,8 @@ class PINNverseOperators(PINNverseOperator):
         # Inherit all attributes and logic from PINNverseOperator
         super().__init__(optimizer=optimizer, loss_func=loss_func, lr_scheduler=lr_scheduler,
                          positional_encoding=positional_encoding, activation_in=activation_in,
-                         activation_out=activation_out, inverse_transform=inverse_transform,
-                         clip=clip, parameters=parameters, log_valid=log_valid)
+                         activation_out=activation_out, transform_out=transform_out, parameters=parameters,
+                         log_valid=log_valid)
 
         # Replace the single model with a list of models, one per profile type
         self.models = nn.ModuleList([

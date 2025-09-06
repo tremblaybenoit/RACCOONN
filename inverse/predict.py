@@ -27,11 +27,11 @@ def main(config: DictConfig) -> None:
     inv = InverseOperator(config)
 
     # Evaluate on test set
-    pred = inv.predict(config.data)
+    pred = inv.predict(config.loader)
 
     # Save predictions to file
     logger.info("Saving predictions to file...")
-    save_function = instantiate(config.data.sets.pred.hofx.save)
+    save_function = instantiate(config.data.stage.pred.prof.save)
     save_function(pred)
 
 

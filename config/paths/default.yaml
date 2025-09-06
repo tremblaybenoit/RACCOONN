@@ -23,7 +23,7 @@ checkpoint_dir: ${hydra:runtime.output_dir}/checkpoints/${paths.run_id}
 run_dir: ${hydra:runtime.output_dir}/runs/${paths.run_id}
 
 # path to output directory, created dynamically by hydra
-# path generation pattern is specified in `configs/hydra/default.yaml`
+# path generation pattern is specified in `configs/hydra/forward_default.yaml`
 # use it to store all files generated during the run, like ckpts and metrics
 output_dir: ${hydra:runtime.output_dir}
 

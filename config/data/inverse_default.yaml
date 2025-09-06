@@ -1,0 +1,116 @@
+# Inheritance of default settings for forward model. We only override the required settings.
+defaults:
+  - forward_default
+
+# Directory
+dir: Test2
+# Split (null for no split)
+split:
+  _target_: numpy.arange
+  _args_:
+      - 0
+      - 426872
+
+# Variables
+vars:
+  # Atmospheric profiles
+  prof:
+    # Normalization function and parameters
+    normalization:
+      _target_: inverse.data.transformations.min_max
+      _partial_: true
+      stats:
+        _target_: inverse.data.statistics.read_statistics_var
+        _args_:
+          - ${preparation.statistics.data.output.path}
+          - 'prof'
+  # Brightness temperatures (observed)
+  hofx:
+    # Loading function
+    load:
+      path: ${dir}/hofx_lightning.npy
+  # Latitude
+  lat:
+    # Normalization function and parameters
+    normalization:
+      _target_: inverse.data.transformations.min_max
+      _partial_: true
+      stats:
+        _target_: inverse.data.statistics.read_statistics_var
+        _args_:
+          - ${preparation.statistics.data.output.path}
+          - 'lat'
+  # Longitude
+  lon:
+    # Normalization function and parameters
+    normalization:
+      _target_: inverse.data.transformations.min_max
+      _partial_: true
+      stats:
+        _target_: inverse.data.statistics.read_statistics_var
+        _args_:
+          - ${preparation.statistics.data.output.path}
+          - 'lon'
+  # Scans
+  scans:
+    # Normalization function and parameters
+    normalization:
+      _target_: inverse.data.transformations.min_max
+      _partial_: true
+      stats:
+        _target_: inverse.data.statistics.read_statistics_var
+        _args_:
+          - ${preparation.statistics.data.output.path}
+          - 'scans'
+  # Pressure levels
+  pressure:
+    # Normalization function and parameters
+    normalization:
+      _target_: inverse.data.transformations.min_max
+      _partial_: true
+      stats:
+        _target_: inverse.data.statistics.read_statistics_var
+        _args_:
+          - ${preparation.statistics.data.output.path}
+          - 'pressure'
+  # Brightness temperature innovations
+  hofx_innovation:
+    # Loading function
+    load:
+      _target_: inverse.data.covariance.innovation_uncertainty
+      data: ${vars.hofx.load}
+    # Normalization function and parameters
+    normalization:
+      _target_: inverse.data.transformations.identity
+      _partial_: true
+  # Background atmospheric profiles
+  prof_background:
+    # Loading function
+    load:
+      _target_: inverse.data.covariance.background_climatology
+      data: ${prof.load}
+      cloud_filter: ${vars.cloud_filter.load}
+    normalization: ${vars.prof.normalization}
+  # Increment atmospheric profiles
+  prof_increment:
+    # Loading function
+    load:
+      _target_: inverse.data.covariance.analysis_increment
+      config_true: ${vars.prof.load}
+      cloud_background: ${vars.cloud_filter.load}
+    # Normalization function and parameters
+    normalization:
+      _target_: inverse.data.transformations.identity
+      _partial_: true
+  # Pressure filter
+  pressure_filter:
+    # Loading function
+    load:
+      _target_: inverse.data.filters.pressure_filter
+      prof: ${vars.prof.load}
+  # Cloud filter
+  cloud_filter:
+    # Loading function
+    load:
+      _target_: inverse.data.filters.cloud_filter
+      prof: ${vars.prof.load}

@@ -1,4 +1,0 @@
-_target_: inverse.model.data_loader.InverseDataloader
-batch_size: 32  # Batch size for training
-num_workers: 0  # Number of workers for data loading
-persistent_workers: false  # Keep workers alive between epochs

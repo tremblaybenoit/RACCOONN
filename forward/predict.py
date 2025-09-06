@@ -29,11 +29,11 @@ def main(config: DictConfig) -> None:
 
     # Evaluate on test set
     logger.info("Testing CRTM emulator...")
-    pred = crtm.predict(config.data)
+    pred = crtm.predict(config.loader)
 
     # Save predictions to file
     logger.info("Saving predictions to file...")
-    save_function = instantiate(config.data.sets.pred.hofx.save)
+    save_function = instantiate(config.data.stage.predict.hofx.save)
     save_function(pred)
 
 

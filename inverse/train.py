@@ -74,7 +74,7 @@ class InverseOperator:
 
         # Data loader
         logger.info("Initializing data loader...")
-        self.data_loader = instantiate(data_config.loader)
+        self.data_loader = instantiate(data_config)
         # Generate training/validation/test sets
         self.data_loader.setup(stage=stage)
 
@@ -113,7 +113,7 @@ class InverseOperator:
         """
 
         # Data loader and trainer setup
-        self.setup(self.config.data, stage='train')
+        self.setup(self.config.loader, stage='train')
 
         # Model
         logger.info("Initializing model...")
@@ -146,11 +146,11 @@ class InverseOperator:
         """
 
         # Create output directories if they don't exist
-        if not os.path.exists(self.config.data.sets.test.path):
-            os.makedirs(self.config.data.sets.test.path, exist_ok=True)
+        if not os.path.exists(self.config.data.stage.test.results[0].save.path):
+            os.makedirs(self.config.data.stage.test.results[0].save.path, exist_ok=True)
 
         # Data loader and trainer setup
-        self.setup(self.config.data, stage='test')
+        self.setup(self.config.loader, stage='test')
 
         # Load model from checkpoint
         if self.model is None:
@@ -172,12 +172,12 @@ class InverseOperator:
             save_function = instantiate(self.config.data.loader.stage.test.results.prof.save)
             save_function(self.model.test_results['prof'])
 
-    def predict(self, data_config: DictConfig) -> np.ndarray:
+    def predict(self, loader_config: DictConfig) -> np.ndarray:
         """ Predicts the output of the model on a given dataset.
 
             Parameters
             ----------
-            data_config: DictConfig. Configuration object for the data to predict on.
+            loader_config: DictConfig. Configuration object for the data to predict on.
 
             Returns
             -------
@@ -185,11 +185,11 @@ class InverseOperator:
         """
 
         # Create output directories if they don't exist
-        if not os.path.exists(self.config.data.sets.pred.path):
-            os.makedirs(self.config.data.sets.pred.path, exist_ok=True)
+        if not os.path.exists(self.config.data.stage.predict.results[0].save.path):
+            os.makedirs(self.config.data.stage.predict.results[0].save.path, exist_ok=True)
 
         # Data loader and trainer setup
-        self.setup(data_config, stage='pred')
+        self.setup(loader_config, stage='pred')
 
         # Load model from checkpoint
         if self.model is None:

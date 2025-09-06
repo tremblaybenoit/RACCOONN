@@ -1,0 +1,34 @@
+# Data loader configuration for forward model testing
+_target_: forward.model.data_loader.Dataloader
+batch_size: 32  # Batch size for training
+# num_workers: 0  # Number of workers for data loading
+# persistent_workers: false  # Keep workers alive between epochs
+
+# Split the data into the prediction set
+stage:
+  # Prediction set
+  predict:
+    # Dataset class
+    _target_: forward.model.data_loader.CRTMDataset
+    _recursive_: false
+    # Cloud filter to apply
+    cloud_filter: ${data.vars.train.cloud_filter.load}
+    # Variables to use as input
+    input:
+      prof: ${data.vars.train.prof}
+      surf: ${data.vars.train.surf}
+      meta: ${data.vars.train.meta}
+    # Results
+    results:
+      # Forward model simulations
+      hofx:
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${loader.stage.predict.results.hofx.load.path}
+        # Load function
+        load:
+          _target_: forward.model.data_loader.load_npy
+          path: ${paths.run_dir}/predict_hofx.npy

@@ -1,77 +1,119 @@
-defaults:
-  - inverse
+# Data loader configuration for inverse model training
+_target_: forward.model.data_loader.Dataloader
+batch_size: 32  # Batch size for training
+num_workers: 0  # Number of workers for data loading
+persistent_workers: false  # Keep workers alive between epochs
 
+# Split the data into training, validation, and test sets
 stage:
+  # Training set
   train:
-    _target_: inverse.model.data_loader.InverseCRTMDataset
+    # Dataset class
+    _target_: forward.model.data_loader.CRTMDataset
     _recursive_: false
-    split:
-      _target_: numpy.arange
-      _args_:
-        - 0
-        - 256608
-    cloud_filter: ${data.vars.cloud_filter.load}
-    coords:
-      lat: ${data.vars.lat}
-      lon: ${data.vars.lon}
-      scans: ${data.vars.scans}
-      pressure: ${data.vars.pressure}
-    prof_type: ${data.vars.prof.type}
-    obs:
-      prof_norm: ${data.vars.prof}
-      prof_norm_background: ${data.vars.prof_background}
-      prof_norm_increment: ${data.vars.prof_increment}
+    # Cloud filter to apply
+    cloud_filter: ${data.vars.train.cloud_filter.load}
+    # Variables to use as input
+    input:
+      # Input coordinates
+      lat: ${data.vars.train.lat}
+      lon: ${data.vars.train.lon}
+      scans: ${data.vars.train.scans}
+      pressure: ${data.vars.train.pressure}
+    # Variables to use as targets or additional inputs
+    target:
+      # Forward model additional inputs
+      surf: ${data.vars.train.surf}
+      meta: ${data.vars.train.meta}
+      # Optimization targets
+      prof_norm: ${data.vars.train.prof}
+      prof_norm_background: ${data.vars.train.prof_background}
+      prof_norm_increment: ${data.vars.train.prof_increment}
       prof:
-        load: ${data.vars.prof.load}
+        load: ${data.vars.train.prof.load}
       prof_background:
-        load: ${data.vars.prof_background.load}
-      surf: ${data.vars.surf}
-      meta: ${data.vars.meta}
-      hofx: ${data.vars.hofx}
+        load: ${data.vars.train.prof_background.load}
+      hofx: ${data.vars.train.hofx}
+
+  # Validation set
   valid:
-    _target_: inverse.model.data_loader.InverseCRTMDataset
+    # Dataset class
+    _target_: forward.model.data_loader.CRTMDataset
     _recursive_: false
-    split:
-      _target_: numpy.arange
-      _args_:
-        - 256608
-        - 341240
-    cloud_filter: ${loader.stage.train.cloud_filter}
-    coords: ${loader.stage.train.coords}
-    prof_type: ${loader.stage.train.prof_type}
-    obs: ${loader.stage.train.obs}
-  test:
-    _target_: inverse.model.data_loader.InverseCRTMDataset
-    _recursive_: false
-    split:
-      _target_: numpy.arange
-      _args_:
-        - 341240
-        - 426872
-    cloud_filter: ${loader.stage.train.cloud_filter}
-    coords: ${loader.stage.train.coords}
-    prof_type: ${loader.stage.train.prof_type}
-    obs: ${loader.stage.train.obs}
-    results:
+    # Cloud filter to apply
+    cloud_filter: ${data.vars.valid.cloud_filter.load}
+    # Variables to use as input
+    input:
+      # Input coordinates
+      lat: ${data.vars.valid.lat}
+      lon: ${data.vars.valid.lon}
+      scans: ${data.vars.valid.scans}
+      pressure: ${data.vars.valid.pressure}
+    # Variables to use as targets or additional inputs
+    target:
+      # Forward model additional inputs
+      surf: ${data.vars.valid.surf}
+      meta: ${data.vars.valid.meta}
+      # Optimization targets
+      prof_norm: ${data.vars.valid.prof}
+      prof_norm_background: ${data.vars.valid.prof_background}
+      prof_norm_increment: ${data.vars.valid.prof_increment}
       prof:
-        path: ${paths.run_dir}/test_prof.npy
+        load: ${data.vars.valid.prof.load}
+      prof_background:
+        load: ${data.vars.valid.prof_background.load}
+      hofx: ${data.vars.valid.hofx}
+  # Test set
+  test:
+    # Dataset class
+    _target_: forward.model.data_loader.CRTMDataset
+    _recursive_: false
+    # Cloud filter to apply
+    cloud_filter: ${data.vars.test.cloud_filter.load}
+    # Variables to use as input
+    input:
+      # Input coordinates
+      lat: ${data.vars.test.lat}
+      lon: ${data.vars.test.lon}
+      scans: ${data.vars.test.scans}
+      pressure: ${data.vars.test.pressure}
+    # Variables to use as targets or additional inputs
+    target:
+      # Forward model additional inputs
+      surf: ${data.vars.test.surf}
+      meta: ${data.vars.test.meta}
+      # Optimization targets
+      prof_norm: ${data.vars.test.prof}
+      prof_norm_background: ${data.vars.test.prof_background}
+      prof_norm_increment: ${data.vars.test.prof_increment}
+      prof:
+        load: ${data.vars.test.prof.load}
+      prof_background:
+        load: ${data.vars.test.prof_background.load}
+      hofx: ${data.vars.test.hofx}
+    # Results
+    results:
+      # Atmospheric profile predictions
+      prof:
+        # Save function
         save:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${loader.stage.test.results.prof.path}
+            - ${loader.stage.test.results.prof.load.path}
+        # Load function
         load:
-          _target_: numpy.load
-          _args_:
-            - ${loader.stage.test.results.prof.path}
+          _target_: forward.model.data_loader.load_npy
+          path: ${paths.run_dir}/test_prof.npy
+      # Forward model simulations
       hofx:
-        path: ${paths.run_dir}/test_hofx.npy
+        # Save function
         save:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${loader.stage.test.results.hofx.path}
+            - ${loader.stage.test.results.hofx.load.path}
+        # Load function
         load:
-          _target_: numpy.load
-          _args_:
-            - ${loader.stage.test.results.hofx.path}
+          _target_: forward.model.data_loader.load_npy
+          path: ${paths.run_dir}/test_hofx.npy

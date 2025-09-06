@@ -1,5 +1,5 @@
 defaults:
-  - forward_default@stage.predict.vars
+  - inverse_default@stage.predict.vars
 
 # Configuration to download the prediction and testing data
 download:
@@ -13,4 +13,8 @@ stage:
     # Path to test data
     dir: ${paths.data_dir}/Test2
     # Split
-    split: null
+    split:
+        _target_: numpy.arange
+        _args_:
+            - 0
+            - 384000

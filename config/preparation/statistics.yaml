@@ -9,16 +9,44 @@ statistics:
     input:
       # Variables
       vars:
-        prof: ${data.vars.prof}
-        surf: ${data.vars.surf}
-        meta: ${data.vars.meta}
-        hofx: ${data.vars.hofx}
-        lat: ${data.vars.lat}
-        lon: ${data.vars.lon}
-        scans: ${data.vars.scans}
-        pressure: ${data.vars.pressure}
+        prof:
+          load:
+            _target: ${data.stage[0].vars.prof.load._target_}
+            path: ${data.stage[0].vars.prof.load.path}
+            split: null
+        surf:
+          load:
+            _target: ${data.stage[0].vars.surf.load._target_}
+            path: ${data.stage[0].vars.surf.load.path}
+            split: null
+        meta:
+          load:
+            _target: ${data.stage[0].vars.meta.load._target_}
+            path: ${data.stage[0].vars.meta.load.path}
+            split: null
+        hofx:
+          load:
+            _target: ${data.stage[0].vars.hofx.load._target_}
+            path: ${data.stage[0].vars.hofx.load.path}
+            split: null
+        lat:
+          load:
+            _target: ${data.stage[0].vars.lat.load._target_}
+            path: ${data.stage[0].vars.lat.load.path}
+        lon:
+          load:
+            _target: ${data.stage[0].vars.lon.load._target_}
+            path: ${data.stage[0].vars.lon.load.path}
+        scans:
+          load:
+            _target: ${data.stage[0].vars.scans.load._target_}
+            path: ${data.stage[0].vars.scans.load.path}
+        pressure:
+          load:
+            _target: ${data.stage[0].vars.pressure.load._target_}
+            path: ${data.stage[0].vars.pressure.load.path}
       # Cloud filter: Consider only cloudy data, if not null (None)
-      cloud_filter: ${data.vars.cloud_filter}
+      cloud_filter: ${data.stage[0].vars.cloud_filter}
     # What the method produces as output (pickle file)
     output:
       path: ${paths.data_dir}/normalization/stats_cloud_filter.pkl

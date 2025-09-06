@@ -58,12 +58,12 @@ class CRTMEmulator:
         if self.config.get("seed"):
             lightning.seed_everything(self.config.task_seed, workers=True)
 
-    def setup(self, data_config, stage: str='train') -> None:
+    def setup(self, loader_config, stage: str='train') -> None:
         """ Setup trainer object.
 
             Parameters
             ----------
-            data_config: DictConfig. Configuration object for the data loader.
+            loader_config: DictConfig. Configuration object for the data loader.
             stage: str. Stage of the training process.
                         Options are 'train', 'test', or 'predict'.
 
@@ -74,7 +74,7 @@ class CRTMEmulator:
 
         # Data loader
         logger.info("Initializing data loader...")
-        self.data_loader = instantiate(data_config)
+        self.data_loader = instantiate(loader_config)
         # Generate training/validation/test sets
         self.data_loader.setup(stage=stage)
 
@@ -113,7 +113,7 @@ class CRTMEmulator:
         """
 
         # Data loader and trainer setup
-        self.setup(self.config.data, stage='train')
+        self.setup(self.config.loader, stage='train')
 
         # Model
         logger.info("Initializing model...")
@@ -141,11 +141,11 @@ class CRTMEmulator:
         """
 
         # Create output directories if they don't exist
-        if not os.path.exists(self.config.data.sets.test.path):
-            os.makedirs(self.config.data.sets.test.path, exist_ok=True)
+        if not os.path.exists(self.config.data.stage.test.results[0].save.path):
+            os.makedirs(self.config.data.stage.test.results[0].save.path, exist_ok=True)
 
         # Data loader and trainer setup
-        self.setup(self.config.data, stage='test')
+        self.setup(self.config.loader, stage='test')
 
         # Load model from checkpoint
         if self.model is None:
@@ -160,16 +160,16 @@ class CRTMEmulator:
 
         # Save test results to file
         logger.info("Saving results to file...")
-        if hasattr(self.config.data.sets.test.results.hofx, 'save'):
-            save_function = instantiate(self.config.data.sets.test.results.hofx.save)
-            save_function(self.model.test_hofx.reshape(self.model.test_hofx.shape[0], -1))
+        if hasattr(self.config.data.stage.test.results.hofx, 'save'):
+            save_function = instantiate(self.config.data.stage.test.results.hofx.save)
+            save_function(self.model.test_results['hofx'].reshape(self.model.test_results['hofx'].shape[0], -1))
 
-    def predict(self, data_config: DictConfig) -> np.ndarray:
+    def predict(self, loader_config: DictConfig) -> np.ndarray:
         """ Predicts the output of the model on a given dataset.
 
             Parameters
             ----------
-            data_config: DictConfig. Configuration object for the data to predict on.
+            loader_config: DictConfig. Configuration object for the data to predict on.
 
             Returns
             -------
@@ -177,11 +177,11 @@ class CRTMEmulator:
         """
 
         # Create output directories if they don't exist
-        if not os.path.exists(self.config.data.sets.pred.path):
-            os.makedirs(self.config.data.sets.pred.path, exist_ok=True)
+        if not os.path.exists(self.config.data.stage.predict.results[0].save.path):
+            os.makedirs(self.config.data.stage.predict.results[0].save.path, exist_ok=True)
 
         # Data loader and trainer setup
-        self.setup(data_config, stage='pred')
+        self.setup(loader_config, stage='pred')
 
         # Load model from checkpoint
         if self.model is None:

@@ -1,17 +1,16 @@
-import os
-import numpy as np
-from typing import Union
-from omegaconf import DictConfig, ListConfig
 import pytorch_lightning as pl
 from torch.utils.data import Dataset, DataLoader
+from omegaconf import DictConfig
 from forward.utilities.instantiators import instantiate
-from forward.data.transformations import identity
+from forward.utilities.io import load_var
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
 
 class BaseDataloader(pl.LightningDataModule):
     def __init__(self, batch_size: int = 32, num_workers: int = None,
                  persistent_workers: bool = True, pin_memory: bool = True, shuffle: bool = True) -> None:
-        """ Dataloader for the CRTM dataset.
+        """ Base dataloader class.
 
         Parameters
         ----------
@@ -107,20 +106,17 @@ class BaseDataloader(pl.LightningDataModule):
                           pin_memory=self.pin_memory, persistent_workers=self.persistent_workers)
 
 
-class CRTMDataloader(BaseDataloader):
-    def __init__(self, dir: str, sets: DictConfig, inputs: Union[ListConfig, list, str],
-                 outputs: Union[ListConfig, list, str] = None, batch_size: int = 32, num_workers: int = None,
-                 pin_memory: bool = True) -> None:
+class Dataloader(BaseDataloader):
+    def __init__(self, stage: DictConfig, batch_size: int = 32, num_workers: int = None,
+                 persistent_workers: bool = True, pin_memory: bool = True) -> None:
         """ Dataloader for the CRTM dataset.
 
         Parameters
         ----------
-        dir : str. Path to the directory containing the dataset files.
-        sets: DictConfig. Configuration object for the dataset sets.
-        inputs : Union[list, str]. List of input data types (e.g., ['prof', 'surf', 'meta']).
-        outputs : Union[list, str]. List of output data types (e.g., 'hofx'). If None, no outputs are loaded.
+        stage: DictConfig. Configuration object for the dataset at each stage (train, valid, test, pred).
         batch_size : int. Batch size for the dataloader.
         num_workers : int. Number of workers for the dataloader.
+        persistent_workers : bool. If True, the data loader will not shut down the worker processes after a dataset has been consumed.
         pin_memory : bool. If True, the data loader will copy Tensors into CUDA pinned memory before returning them.
 
         Returns
@@ -129,48 +125,10 @@ class CRTMDataloader(BaseDataloader):
         """
 
         #  Class inheritance
-        super().__init__(batch_size=batch_size, num_workers=num_workers, pin_memory=pin_memory)
+        super().__init__(batch_size=batch_size, num_workers=num_workers, persistent_workers=persistent_workers, pin_memory=pin_memory)
 
-        # Path to data
-        self.ds_path = dir
-        # Inputs and outputs
-        self.inputs = inputs if isinstance(inputs, list) or isinstance(inputs, ListConfig) else [inputs]
-        self.outputs = outputs if isinstance(outputs, list) or isinstance(inputs, ListConfig) else [outputs] if outputs is not None else None
         # Data sets
-        self.sets = sets
-
-    def _make_dataset(self, stage: str, inputs: Union[list, str], outputs: Union[list, str] = None) -> Dataset:
-        """ Create a dataset for the specified stage.
-
-        Parameters
-        ----------
-        stage : str. Stage of the model ('train', 'valid', 'test', 'pred').
-        inputs : Union[list, str]. List of input data files or a single input data file.
-        outputs : Union[list, str]. List of output data files or a single output data file.
-
-        Returns
-        -------
-        CRTMDataset. Dataset object containing the input and output data.
-        """
-
-        # Inputs
-        x = {}
-        for input in inputs:
-            f_norm = instantiate(self.sets[stage][input]['normalization']) \
-                if hasattr(self.sets[stage][input], 'normalization') else identity
-            x[input] = f_norm(np.array(instantiate(self.sets[stage][input]['load']), dtype=np.float32)
-                              [self.sets[stage]['split']['start']:self.sets[stage]['split']['end']])
-
-        # Outputs
-        if outputs is not None:
-            y = {}
-            for output in outputs:
-                f_norm = instantiate(self.sets[stage][output]['normalization']) \
-                    if hasattr(self.sets[stage][output], 'normalization') else identity
-                y[output] = f_norm(np.array(instantiate(self.sets[stage][output]['load']), dtype=np.float32)
-                                   [self.sets[stage]['split']['start']:self.sets[stage]['split']['end']])
-            return CRTMDataset(x, y)
-        return CRTMDataset(x)
+        self.stage = stage
 
     def setup(self, stage: str):
         """ Set up the dataset for training, validation, testing, or prediction.
@@ -186,60 +144,90 @@ class CRTMDataloader(BaseDataloader):
 
         # Load datasets
         if stage == 'train':
-            # Training data
-            self.ds_train = self._make_dataset('train', inputs=self.inputs, outputs=self.outputs)
-            # Validation data
-            self.ds_valid = self._make_dataset('valid', inputs=self.inputs, outputs=self.outputs)
+            # Training/validation data
+            self.ds_train, self.ds_valid = self.stage.train, self.stage.valid
         elif stage == 'test':
-            # Test data
-            self.ds_test = self._make_dataset(stage, inputs=self.inputs, outputs=self.outputs)
+            # Test/prediction data
+            self.ds_test = self.stage.test
         elif stage == 'pred':
             # Prediction data
-            self.ds_pred = self._make_dataset(stage, inputs=self.inputs, outputs=None)
+            self.ds_pred = self.stage.pred
 
 
-class CRTMDataset(Dataset):
-    """Lazy loader for the CRTM dataset."""
+class BaseDataset(Dataset):
+    """Base dataset class."""
 
-    def __init__(self, x: dict, y: dict=None) -> None:
-        """Initialize the lazy loader.
+    def __init__(self, x: dict) -> None:
+        """Initialize the dataset class.
 
-        Parameters
-        ----------
-        x : tuple. Tuple containing input tensors (profiles, surface, meta).
-        y : np.ndarray. Target tensor (BT) (optional).
+            Parameters
+            ----------
+            x : dict. Dictionary containing the data.
 
-        Returns
-        -------
-        None.
+            Returns
+            -------
+            None.
         """
 
         # Store data
         self.x = x
-        self.y = y
 
     def __len__(self) -> int:
         """ Get the length of the dataset.
 
-        Returns
-        -------
-        int. Length of the dataset.
+            Returns
+            -------
+            int. Length of the dataset.
         """
         # Return the length of the first input tensor
-        return len(next(iter(self.x.values())))
+        first_dict = next(iter(self.x.values()))
+        first_var = next(iter(first_dict.values()))
+        return len(first_var)
 
-    def __getitem__(self, idx: int) -> Union[tuple, dict]:
+    def __getitem__(self, idx: int) -> dict:
         """ Get data
 
-        Returns
-        -------
-        Dataset object.
+            Returns
+            -------
+            Dataset object.
         """
 
         # Get the data at the specified index
-        x_out = {k: v[idx] for k, v in self.x.items()}
-        if self.y is not None:
-            y_out = {k: v[idx] for k, v in self.y.items()}
-            return x_out, y_out
-        else:
-            return x_out
+        return {k: {kk: vv[idx] if vv.shape[0] == self.__len__() else vv
+                    for kk, vv in v.items()} for k, v in self.x.items()}
+
+
+class CRTMDataset(BaseDataset):
+    """ Dataset class for the CRTM dataset."""
+
+    def __init__(self, input: DictConfig, cloud_filter: DictConfig = None, target: DictConfig = None,
+                 results: DictConfig = None) -> None:
+        """ Initialize the dataset.
+
+            Parameters
+            ----------
+            input: DictConfig. Configuration object for the input variables.
+            target: DictConfig. Configuration object for the target variables.
+            cloud_filter: DictConfig. Boolean mask to filter out clear-sky profiles.
+            results: DictConfig. Configuration object for the results.
+
+            Returns
+            -------
+            None.
+        """
+
+        # Store results configuration
+        self.results = results
+
+        # Extract splitting indices
+        cloud_filter = instantiate(cloud_filter) if cloud_filter is not None else None
+
+        # Load input
+        x = {'input': {var: load_var(config, split=cloud_filter) for var, config in input.items()}}
+
+        # Load variables (if provided)
+        if target is not None:
+            x['target'] = {var: load_var(config, split=cloud_filter) for var, config in target.items()}
+
+        # Class inheritance
+        super().__init__(x)

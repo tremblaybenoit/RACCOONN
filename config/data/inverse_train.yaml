@@ -1,7 +1,7 @@
 defaults:
-  - forward_default@stage.train
-  - forward_default@stage.valid
-  - forward_default@stage.test
+  - inverse_default@stage.train
+  - inverse_default@stage.valid
+  - inverse_default@stage.test
 
 # Configuration to download the training and testing data
 download:
@@ -13,18 +13,30 @@ stage:
   # Training set
   train:
     # Path to training data
-    dir: ${paths.data_dir}/Train2
+    dir: ${paths.data_dir}/Test2
     # Split
-    split: null
+    split:
+      _target_: numpy.arange
+      _args_:
+        - 0
+        - 256608
   # Validation set
   valid:
     # Path to validation data
-    dir: ${paths.data_dir}/Valid2
+    dir: ${paths.data_dir}/Test2
     # Split
-    split: null
+    split:
+      _target_: numpy.arange
+      _args_:
+        - 256608
+        - 320760
   # Test set
   test:
     # Path to test data
     dir: ${paths.data_dir}/Test2
     # Split
-    split: null
+    split:
+      _target_: numpy.arange
+      _args_:
+        - 320760
+        - 384912

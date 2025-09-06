@@ -1,26 +1,31 @@
+# Model
 _target_: forward.model.model.CRTMModel
 
 # Optimizer function and parameters
 optimizer:
+  # Function
   _target_: torch.optim.Adam
   _partial_: true
-  lr: 0.0005  # learning_rate_0 de Keras
+  # Learning rate
+  lr: 0.0005
+  # Weight decay (L2 regularization)
   weight_decay: 0.0
 
 # Learning rate scheduler
 lr_scheduler:
+  # Function
   _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
   _partial_: true
+  # Mode for the scheduler
   mode: min
-  factor: 0.2  # factor_lr_reduce
-  patience: 3  # patience_lr
-  min_lr: 1.0e-6  # learning_rate_min
+  # Factor to reduce the learning rate
+  factor: 0.2
+  # Number of epochs with no improvement after which learning rate will be reduced
+  patience: 3
+  # Minimum learning rate
+  min_lr: 1.0e-6
+  # Threshold for measuring the new optimum, to only focus on significant changes
   threshold: 0.01  # mindelta_lr_reduce
-
-# Loss term(s)
-loss_func:
-  _target_: forward.model.loss.crps_cost_function  # Load loss function
-  _partial_: true  # Partial instantiation for callable
 
 # Parameters
 parameters:
@@ -48,9 +53,19 @@ parameters:
                 'Vegetation area fraction', 'Water area fraction', 'Volumetric water ratio (soil)']
     meta_vars: ['Sensor scan angle', 'Sensor zenith angle', 'Sensor view angle', 'Sensor azimuth angle',
                 'Sensor elevation angle', 'Solar azimuth angle', 'Solar zenith angle']
+  # Model architecture
   architecture:
+    # Dropout rate
     dropout_rate: 0
+    # Number of hidden layers
     nhidden_bt: 3
+    # Number of neurons in the hidden layers
     nnodes_bt: 512
+    # Offset and scale for the standard deviation output
     std_output_activation_offset: 0.001
     std_scale_trainable: true
+
+# Loss function and parameters
+loss_func:
+  # Function
+  _target_: forward.model.loss.CRPS

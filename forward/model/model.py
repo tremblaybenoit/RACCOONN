@@ -41,12 +41,12 @@ class BaseModel(LightningModule):
         # Test set results
         self.test_results = {'hofx': []}
 
-    def base_step(self, batch: tuple[dict, dict], batch_nb: int, stage: str) -> torch.Tensor:
+    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
         """ Perform training/validation/test step.
 
             Parameters
             ----------
-            batch: tensor. Batch from the training set.
+            batch: dict. Batch from the training set.
             batch_nb: int. Index of the batch out of the training set.
             stage: str. Current operation: "train", "valid", or "test".
 
@@ -55,16 +55,10 @@ class BaseModel(LightningModule):
             Loss value: tensor.
         """
 
-        # Check if loss function is defined
-        if self.loss_func is None:
-            raise ValueError("Loss function is not defined. Please provide a loss function.")
-
-        # Extract data from batch
-        x, y = batch
         # Forward pass
-        y_pred = self((x['prof'], x['surf'], x['meta']))
+        pred = self(batch['input'])
         # Compute loss function
-        loss = self.loss_func(y_pred, y['hofx'])
+        loss = self.loss_func(pred, batch['target']['hofx'])
 
         # Log metrics
         self.log(f"{stage}_loss", loss, on_epoch=True, prog_bar=True, logger=True)
@@ -72,16 +66,16 @@ class BaseModel(LightningModule):
         # If testing, return predictions in addition to loss
         if stage == 'test':
             # Store test outputs
-            self.test_results['hofx'].append(y_pred.detach().cpu())
+            self.test_results['hofx'].append(pred.detach().cpu())
 
         return loss
 
-    def training_step(self, batch: tuple[dict, dict], batch_nb: int) -> torch.Tensor:
+    def training_step(self, batch: dict, batch_nb: int) -> torch.Tensor:
         """ Perform training step.
 
             Parameters
             ----------
-            batch: tensor. Batch from the training set.
+            batch: dict. Batch from the training set.
             batch_nb: int. Index of the batch out of the training set.
 
             Returns
@@ -91,7 +85,7 @@ class BaseModel(LightningModule):
 
         return self.base_step(batch, batch_nb, stage='train')
 
-    def validation_step(self, batch: tuple[dict, dict], batch_nb: int) -> torch.Tensor:
+    def validation_step(self, batch: dict, batch_nb: int) -> torch.Tensor:
         """ Perform validation step.
 
             Parameters
@@ -106,12 +100,12 @@ class BaseModel(LightningModule):
 
         return self.base_step(batch, batch_nb, stage='valid')
 
-    def test_step(self, batch: tuple[dict, dict], batch_nb: int) -> torch.Tensor:
+    def test_step(self, batch: dict, batch_nb: int) -> torch.Tensor:
         """ Perform test step.
 
             Parameters
             ----------
-            batch: tensor. Batch from the test set.
+            batch: dict. Batch from the test set.
             batch_nb: int. Index of the batch out of the test set.
 
             Returns
@@ -280,12 +274,12 @@ class CRTMModel(BaseModel):
         else:
             self.std_scale = None
 
-    def forward(self, x: tuple):
+    def forward(self, input: dict):
         """ Forward pass for the model.
 
         Parameters
         ----------
-        x: tuple. Tuple containing input tensors (profiles, surface, meta).
+        input: dict. Dictionary containing input tensors (profiles, surface, meta).
             profiles: torch.Tensor. Input tensor for profiles.
             surface: torch.Tensor. Input tensor for surface variables.
             meta: torch.Tensor. Input tensor for meta variables.
@@ -295,13 +289,10 @@ class CRTMModel(BaseModel):
         torch.Tensor. Output tensor after passing through the model.
         """
 
-        # Unpack the input tensors
-        prof, surf, meta = x  # x['prof'], x['surf'], x['meta']
-
         # Reformat variables
-        prof = prof[:, :, :]  # (batch, nprofvars, nlevels)
+        prof = input['prof']  # (batch, nprofvars, nlevels)
         prof = self.flatten(prof)
-        x = self.concat(prof, surf, meta)
+        x = self.concat(prof, input['surf'], input['meta'])
 
         # Foward pass through hidden layers
         for dense, swish, drop in zip(self.hidden_layers, self.swish_layers, self.dropout_layers):
@@ -310,9 +301,9 @@ class CRTMModel(BaseModel):
             x = drop(x)
 
         # Mean output
-        out_T = self.out_T(x)
-        out_T = self.bt_output_activation(out_T)
-        out_T = out_T * (self.max_T - self.min_T) + self.min_T
+        out = self.out_T(x)
+        out = self.bt_output_activation(out)
+        out = out * (self.max_T - self.min_T) + self.min_T
 
         # Std output
         out_std = self.out_std(x)
@@ -322,14 +313,14 @@ class CRTMModel(BaseModel):
         out_std = out_std + self.std_output_activation_offset
 
         # Concatenate outputs
-        return torch.cat([out_T, out_std], dim=1)
+        return torch.cat([out, out_std], dim=1)
 
-    def predict_step(self, batch: torch.Tensor, batch_nb: int):
+    def predict_step(self, batch: dict, batch_nb: int):
         """ Perform prediction step.
 
             Parameters
             ----------
-            batch: tensor. Batch from the prediction set.
+            batch: dict. Batch from the prediction set.
             batch_nb: int. Index of the batch out of the prediction set.
 
             Returns
@@ -338,12 +329,4 @@ class CRTMModel(BaseModel):
         """
 
         # Forward pass through the model
-        breakpoint()
-        if len(batch) == 3:
-            # If the batch contains input tensors (profiles, surface, meta)
-            return self(batch)
-        else:
-            # Unpack the input tensors
-            x = batch[0]
-            # Forward pass through the model
-            return self(x)
+        return self(batch['input'])
