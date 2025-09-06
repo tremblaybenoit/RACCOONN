@@ -3,12 +3,14 @@ import torch
 from typing import Union
 
 
-def cloud_filter(prof: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:
+def cloud_filter(prof: Union[np.ndarray, torch.Tensor], split: Union[np.ndarray, torch.tensor] = None) \
+        -> Union[np.ndarray, torch.Tensor]:
     """ Filter out profiles with clear skies.
 
         Parameters
         ----------
         prof: np.ndarray or torch.Tensor. Input profiles of shape (n_samples, n_profiles, n_levels).
+        split: np.ndarray or torch.tensor. Indices to split the profiles.
 
         Returns
         -------
@@ -22,6 +24,9 @@ def cloud_filter(prof: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, tor
         clrsky = np.logical_and(prof[:, 5, :].sum(axis=1) == 0, prof[:, 6, :].sum(axis=1) == 0,
                                 prof[:, 7, :].sum(axis=1) == 0)
 
+    # Apply split
+    if split is not None:
+        clrsky = clrsky[split]
     return ~clrsky
 
 

@@ -16,27 +16,45 @@ stage:
     dir: ${paths.data_dir}/Test2
     # Split
     split:
-      _target_: numpy.arange
-      _args_:
-        - 0
-        - 256608
+      _target_: ${data.stage.train.vars.cloud_filter._target_}
+      prof:
+        load:
+          _target_: ${data.stage.train.vars.prof.load._target_}
+          path: ${data.stage.train.vars.prof.load.path}
+      split:
+        _target_: numpy.arange
+        _args_:
+          - 0
+          - 256608
   # Validation set
   valid:
     # Path to validation data
     dir: ${paths.data_dir}/Test2
     # Split
     split:
-      _target_: numpy.arange
-      _args_:
-        - 256608
-        - 320760
+      _target_: ${data.stage.valid.vars.cloud_filter._target_}
+      prof:
+        load:
+          _target_: ${data.stage.valid.vars.prof.load._target_}
+          path: ${data.stage.valid.vars.prof.load.path}
+      split:
+        _target_: numpy.arange
+        _args_:
+          - 256608
+          - 320760
   # Test set
   test:
     # Path to test data
     dir: ${paths.data_dir}/Test2
     # Split
     split:
-      _target_: numpy.arange
-      _args_:
-        - 320760
-        - 384912
+      _target_: ${data.stage.test.vars.cloud_filter._target_}
+      prof:
+        load:
+          _target_: ${data.stage.test.vars.prof.load._target_}
+          path: ${data.stage.test.vars.prof.load.path}
+      split:
+        _target_: numpy.arange
+        _args_:
+          - 320760
+          - 384912

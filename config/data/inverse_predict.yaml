@@ -14,7 +14,13 @@ stage:
     dir: ${paths.data_dir}/Test2
     # Split
     split:
-        _target_: numpy.arange
-        _args_:
-            - 0
-            - 384000
+        _target_: ${data.stage.predict.vars.cloud_filter._target_}
+        prof:
+          load:
+            _target_: ${data.stage.predict.vars.prof.load._target_}
+            path: ${data.stage.predict.vars.prof.load.path}
+        split:
+          _target_: numpy.arange
+          _args_:
+              - 0
+              - 384000

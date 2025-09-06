@@ -95,9 +95,12 @@ vars:
   prof_increment:
     # Loading function
     load:
-      _target_: inverse.data.covariance.analysis_increment
+      _target_: inverse.data.covariance.background_increment
       config_true: ${vars.prof.load}
-      cloud_background: ${vars.cloud_filter.load}
+      cloud_background:
+        _target_: inverse.data.covariance.background_climatology
+        data: ${vars.prof.load}
+        cloud_filter: ${vars.cloud_filter.load}
     # Normalization function and parameters
     normalization:
       _target_: inverse.data.transformations.identity
