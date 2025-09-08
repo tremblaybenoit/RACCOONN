@@ -45,11 +45,6 @@ statistics:
           load:
             _target: ${data.stage[0].vars.pressure.load._target_}
             path: ${data.stage[0].vars.pressure.load.path}
-      # Cloud filter: Consider only cloudy data, if not null (None)
-      cloud_filter:
-        load:
-          _target: ${data.stage[0].vars.cloud_filter.load._target_}
-          prof: ${preparation.statistics.data.input.vars.prof.load}
     # What the method produces as output (pickle file)
     output:
       path: ${paths.data_dir}/normalization/stats_cloud_filter.pkl

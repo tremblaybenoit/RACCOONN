@@ -26,6 +26,16 @@ stage:
         _args_:
           - 0
           - 256608
+      # Adjust computation of pressure filter
+      vars:
+        pressure_filter:
+          load:
+            _target_: inverse.data.filters.pressure_filter
+            prof:
+              _target_: numpy.stack
+              _args_:
+                - [${stage.train.vars.prof.load}, ${stage.valid.vars.prof.load}, ${stage.test.vars.prof.load}]
+                - 0
   # Validation set
   valid:
     # Path to validation data
@@ -42,6 +52,9 @@ stage:
         _args_:
           - 256608
           - 320760
+      # Adjust computation of pressure filter
+      vars:
+        pressure_filter: ${stage.train.vars.pressure_filter}
   # Test set
   test:
     # Path to test data
@@ -58,3 +71,6 @@ stage:
         _args_:
           - 320760
           - 384912
+      # Adjust computation of pressure filter
+      vars:
+        pressure_filter: ${stage.train.vars.pressure_filter}

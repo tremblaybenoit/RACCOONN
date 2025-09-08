@@ -13,7 +13,8 @@ class BaseModel(LightningModule):
     This is translation from Keras to Pytorch of the CRTM emulator by Howard et al. (2025).
     Link: https://zenodo.org/records/13963758.
     """
-    def __init__(self, optimizer: Callable = None, lr_scheduler: Callable = None, loss_func: Callable = None):
+    def __init__(self, optimizer: Callable = None, lr_scheduler: Callable = None, loss_func: Callable = None,
+                 log_valid: bool = True):
         """ Initialize LightningCRTMModel.
 
         Parameters
@@ -21,6 +22,7 @@ class BaseModel(LightningModule):
         optimizer: Callable. Optimizer for the model.
         lr_scheduler: Callable. Configuration object for the learning rate scheduler (optional).
         loss_func: Callable. Loss function for the model.
+        log_valid: bool. If True, log validation results at the end of each validation epoch.
 
         Returns
         -------
@@ -38,6 +40,12 @@ class BaseModel(LightningModule):
         # Store hyperparameters
         self.save_hyperparameters(ignore=['optimizer', 'lr_scheduler', 'loss_func'])
 
+        # Validation results
+        self.log_valid = log_valid
+        if self.log_valid:
+            self.valid_results = {'hofx_target': [],
+                                  'hofx_pred': [],
+                                  'cloud_filter': []}
         # Test set results
         self.test_results = {'hofx': []}
 
@@ -67,6 +75,11 @@ class BaseModel(LightningModule):
         if stage == 'test':
             # Store test outputs
             self.test_results['hofx'].append(pred.detach().cpu())
+        elif stage == 'valid' and self.log_valid:
+            # Store validation outputs
+            self.valid_results['cloud_filter'].append(batch['cloud_filter'].detach().cpu())
+            self.valid_results['hofx_target'].append(batch['target']['hofx'].detach().cpu())
+            self.valid_results['hofx_pred'].append(pred.detach().cpu())
 
         return loss
 
@@ -114,6 +127,23 @@ class BaseModel(LightningModule):
         """
 
         return self.base_step(batch, batch_nb, stage='test')
+
+    def on_validation_epoch_end(self):
+        """ Callback to log validation results at the end of each validation epoch.
+
+            Parameters
+            ----------
+            None.
+
+            Returns
+            -------
+            None.
+        """
+
+        # Clear the lists for the next epoch
+        if self.log_valid:
+            for k in self.valid_results:
+                self.valid_results[k].clear()
 
     def on_test_epoch_start(self):
         """ Perform test epoch start.
@@ -212,7 +242,7 @@ class CRTMModel(BaseModel):
     Link: https://zenodo.org/records/13963758.
     """
     def __init__(self, parameters: DictConfig, optimizer: Callable = None, lr_scheduler: Callable = None,
-                 loss_func: Callable = None):
+                 loss_func: Callable = None, log_valid: bool = True):
         """ Initialize LightningCRTMModel.
 
         Parameters
@@ -221,6 +251,7 @@ class CRTMModel(BaseModel):
         loss_func: Callable. Loss function for the model.
         parameters: DictConfig. Configuration object containing model parameters.
         lr_scheduler: Callable. Configuration object for the learning rate scheduler (optional).
+        log_valid: bool. If True, log validation results at the end of each validation epoch.
 
         Returns
         -------
@@ -228,7 +259,7 @@ class CRTMModel(BaseModel):
         """
 
         # Class inheritance
-        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func)
+        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func, log_valid=log_valid)
 
         # Input parameters
         self.nprofvars = len(parameters.data.use_prof_vars)

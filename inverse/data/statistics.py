@@ -125,6 +125,54 @@ def statistics(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = 
     return stats
 
 
+def compute_dataset_statistics(input: DictConfig, output: DictConfig) -> None:
+    """ Compute statistics of a given dataset.
+
+        Parameters
+        ----------
+        input: DictConfig. Main hydra configuration file containing all model hyperparameters.
+        output: DictConfig. Main hydra configuration file containing all model hyperparameters.
+
+        Returns
+        -------
+        None.
+    """
+
+    # List datasets to combine
+    datasets = list(input.keys())
+
+    # Check if multiple datasets are provided
+    if len(datasets) == 1:
+        compute_statistics(input[datasets[0]], output)
+    # If multiple datasets are provided, compute statistics for each dataset and then combine them
+    else:
+        # Compute statistics per variable and dataset
+        stats = {}
+        stats_ds = {}
+        variables = list(input[0].vars.keys())
+        # Loop over datasets and then variables
+        for ds, ds_config in input.items():
+            stats_ds[ds] = {}
+            for v, variable in enumerate(variables):
+                # Load data
+                data = np.array(instantiate(ds_config.vars[variable].load)).astype(np.float64)
+                # Compute statistics per height
+                stats_ds[ds][variable] = statistics(data, axis=0)
+        # Combine statistics across datasets if more than one dataset is provided
+        for variable in variables:
+            stats[variable] = combine_statistics([stats_ds[ds][variable] for ds in datasets])
+
+        # Save statistics to file
+        logger.info(f"Saving statistics to file {output.path}.")
+        with open(output.path, 'wb') as file:
+            # noinspection PyTypeChecker
+            pickle.dump(stats, file)
+        # Clear memory
+        io = None
+
+    return
+
+
 def compute_statistics(input: DictConfig, output: DictConfig) -> None:
     """ Compute statistics of a given dataset.
 
@@ -138,10 +186,6 @@ def compute_statistics(input: DictConfig, output: DictConfig) -> None:
         None.
     """
 
-    # Filter out clearsky or not
-    logger.info("Loadging cloud filter, if available...")
-    cloud_filter = instantiate(input.cloud_filter.load) if hasattr(input, 'cloud_filter') else None
-
     # Compute statistics per variable
     stats = {}
     variables = list(input.vars.keys())
@@ -151,11 +195,7 @@ def compute_statistics(input: DictConfig, output: DictConfig) -> None:
         data = np.array(instantiate(input.vars[variable].load)).astype(np.float64)
         # Compute statistics per height
         logger.info(f"Computing statistics of variable {variable} ({v + 1}/{len(variables)})...")
-        if variable in ['prof', 'surf', 'meta', 'hofx'] and cloud_filter is not None:
-            logger.info("Applying cloud filter...")
-            stats[variable] = statistics(data[cloud_filter, ...], axis=0)
-        else:
-            stats[variable] = statistics(data, axis=0)
+        stats[variable] = statistics(data, axis=0)
 
     # Save statistics to file
     logger.info(f"Saving statistics to file {output.path}.")

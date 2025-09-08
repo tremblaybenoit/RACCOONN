@@ -1,7 +1,6 @@
 import pytorch_lightning as pl
 from torch.utils.data import Dataset, DataLoader
 from omegaconf import DictConfig
-from forward.utilities.instantiators import instantiate
 from forward.utilities.io import load_var
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
@@ -200,15 +199,13 @@ class BaseDataset(Dataset):
 class CRTMDataset(BaseDataset):
     """ Dataset class for the CRTM dataset."""
 
-    def __init__(self, input: DictConfig, cloud_filter: DictConfig = None, target: DictConfig = None,
-                 results: DictConfig = None) -> None:
+    def __init__(self, input: DictConfig, target: DictConfig = None, results: DictConfig = None) -> None:
         """ Initialize the dataset.
 
             Parameters
             ----------
             input: DictConfig. Configuration object for the input variables.
             target: DictConfig. Configuration object for the target variables.
-            cloud_filter: DictConfig. Boolean mask to filter out clear-sky profiles.
             results: DictConfig. Configuration object for the results.
 
             Returns
@@ -219,15 +216,12 @@ class CRTMDataset(BaseDataset):
         # Store results configuration
         self.results = results
 
-        # Extract splitting indices
-        cloud_filter = instantiate(cloud_filter) if cloud_filter is not None else None
-
         # Load input
-        x = {'input': {var: load_var(config, split=cloud_filter) for var, config in input.items()}}
+        x = {'input': {var: load_var(config) for var, config in input.items()}}
 
         # Load variables (if provided)
         if target is not None:
-            x['target'] = {var: load_var(config, split=cloud_filter) for var, config in target.items()}
+            x['target'] = {var: load_var(config) for var, config in target.items()}
 
         # Class inheritance
         super().__init__(x)

@@ -11,8 +11,6 @@ stage:
     # Dataset class
     _target_: forward.model.data_loader.CRTMDataset
     _recursive_: false
-    # Cloud filter to apply
-    cloud_filter: ${data.vars.train.cloud_filter.load}
     # Variables to use as input
     input:
       # Input coordinates
@@ -34,14 +32,13 @@ stage:
       prof_background:
         load: ${data.vars.train.prof_background.load}
       hofx: ${data.vars.train.hofx}
+      cloud_filter: ${data.vars.train.cloud_filter.load}
 
   # Validation set
   valid:
     # Dataset class
     _target_: forward.model.data_loader.CRTMDataset
     _recursive_: false
-    # Cloud filter to apply
-    cloud_filter: ${data.vars.valid.cloud_filter.load}
     # Variables to use as input
     input:
       # Input coordinates
@@ -63,13 +60,12 @@ stage:
       prof_background:
         load: ${data.vars.valid.prof_background.load}
       hofx: ${data.vars.valid.hofx}
+      cloud_filter: ${data.vars.valid.cloud_filter.load}
   # Test set
   test:
     # Dataset class
     _target_: forward.model.data_loader.CRTMDataset
     _recursive_: false
-    # Cloud filter to apply
-    cloud_filter: ${data.vars.test.cloud_filter.load}
     # Variables to use as input
     input:
       # Input coordinates
@@ -91,6 +87,7 @@ stage:
       prof_background:
         load: ${data.vars.test.prof_background.load}
       hofx: ${data.vars.test.hofx}
+      cloud_filter: ${data.vars.test.cloud_filter.load}
     # Results
     results:
       # Atmospheric profile predictions

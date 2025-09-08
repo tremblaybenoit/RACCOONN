@@ -19,7 +19,7 @@ stage:
     # Variables to use as targets
     target:
       hofx: ${data.vars.train.hofx}
-      pressure: ${data.vars.train.pressure}
+      cloud_filter: ${data.vars.train.cloud_filter}
 
   # Validation set
   valid:
@@ -34,7 +34,7 @@ stage:
     # Variables to use as targets
     target:
       hofx: ${data.vars.valid.hofx}
-      pressure: ${data.vars.valid.pressure}
+      cloud_filter: ${data.vars.valid.cloud_filter}
   # Test set
   test:
     # Dataset class

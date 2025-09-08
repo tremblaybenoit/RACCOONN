@@ -54,8 +54,8 @@ class FigureLogger(Callback):
             instantiate(trainer.datamodule.stage.valid.obs.pressure.normalization, inverse_transform=True)
             (model.valid_results['pressure'][0][0]))
         # Cloud mask
-        clrsky = np.logical_and(prof_target[:, 5, :].sum(axis=1) == 0, prof_target[:, 6, :].sum(axis=1) == 0)
-        clrsky = np.logical_and(clrsky, prof_target[:, 7, :].sum(axis=1) == 0)
+        cloud_filter = np.concatenate(model.valid_results['cloud_filter'], axis=0)
+        clrsky = ~cloud_filter
 
         # List of figures to log
         figs = []

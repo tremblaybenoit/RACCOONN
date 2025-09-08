@@ -11,8 +11,6 @@ stage:
     # Dataset class
     _target_: forward.model.data_loader.CRTMDataset
     _recursive_: false
-    # Cloud filter to apply
-    cloud_filter: ${data.vars.predict.cloud_filter.load}
     # Variables to use as input
     input:
       lat: ${data.vars.predict.lat}

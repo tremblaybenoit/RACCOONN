@@ -56,10 +56,8 @@ class PINNverseOperator(BaseModel):
         """
 
         # Class inheritance
-        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func)
+        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func, log_valid=log_valid)
 
-        # Validation results
-        self.log_valid = log_valid
         # Initialize empty lists for validation and test results
         if self.log_valid:
             self.valid_results = {
@@ -72,6 +70,7 @@ class PINNverseOperator(BaseModel):
                 'prof_background': [],
                 'prof_norm_background': [],
                 'pressure': [],
+                'cloud_filter': []
             }
         # Test results
         self.test_results = {'hofx': [], 'prof': []}
@@ -82,7 +81,7 @@ class PINNverseOperator(BaseModel):
         # Model architecture
         self.n_prof = parameters.data.n_prof
         self.n_levels = parameters.data.n_levels
-        self.prof_vars = parameters.data.prof_vars  # TODO: Handle this differently
+        self.prof_vars = parameters.data.prof_vars
         self.model = self._build_model(positional_encoding, activation_in, activation_out, parameters)
 
     def _build_model(self, positional_encoding: Callable, activation_in: Callable, activation_out: Callable,
@@ -216,7 +215,7 @@ class PINNverseOperator(BaseModel):
             for k, v in {'prof_target': target['prof'], 'prof_pred': pred['prof'],
                          'prof_norm_target': target['prof_norm'], 'prof_norm_pred': pred['prof_norm'],
                          'hofx_target': target['hofx'], 'hofx_pred': pred['hofx'],
-                         'pressure': input['pressure']}.items():
+                         'pressure': input['pressure'], 'cloud_filter': target['cloud_filter']}.items():
                 self.valid_results[k].append(v.detach().cpu().numpy())
             # Store background if available
             if 'prof_background' in target:
