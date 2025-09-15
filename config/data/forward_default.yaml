@@ -2,6 +2,7 @@
 dir: Test2
 # Split (null for no split)
 split: null
+
 # Variables
 vars:
   # Atmospheric profiles
@@ -13,19 +14,8 @@ vars:
     # Loading function
     load:
       _target_: forward.utilities.io.load_npy
-      path: ${dir}/prof.npy
-      split: ${split}
-    # Normalization function and parameters
-    normalization:
-      _target_: forward.data.transformations.NormalizeProfiles
-      profmax:
-        _target_: numpy.loadtxt
-        _args_:
-          - forward/data/normalization/prof_div.txt
-      profmin:
-        _target_: numpy.loadtxt
-        _args_:
-          - forward/data/normalization/prof_m.txt
+      path: ${....dir}/prof.npy
+      split: ${....split}
   # Surface observations
   surf:
     # Surface variable types
@@ -36,8 +26,8 @@ vars:
     # Loading function
     load:
       _target_: forward.utilities.io.load_npy
-      path: ${dir}/surf.npy
-      split: ${split}
+      path: ${....dir}/surf.npy
+      split: ${....split}
     # Normalization function and parameters
     normalization:
       _target_: forward.data.transformations.NormalizeSurface
@@ -57,8 +47,8 @@ vars:
     # Loading function
     load:
       _target_: forward.utilities.io.load_npy
-      path: ${dir}/meta.npy
-      split: ${split}
+      path: ${....dir}/meta.npy
+      split: ${....split}
     # Normalization function and parameters
     normalization:
       _target_: forward.data.transformations.NormalizeMeta
@@ -73,8 +63,8 @@ vars:
     # Loading function
     load:
       _target_: forward.utilities.io.load_npy
-      path: ${dir}/hofx.npy
-      split: ${split}
+      path: ${....dir}/hofx.npy
+      split: ${....split}
     # Normalization function and parameters
     normalization:
       _target_: forward.data.transformations.identity
@@ -84,11 +74,11 @@ vars:
     # Loading function
     load:
       _target_: forward.utilities.io.load_latlon
-      path: ${dir}/lat.npy
+      path: ${....dir}/lat.npy
       scans:
-        _target_: ${vars.scans.load._target_}
-        path: ${vars.scans.load.path}
-      split: ${split}
+        _target_: ${....scans.load._target_}
+        path: ${....scans.load.path}
+      split: ${....split}
     # Normalization function and parameters
     normalization:
       _target_: forward.data.transformations.identity
@@ -98,11 +88,11 @@ vars:
     # Loading function
     load:
       _target_: forward.utilities.io.load_latlon
-      path: ${dir}/lon.npy
+      path: ${....dir}/lon.npy
       scans:
-         _target_: ${vars.scans.load._target_}
-         path: ${vars.scans.load.path}
-      split: ${split}
+         _target_: ${....scans.load._target_}
+         path: ${....scans.load.path}
+      split: ${....split}
     # Normalization function and parameters
     normalization:
       _target_: forward.data.transformations.identity
@@ -112,11 +102,11 @@ vars:
     # Loading function
     load:
       _target_: forward.utilities.io.load_scans
-      path: ${dir}/scans.txt
+      path: ${....dir}/scans.txt
       lat:
-        _target_: ${vars.lat.load._target_}
-        path: ${vars.lat.load.path}
-      split: ${split}
+        _target_: ${....lat.load._target_}
+        path: ${....lat.load.path}
+      split: ${....split}
     # Normalization function and parameters
     normalization:
       _target_: forward.data.transformations.identity
@@ -126,8 +116,15 @@ vars:
     # Loading function
     load:
       _target_: forward.utilities.io.load_npy
-      path: ${dir}/pressure.npy
+      path: ${....dir}/pressure.npy
     # Normalization function and parameters
     normalization:
       _target_: forward.data.transformations.identity
       _partial_: true
+  # Cloud filter
+  cloud_filter:
+    # Loading function
+    load:
+      _target_: inverse.data.filters.cloud_filter
+      _args_:
+        - ${....prof.load}

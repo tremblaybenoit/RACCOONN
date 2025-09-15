@@ -40,7 +40,7 @@ parameters:
     n_pressure: 1
     n_cloud: 0
     # Profile variables (input/output)
-    prof_vars: ${data.stage[0].vars.prof.type}
+    prof_vars: ${data.stage.train.vars.prof.type}
   # Model architecture
   architecture:
     # Number of neurons in the hidden layers
@@ -85,7 +85,7 @@ loss_func:
   loss_bcs:
     _target_: inverse.model.loss.mse
   # Pressure filter: Consider only pressure levels with non-zero variance (for model and bcs errors)
-  pressure_filter:  ${data.stage[0].vars.pressure_filter.load}
+  pressure_filter:  ${data.pressure_filter.load}
 
 # Positional encoding
 positional_encoding:
@@ -105,10 +105,10 @@ activation_out:
 # Transformations (to apply after the output layer)
 transform_out:
   # Inverse normalization for profile variables
-  - _target_: ${data.stage[0].vars.prof.normalization._target_}
+  - _target_: ${data.stage.train.vars.prof.normalization._target_}
     _partial_: true
-    stats: ${data.stage[0].vars.prof.normalization.stats}
-    axis: ${data.stage[0].vars.prof.normalization.axis}  # Axis for normalization
+    stats: ${data.stage.train.vars.prof.normalization.stats}
+    axis: ${data.stage.train.vars.prof.normalization.axis}  # Axis for normalization
     inverse_transform: true
 
 # Plot logger

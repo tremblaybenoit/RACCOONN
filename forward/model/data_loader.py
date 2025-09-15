@@ -1,7 +1,7 @@
 import pytorch_lightning as pl
 from torch.utils.data import Dataset, DataLoader
 from omegaconf import DictConfig
-from forward.utilities.io import load_var
+from forward.utilities.io import load_var_and_normalize
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
@@ -217,11 +217,11 @@ class CRTMDataset(BaseDataset):
         self.results = results
 
         # Load input
-        x = {'input': {var: load_var(config) for var, config in input.items()}}
+        x = {'input': {var: load_var_and_normalize(config) for var, config in input.items()}}
 
         # Load variables (if provided)
         if target is not None:
-            x['target'] = {var: load_var(config) for var, config in target.items()}
+            x['target'] = {var: load_var_and_normalize(config) for var, config in target.items()}
 
         # Class inheritance
         super().__init__(x)

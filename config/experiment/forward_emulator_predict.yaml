@@ -1,0 +1,38 @@
+# @package _global_
+# Experiment-specific Hydra structure
+
+# Overriding default structure
+defaults:
+  - override /paths: default
+  - override /hydra: default
+  - override /data: forward_predict  # Data only for prediction
+  - override /preparation: forward_default
+  - override /loader: forward_predict  # Prediction only
+  - override /model: forward_emulator
+  - override /trainer: gpu
+  - override /callbacks: default
+  - override /logger: default
+
+# All parameters below will be merged with parameters from default configurations set above.
+# This allows you to overwrite only specified parameters
+
+# Task name. Note that it determines the output directory path
+task_name: "forward_emulator"  # Experiment
+
+# Run id (unique identifier for the run)
+paths:
+  task_dir: "../forward_outputs"
+  run_id: "version_000"
+  data_dir: "../../GOES_ML-main/Data"
+  checkpoint_dir: "forward/model/checkpoints"
+
+  # Model configuration
+  model:
+    # Optimizer function and parameters
+    optimizer: null
+    # Learning rate scheduler
+    lr_scheduler: null
+    # Loss function and parameters
+    loss_func: null
+    # Plot logger
+    log_valid: false

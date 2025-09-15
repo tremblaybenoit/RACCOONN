@@ -13,22 +13,11 @@ split:
 
 # Variables
 vars:
-  # Atmospheric profiles
-  prof:
-    # Normalization function and parameters
-    normalization:
-      _target_: inverse.data.transformations.min_max
-      _partial_: true
-      stats:
-        _target_: inverse.data.statistics.read_statistics_var
-        _args_:
-          - ${preparation.statistics.data.output.path}
-          - 'prof'
   # Brightness temperatures (observed)
   hofx:
     # Loading function
     load:
-      path: ${dir}/hofx_lightning.npy
+      path: ${....dir}/hofx_lightning.npy
   # Latitude
   lat:
     # Normalization function and parameters
@@ -78,7 +67,7 @@ vars:
     # Loading function
     load:
       _target_: inverse.data.covariance.innovation_uncertainty
-      data: ${vars.hofx.load}
+      data: ${...hofx.load}
     # Normalization function and parameters
     normalization:
       _target_: inverse.data.transformations.identity
@@ -88,32 +77,17 @@ vars:
     # Loading function
     load:
       _target_: inverse.data.covariance.background_climatology
-      data: ${prof.load}
-      cloud_filter: ${vars.cloud_filter.load}
-    normalization: ${vars.prof.normalization}
+      data: ${...prof.load}
+    # Normalization function and parameters
+    normalization: ${..prof.normalization}
   # Increment atmospheric profiles
   prof_increment:
     # Loading function
     load:
       _target_: inverse.data.covariance.background_increment
-      config_true: ${vars.prof.load}
-      cloud_background:
-        _target_: inverse.data.covariance.background_climatology
-        data: ${vars.prof.load}
-        cloud_filter: ${vars.cloud_filter.load}
+      config_true: ${...prof}
+      config_background: ${...prof_background}
     # Normalization function and parameters
     normalization:
       _target_: inverse.data.transformations.identity
       _partial_: true
-  # Pressure filter
-  pressure_filter:
-    # Loading function
-    load:
-      _target_: inverse.data.filters.pressure_filter
-      prof: ${vars.prof.load}
-  # Cloud filter
-  cloud_filter:
-    # Loading function
-    load:
-      _target_: inverse.data.filters.cloud_filter
-      prof: ${vars.prof.load}

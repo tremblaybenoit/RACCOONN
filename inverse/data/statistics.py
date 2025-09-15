@@ -3,7 +3,7 @@ import numpy as np
 import pickle
 import torch
 import hydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig
 from forward.utilities.instantiators import instantiate
 from forward.utilities.logic import get_config_path
 import logging
@@ -125,7 +125,7 @@ def statistics(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = 
     return stats
 
 
-def compute_dataset_statistics(input: DictConfig, output: DictConfig) -> None:
+def compute_statistics_stack(input: ListConfig, output: DictConfig) -> None:
     """ Compute statistics of a given dataset.
 
         Parameters
@@ -138,29 +138,26 @@ def compute_dataset_statistics(input: DictConfig, output: DictConfig) -> None:
         None.
     """
 
-    # List datasets to combine
-    datasets = list(input.keys())
-
     # Check if multiple datasets are provided
-    if len(datasets) == 1:
-        compute_statistics(input[datasets[0]], output)
+    if len(input) == 1:
+        compute_statistics(input[0], output)
     # If multiple datasets are provided, compute statistics for each dataset and then combine them
     else:
         # Compute statistics per variable and dataset
         stats = {}
         stats_ds = {}
-        variables = list(input[0].vars.keys())
+        variables = list(input[0].keys())
         # Loop over datasets and then variables
-        for ds, ds_config in input.items():
+        for ds, ds_config in enumerate(input):
             stats_ds[ds] = {}
             for v, variable in enumerate(variables):
                 # Load data
-                data = np.array(instantiate(ds_config.vars[variable].load)).astype(np.float64)
+                data = np.array(instantiate(ds_config[variable].load)).astype(np.float64)
                 # Compute statistics per height
                 stats_ds[ds][variable] = statistics(data, axis=0)
         # Combine statistics across datasets if more than one dataset is provided
         for variable in variables:
-            stats[variable] = combine_statistics([stats_ds[ds][variable] for ds in datasets])
+            stats[variable] = combine_statistics([stats_ds[ds][variable] for ds in range(len(input))])
 
         # Save statistics to file
         logger.info(f"Saving statistics to file {output.path}.")
@@ -173,7 +170,7 @@ def compute_dataset_statistics(input: DictConfig, output: DictConfig) -> None:
     return
 
 
-def compute_statistics(input: DictConfig, output: DictConfig) -> None:
+def compute_statistics(input: DictConfig, output: DictConfig = None) -> dict:
     """ Compute statistics of a given dataset.
 
         Parameters
@@ -188,24 +185,23 @@ def compute_statistics(input: DictConfig, output: DictConfig) -> None:
 
     # Compute statistics per variable
     stats = {}
-    variables = list(input.vars.keys())
+    variables = list(input.keys())
     # Loop sequentially for memory efficiency (over speed)
     for v, variable in enumerate(variables):
         # Load data
-        data = np.array(instantiate(input.vars[variable].load)).astype(np.float64)
+        data = np.array(instantiate(input[variable].load)).astype(np.float64)
         # Compute statistics per height
         logger.info(f"Computing statistics of variable {variable} ({v + 1}/{len(variables)})...")
         stats[variable] = statistics(data, axis=0)
 
     # Save statistics to file
-    logger.info(f"Saving statistics to file {output.path}.")
-    with open(output.path, 'wb') as file:
-        # noinspection PyTypeChecker
-        pickle.dump(stats, file)
-    # Clear memory
-    io = None
+    if output is not None:
+        logger.info(f"Saving statistics to file {output.path}.")
+        with open(output.path, 'wb') as file:
+            # noinspection PyTypeChecker
+            pickle.dump(stats, file)
 
-    return
+    return stats
 
 
 @hydra.main(version_base=None, config_path=get_config_path(), config_name="default")
@@ -226,7 +222,7 @@ def main(config: DictConfig) -> None:
     if hasattr(config.preparation, "statistics"):
         for dataset, config_statistics in config.preparation.statistics.items():
             logger.info(f"Computing statistics of {dataset} set")
-            instantiate(config_statistics)
+            _ = instantiate(config_statistics)
 
     return
 

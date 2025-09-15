@@ -14,25 +14,25 @@ stage:
     # Variables to use as input
     input:
       # Input coordinates
-      lat: ${data.vars.train.lat}
-      lon: ${data.vars.train.lon}
-      scans: ${data.vars.train.scans}
-      pressure: ${data.vars.train.pressure}
+      lat: ${data.stage.train.vars.lat}
+      lon: ${data.stage.train.vars.lon}
+      scans: ${data.stage.train.vars.scans}
+      pressure: ${data.stage.train.vars.pressure}
     # Variables to use as targets or additional inputs
     target:
       # Forward model additional inputs
-      surf: ${data.vars.train.surf}
-      meta: ${data.vars.train.meta}
+      surf: ${data.stage.train.vars.surf}
+      meta: ${data.stage.train.vars.meta}
       # Optimization targets
-      prof_norm: ${data.vars.train.prof}
-      prof_norm_background: ${data.vars.train.prof_background}
-      prof_norm_increment: ${data.vars.train.prof_increment}
+      prof_norm: ${data.stage.train.vars.prof}
+      prof_norm_background: ${data.stage.train.vars.prof_background}
+      prof_norm_increment: ${data.stage.train.vars.prof_increment}
       prof:
-        load: ${data.vars.train.prof.load}
+        load: ${data.stage.train.vars.prof.load}
       prof_background:
-        load: ${data.vars.train.prof_background.load}
-      hofx: ${data.vars.train.hofx}
-      cloud_filter: ${data.vars.train.cloud_filter.load}
+        load: ${data.stage.train.vars.prof_background.load}
+      hofx: ${data.stage.train.vars.hofx}
+      cloud_filter: ${data.stage.train.vars.cloud_filter}
 
   # Validation set
   valid:
@@ -42,25 +42,25 @@ stage:
     # Variables to use as input
     input:
       # Input coordinates
-      lat: ${data.vars.valid.lat}
-      lon: ${data.vars.valid.lon}
-      scans: ${data.vars.valid.scans}
-      pressure: ${data.vars.valid.pressure}
+      lat: ${data.stage.valid.vars.lat}
+      lon: ${data.stage.valid.vars.lon}
+      scans: ${data.stage.valid.vars.scans}
+      pressure: ${data.stage.valid.vars.pressure}
     # Variables to use as targets or additional inputs
     target:
       # Forward model additional inputs
-      surf: ${data.vars.valid.surf}
-      meta: ${data.vars.valid.meta}
+      surf: ${data.stage.valid.vars.surf}
+      meta: ${data.stage.valid.vars.meta}
       # Optimization targets
-      prof_norm: ${data.vars.valid.prof}
-      prof_norm_background: ${data.vars.valid.prof_background}
-      prof_norm_increment: ${data.vars.valid.prof_increment}
+      prof_norm: ${data.stage.valid.vars.prof}
+      prof_norm_background: ${data.stage.valid.vars.prof_background}
+      prof_norm_increment: ${data.stage.valid.vars.prof_increment}
       prof:
-        load: ${data.vars.valid.prof.load}
+        load: ${data.stage.valid.vars.prof.load}
       prof_background:
-        load: ${data.vars.valid.prof_background.load}
-      hofx: ${data.vars.valid.hofx}
-      cloud_filter: ${data.vars.valid.cloud_filter.load}
+        load: ${data.stage.valid.vars.prof_background.load}
+      hofx: ${data.stage.valid.vars.hofx}
+      cloud_filter: ${data.stage.valid.vars.cloud_filter}
   # Test set
   test:
     # Dataset class
@@ -69,25 +69,25 @@ stage:
     # Variables to use as input
     input:
       # Input coordinates
-      lat: ${data.vars.test.lat}
-      lon: ${data.vars.test.lon}
-      scans: ${data.vars.test.scans}
-      pressure: ${data.vars.test.pressure}
+      lat: ${data.stage.test.vars.lat}
+      lon: ${data.stage.test.vars.lon}
+      scans: ${data.stage.test.vars.scans}
+      pressure: ${data.stage.test.vars.pressure}
     # Variables to use as targets or additional inputs
     target:
       # Forward model additional inputs
-      surf: ${data.vars.test.surf}
-      meta: ${data.vars.test.meta}
+      surf: ${data.stage.test.vars.surf}
+      meta: ${data.stage.test.vars.meta}
       # Optimization targets
-      prof_norm: ${data.vars.test.prof}
-      prof_norm_background: ${data.vars.test.prof_background}
-      prof_norm_increment: ${data.vars.test.prof_increment}
+      prof_norm: ${data.stage.test.vars.prof}
+      prof_norm_background: ${data.stage.test.vars.prof_background}
+      prof_norm_increment: ${data.stage.test.vars.prof_increment}
       prof:
-        load: ${data.vars.test.prof.load}
+        load: ${data.stage.test.vars.prof.load}
       prof_background:
-        load: ${data.vars.test.prof_background.load}
-      hofx: ${data.vars.test.hofx}
-      cloud_filter: ${data.vars.test.cloud_filter.load}
+        load: ${data.stage.test.vars.prof_background.load}
+      hofx: ${data.stage.test.vars.hofx}
+      cloud_filter: ${data.stage.test.vars.cloud_filter}
     # Results
     results:
       # Atmospheric profile predictions

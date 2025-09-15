@@ -7,14 +7,16 @@ covariance:
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:
-      # Variables
-      vars:
-        # Increment estimates for the profile variables
-        err: ${data.vars.prof_increment}
-      # Cloud filter: Consider only cloudy data, if not null (None)
-      cloud_filter: ${data.vars.cloud_filter}
+      # Increment estimates for the profile variables
+      err:
+        load:
+          _target_: forward.utilities.io.load_stack_and_normalize
+          stack:
+            - ${data.stage.train.vars.prof_increment}
+            - ${data.stage.valid.vars.prof_increment}
+            - ${data.stage.test.vars.prof_increment}
       # Pressure filter: Consider only pressure levels with non-zero variance
-      pressure_filter: ${data.vars.pressure_filter}
+      pressure_filter: ${data.pressure_filter}
     # What the method produces as output
     output:
       # File path to save/load the covariance matrix
@@ -38,12 +40,13 @@ covariance:
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:
-      # Variables
-      vars:
-        # Innovation estimates for the observation variables
-        err: ${data.vars.hofx_innovation}
-      # Cloud filter: Consider only cloudy data, if not null (None)
-      cloud_filter: ${data.vars.cloud_filter}
+      # Innovation estimates for the observation variables
+      err:
+        _target_: forward.utilities.io.load_stack_and_normalize
+        stack:
+          - ${data.stage.train.vars.hofx_innovation}
+          - ${data.stage.valid.vars.hofx_innovation}
+          - ${data.stage.test.vars.hofx_innovation}
     # What the method produces as output
     output:
       # File path to save/load the covariance matrix

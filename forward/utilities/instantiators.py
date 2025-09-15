@@ -33,7 +33,7 @@ def instantiate(config: Any, **kwargs):
         return hydra.utils.instantiate(config, **kwargs)
 
     # If callable object is provided
-    elif callable(config):
+    elif callable(config) and not isinstance(config, partial):
 
         # Check for partial instantiation
         partial_flag = kwargs.pop("_partial_", False)

@@ -13,9 +13,9 @@ stage:
     _recursive_: false
     # Variables to use as input
     input:
-      prof: ${data.vars.train.prof}
-      surf: ${data.vars.train.surf}
-      meta: ${data.vars.train.meta}
+      prof: ${data.stage.predict.vars.prof}
+      surf: ${data.stage.predict.vars.surf}
+      meta: ${data.stage.predict.vars.meta}
     # Results
     results:
       # Forward model simulations

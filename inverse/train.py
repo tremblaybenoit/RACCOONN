@@ -146,8 +146,9 @@ class InverseOperator:
         """
 
         # Create output directories if they don't exist
-        if not os.path.exists(self.config.data.stage.test.results[0].save.path):
-            os.makedirs(self.config.data.stage.test.results[0].save.path, exist_ok=True)
+        save_dir = os.path.dirname(self.config.data.stage.test.results[0].save.path)
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir, exist_ok=True)
 
         # Data loader and trainer setup
         self.setup(self.config.loader, stage='test')
@@ -185,8 +186,9 @@ class InverseOperator:
         """
 
         # Create output directories if they don't exist
-        if not os.path.exists(self.config.data.stage.predict.results[0].save.path):
-            os.makedirs(self.config.data.stage.predict.results[0].save.path, exist_ok=True)
+        save_dir = os.path.dirname(loader_config.data.stage.test.results.hofx.save.path)
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir, exist_ok=True)
 
         # Data loader and trainer setup
         self.setup(loader_config, stage='pred')

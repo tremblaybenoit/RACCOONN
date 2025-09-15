@@ -1,5 +1,5 @@
 import numpy as np
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig
 from forward.utilities.instantiators import instantiate
 from forward.data.transformations import identity
 
@@ -83,6 +83,27 @@ def load_scans(path: str, lat: np.ndarray = None, split: np.ndarray = None) -> n
 
 
 def load_var(config: DictConfig, split: np.ndarray = None) -> np.ndarray:
+    """ Load variable.
+
+        Parameters
+        ----------
+        config: DictConfig. Configuration object for the variables.
+        split : np.ndarray. Array of indices for the specified stage.
+
+        Returns
+        -------
+        dict. Array containing the loaded variable.
+    """
+
+    # Load and normalize variable
+    data = np.array(instantiate(config['load']), dtype=np.float64)
+    # Apply split if available
+    if split is not None and data.shape[0] == len(split):
+        data = data[split]
+    return data
+
+
+def load_var_and_normalize(config: DictConfig, split: np.ndarray = None) -> np.ndarray:
     """ Load and normalize variable.
 
         Parameters
@@ -98,8 +119,55 @@ def load_var(config: DictConfig, split: np.ndarray = None) -> np.ndarray:
     # Extract normalization function
     f_norm = instantiate(config['normalization']) if hasattr(config, 'normalization') else identity
     # Load and normalize variable
-    data = f_norm(np.array(instantiate(config['load']), dtype=np.float64))
+    data = f_norm(load_var(config['load']))
     # Apply split if available
     if split is not None and data.shape[0] == len(split):
         data = data[split]
     return data
+
+
+def load_stack(config: ListConfig) -> np.ndarray:
+    """ Load and stack multiple variables.
+
+        Parameters
+        ----------
+        config: List[DictConfig]. List of configuration objects for the variables.
+
+        Returns
+        -------
+        np.ndarray. Array containing the loaded and stacked variables.
+    """
+
+    # Load and stack variables along the last axis
+    return np.concatenate([load_var(c) for c in config], axis=0)
+
+
+def load_stack_and_normalize(stack: ListConfig) -> np.ndarray:
+    """ Load and stack multiple normalized variables.
+
+        Parameters
+        ----------
+        stack: List[DictConfig]. List of configuration objects for the variables.
+
+        Returns
+        -------
+        np.ndarray. Array containing the loaded and stacked normalized variables.
+    """
+
+    # Load and stack variables along the last axis
+    return np.concatenate([load_var_and_normalize(c) for c in stack], axis=0)
+
+
+def extract_indices(indices: np.ndarray, filter: np.ndarray = None) -> np.ndarray:
+    """ Extract split indices for a given stage from the configuration.
+
+        Parameters
+        ----------
+        indices: np.ndarray. Array of indices for the specified stage.
+        filter: np.ndarray, optional. Boolean array to filter the indices. Defaults to None.
+
+        Returns
+        -------
+        np.ndarray. Array of indices for the specified stage, or None if not found.
+    """
+    return indices[filter[indices]] if filter is not None else indices

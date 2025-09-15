@@ -13,15 +13,15 @@ stage:
     _recursive_: false
     # Variables to use as input
     input:
-      lat: ${data.vars.predict.lat}
-      lon: ${data.vars.predict.lon}
-      scans: ${data.vars.predict.scans}
-      pressure: ${data.vars.predict.pressure}
+      lat: ${data.stage.predict.vars.lat}
+      lon: ${data.stage.predict.vars.lon}
+      scans: ${data.stage.predict.vars.scans}
+      pressure: ${data.stage.predict.vars.pressure}
     # Variables to use as targets or additional inputs
     #target:
     #  # Forward model additional inputs
-    #  surf: ${data.vars.predict.surf}
-    #  meta: ${data.vars.predict.meta}
+    #  surf: ${data.stage.predict.vars.surf}
+    #  meta: ${data.stage.predict.vars.meta}
     # Results
     results:
       # Atmospheric profile predictions

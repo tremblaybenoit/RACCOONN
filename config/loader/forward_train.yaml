@@ -13,13 +13,13 @@ stage:
     _recursive_: false
     # Variables to use as input
     input:
-      prof: ${data.vars.train.prof}
-      surf: ${data.vars.train.surf}
-      meta: ${data.vars.train.meta}
+      prof: ${data.stage.train.vars.prof}
+      surf: ${data.stage.train.vars.surf}
+      meta: ${data.stage.train.vars.meta}
     # Variables to use as targets
     target:
-      hofx: ${data.vars.train.hofx}
-      cloud_filter: ${data.vars.train.cloud_filter}
+      hofx: ${data.stage.train.vars.hofx}
+      cloud_filter: ${data.stage.train.vars.cloud_filter}
 
   # Validation set
   valid:
@@ -28,13 +28,13 @@ stage:
     _recursive_: false
     # Variables to use as input
     input:
-      prof: ${data.vars.valid.prof}
-      surf: ${data.vars.valid.surf}
-      meta: ${data.vars.valid.meta}
+      prof: ${data.stage.valid.vars.prof}
+      surf: ${data.stage.valid.vars.surf}
+      meta: ${data.stage.valid.vars.meta}
     # Variables to use as targets
     target:
-      hofx: ${data.vars.valid.hofx}
-      cloud_filter: ${data.vars.valid.cloud_filter}
+      hofx: ${data.stage.valid.vars.hofx}
+      cloud_filter: ${data.stage.valid.vars.cloud_filter}
   # Test set
   test:
     # Dataset class
@@ -42,13 +42,13 @@ stage:
     _recursive_: false
     # Variables to use as input
     input:
-      prof: ${data.vars.test.prof}
-      surf: ${data.vars.test.surf}
-      meta: ${data.vars.test.meta}
+      prof: ${data.stage.test.vars.prof}
+      surf: ${data.stage.test.vars.surf}
+      meta: ${data.stage.test.vars.meta}
     # Variables to use as targets
     target:
-      hofx: ${data.vars.test.hofx}
-      cloud_filter: ${data.vars.test.cloud_filter}
+      hofx: ${data.stage.test.vars.hofx}
+      cloud_filter: ${data.stage.test.vars.cloud_filter}
     # Results
     results:
       # Forward model simulations

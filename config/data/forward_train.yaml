@@ -16,15 +16,42 @@ stage:
     dir: ${paths.data_dir}/Train2
     # Split
     split: null
+    # Variables
+    vars:
+      # Atmospheric profiles
+      prof:
+        # Normalization function and parameters
+        normalization:
+          _target_: forward.data.transformations.NormalizeProfiles
+          profmax:
+            _target_: numpy.loadtxt
+            _args_:
+              - forward/data/normalization/prof_div.txt
+          profmin:
+            _target_: numpy.loadtxt
+            _args_:
+              - forward/data/normalization/prof_m.txt
   # Validation set
   valid:
     # Path to validation data
     dir: ${paths.data_dir}/Valid2
     # Split
     split: null
+    # Variables
+    vars:
+      # Atmospheric profiles
+      prof:
+        # Normalization function and parameters
+        normalization: ${data.stage.train.vars.prof.normalization}
   # Test set
   test:
     # Path to test data
     dir: ${paths.data_dir}/Test2
     # Split
     split: null
+    # Variables
+    vars:
+      # Atmospheric profiles
+      prof:
+        # Normalization function and parameters
+        normalization: ${data.stage.train.vars.prof.normalization}

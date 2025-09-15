@@ -7,44 +7,62 @@ statistics:
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:
-      # Variables
-      vars:
-        prof:
-          load:
-            _target: ${data.stage[0].vars.prof.load._target_}
-            path: ${data.stage[0].vars.prof.load.path}
-            split: null
-        surf:
-          load:
-            _target: ${data.stage[0].vars.surf.load._target_}
-            path: ${data.stage[0].vars.surf.load.path}
-            split: null
-        meta:
-          load:
-            _target: ${data.stage[0].vars.meta.load._target_}
-            path: ${data.stage[0].vars.meta.load.path}
-            split: null
-        hofx:
-          load:
-            _target: ${data.stage[0].vars.hofx.load._target_}
-            path: ${data.stage[0].vars.hofx.load.path}
-            split: null
-        lat:
-          load:
-            _target: ${data.stage[0].vars.lat.load._target_}
-            path: ${data.stage[0].vars.lat.load.path}
-        lon:
-          load:
-            _target: ${data.stage[0].vars.lon.load._target_}
-            path: ${data.stage[0].vars.lon.load.path}
-        scans:
-          load:
-            _target: ${data.stage[0].vars.scans.load._target_}
-            path: ${data.stage[0].vars.scans.load.path}
-        pressure:
-          load:
-            _target: ${data.stage[0].vars.pressure.load._target_}
-            path: ${data.stage[0].vars.pressure.load.path}
+      prof:
+        load:
+          _target_: forward_utilities.io.load_stack
+          stack:
+            - ${data.stage.train.vars.prof}
+            - ${data.stage.valid.vars.prof}
+            - ${data.stage.test.vars.prof}
+      surf:
+        load:
+          _target_: forward_utilities.io.load_stack
+          stack:
+            - ${data.stage.train.vars.surf}
+            - ${data.stage.valid.vars.surf}
+            - ${data.stage.test.vars.surf}
+      meta:
+        load:
+          _target_: forward_utilities.io.load_stack
+          stack:
+              - ${data.stage.train.vars.meta}
+              - ${data.stage.valid.vars.meta}
+              - ${data.stage.test.vars.meta}
+      hofx:
+        load:
+          _target_: forward_utilities.io.load_stack
+          stack:
+              - ${data.stage.train.vars.hofx}
+              - ${data.stage.valid.vars.hofx}
+              - ${data.stage.test.vars.hofx}
+      lat:
+        load:
+          _target_: forward_utilities.io.load_stack
+          stack:
+              - ${data.stage.train.vars.lat}
+              - ${data.stage.valid.vars.lat}
+              - ${data.stage.test.vars.lat}
+      lon:
+        load:
+          _target_: forward_utilities.io.load_stack
+          stack:
+            - ${data.stage.train.vars.lon}
+            - ${data.stage.valid.vars.lon}
+            - ${data.stage.test.vars.lon}
+      scans:
+        load:
+          _target_: forward_utilities.io.load_stack
+          stack:
+            - ${data.stage.train.vars.scans}
+            - ${data.stage.valid.vars.scans}
+            - ${data.stage.test.vars.scans}
+      pressure:
+        load:
+          _target_: forward_utilities.io.load_stack
+          stack:
+            - ${data.stage.train.vars.pressure}
+            - ${data.stage.valid.vars.pressure}
+            - ${data.stage.test.vars.pressure}
     # What the method produces as output (pickle file)
     output:
-      path: ${paths.data_dir}/normalization/stats_cloud_filter.pkl
+      path: ${paths.data_dir}/normalization/stats_cloud_filter2.pkl

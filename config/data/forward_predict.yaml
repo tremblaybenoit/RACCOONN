@@ -14,3 +14,9 @@ stage:
     dir: ${paths.data_dir}/Test2
     # Split
     split: null
+    # Variables
+    vars:
+      # Atmospheric profiles
+      prof:
+        # Normalization function and parameters
+        normalization: ${data.stage.train.vars.prof.normalization}

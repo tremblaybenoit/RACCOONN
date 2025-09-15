@@ -5,8 +5,8 @@
 defaults:
   - override /paths: default
   - override /hydra: default
-  - override /data: inverse
-  - override /preparation: default
+  - override /data: inverse_train  # Data only for training
+  - override /preparation: inverse_default
   - override /loader: inverse_train  # Training only
   - override /model: pinnverse_operator
   - override /trainer: gpu
@@ -34,15 +34,25 @@ trainer:
 loader:
   stage:
     train:
-      obs:
-        prof_norm_background: ${data.vars.prof}
+      target:
+        prof_norm_background: ${data.stage.train.vars.prof}
         prof_background:
-          load: ${data.vars.prof.load}
+          load: ${data.stage.train.vars.prof.load}
+    valid:
+      target:
+        prof_norm_background: ${data.stage.valid.vars.prof}
+        prof_background:
+          load: ${data.stage.valid.vars.prof.load}
+    test:
+      target:
+        prof_norm_background: ${data.stage.test.vars.prof}
+        prof_background:
+          load: ${data.stage.test.vars.prof.load}
 
 # Model parameters
 model:
   # Model
-  _target_: inverse.model.model.PINNverseOperator
+  _target_: inverse.model.model.PINNverseOperators
 
   # Optimizer function and parameters
   optimizer:
@@ -83,7 +93,7 @@ model:
       n_pressure: 1
       n_cloud: 0
       # Profile variables (input/output)
-      prof_vars: ${data.vars.prof.type}
+      prof_vars: ${data.stage.train.vars.prof.type}
     # Model architecture
     architecture:
       # Number of neurons in the hidden layers
@@ -128,7 +138,7 @@ model:
     loss_bcs:
       _target_: inverse.model.loss.mse
     # Pressure filter: Consider only pressure levels with non-zero variance (for model and bcs errors)
-    pressure_filter:  ${data.vars.pressure_filter.load}
+    pressure_filter:  ${data.pressure_filter.load}
 
   # Positional encoding
   positional_encoding:
@@ -148,10 +158,10 @@ model:
   # Transformations (to apply after the output layer)
   transform_out:
     # Inverse normalization for profile variables
-    - _target_: ${data.vars.prof.normalization._target_}
+    - _target_: ${data.stage.train.vars.prof.normalization._target_}
       _partial_: true
-      stats: ${data.vars.prof.normalization.stats}
-      axis: ${data.vars.prof.normalization.axis}  # Axis for normalization
+      stats: ${data.stage.train.vars.prof.normalization.stats}
+      axis: ${data.stage.train.vars.prof.normalization.axis}  # Axis for normalization
       inverse_transform: true
 
   # Plot logger

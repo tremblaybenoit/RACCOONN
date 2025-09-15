@@ -1,10 +1,10 @@
 import numpy as np
 import hydra
 from omegaconf import DictConfig
+from forward.utilities.io import load_var_and_normalize
 from forward.utilities.instantiators import instantiate
 from forward.utilities.logic import get_config_path
 from inverse.utilities.plot import plot_map, save_plot, flexible_gridspec
-from inverse.data.transformations import identity
 import os
 import logging
 
@@ -29,14 +29,13 @@ def innovation_uncertainty(data: np.ndarray) -> np.ndarray:
     return data[:, 10:]
 
 
-def background_climatology(data: np.ndarray, cloud_filter: np.ndarray=None, axis: int=0, keepdims: bool=True) \
+def background_climatology(data: np.ndarray, axis: int=0, keepdims: bool=True) \
         -> np.ndarray:
     """ Compute spatiotemporal mean of a given dataset.
 
         Parameters
         ----------
         data: np.ndarray. Input profiles of shape (n_samples, n_profiles, n_levels).
-        cloud_filter: np.ndarray or None. Boolean mask to filter out clear-sky profiles.
         axis: int or tuple of int. Axis or axes along which the means are computed.
         keepdims: bool. If True, the reduced axes are left in the result as dimensions with size one.
 
@@ -45,43 +44,25 @@ def background_climatology(data: np.ndarray, cloud_filter: np.ndarray=None, axis
         np.ndarray. Spatiotemporal mean of the dataset.
     """
 
-    # Apply cloud filter if provided
-    if cloud_filter is not None:
-        data = data[cloud_filter]
-
     # Compute mean
     return np.mean(data, axis=axis, keepdims=keepdims).astype(np.float64)
 
 
-def background_increment(config_true: DictConfig, config_background: DictConfig,
-                         cloud_filter: np.ndarray=None) -> np.ndarray:
+def background_increment(config_true: DictConfig, config_background: DictConfig) -> np.ndarray:
     """ Compute error between ground truth and background.
 
         Parameters
         ----------
         config_true: DictConfig. Configuration for the ground truth dataset.
         config_background: DictConfig. Configuration for the background dataset.
-        cloud_filter: np.ndarray or None. Boolean mask to filter out clear-sky profiles.
 
         Returns
         -------
         np.ndarray. Error between ground truth and background.
     """
 
-    # Truth
-    f_norm = config_true.normalization if hasattr(config_true, 'normalization') else identity
-    xt = f_norm(np.array(config_true.load, dtype=np.float64))
-
-    # Background
-    f_norm = config_background.normalization if hasattr(config_background, 'normalization') else identity
-    xb = f_norm(np.array(config_background.load, dtype=np.float64))
-
-    # Apply cloud filter if provided
-    if cloud_filter is not None:
-        xt = xt[cloud_filter] if xt.shape[0] == xb.shape[0] else xt
-        xb = xb[cloud_filter]
-
-    return xt - xb
+    # Truth - Background
+    return load_var_and_normalize(config_true) - load_var_and_normalize(config_background)
 
 
 def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=True, recenter: bool=True) -> None:
@@ -101,15 +82,7 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
 
     # Error
     logger.info("Loading data...")
-    f_norm = instantiate(input.vars.err.normalization) \
-        if hasattr(input.vars.err, 'normalization') else identity
-    err = f_norm(np.array(instantiate(input.vars.err.load), dtype=np.float64))
-
-    # Cloud filter
-    if hasattr(input, 'cloud_filter'):
-        logger.info("Applying cloud filter...")
-        cloud_filter = instantiate(input.cloud_filter.load)
-        err = err[cloud_filter]
+    err = load_var_and_normalize(input.err)
 
     # Pressure filter (background only)
     if hasattr(input, 'pressure_filter'):

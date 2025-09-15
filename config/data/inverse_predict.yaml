@@ -1,5 +1,5 @@
 defaults:
-  - inverse_default@stage.predict.vars
+  - inverse_default@stage.predict
 
 # Configuration to download the prediction and testing data
 download:
@@ -14,13 +14,79 @@ stage:
     dir: ${paths.data_dir}/Test2
     # Split
     split:
-        _target_: ${data.stage.predict.vars.cloud_filter._target_}
-        prof:
-          load:
-            _target_: ${data.stage.predict.vars.prof.load._target_}
-            path: ${data.stage.predict.vars.prof.load.path}
-        split:
-          _target_: numpy.arange
-          _args_:
-              - 0
-              - 384000
+        _target_: numpy.arange
+        _args_:
+          - 0
+          - 426872
+    # Variables
+    vars:
+      # Atmospheric profiles
+      prof:
+        # Normalization function and parameters
+        normalization:
+          _target_: inverse.data.transformations.min_max
+          _partial_: true
+          stats:
+            _target_: inverse.data.statistics.read_statistics_var
+            _args_:
+              - ${paths.data_dir}/normalization/stats_cloud_filter2.pkl
+              - 'prof'
+          axis: 1  # null
+      # Brightness temperatures (observed)
+      hofx: {}
+      # Surface data
+      surf: {}
+      # Meta data
+      meta: {}
+      # Brightness temperature innovations
+      hofx_innovation: {}
+      # Background atmospheric profiles
+      prof_background: {}
+      # Atmospheric profile increment
+      prof_increment: {}
+      # Cloud filter
+      cloud_filter: {}
+      # Latitude
+      lat:
+        # Normalization function and parameters
+        normalization:
+          _target_: inverse.data.transformations.min_max
+          _partial_: true
+          stats:
+            _target_: inverse.data.statistics.read_statistics_var
+            _args_:
+              - ${paths.data_dir}/normalization/stats_cloud_filter2.pkl
+              - 'lat'
+      # Longitude
+      lon:
+        # Normalization function and parameters
+        normalization:
+          _target_: inverse.data.transformations.min_max
+          _partial_: true
+          stats:
+            _target_: inverse.data.statistics.read_statistics_var
+            _args_:
+              - ${paths.data_dir}/normalization/stats_cloud_filter2.pkl
+              - 'lon'
+      # Scans
+      scans:
+        # Normalization function and parameters
+        normalization:
+          _target_: inverse.data.transformations.min_max
+          _partial_: true
+          stats:
+            _target_: inverse.data.statistics.read_statistics_var
+            _args_:
+              - ${paths.data_dir}/normalization/stats_cloud_filter2.pkl
+              - 'scans'
+      # Pressure levels
+      pressure:
+        # Normalization function and parameters
+        normalization:
+          _target_: inverse.data.transformations.min_max
+          _partial_: true
+          stats:
+            _target_: inverse.data.statistics.read_statistics_var
+            _args_:
+              - ${paths.data_dir}/normalization/stats_cloud_filter2.pkl
+              - 'pressure'
