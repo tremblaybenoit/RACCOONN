@@ -146,7 +146,7 @@ class InverseOperator:
         """
 
         # Create output directories if they don't exist
-        save_dir = os.path.dirname(self.config.loader.stage.test.results.prof.save.path)
+        save_dir = os.path.dirname(self.config.loader.stage.test.results.prof.path)
         if not os.path.exists(save_dir):
             os.makedirs(save_dir, exist_ok=True)
 
@@ -186,7 +186,7 @@ class InverseOperator:
         """
 
         # Create output directories if they don't exist
-        save_dir = os.path.dirname(loader_config.stage.test.results.prof.save.path)
+        save_dir = os.path.dirname(loader_config.stage.predict.results.prof.path)
         if not os.path.exists(save_dir):
             os.makedirs(save_dir, exist_ok=True)
 

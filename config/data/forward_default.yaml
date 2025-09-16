@@ -38,14 +38,13 @@ stage:
         # Normalization function and parameters
         normalization:
           _target_: forward.data.transformations.NormalizeProfiles
-          profmax:
-            _target_: numpy.loadtxt
-            _args_:
-              - forward/data/normalization/prof_div.txt
-          profmin:
-            _target_: numpy.loadtxt
-            _args_:
-              - forward/data/normalization/prof_m.txt
+          _args_:
+            - _target_: numpy.loadtxt
+              _args_:
+                - forward/data/normalization/prof_m.txt
+            - _target_: numpy.loadtxt
+              _args_:
+                - forward/data/normalization/prof_div.txt
   # Validation set
   valid:
     # Path to validation data
@@ -56,8 +55,8 @@ stage:
     vars:
       # Atmospheric profiles
       prof:
-          # Normalization function and parameters
-          normalization: ${data.stage.train.vars.prof.normalization}
+        # Normalization function and parameters
+        normalization: ${data.stage.train.vars.prof.normalization}
   # Test set
   test:
     # Path to test data
@@ -68,8 +67,8 @@ stage:
     vars:
       # Atmospheric profiles
       prof:
-          # Normalization function and parameters
-          normalization: ${data.stage.train.vars.prof.normalization}
+        # Normalization function and parameters
+        normalization: ${data.stage.train.vars.prof.normalization}
   # Prediction set (NOTE: By default, we use the test set as the prediction set for demonstration purposes)
   predict:
     # Path to prediction data

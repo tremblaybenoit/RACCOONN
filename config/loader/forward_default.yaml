@@ -1,5 +1,6 @@
 # Data loader configuration for forward model training
 _target_: forward.model.data_loader.Dataloader
+_recursive_: false
 batch_size: 32  # Batch size for training
 # num_workers: 0  # Number of workers for data loading
 # persistent_workers: false  # Keep workers alive between epochs
@@ -52,16 +53,18 @@ stage:
     results:
       # Forward model simulations
       hofx:
+        # Path
+        path: ${paths.run_dir}/test_hofx.npy
         # Save function
         save:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${loader.stage.test.results.hofx.load.path}
+            - ${loader.stage.test.results.hofx.path}
         # Load function
         load:
           _target_: forward.model.data_loader.load_npy
-          path: ${paths.run_dir}/test_hofx.npy
+          path: ${loader.stage.test.results.hofx.path}
   # Prediction set
   predict:
     # Dataset class
@@ -76,13 +79,15 @@ stage:
     results:
       # Forward model simulations
       hofx:
+        # Path
+        path: ${paths.run_dir}/predict_hofx.npy
         # Save function
         save:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${loader.stage.predict.results.hofx.load.path}
+            - ${loader.stage.predict.results.hofx.path}
         # Load function
         load:
           _target_: forward.model.data_loader.load_npy
-          path: ${paths.run_dir}/predict_hofx.npy
+          path: ${loader.stage.predict.results.hofx.path}

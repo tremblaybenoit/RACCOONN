@@ -119,7 +119,7 @@ def load_var_and_normalize(config: DictConfig, split: np.ndarray = None) -> np.n
     # Extract normalization function
     f_norm = instantiate(config['normalization']) if hasattr(config, 'normalization') else identity
     # Load and normalize variable
-    data = f_norm(load_var(config['load']))
+    data = f_norm(load_var(config))
     # Apply split if available
     if split is not None and data.shape[0] == len(split):
         data = data[split]

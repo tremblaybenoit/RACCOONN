@@ -141,7 +141,7 @@ class CRTMEmulator:
         """
 
         # Create output directories if they don't exist
-        save_dir = os.path.dirname(self.config.loader.stage.test.results.hofx.save.path)
+        save_dir = os.path.dirname(self.config.loader.stage.test.results.hofx.path)
         if not os.path.exists(save_dir):
             os.makedirs(save_dir, exist_ok=True)
 
@@ -178,7 +178,7 @@ class CRTMEmulator:
         """
 
         # Create output directories if they don't exist
-        save_dir = os.path.dirname(loader_config.stage.test.results.hofx.save.path)
+        save_dir = os.path.dirname(loader_config.stage.test.results.hofx.path)
         if not os.path.exists(save_dir):
             os.makedirs(save_dir, exist_ok=True)
 

@@ -2,6 +2,7 @@ import pytorch_lightning as pl
 from torch.utils.data import Dataset, DataLoader
 from omegaconf import DictConfig
 from forward.utilities.io import load_var_and_normalize
+from forward.utilities.instantiators import instantiate
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
@@ -144,13 +145,13 @@ class Dataloader(BaseDataloader):
         # Load datasets
         if stage == 'train':
             # Training/validation data
-            self.ds_train, self.ds_valid = self.stage.train, self.stage.valid
+            self.ds_train, self.ds_valid = instantiate(self.stage.train), instantiate(self.stage.valid)
         elif stage == 'test':
             # Test/prediction data
-            self.ds_test = self.stage.test
+            self.ds_test = instantiate(self.stage.test)
         elif stage == 'pred':
             # Prediction data
-            self.ds_pred = self.stage.pred
+            self.ds_pred = instantiate(self.stage.predict)
 
 
 class BaseDataset(Dataset):
