@@ -88,6 +88,11 @@ stage:
               - ${preparation.statistics.data.output.path}
               - 'prof'
           axis: 1  # null
+      # Brightness temperatures
+      hofx:
+        # Load function and parameters
+        load:
+          path: ${....dir}/hofx_lightning.npy
   # Validation set
   valid:
     # Path to validation data
@@ -106,10 +111,15 @@ stage:
               path: ${data.stage.valid.vars.prof.load.path}
     # Variables
     vars:
-        # Atmospheric profiles
-        prof:
-            # Normalization function and parameters
-            normalization: ${data.stage.train.vars.prof.normalization}
+      # Atmospheric profiles
+      prof:
+        # Normalization function and parameters
+        normalization: ${data.stage.train.vars.prof.normalization}
+      # Brightness temperatures
+      hofx:
+        # Load function and parameters
+        load:
+          path: ${....dir}/hofx_lightning.npy
   # Test set
   test:
     # Path to test data
@@ -128,10 +138,15 @@ stage:
               path: ${data.stage.test.vars.prof.load.path}
     # Variables
     vars:
-        # Atmospheric profiles
-        prof:
-            # Normalization function and parameters
-            normalization: ${data.stage.train.vars.prof.normalization}
+      # Atmospheric profiles
+      prof:
+        # Normalization function and parameters
+        normalization: ${data.stage.train.vars.prof.normalization}
+      # Brightness temperatures
+      hofx:
+        # Load function and parameters
+        load:
+          path: ${....dir}/hofx_lightning.npy
   # Prediction set (NOTE: By default, we use the test set as the prediction set for demonstration purposes)
   predict:
     # Path to prediction data
