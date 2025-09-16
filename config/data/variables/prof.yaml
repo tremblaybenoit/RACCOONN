@@ -1,0 +1,13 @@
+# Profile types
+type: ['Air temperature', 'Water vapor mixing ratio', 'Cloud ice mass', 'Cloud water mass', 'Snow mass',
+       'Ice particle effective radius', 'Water particle effective radius',
+       'Snow particle effective radius', 'Ozone mixing ratio']
+# Loading function
+load:
+  _target_: forward.utilities.io.load_npy
+  path: ${....dir}/prof.npy
+  split: ${....split}
+# Normalization function and parameters
+normalization:
+    _target_: inverse.data.transformations.identity
+    _partial_: true

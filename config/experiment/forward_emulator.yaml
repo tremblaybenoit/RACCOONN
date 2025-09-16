@@ -5,9 +5,9 @@
 defaults:
   - override /paths: default
   - override /hydra: default
-  - override /data: forward_predict  # Data only for prediction
+  - override /data: forward_default
   - override /preparation: forward_default
-  - override /loader: forward_predict  # Prediction only
+  - override /loader: forward_default
   - override /model: forward_emulator
   - override /trainer: gpu
   - override /callbacks: default
@@ -26,13 +26,18 @@ paths:
   data_dir: "../../GOES_ML-main/Data"
   checkpoint_dir: "forward/model/checkpoints"
 
-  # Model configuration
-  model:
-    # Optimizer function and parameters
-    optimizer: null
-    # Learning rate scheduler
-    lr_scheduler: null
-    # Loss function and parameters
-    loss_func: null
-    # Plot logger
-    log_valid: false
+# Trainer configuration
+trainer:
+  min_epochs: 1  # To prevent early stopping
+  max_epochs: 32  # Number of epochs
+
+# Model configuration
+model:
+  # Optimizer function and parameters
+  optimizer: null
+  # Learning rate scheduler
+  lr_scheduler: null
+  # Loss function and parameters
+  loss_func: null
+  # Plot logger
+  log_valid: false

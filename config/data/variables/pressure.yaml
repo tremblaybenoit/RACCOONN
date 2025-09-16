@@ -1,0 +1,13 @@
+# Loading function
+load:
+  _target_: forward.utilities.io.load_npy
+  path: ${....dir}/pressure.npy
+# Normalization function and parameters
+normalization:
+  _target_: inverse.data.transformations.min_max
+  _partial_: true
+  stats:
+    _target_: inverse.data.statistics.read_statistics_var
+    _args_:
+      - ${preparation.statistics.data.output.path}
+      - 'pressure'

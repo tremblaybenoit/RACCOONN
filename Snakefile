@@ -204,9 +204,6 @@ if 'predict' in loader_config:
             # Input coordinates
             data = set([path for path in find_file_paths(loader_config['predict'], exclude_keys='results',
                 track_seen_dependencies=hydra_dependencies)]),
-            # Preparation
-            preparation = set([path for step in prep_config for step_config in prep_config[step].values()
-                               for path in find_file_paths(step_config['output'], track_seen_dependencies=hydra_dependencies)]),
             # Model checkpoint
             checkpoint = f"{paths_config['checkpoint_dir']}/{checkpoint_config['filename']}.ckpt"
         params:

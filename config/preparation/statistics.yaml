@@ -65,4 +65,4 @@ statistics:
             - ${data.stage.test.vars.pressure}
     # What the method produces as output (pickle file)
     output:
-      path: ${paths.data_dir}/normalization/stats_cloud_filter2.pkl
+      path: ${paths.data_dir}/normalization/statistics_cloud_filter.pkl

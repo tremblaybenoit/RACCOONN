@@ -5,10 +5,10 @@
 defaults:
   - override /paths: default
   - override /hydra: default
-  - override /data: inverse_train  # Data only for training
+  - override /data: inverse_default
   - override /preparation: inverse_default
-  - override /loader: inverse_train  # Training only
-  - override /model: pinnverse_operator
+  - override /loader: inverse_default
+  - override /model: inverse_operator
   - override /trainer: gpu
   - override /callbacks: default
   - override /logger: default
@@ -29,3 +29,8 @@ paths:
 trainer:
   min_epochs: 1  # To prevent early stopping
   max_epochs: 32  # Number of epochs
+
+# Model parameters
+model:
+  # Model
+  _target_: inverse.model.model.PINNverseOperator

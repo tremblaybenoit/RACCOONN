@@ -5,10 +5,10 @@
 defaults:
   - override /paths: default
   - override /hydra: default
-  - override /data: inverse_train  # Data only for training
+  - override /data: inverse_default
   - override /preparation: inverse_default
-  - override /loader: inverse_train  # Training only
-  - override /model: pinnverse_operator
+  - override /loader: inverse_default
+  - override /model: inverse_operator
   - override /trainer: gpu
   - override /callbacks: default
   - override /logger: default
@@ -17,7 +17,7 @@ defaults:
 # This allows you to overwrite only specified parameters
 
 # Task name. Note that it determines the output directory path
-task_name: "inverse_operator"  # Experiment
+task_name: "inverse_operators"  # Experiment
 
 # Run id (unique identifier for the run)
 paths:
