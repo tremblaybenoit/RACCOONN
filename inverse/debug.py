@@ -22,8 +22,7 @@ def main(config: DictConfig) -> None:
         None.
     """
 
-    # Initialize trainer object
-    stats = instantiate(config.preparation.statistics.data)
+    # Breakpoint for debugging
     breakpoint()
 
 

@@ -28,28 +28,6 @@ paths_config = hydra_config["paths"]
 checkpoint_config = hydra_config["callbacks"]["model_checkpoint"]
 
 #########################################################################################################
-# TARGET
-#########################################################################################################
-
-# Train model and get test results (if applicable)
-rule model_train:
-    input:
-        checkpoint = f"{checkpoint_config['dirpath']}/{checkpoint_config['filename']}.ckpt",
-        test_out = [loader_config['test']['results'][output]['load']['path']
-                    for output in loader_config['test']['results']] if 'test' in loader_config else ''
-
-# TODO: Untested.
-# Make predictions with the trained model
-if 'predict' in loader_config:
-    rule model_predict:
-        input:
-            # Model checkpoint
-            checkpoint = f"{checkpoint_config['dirpath']}/{checkpoint_config['filename']}.ckpt",
-            # Prediction results
-            pred_out = [loader_config['predict']['results'][output]['load']['path']
-                        for output in loader_config['predict']['results']]
-
-#########################################################################################################
 # HELPER FUNCTIONS
 #########################################################################################################
 

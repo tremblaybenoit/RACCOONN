@@ -4,6 +4,16 @@ defaults:
   - variables/meta@stage.train.vars.meta
   - variables/hofx@stage.train.vars.hofx
   - variables/cloud_filter@stage.train.vars.cloud_filter
+  - variables/prof@stage.valid.vars.prof
+  - variables/surf@stage.valid.vars.surf
+  - variables/meta@stage.valid.vars.meta
+  - variables/hofx@stage.valid.vars.hofx
+  - variables/cloud_filter@stage.valid.vars.cloud_filter
+  - variables/prof@stage.test.vars.prof
+  - variables/surf@stage.test.vars.surf
+  - variables/meta@stage.test.vars.meta
+  - variables/hofx@stage.test.vars.hofx
+  - variables/cloud_filter@stage.test.vars.cloud_filter
   - variables/prof@stage.predict.vars.prof
   - variables/surf@stage.predict.vars.surf
   - variables/meta@stage.predict.vars.meta
@@ -43,7 +53,11 @@ stage:
     # Split
     split: null
     # Variables
-    vars: ${data.stage.train.vars}
+    vars:
+      # Atmospheric profiles
+      prof:
+          # Normalization function and parameters
+          normalization: ${data.stage.train.vars.prof.normalization}
   # Test set
   test:
     # Path to test data
@@ -51,7 +65,11 @@ stage:
     # Split
     split: null
     # Variables
-    vars: ${data.stage.train.vars}
+    vars:
+      # Atmospheric profiles
+      prof:
+          # Normalization function and parameters
+          normalization: ${data.stage.train.vars.prof.normalization}
   # Prediction set (NOTE: By default, we use the test set as the prediction set for demonstration purposes)
   predict:
     # Path to prediction data

@@ -11,6 +11,30 @@ defaults:
   - variables/hofx@stage.train.vars.hofx
   - variables/hofx_innovation@stage.train.vars.hofx_innovation
   - variables/cloud_filter@stage.train.vars.cloud_filter
+  - variables/lat@stage.valid.vars.lat
+  - variables/lon@stage.valid.vars.lon
+  - variables/scans@stage.valid.vars.scans
+  - variables/pressure@stage.valid.vars.pressure
+  - variables/prof@stage.valid.vars.prof
+  - variables/prof_background@stage.valid.vars.prof_background
+  - variables/prof_increment@stage.valid.vars.prof_increment
+  - variables/surf@stage.valid.vars.surf
+  - variables/meta@stage.valid.vars.meta
+  - variables/hofx@stage.valid.vars.hofx
+  - variables/hofx_innovation@stage.valid.vars.hofx_innovation
+  - variables/cloud_filter@stage.valid.vars.cloud_filter
+  - variables/lat@stage.test.vars.lat
+  - variables/lon@stage.test.vars.lon
+  - variables/scans@stage.test.vars.scans
+  - variables/pressure@stage.test.vars.pressure
+  - variables/prof@stage.test.vars.prof
+  - variables/prof_background@stage.test.vars.prof_background
+  - variables/prof_increment@stage.test.vars.prof_increment
+  - variables/surf@stage.test.vars.surf
+  - variables/meta@stage.test.vars.meta
+  - variables/hofx@stage.test.vars.hofx
+  - variables/hofx_innovation@stage.test.vars.hofx_innovation
+  - variables/cloud_filter@stage.test.vars.cloud_filter
   - variables/lat@stage.predict.vars.lat
   - variables/lon@stage.predict.vars.lon
   - variables/scans@stage.predict.vars.scans
@@ -37,7 +61,7 @@ stage:
   # Training set
   train:
     # Path to training data
-    dir: ${paths.data_dir}/Train2
+    dir: ${paths.data_dir}/Test2
     # Split
     split:
       _target_: forward.utilities.io.extract_indices
@@ -67,7 +91,7 @@ stage:
   # Validation set
   valid:
     # Path to validation data
-    dir: ${paths.data_dir}/Valid2
+    dir: ${paths.data_dir}/Test2
     # Split
     split:
       _target_: forward.utilities.io.extract_indices
@@ -81,7 +105,11 @@ stage:
             - _target_: ${data.stage.valid.vars.prof.load._target_}
               path: ${data.stage.valid.vars.prof.load.path}
     # Variables
-    vars: ${data.stage.train.vars}
+    vars:
+        # Atmospheric profiles
+        prof:
+            # Normalization function and parameters
+            normalization: ${data.stage.train.vars.prof.normalization}
   # Test set
   test:
     # Path to test data
@@ -99,7 +127,11 @@ stage:
             - _target_: ${data.stage.test.vars.prof.load._target_}
               path: ${data.stage.test.vars.prof.load.path}
     # Variables
-    vars: ${data.stage.train.vars}
+    vars:
+        # Atmospheric profiles
+        prof:
+            # Normalization function and parameters
+            normalization: ${data.stage.train.vars.prof.normalization}
   # Prediction set (NOTE: By default, we use the test set as the prediction set for demonstration purposes)
   predict:
     # Path to prediction data
