@@ -141,8 +141,9 @@ class CRTMEmulator:
         """
 
         # Create output directories if they don't exist
-        if not os.path.exists(self.config.data.stage.test.results[0].save.path):
-            os.makedirs(self.config.data.stage.test.results[0].save.path, exist_ok=True)
+        save_dir = os.path.dirname(self.config.loader.stage.test.results.hofx.save.path)
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir, exist_ok=True)
 
         # Data loader and trainer setup
         self.setup(self.config.loader, stage='test')
@@ -156,12 +157,12 @@ class CRTMEmulator:
 
         # Evaluate on test set
         logger.info("Running against test set...")
-        results = self.trainer.test(self.model, self.data_loader)
+        _ = self.trainer.test(self.model, self.data_loader)
 
         # Save test results to file
         logger.info("Saving results to file...")
-        if hasattr(self.config.data.stage.test.results.hofx, 'save'):
-            save_function = instantiate(self.config.data.stage.test.results.hofx.save)
+        if hasattr(self.config.loader.stage.test.results, 'hofx'):
+            save_function = instantiate(self.config.loader.stage.test.results.hofx.save)
             save_function(self.model.test_results['hofx'].reshape(self.model.test_results['hofx'].shape[0], -1))
 
     def predict(self, loader_config: DictConfig) -> np.ndarray:
@@ -177,8 +178,9 @@ class CRTMEmulator:
         """
 
         # Create output directories if they don't exist
-        if not os.path.exists(self.config.data.stage.predict.results[0].save.path):
-            os.makedirs(self.config.data.stage.predict.results[0].save.path, exist_ok=True)
+        save_dir = os.path.dirname(loader_config.stage.test.results.hofx.save.path)
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir, exist_ok=True)
 
         # Data loader and trainer setup
         self.setup(loader_config, stage='pred')

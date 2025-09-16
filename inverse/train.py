@@ -146,7 +146,7 @@ class InverseOperator:
         """
 
         # Create output directories if they don't exist
-        save_dir = os.path.dirname(self.config.data.stage.test.results[0].save.path)
+        save_dir = os.path.dirname(self.config.loader.stage.test.results.prof.save.path)
         if not os.path.exists(save_dir):
             os.makedirs(save_dir, exist_ok=True)
 
@@ -166,11 +166,11 @@ class InverseOperator:
 
         # Save test results to file
         logger.info("Saving results to file...")
-        if hasattr(self.config.data.loader.stage.test.results, 'hofx'):
-            save_function = instantiate(self.config.data.loader.stage.test.results.hofx.save)
+        if hasattr(self.config.loader.stage.test.results, 'hofx'):
+            save_function = instantiate(self.config.loader.stage.test.results.hofx.save)
             save_function(self.model.test_results['hofx'])
-        if hasattr(self.config.data.loader.stage.test.results, 'prof'):
-            save_function = instantiate(self.config.data.loader.stage.test.results.prof.save)
+        if hasattr(self.config.loader.stage.test.results, 'prof'):
+            save_function = instantiate(self.config.loader.stage.test.results.prof.save)
             save_function(self.model.test_results['prof'])
 
     def predict(self, loader_config: DictConfig) -> np.ndarray:
@@ -186,7 +186,7 @@ class InverseOperator:
         """
 
         # Create output directories if they don't exist
-        save_dir = os.path.dirname(loader_config.data.stage.test.results.hofx.save.path)
+        save_dir = os.path.dirname(loader_config.stage.test.results.prof.save.path)
         if not os.path.exists(save_dir):
             os.makedirs(save_dir, exist_ok=True)
 
