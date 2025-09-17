@@ -1,6 +1,0 @@
-# Loading function
-load:
-  _target_: inverse.data.covariance.background_climatology
-  data: ${...prof.load}
-# Normalization function and parameters
-normalization: ${..prof.normalization}

@@ -2,7 +2,9 @@
 _target_: forward.model.data_loader.Dataloader
 _recursive_: false
 batch_size: 32  # Batch size for training
+# TODO: Due to Windows limitations, num_workers must be set to 0. Change this to a higher value for Linux/MacOS for better performance.
 num_workers: 0  # Number of workers for data loading
+# TODO: Set persistent_workers to true if num_workers > 0 for better performance.
 persistent_workers: false  # Keep workers alive between epochs
 
 # Split the data into training, validation, and test sets

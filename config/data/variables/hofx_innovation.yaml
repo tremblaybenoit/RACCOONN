@@ -1,4 +1,0 @@
-# Loading function
-load:
-  _target_: inverse.data.covariance.innovation_uncertainty
-  data: ${...hofx.load}

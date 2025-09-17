@@ -1,0 +1,72 @@
+# Latitude
+lat:
+  # Loading function
+  load:
+    _target_: forward.utilities.io.load_latlon
+    path: ${....dir}/lat.npy
+    scans:
+      _target_: ${....scans.load._target_}
+      path: ${....scans.load.path}
+    split: ${....split}
+  # Normalization function and parameters
+  normalization:
+    _target_: inverse.data.transformations.min_max
+    _partial_: true
+    stats:
+      _target_: inverse.data.statistics.read_statistics_var
+      _args_:
+        - ${preparation.statistics.data.output.path}
+        - 'lat'
+# Longitude
+lon:
+  # Loading function
+  load:
+    _target_: forward.utilities.io.load_latlon
+    path: ${....dir}/lon.npy
+    scans:
+      _target_: ${....scans.load._target_}
+      path: ${....scans.load.path}
+    split: ${....split}
+  # Normalization function and parameters
+  normalization:
+    _target_: inverse.data.transformations.min_max
+    _partial_: true
+    stats:
+      _target_: inverse.data.statistics.read_statistics_var
+      _args_:
+        - ${preparation.statistics.data.output.path}
+        - 'lon'
+# Scans
+scans:
+  # Loading function
+  load:
+    _target_: forward.utilities.io.load_scans
+    path: ${....dir}/scans.txt
+    lat:
+      _target_: ${....lat.load._target_}
+      path: ${....lat.load.path}
+    split: ${....split}
+  # Normalization function and parameters
+  normalization:
+    _target_: inverse.data.transformations.min_max
+    _partial_: true
+    stats:
+      _target_: inverse.data.statistics.read_statistics_var
+      _args_:
+        - ${preparation.statistics.data.output.path}
+        - 'scans'
+# Pressure
+pressure:
+  # Loading function
+  load:
+    _target_: forward.utilities.io.load_npy
+    path: ${....dir}/pressure.npy
+  # Normalization function and parameters
+  normalization:
+    _target_: inverse.data.transformations.min_max
+    _partial_: true
+    stats:
+      _target_: inverse.data.statistics.read_statistics_var
+      _args_:
+        - ${preparation.statistics.data.output.path}
+        - 'pressure'

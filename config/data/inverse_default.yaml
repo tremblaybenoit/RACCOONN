@@ -1,44 +1,11 @@
 defaults:
-  - variables/lat@stage.train.vars.lat
-  - variables/lon@stage.train.vars.lon
-  - variables/scans@stage.train.vars.scans
-  - variables/pressure@stage.train.vars.pressure
-  - variables/prof@stage.train.vars.prof
-  - variables/prof_background@stage.train.vars.prof_background
-  - variables/prof_increment@stage.train.vars.prof_increment
-  - variables/surf@stage.train.vars.surf
-  - variables/meta@stage.train.vars.meta
-  - variables/hofx@stage.train.vars.hofx
-  - variables/hofx_innovation@stage.train.vars.hofx_innovation
-  - variables/cloud_filter@stage.train.vars.cloud_filter
-  - variables/lat@stage.valid.vars.lat
-  - variables/lon@stage.valid.vars.lon
-  - variables/scans@stage.valid.vars.scans
-  - variables/pressure@stage.valid.vars.pressure
-  - variables/prof@stage.valid.vars.prof
-  - variables/prof_background@stage.valid.vars.prof_background
-  - variables/prof_increment@stage.valid.vars.prof_increment
-  - variables/surf@stage.valid.vars.surf
-  - variables/meta@stage.valid.vars.meta
-  - variables/hofx@stage.valid.vars.hofx
-  - variables/hofx_innovation@stage.valid.vars.hofx_innovation
-  - variables/cloud_filter@stage.valid.vars.cloud_filter
-  - variables/lat@stage.test.vars.lat
-  - variables/lon@stage.test.vars.lon
-  - variables/scans@stage.test.vars.scans
-  - variables/pressure@stage.test.vars.pressure
-  - variables/prof@stage.test.vars.prof
-  - variables/prof_background@stage.test.vars.prof_background
-  - variables/prof_increment@stage.test.vars.prof_increment
-  - variables/surf@stage.test.vars.surf
-  - variables/meta@stage.test.vars.meta
-  - variables/hofx@stage.test.vars.hofx
-  - variables/hofx_innovation@stage.test.vars.hofx_innovation
-  - variables/cloud_filter@stage.test.vars.cloud_filter
-  - variables/lat@stage.predict.vars.lat
-  - variables/lon@stage.predict.vars.lon
-  - variables/scans@stage.predict.vars.scans
-  - variables/pressure@stage.predict.vars.pressure
+  - variables/inverse_input@stage.train.vars
+  - variables/inverse_input@stage.valid.vars
+  - variables/inverse_input@stage.test.vars
+  - variables/inverse_input@stage.predict.vars
+  - variables/inverse_target@stage.train.vars
+  - variables/inverse_target@stage.valid.vars
+  - variables/inverse_target@stage.test.vars
 
 # Configuration to download the training and testing data
 download:
@@ -74,25 +41,7 @@ stage:
           _args_:
             - _target_: ${data.stage.train.vars.prof.load._target_}
               path: ${data.stage.train.vars.prof.load.path}
-    # Variables
-    vars:
-      # Atmospheric profiles
-      prof:
-        # Normalization function and parameters
-        normalization:
-          _target_: inverse.data.transformations.min_max
-          _partial_: true
-          stats:
-            _target_: inverse.data.statistics.read_statistics_var
-            _args_:
-              - ${preparation.statistics.data.output.path}
-              - 'prof'
-          axis: 1  # null
-      # Brightness temperatures
-      hofx:
-        # Load function and parameters
-        load:
-          path: ${....dir}/hofx_lightning.npy
+
   # Validation set
   valid:
     # Path to validation data
@@ -109,17 +58,7 @@ stage:
           _args_:
             - _target_: ${data.stage.valid.vars.prof.load._target_}
               path: ${data.stage.valid.vars.prof.load.path}
-    # Variables
-    vars:
-      # Atmospheric profiles
-      prof:
-        # Normalization function and parameters
-        normalization: ${data.stage.train.vars.prof.normalization}
-      # Brightness temperatures
-      hofx:
-        # Load function and parameters
-        load:
-          path: ${....dir}/hofx_lightning.npy
+
   # Test set
   test:
     # Path to test data
@@ -136,17 +75,7 @@ stage:
           _args_:
             - _target_: ${data.stage.test.vars.prof.load._target_}
               path: ${data.stage.test.vars.prof.load.path}
-    # Variables
-    vars:
-      # Atmospheric profiles
-      prof:
-        # Normalization function and parameters
-        normalization: ${data.stage.train.vars.prof.normalization}
-      # Brightness temperatures
-      hofx:
-        # Load function and parameters
-        load:
-          path: ${....dir}/hofx_lightning.npy
+
   # Prediction set (NOTE: By default, we use the test set as the prediction set for demonstration purposes)
   predict:
     # Path to prediction data

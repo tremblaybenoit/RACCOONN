@@ -1,5 +1,0 @@
-# Loading function
-load:
-  _target_: inverse.data.filters.cloud_filter
-  _args_:
-    - ${....prof.load}
