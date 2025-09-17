@@ -35,7 +35,7 @@ def main(config: DictConfig) -> None:
 
     # Save predictions to file
     logger.info("Saving predictions to file...")
-    save_function = instantiate(config.loader.stage.predict.hofx.save)
+    save_function = instantiate(config.loader.stage.predict.results.hofx.save)
     save_function(pred)
 
 

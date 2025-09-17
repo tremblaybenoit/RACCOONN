@@ -33,7 +33,7 @@ def main(config: DictConfig) -> None:
 
     # Save predictions to file
     logger.info("Saving predictions to file...")
-    save_function = instantiate(config.loader.stage.pred.prof.save)
+    save_function = instantiate(config.loader.stage.predict.results.prof.save)
     save_function(pred)
 
 
