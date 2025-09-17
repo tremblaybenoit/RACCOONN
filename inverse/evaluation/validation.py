@@ -34,8 +34,7 @@ def main(config: DictConfig) -> None:
     logger.info("Load test set references...")
     prof = np.array(instantiate(config.data.stage.test.vars.prof.load)).astype(np.float32)
     hofx = np.array(instantiate(config.data.stage.test.vars.hofx.load)).astype(np.float32)
-    clear = np.logical_and(prof[:, 5, :].sum(axis=1) == 0, prof[:, 6, :].sum(axis=1) == 0)
-    clear = np.logical_and(clear, prof[:, 7, :].sum(axis=1) == 0)
+    clear = ~instantiate(config.data.stage.test.vars.cloud_filter.load)
 
     # Plot
     logger.info("Plot comparison...")
