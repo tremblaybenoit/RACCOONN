@@ -37,14 +37,17 @@ stage:
       prof:
         # Normalization function and parameters
         normalization:
+          # Function
           _target_: forward.data.transformations.NormalizeProfiles
-          _args_:
-            - _target_: numpy.loadtxt
-              _args_:
-                - forward/data/normalization/prof_m.txt
-            - _target_: numpy.loadtxt
-              _args_:
-                - forward/data/normalization/prof_div.txt
+          # Min/max values for normalization
+          profmin:
+            _target_: numpy.loadtxt
+            _args_:
+              - forward/data/normalization/prof_m.txt
+          profmax:
+            _target_: numpy.loadtxt
+            _args_:
+              - forward/data/normalization/prof_div.txt
   # Validation set
   valid:
     # Path to validation data
