@@ -3,8 +3,3 @@ load:
   _target_: inverse.data.covariance.background_increment
   config_true: ${...prof}  # We use the normalized true profiles
   config_background: ${...prof_background}  # We use the normalized background profiles
-# Normalization function and parameters
-# Identity, as the increment is already normalized
-normalization:
-  _target_: inverse.data.transformations.identity
-  _partial_: true

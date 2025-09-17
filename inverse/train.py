@@ -58,12 +58,12 @@ class InverseOperator:
         if self.config.get("seed"):
             lightning.seed_everything(self.config.task_seed, workers=True)
 
-    def setup(self, data_config, stage: str='train') -> None:
+    def setup(self, loader_config, stage: str='train') -> None:
         """ Setup trainer object.
 
             Parameters
             ----------
-            data_config: DictConfig. Configuration object for the data loader.
+            loader_config: DictConfig. Configuration object for the data loader.
             stage: str. Stage of the training process.
                         Options are 'train', 'test', or 'predict'.
 
@@ -74,12 +74,12 @@ class InverseOperator:
 
         # Data loader
         logger.info("Initializing data loader...")
-        self.data_loader = instantiate(data_config)
+        self.data_loader = instantiate(loader_config)
         # Generate training/validation/test sets
         self.data_loader.setup(stage=stage)
 
         # Trainer loggers and callbacks: Only activated during training
-        if stage in ['train', 'test']:
+        if stage == 'train':
             # Configure logger
             if self.trainer_logger is None:
                 TrainerLogger(self.config.logger).configure()

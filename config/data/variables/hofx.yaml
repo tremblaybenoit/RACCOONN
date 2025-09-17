@@ -3,7 +3,3 @@ load:
   _target_: forward.utilities.io.load_npy
   path: ${....dir}/hofx.npy
   split: ${....split}
-# Normalization function and parameters
-normalization:
-  _target_: forward.data.transformations.identity
-  _partial_: true

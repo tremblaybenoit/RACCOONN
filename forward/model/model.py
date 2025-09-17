@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 from typing import Callable, Union, Any
@@ -68,18 +69,20 @@ class BaseModel(LightningModule):
         # Compute loss function
         loss = self.loss_func(pred, batch['target']['hofx'])
 
-        # Log metrics
-        self.log(f"{stage}_loss", loss, on_epoch=True, prog_bar=True, logger=True)
-
         # If testing, return predictions in addition to loss
         if stage == 'test':
+            # Log metrics
+            self.log(f"{stage}_loss", loss.mean(), on_epoch=True, prog_bar=True, logger=False)
             # Store test outputs
-            self.test_results['hofx'].append(pred.detach().cpu())
-        elif stage == 'valid' and self.log_valid:
+            self.test_results['hofx'].append(pred.detach().cpu().numpy())
+        elif stage == 'valid':
+            # Log metrics
+            self.log(f"{stage}_loss", loss.mean(), on_epoch=True, prog_bar=True, logger=True)
             # Store validation outputs
-            self.valid_results['cloud_filter'].append(batch['cloud_filter'].detach().cpu())
-            self.valid_results['hofx_target'].append(batch['target']['hofx'].detach().cpu())
-            self.valid_results['hofx_pred'].append(pred.detach().cpu())
+            if self.log_valid:
+                self.valid_results['cloud_filter'].append(batch['cloud_filter'].detach().cpu().numpy())
+                self.valid_results['hofx_target'].append(batch['target']['hofx'].detach().cpu().numpy())
+                self.valid_results['hofx_pred'].append(pred.detach().cpu().numpy())
 
         return loss
 

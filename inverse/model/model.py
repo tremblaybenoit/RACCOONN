@@ -186,46 +186,54 @@ class PINNverseOperator(BaseModel):
             None.
         """
 
-        # Log total loss
-        if 'total' in loss:
-            self.log(f"{stage}_loss", loss['total'], on_epoch=True, prog_bar=True, logger=True)
-        # Log profile and boundary condition losses
-        for key in ['model', 'bcs']:
-            if key in loss:
-                self.log(f"{stage}_loss_{key}", loss[key].mean(), on_epoch=True, prog_bar=True, logger=True)
-                if loss[key].ndim == 3:
-                    for i, var in enumerate(self.prof_vars):
-                        self.log(f"{stage}_loss_{key}_{i}_{var}", loss[key][:, i, :].mean(), on_epoch=True,
-                                 prog_bar=False, logger=True)
-        # Log observation loss
-        if 'obs' in loss:
-            self.log(f"{stage}_loss_obs", loss['obs'].mean(), on_epoch=True, prog_bar=True, logger=True)
-            if loss['obs'].ndim == 2:
-                for i in range(pred['hofx'].shape[1] // 2):
-                    self.log(f"{stage}_loss_obs_{i}", loss['obs'][:, i].mean(), on_epoch=True, prog_bar=False,
-                             logger=True)
-
         # If testing, return predictions in addition to loss
         if stage == 'test':
+            # Logger flag
+            logger_flag = False
             # Store test outputs
             for k, v in {'prof': pred['prof'], 'hofx': pred['hofx']}.items():
                 self.test_results[k].append(v.detach().cpu().numpy())
-        elif stage == 'valid' and self.log_valid:
-            # Store validation outputs
-            for k, v in {'prof_target': target['prof'], 'prof_pred': pred['prof'],
-                         'prof_norm_target': target['prof_norm'], 'prof_norm_pred': pred['prof_norm'],
-                         'hofx_target': target['hofx'], 'hofx_pred': pred['hofx'],
-                         'pressure': input['pressure'], 'cloud_filter': target['cloud_filter']}.items():
-                self.valid_results[k].append(v.detach().cpu().numpy())
-            # Store background if available
-            if 'prof_background' in target:
-                for k, v in {'prof_background': target['prof_background'],
-                             'prof_norm_background': target['prof_norm_background']}.items():
+        elif stage == 'valid':
+            # Logger flag
+            logger_flag = True
+            # Store validation outputs for logging
+            if self.log_valid:
+                # Store validation outputs
+                for k, v in {'prof_target': target['prof'], 'prof_pred': pred['prof'],
+                             'prof_norm_target': target['prof_norm'], 'prof_norm_pred': pred['prof_norm'],
+                             'hofx_target': target['hofx'], 'hofx_pred': pred['hofx'],
+                             'pressure': input['pressure'], 'cloud_filter': target['cloud_filter']}.items():
                     self.valid_results[k].append(v.detach().cpu().numpy())
+                # Store background if available
+                if 'prof_background' in target:
+                    for k, v in {'prof_background': target['prof_background'],
+                                 'prof_norm_background': target['prof_norm_background']}.items():
+                        self.valid_results[k].append(v.detach().cpu().numpy())
         else:
+            # Logger flag
+            logger_flag = True
             # Compute L2 norm of the model parameters
             l2_norm = sum((p ** 2).sum() for p in self.parameters() if p.requires_grad)
-            self.log(f"{stage}_l2_norm", l2_norm, on_epoch=True, prog_bar=False, logger=True)
+            self.log(f"{stage}_l2_norm", l2_norm, on_epoch=True, prog_bar=False, logger=logger_flag)
+
+        # Log total loss
+        if 'total' in loss:
+            self.log(f"{stage}_loss", loss['total'], on_epoch=True, prog_bar=True, logger=logger_flag)
+        # Log profile and boundary condition losses
+        for key in ['model', 'bcs']:
+            if key in loss:
+                self.log(f"{stage}_loss_{key}", loss[key].mean(), on_epoch=True, prog_bar=True, logger=logger_flag)
+                if loss[key].ndim == 3:
+                    for i, var in enumerate(self.prof_vars):
+                        self.log(f"{stage}_loss_{key}_{i}_{var}", loss[key][:, i, :].mean(), on_epoch=True,
+                                 prog_bar=False, logger=logger_flag)
+        # Log observation loss
+        if 'obs' in loss:
+            self.log(f"{stage}_loss_obs", loss['obs'].mean(), on_epoch=True, prog_bar=True, logger=logger_flag)
+            if loss['obs'].ndim == 2:
+                for i in range(pred['hofx'].shape[1] // 2):
+                    self.log(f"{stage}_loss_obs_{i}", loss['obs'][:, i].mean(), on_epoch=True, prog_bar=False,
+                             logger=logger_flag)
 
     def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
         """ Perform training/validation/test step.

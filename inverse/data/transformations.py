@@ -288,3 +288,5 @@ def clip(data: Union[np.ndarray, torch.Tensor], stats: Dict) \
         min_value = min_value.expand_as(data)
         max_value = max_value.expand_as(data)
         return torch.clamp(data, min=min_value, max=max_value)
+    else:
+        raise TypeError("Input data must be a numpy array or a torch tensor.")

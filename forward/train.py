@@ -8,7 +8,8 @@ import pytorch_lightning as lightning
 from forward.utilities.logger import TrainerLogger
 from forward.utilities.instantiators import instantiate, instantiate_list
 from forward.utilities.logic import get_config_path
-torch.set_float32_matmul_precision('medium')
+# torch.set_float32_matmul_precision('high')
+torch.set_default_dtype(torch.float64)
 
 
 # Initialize logger
@@ -79,7 +80,7 @@ class CRTMEmulator:
         self.data_loader.setup(stage=stage)
 
         # Trainer loggers and callbacks: Only activated during training
-        if stage in ['train', 'test']:
+        if stage == 'train':
             # Configure logger
             if self.trainer_logger is None:
                 TrainerLogger(self.config.logger).configure()

@@ -63,14 +63,14 @@ loss_func:
       # Function
       _target_: forward.data.transformations.NormalizeProfiles
       # Min/max values for normalization
-      profmax:
-        _target_: numpy.loadtxt
-        _args_:
-          - forward/data/normalization/prof_div.txt
       profmin:
         _target_: numpy.loadtxt
         _args_:
           - forward/data/normalization/prof_m.txt
+      profmax:
+        _target_: numpy.loadtxt
+        _args_:
+          - forward/data/normalization/prof_div.txt
   # Weights for observation (obs), model, and boundary condition (bcs) errors
   lambda_obs: 1.
   lambda_model: 1.

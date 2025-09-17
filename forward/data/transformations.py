@@ -6,7 +6,7 @@ from typing import Union
 class NormalizeProfiles:
     """ Normalize profiles using min-max scaling. """
 
-    def __init__(self, profmin, profmax, inverse_transform=False):
+    def __init__(self, profmin: np.ndarray, profmax: np.ndarray, inverse_transform: bool=False):
         """ Initialize NormalizeProfiles.
 
         Parameters
@@ -22,25 +22,16 @@ class NormalizeProfiles:
         super().__init__()
 
         # Load min and max profiles
-        if isinstance(profmin, np.ndarray):
-            self.profmin = torch.tensor(profmin if len(profmin.shape) >= 2 else profmin.reshape([9, 1]),
-                                        dtype=torch.float32)
-        elif isinstance(profmin, torch.Tensor):
-            self.profmin = profmin if len(profmin.shape) >= 2 else profmin.view(9, 1)
-        else:
-            raise TypeError("profmin must be a numpy array or a torch tensor.")
-        if isinstance(profmax, np.ndarray):
-            self.profmax = torch.tensor(profmax if len(profmax.shape) >= 2 else profmax.reshape([9, 1]),
-                                        dtype=torch.float32)
-        elif isinstance(profmax, torch.Tensor):
-            self.profmax = profmax if len(profmax.shape) >= 2 else profmax.view(9, 1)
-        else:
-            raise TypeError("profmax must be a numpy array or a torch tensor.")
+        self.profmin = profmin.astype(np.float64) if len(profmin.shape) >= 2 \
+            else profmin.reshape([9, 1]).astype(np.float64)
+
+        self.profmax = profmax.astype(np.float64)  if len(profmax.shape) >= 2 \
+            else profmax.reshape([9, 1]).astype(np.float64)
 
         # Inverse transform flag
         self.inverse_transform = inverse_transform
 
-    def forward(self, x):
+    def forward(self, x: Union[torch.Tensor, np.ndarray]) -> Union[torch.Tensor, np.ndarray]:
         """ Forward pass for NormalizeProfiles.
 
         Parameters
@@ -63,6 +54,7 @@ class NormalizeProfiles:
 
     def to(self, device):
         """ Move the normalization parameters to the specified device.
+            This should only be called if the instance is used within a PyTorch model.
 
         Parameters
         ----------
@@ -72,6 +64,12 @@ class NormalizeProfiles:
         -------
         NormalizeProfiles. The instance with parameters moved to the specified device.
         """
+
+        # If called, convert profmin and profmax to torch tensors and move to device
+        if not isinstance(self.profmin, torch.Tensor):
+            self.profmin = torch.tensor(self.profmin, dtype=torch.float64)
+        if not isinstance(self.profmax, torch.Tensor):
+            self.profmax = torch.tensor(self.profmax, dtype=torch.float64)
         self.profmin = self.profmin.to(device)
         self.profmax = self.profmax.to(device)
         return self
@@ -99,8 +97,8 @@ class NormalizeSurface:
         surfmin[[0, 1, 2, 3, 6, 11, 12]] = 0
         surfmax[[0, 1, 5, 13, 14, 15]] = 1
         # Load min and max surfaces
-        self.surfmin = surfmin.astype(np.float32)
-        self.surfmax = surfmax.astype(np.float32)
+        self.surfmin = surfmin.astype(np.float64)
+        self.surfmax = surfmax.astype(np.float64)
 
         # Inverse transform flag
         self.inverse_transform = inverse_transform
@@ -118,28 +116,43 @@ class NormalizeSurface:
         torch.Tensor. Normalized tensor.
         """
 
+        # Apply transformation
         if self.inverse_transform:
             # Inverse normalization
-            if isinstance(x, np.ndarray):
-                return x * (self.surfmax - self.surfmin) + self.surfmin
-            return (x * (torch.tensor(self.surfmax, dtype=torch.float32).to(x.device) -
-                         torch.tensor(self.surfmin, dtype=torch.float32).to(x.device)) +
-                    torch.tensor(self.surfmin, dtype=torch.float32).to(x.device))
+            return x * (self.surfmax - self.surfmin) + self.surfmin
         else:
             # Normalize surface
-            if isinstance(x, np.ndarray):
-                return (x - self.surfmin) / (self.surfmax - self.surfmin)
-            return (x - torch.tensor(self.surfmin, dtype=torch.float32).to(x.device)) / \
-                (torch.tensor(self.surfmax, dtype=torch.float32).to(x.device) -
-                 torch.tensor(self.surfmin, dtype=torch.float32).to(x.device))
+            return (x - self.surfmin) / (self.surfmax - self.surfmin)
 
     __call__ = forward  # Make the instance callable for normalization
+
+    def to(self, device):
+        """ Move the normalization parameters to the specified device.
+            This should only be called if the instance is used within a PyTorch model.
+
+        Parameters
+        ----------
+        device : torch.device. The device to move the parameters to.
+
+        Returns
+        -------
+        NormalizeSurface. The instance with parameters moved to the specified device.
+        """
+
+        # If called, convert surfmin and surfmax to torch tensors and move to device
+        if not isinstance(self.surfmin, torch.Tensor):
+            self.surfmin = torch.tensor(self.surfmin, dtype=torch.float64)
+        if not isinstance(self.surfmax, torch.Tensor):
+            self.surfmax = torch.tensor(self.surfmax, dtype=torch.float64)
+        self.surfmin = self.surfmin.to(device)
+        self.surfmax = self.surfmax.to(device)
+        return self
 
 
 class NormalizeMeta:
     """ Normalize meta variables using sine and cosine transformations. """
 
-    def __init__(self, settings):
+    def __init__(self, settings: dict):
         """ Initialize NormalizeMeta.
 
         Parameters
@@ -162,7 +175,7 @@ class NormalizeMeta:
         self.meta_sin_vars = settings['meta_sin_vars']
         self.meta_cos_vars = settings['meta_cos_vars']
         self.meta_scale_vars = settings['meta_scale_vars']
-        self.meta_scale_factor =settings['meta_scale_factor']
+        self.meta_scale_factor = settings['meta_scale_factor']
         self.meta_scale_offset = settings['meta_scale_offset']
 
     def forward(self, x):

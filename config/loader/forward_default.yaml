@@ -2,8 +2,8 @@
 _target_: forward.model.data_loader.Dataloader
 _recursive_: false
 batch_size: 32  # Batch size for training
-# num_workers: 0  # Number of workers for data loading
-# persistent_workers: false  # Keep workers alive between epochs
+num_workers: 0  # Number of workers for data loading
+persistent_workers: false  # Keep workers alive between epochs
 
 # Split the data into training, validation, and test sets
 stage:
