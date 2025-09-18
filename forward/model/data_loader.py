@@ -1,8 +1,8 @@
 import pytorch_lightning as pl
 from torch.utils.data import Dataset, DataLoader
 from omegaconf import DictConfig
-from forward.utilities.io import load_var_and_normalize
-from forward.utilities.instantiators import instantiate
+from utilities.io import load_var_and_normalize
+from utilities.instantiators import instantiate
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 

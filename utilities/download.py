@@ -2,8 +2,8 @@ import os
 import logging
 import hydra
 from omegaconf import DictConfig
-from forward.utilities.instantiators import instantiate
-from forward.utilities.logic import get_config_path
+from utilities.instantiators import instantiate
+from utilities.logic import get_config_path
 
 
 # Initialize logger

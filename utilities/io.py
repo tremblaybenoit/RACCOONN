@@ -1,6 +1,6 @@
 import numpy as np
 from omegaconf import DictConfig, ListConfig
-from forward.utilities.instantiators import instantiate
+from utilities.instantiators import instantiate
 from forward.data.transformations import identity
 
 

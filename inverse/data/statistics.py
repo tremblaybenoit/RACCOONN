@@ -4,9 +4,9 @@ import pickle
 import torch
 import hydra
 from omegaconf import DictConfig
-from forward.utilities.instantiators import instantiate
-from forward.utilities.io import load_var
-from forward.utilities.logic import get_config_path
+from utilities.instantiators import instantiate
+from utilities.io import load_var
+from utilities.logic import get_config_path
 import logging
 
 

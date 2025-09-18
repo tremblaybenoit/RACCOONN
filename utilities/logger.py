@@ -2,7 +2,7 @@ import os
 import subprocess
 import hydra
 from omegaconf import DictConfig
-from forward.utilities.logic import get_config_path
+from utilities.logic import get_config_path
 import webbrowser
 import logging
 

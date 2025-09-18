@@ -1,6 +1,6 @@
 import torch
 from omegaconf import OmegaConf
-from forward.utilities.instantiators import instantiate
+from utilities.instantiators import instantiate
 
 
 class CRTMForward:

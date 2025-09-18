@@ -2,7 +2,7 @@
 lat:
   # Loading function
   load:
-    _target_: forward.utilities.io.load_latlon
+    _target_: utilities.io.load_latlon
     path: ${....dir}/lat.npy
     scans:
       _target_: ${....scans.load._target_}
@@ -21,7 +21,7 @@ lat:
 lon:
   # Loading function
   load:
-    _target_: forward.utilities.io.load_latlon
+    _target_: utilities.io.load_latlon
     path: ${....dir}/lon.npy
     scans:
       _target_: ${....scans.load._target_}
@@ -40,7 +40,7 @@ lon:
 scans:
   # Loading function
   load:
-    _target_: forward.utilities.io.load_scans
+    _target_: utilities.io.load_scans
     path: ${....dir}/scans.txt
     lat:
       _target_: ${....lat.load._target_}
@@ -59,7 +59,7 @@ scans:
 pressure:
   # Loading function
   load:
-    _target_: forward.utilities.io.load_npy
+    _target_: utilities.io.load_npy
     path: ${....dir}/pressure.npy
   # Normalization function and parameters
   normalization:

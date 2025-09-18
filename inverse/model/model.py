@@ -4,7 +4,7 @@ from typing import Callable
 from omegaconf import DictConfig, ListConfig
 from pytorch_lightning import LightningModule
 from forward.model.model import BaseModel
-from forward.utilities.instantiators import instantiate
+from utilities.instantiators import instantiate
 from inverse.data.transformations import identity
 from copy import deepcopy
 

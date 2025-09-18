@@ -163,6 +163,11 @@ def apply_colorbar(ax, plot, font_size: float=13, label: str='Density', label_pa
         cbar_ax = fig.add_axes([left, bottom, width, height])
         # Create colorbar
         cbar = fig.colorbar(plot, cax=cbar_ax, orientation='vertical')
+        # Set ticks if specified
+        if ticks is not None:
+            tick_values = np.linspace(vmin, vmax, ticks)
+            cbar.set_ticks(tick_values)
+            cbar.ax.set_yticklabels([f"{v:.2f}" for v in tick_values])
         # Customize ticks
         cbar.ax.tick_params(axis='y', direction=tickdir, labelsize=font_size, width=tickw, length=tickl, left=(side=='left'), right=(side=='right'))
         # Set tick positions and label positions
@@ -170,10 +175,6 @@ def apply_colorbar(ax, plot, font_size: float=13, label: str='Density', label_pa
         cbar.ax.yaxis.set_label_position(side)
         if label is not None:
             cbar.set_label(label, labelpad=label_pad, rotation=rotation if rotation is not None else (270 if side=='right' else 90), size=font_size)
-        if ticks is not None:
-            tick_values = np.linspace(vmin, vmax, ticks)
-            cbar.set_ticks(tick_values)
-            cbar.ax.set_xticklabels([f"{v:.2f}" for v in tick_values])
 
     return cbar
 
@@ -226,6 +227,150 @@ def save_plot(fig, filename: str, fileformat: str='png', dpi: int=300):
     fig.savefig(filename, format=fileformat, dpi=dpi)
     # Close the figure
     plt.close('all')
+
+
+def plot_map(ax, img, img_alpha=1.0, img_norm='linear', img_coord=(0, 0), img_shape=None, img_pixel=(1, 1),
+             img_ticks=None, img_labels=('y-axis', 'x-axis'), title=None, img_labelspad=(5, 3), img_tickw=1,
+             img_tickl=2.5, img_tickdir='out', title_pad=1.005, cb_label=None, img_range=None,
+             cb_cmap=None, cb_pad=0, cb_tickw=1, cb_tickl=2.5, cb_font=12, cb_dir='out', cb_rot=270, cb_labelpad=15.5,
+             cb_side='right', cb_size=0.025, cb_ticks=5,
+             plt_coord=None, plt_color='black', plt_linew=1, plt_lines='-', plt_symbl='', plt_origin='lower',
+             vec=None, vec_coord=None, vec_step=1, vec_scale=1, vec_width=1, vec_hwidth=1, vec_hlength=1,
+             vec_haxislength=1, vec_color='black', vec_qlength=1, vec_labelsep=0.05,
+             vec_qdecimals=2, vec_qscale=1, vec_qunits='', font_size=13):
+    """ Plot a map with optional vectors and colorbar.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes. Axes to plot on.
+    img : numpy.ndarray. Image data to plot.
+    img_alpha : float. Alpha value for the image.
+    img_norm : str. Normalization for the image. Default is 'linear'.
+    img_coord : tuple. Coordinates for the image. Default is (0, 0).
+    img_shape : tuple. Shape of the image. Default is None.
+    img_pixel : tuple. Pixel size of the image. Default is (1, 1).
+    img_ticks : tuple. Ticks for the image. Default is None.
+    img_labels : tuple. Labels for the image axes. Default is ('y-axis', 'x-axis').
+    title : str. Title of the plot. Default is None.
+    img_labelspad : tuple. Padding for the image labels. Default is (5, 3).
+    img_tickw : float. Width of the ticks. Default is 1.
+    img_tickl : float. Length of the ticks. Default is 2.5.
+    img_tickdir : str. Direction of the ticks. Default is 'out'.
+    title_pad : float. Padding for the title. Default is 1.005.
+    cb_label : str. Label for the colorbar. Default is None.
+    img_range : tuple. Range for the image. Default is None.
+    cb_cmap : str. Colormap for the colorbar. Default is None.
+    cb_pad : float. Padding for the colorbar. Default is 0.
+    cb_tickw : float. Width of the colorbar ticks. Default is 1.
+    cb_tickl : float. Length of the colorbar ticks. Default is 2.5.
+    cb_font : int. Font size for the colorbar. Default is 12.
+    cb_dir : str. Direction of the colorbar ticks. Default is 'out'.
+    cb_rot : int. Rotation of the colorbar label. Default is 270.
+    cb_labelpad : float. Padding for the colorbar label. Default is 15.5.
+    cb_side : str. Side for the colorbar. Default is 'right'.
+    cb_size : float. Size of the colorbar. Default is 0.05*4/(0.8+0.8+4).
+    cb_ticks : int. Number of ticks on the colorbar. Default is 5.
+    plt_coord : list. Coordinates for the plot. Default is None.
+    plt_color : str. Color for the plot. Default is 'black'.
+    plt_linew : float. Line width for the plot. Default is 1.
+    plt_lines : str. Line style for the plot. Default is '-'.
+    plt_symbl : str. Marker style for the plot. Default is ''.
+    plt_origin : str. Origin for the plot. Default is 'lower'.
+    vec : numpy.ndarray. Vectors to plot. Default is None.
+    vec_coord : tuple. Coordinates for the vectors. Default is None.
+    vec_step : int. Step size for the vectors. Default is 1.
+    vec_scale : float. Scale for the vectors. Default is 1.
+    vec_width : float. Width of the vectors. Default is 1.
+    vec_hwidth : float. Head width of the vectors. Default is 1.
+    vec_hlength : float. Head length of the vectors. Default is 1.
+    vec_haxislength : float. Head axis length of the vectors. Default is 1.
+    vec_color : str. Color for the vectors. Default is 'black'.
+    vec_qlength : float. Length of the quiver key. Default is 1.
+    vec_labelsep : float. Label separation for the quiver key. Default is 0.05.
+    vec_qdecimals : int. Number of decimals for the quiver key. Default is 2.
+    vec_qscale : float. Scale for the quiver key. Default is 1.
+    vec_qunits : str. Units for the quiver key. Default is ''.
+    font_size : int. Font size for the plot. Default is 13.
+
+    Returns
+    -------
+    None.
+    """
+
+    # Extract image shape if not provided
+    if img_shape is None:
+        img_shape = img.shape
+
+    # Extract subpatch
+    img_plot = img[img_coord[0]:img_coord[0] + img_shape[0], img_coord[1]:img_coord[1] + img_shape[1]]
+
+    # Spatial extent
+    extent = np.array([
+        img_pixel[1] * img_coord[1],
+        img_pixel[1] * (img_coord[1] + img_shape[1]),
+        img_pixel[0] * img_coord[0],
+        img_pixel[0] * (img_coord[0] + img_shape[0])
+    ])
+
+    # Colormap
+    if img_range is None:
+        img_range = compute_min_max(img_plot, symmetric=True)
+    if cb_cmap is None:
+        cmap = 'RdBu_r' if img_range[0] * img_range[1] < 0 else 'GnBu_r'
+    else:
+        cmap = cb_cmap
+
+    # Plot image
+    I = ax.imshow(
+        img_plot, extent=extent, cmap=cmap, vmin=img_range[0], vmax=img_range[1],
+        aspect=1, interpolation='none', alpha=img_alpha, origin=plt_origin, norm=img_norm
+    )
+
+    # Plot vectors
+    if vec is not None and vec_coord is not None:
+        q = ax.quiver(
+            vec_coord[1][::vec_step, ::vec_step], vec_coord[0][::vec_step, ::vec_step],
+            vec[1][::vec_step, ::vec_step], vec[0][::vec_step, ::vec_step],
+            units='xy', scale=vec_scale, width=vec_width, headwidth=vec_hwidth,
+            headlength=vec_hlength, headaxislength=vec_haxislength, pivot='tail', scale_units='xy',
+            color=vec_color
+        )
+        qk_label = str(np.around(vec_qlength, decimals=vec_qdecimals))
+        ax.quiverkey(
+            q, 0.9, 0.05, vec_qlength * vec_qscale, qk_label + f' {vec_qunits}',
+            labelpos='E', coordinates='axes', fontproperties={'size': str(cb_font)}, labelsep=vec_labelsep
+        )
+
+    # Overplot patch boundaries
+    if plt_coord is not None:
+        for loop in range(len(plt_coord)):
+            x, y = zip(*plt_coord[loop])
+            ax.plot(x, y, color=plt_color, linewidth=plt_linew, linestyle=plt_lines, marker=plt_symbl)
+
+    # Set axis ticks
+    ax.get_yaxis().set_tick_params(which='both', direction=img_tickdir, width=img_tickw, length=img_tickl,
+                                   labelsize=cb_font, left=True, right=True)
+    ax.get_xaxis().set_tick_params(which='both', direction=img_tickdir, width=img_tickw, length=img_tickl,
+                                   labelsize=cb_font, bottom=True, top=True)
+    if img_ticks is not None:
+        ax.get_yaxis().set_major_locator(plt.MultipleLocator(img_ticks[0]))
+        ax.get_xaxis().set_major_locator(plt.MultipleLocator(img_ticks[1]))
+
+
+    # Set axis labels
+    ax.set_ylabel(img_labels[0], fontsize=cb_font, labelpad=img_labelspad[0])
+    ax.set_xlabel(img_labels[1], fontsize=cb_font, labelpad=img_labelspad[1])
+
+
+    # Title
+    if title is not None:
+        ax.set_title(title, fontsize=font_size, y=title_pad, wrap=True)
+
+    # Set colorbar
+    if I is not None:
+        apply_colorbar(ax, I, font_size=cb_font, label=cb_label, label_pad=cb_labelpad, orientation='vertical',
+                       rotation=cb_rot, side=cb_side, vmin=img_range[0], vmax=img_range[1], size=cb_size, pad=cb_pad,
+                       ticks=cb_ticks, tickw=cb_tickw, tickl=cb_tickl, tickdir=cb_dir)
 
 
 def plot_vertical_profiles(ax, data, err=None, font_size=13, title='Mean vertical profile ± std', title_pad=1.005, y=None,

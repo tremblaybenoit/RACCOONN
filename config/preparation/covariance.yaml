@@ -10,7 +10,7 @@ covariance:
       # Increment estimates for the profile variables
       err:
         load:
-          _target_: forward.utilities.io.load_stack_and_normalize
+          _target_: utilities.io.load_stack_and_normalize
           _recursive_: false
           stack:
             - ${data.stage.train.vars.prof_increment}
@@ -44,7 +44,7 @@ covariance:
       # Innovation estimates for the observation variables
       err:
         load:
-          _target_: forward.utilities.io.load_stack_and_normalize
+          _target_: utilities.io.load_stack_and_normalize
           _recursive_: false
           stack:
             - ${data.stage.train.vars.hofx_innovation}

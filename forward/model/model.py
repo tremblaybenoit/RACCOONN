@@ -5,7 +5,7 @@ from typing import Callable, Union, Any
 from pytorch_lightning import LightningModule
 from forward.model.activation import Swish, Scale
 from omegaconf import DictConfig
-from forward.utilities.instantiators import instantiate
+from utilities.instantiators import instantiate
 
 
 class BaseModel(LightningModule):

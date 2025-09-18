@@ -3,9 +3,9 @@ import logging
 import hydra
 from omegaconf import DictConfig
 import matplotlib.pyplot as plt
-from forward.utilities.logic import get_config_path
-from forward.utilities.instantiators import instantiate
-from inverse.utilities.plot import fig_rmse_bars
+from utilities.logic import get_config_path
+from utilities.instantiators import instantiate
+from utilities.plot import fig_rmse_bars
 
 # Initialize logger
 logger = logging.getLogger(__name__)

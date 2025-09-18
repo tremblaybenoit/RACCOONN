@@ -1,6 +1,6 @@
 from pytorch_lightning.callbacks import Callback
 import matplotlib.pyplot as plt
-from inverse.utilities.plot import fig_rmse_bars
+from utilities.plot import fig_rmse_bars
 import numpy as np
 import wandb
 import tempfile

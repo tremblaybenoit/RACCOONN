@@ -1,10 +1,10 @@
 import numpy as np
 import hydra
 from omegaconf import DictConfig
-from forward.utilities.io import load_var_and_normalize
-from forward.utilities.instantiators import instantiate
-from forward.utilities.logic import get_config_path
-from inverse.utilities.plot import plot_map, save_plot, flexible_gridspec
+from utilities.io import load_var_and_normalize
+from utilities.instantiators import instantiate
+from utilities.logic import get_config_path
+from utilities.plot import plot_map, save_plot, flexible_gridspec
 import os
 import logging
 
@@ -109,14 +109,13 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
     # Plot covariance matrix if required
     if plot_flag:
         logger.info("Plotting inverse covariance matrix...")
-        # From n_profiles, determine optimal layout for flexible_gridspec
-        n_rows, n_cols = 1, 1
         # Create a flexible gridspec
-        list_cols = [n_cols for _ in range(n_rows)]
-        fig, get_axes = flexible_gridspec(list_cols, cell_width=4, cell_height=4)
+        fig, get_axes = flexible_gridspec(cell_widths=[4.0], cell_heights=[4.0],
+                                          lefts=[1.00], rights=[1.00], bottoms=[1.00], tops=[1.00])
         ax = get_axes(0, 0)
         # Plot covariance matrix
-        plot_map(ax, cov_inv, title=f"Covariance matrix of profiles", img_range=(-10000, 10000), plt_origin='upper')
+        plot_map(ax, cov_inv/10000, title=f"Inverse covariance matrix", img_range=(-1, 1), plt_origin='upper',
+                 cb_label=r'Values (divided by 10$^4$)')
         save_plot(fig, filename=os.path.splitext(output.path)[0] + '.png')
 
     return

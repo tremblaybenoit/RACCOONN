@@ -89,7 +89,7 @@ rule data:
                     for path in find_file_paths(var['load'], exclude_keys='normalization')])
     shell:
         """
-        python -m forward.utilities.download \
+        python -m utilities.download \
         --config-name={params.config_name} \
         {params.experiment}
         """

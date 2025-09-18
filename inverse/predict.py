@@ -1,9 +1,9 @@
 import logging
 import hydra
 from omegaconf import DictConfig
-from forward.utilities.instantiators import instantiate
+from utilities.instantiators import instantiate
 from inverse.train import InverseOperator
-from forward.utilities.logic import get_config_path
+from utilities.logic import get_config_path
 import torch
 # torch.set_float32_matmul_precision('high')
 torch.set_default_dtype(torch.float64)

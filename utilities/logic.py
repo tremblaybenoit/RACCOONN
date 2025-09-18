@@ -8,7 +8,7 @@ def get_repo_root() -> str:
         -------
         str: Root directory of the repository.
     """
-    return os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
 
 
 def get_config_path() -> str:

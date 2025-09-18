@@ -105,7 +105,7 @@ stage:
             - ${loader.stage.test.results.prof.path}
         # Load function
         load:
-          _target_: forward.utilities.io.load_npy
+          _target_: utilities.io.load_npy
           path: ${loader.stage.test.results.prof.path}
       # Forward model simulations
       hofx:
@@ -119,7 +119,7 @@ stage:
             - ${loader.stage.test.results.hofx.path}
         # Load function
         load:
-          _target_: forward.utilities.io.load_npy
+          _target_: utilities.io.load_npy
           path: ${loader.stage.test.results.hofx.path}
   # Prediction set
   predict:
@@ -146,5 +146,5 @@ stage:
             - ${loader.stage.predict.results.prof.path}
         # Load function
         load:
-          _target_: forward.utilities.io.load_npy
+          _target_: utilities.io.load_npy
           path: ${loader.stage.predict.results.prof.path}

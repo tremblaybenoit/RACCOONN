@@ -2,7 +2,7 @@
 hofx:
   # Loading function
   load:
-    _target_: forward.utilities.io.load_npy
+    _target_: utilities.io.load_npy
     path: ${....dir}/hofx.npy
     split: ${....split}
 # Cloud filter

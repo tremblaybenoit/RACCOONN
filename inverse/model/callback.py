@@ -1,7 +1,7 @@
 from pytorch_lightning.callbacks import Callback
-from forward.utilities.instantiators import instantiate
+from utilities.instantiators import instantiate
 import matplotlib.pyplot as plt
-from inverse.utilities.plot import fig_vertical_profiles, fig_rmse_bars
+from utilities.plot import fig_vertical_profiles, fig_rmse_bars
 import numpy as np
 import wandb
 import tempfile

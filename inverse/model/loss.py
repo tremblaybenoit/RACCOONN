@@ -3,8 +3,8 @@ import os
 import numpy as np
 from typing import Callable
 try:
-    from inverse.utilities.forward import CRTMForward
-    from forward.utilities.logic import get_config_path
+    from inverse.model.forward import CRTMForward
+    from utilities.logic import get_config_path
     # Initialize CRTM forward model
     checkpoint_path = os.path.abspath(os.path.join(os.path.dirname(__name__), 'forward/model/checkpoints/model.ckpt'))
     config_path = os.path.join(get_config_path(), 'model/forward_emulator.yaml')

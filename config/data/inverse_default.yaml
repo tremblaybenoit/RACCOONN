@@ -17,7 +17,7 @@ pressure_filter:
   load:
     _target_: inverse.data.filters.pressure_filter
     prof:
-      _target_: forward.utilities.io.load_stack
+      _target_: utilities.io.load_stack
       _recursive_: false
       stack:
         - ${data.stage.train.vars.prof}
@@ -32,7 +32,7 @@ stage:
     dir: ${paths.data_dir}/Test2
     # Split
     split:
-      _target_: forward.utilities.io.extract_indices
+      _target_: utilities.io.extract_indices
       _args_:
         - _target_: numpy.arange
           _args_:
@@ -49,7 +49,7 @@ stage:
     dir: ${paths.data_dir}/Test2
     # Split
     split:
-      _target_: forward.utilities.io.extract_indices
+      _target_: utilities.io.extract_indices
       _args_:
         - _target_: numpy.arange
           _args_:
@@ -66,7 +66,7 @@ stage:
     dir: ${paths.data_dir}/Test2
     # Split
     split:
-      _target_: forward.utilities.io.extract_indices
+      _target_: utilities.io.extract_indices
       _args_:
         - _target_: numpy.arange
           _args_:
