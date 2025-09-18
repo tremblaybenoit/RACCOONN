@@ -12,6 +12,8 @@ git clone https://github.com/tremblaybenoit/RACCOONN.git
 RACCOONN is built with [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/) and [Hydra](https://hydra.cc/docs/intro/).
 
 # Usage
+
+## Automated workflow (recommended)
 RACCOONN uses the [Snakemake workflow management system](https://snakemake.readthedocs.io/en/stable/) for reproducibility.
 
 To perform a dry-run (i.e., to check the workflow prior to execution) of the `test` rule with the `inverse_operator` experiment configuration:
@@ -39,7 +41,7 @@ The following graph shows the workflow for the `test` rule with the `inverse_ope
 
 ```mermaid
 ---
-title: RACCOONN training workflow
+title: RACCOONN training workflow - Inverse model
 ---
 flowchart TB
 	id0[test]
@@ -67,6 +69,24 @@ flowchart TB
 	id2 --> id5
 	id3 --> id5
 	id4 --> id5
+```
+## Manual execution of individual steps
+Each step of the workflow can be run manually using the corresponding Python script and 
+the desired experiment configuration (e.g., inverse_operator for the inverse model).
+
+1. Data preparation for the inverse model:
+```bash
+python -m inverse.data.statistics +experiment=inverse_operator
+python -m inverse.data.covariance +experiment=inverse_operator
+```
+2. Train the inverse model:
+```bash
+python -m inverse.train +experiment=inverse_operator
+```
+3. Test and evaluate the inverse model:
+```bash
+python -m inverse.test +experiment=inverse_operator
+python -m inverse.evaluation.validation +experiment=inverse_operator
 ```
 
 
