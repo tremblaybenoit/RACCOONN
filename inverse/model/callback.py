@@ -1,7 +1,7 @@
 from pytorch_lightning.callbacks import Callback
 from forward.utilities.instantiators import instantiate
 import matplotlib.pyplot as plt
-from inverse.utilities.plot import fig_vertical_profiles, fig_vertical_profile, fig_rmse_bars, fig_vertical_profiles_background
+from inverse.utilities.plot import fig_vertical_profiles, fig_rmse_bars
 import numpy as np
 import wandb
 import tempfile
@@ -60,27 +60,28 @@ class FigureLogger(Callback):
         # List of figures to log
         figs = []
 
-        # Profiles
+        # Profiles (original units)
+        sources = [prof_target, prof_pred]
         if 'prof_background' in model.valid_results and len(model.valid_results['prof_background']) > 0:
            prof_background = np.concatenate(model.valid_results['prof_background'], axis=0)
-           figs.append(fig_vertical_profiles_background(prof_target, prof_pred, prof_background, y=pressure_levels, y_label='Pressure (hPa)',
-                                                   title=[f"Epoch {current_epoch:02d} - {prof_label} profiles" for prof_label in prof_labels]))
-        else:
-           # Generate figures
-           figs.append(fig_vertical_profiles(prof_target, prof_pred, y=pressure_levels, y_label='Pressure (hPa)',
-                                         title=[f"Epoch {current_epoch:02d} - {prof_label} profiles" for prof_label in prof_labels]))
+           sources.insert(0, prof_background)
+        figs.append(fig_vertical_profiles(sources, y=pressure_levels, y_label='Pressure (hPa)',
+                                          title=[f"Epoch {current_epoch:02d} - {prof_label} profiles" for prof_label in prof_labels]))
+
+        # Normalized profiles
+        norm_sources = [prof_norm_target, prof_norm_pred]
         if 'prof_norm_background' in model.valid_results and len(model.valid_results['prof_norm_background']) > 0:
            prof_norm_background = np.concatenate(model.valid_results['prof_norm_background'], axis=0)
-           figs.append(fig_vertical_profiles_background(prof_norm_target, prof_norm_pred, prof_norm_background, y=pressure_levels, y_label='Pressure (hPa)',
-                                                        title=[f"Epoch {current_epoch:02d} - {prof_label} normalized profiles" for prof_label in prof_labels]))
-        else:
-           figs.append(fig_vertical_profiles(prof_norm_target, prof_norm_pred, y=pressure_levels, y_label='Pressure (hPa)',
-                                              title=[f"Epoch {current_epoch:02d} - {prof_label} normalized profiles" for prof_label in prof_labels]))
+           norm_sources.insert(0, prof_norm_background)
+        figs.append(fig_vertical_profiles(sources, y=pressure_levels, y_label='Pressure (hPa)',
+                                          title=[f"Epoch {current_epoch:02d} - {prof_label} normalized profiles" for prof_label in prof_labels]))
+
         # Profile errors
-        figs.append(fig_vertical_profile(prof_err, y=pressure_levels, y_label='Pressure (hPa)',
-                                         title=[f"Epoch {current_epoch:02d} - {prof_label} profile errors" for prof_label in prof_labels]))
-        figs.append(fig_vertical_profile(prof_norm_err, y=pressure_levels, y_label='Pressure (hPa)',
-                                         title=[f"Epoch {current_epoch:02d} - {prof_label} normalized profile errors" for prof_label in prof_labels]))
+        figs.append(fig_vertical_profiles([prof_err], y=pressure_levels, y_label='Pressure (hPa)',
+                                          title=[f"Epoch {current_epoch:02d} - {prof_label} profile errors" for prof_label in prof_labels]))
+        figs.append(fig_vertical_profiles([prof_norm_err], y=pressure_levels, y_label='Pressure (hPa)',
+                                          title=[f"Epoch {current_epoch:02d} - {prof_label} normalized profile errors" for prof_label in prof_labels]))
+
         # Forward model RMSE
         figs.append(fig_rmse_bars(hofx_target, hofx_pred, clrsky, title=[f"Epoch {current_epoch:02d} - Forward model errors",
                                                                          f"Epoch {current_epoch:02d} - Normalized forward model errors"]))
