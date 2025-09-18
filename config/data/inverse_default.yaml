@@ -18,6 +18,7 @@ pressure_filter:
     _target_: inverse.data.filters.pressure_filter
     prof:
       _target_: forward.utilities.io.load_stack
+      _recursive_: false
       stack:
         - ${data.stage.train.vars.prof}
         - ${data.stage.valid.vars.prof}

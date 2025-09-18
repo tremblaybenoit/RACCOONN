@@ -126,12 +126,12 @@ def load_var_and_normalize(config: DictConfig, split: np.ndarray = None) -> np.n
     return data
 
 
-def load_stack(config: ListConfig) -> np.ndarray:
+def load_stack(stack: ListConfig) -> np.ndarray:
     """ Load and stack multiple variables.
 
         Parameters
         ----------
-        config: List[DictConfig]. List of configuration objects for the variables.
+        stack: List[DictConfig]. List of configuration objects for the variables.
 
         Returns
         -------
@@ -139,7 +139,7 @@ def load_stack(config: ListConfig) -> np.ndarray:
     """
 
     # Load and stack variables along the last axis
-    return np.concatenate([load_var(c) for c in config], axis=0)
+    return np.concatenate([load_var(c) for c in stack], axis=0)
 
 
 def load_stack_and_normalize(stack: ListConfig) -> np.ndarray:

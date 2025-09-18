@@ -9,56 +9,64 @@ statistics:
     input:
       prof:
         load:
-          _target_: forward_utilities.io.load_stack
+          _target_: forward.utilities.io.load_stack
+          _recursive_: false
           stack:
             - ${data.stage.train.vars.prof}
             - ${data.stage.valid.vars.prof}
             - ${data.stage.test.vars.prof}
       surf:
         load:
-          _target_: forward_utilities.io.load_stack
+          _target_: forward.utilities.io.load_stack
+          _recursive_: false
           stack:
             - ${data.stage.train.vars.surf}
             - ${data.stage.valid.vars.surf}
             - ${data.stage.test.vars.surf}
       meta:
         load:
-          _target_: forward_utilities.io.load_stack
+          _target_: forward.utilities.io.load_stack
+          _recursive_: false
           stack:
               - ${data.stage.train.vars.meta}
               - ${data.stage.valid.vars.meta}
               - ${data.stage.test.vars.meta}
       hofx:
         load:
-          _target_: forward_utilities.io.load_stack
+          _target_: forward.utilities.io.load_stack
+          _recursive_: false
           stack:
               - ${data.stage.train.vars.hofx}
               - ${data.stage.valid.vars.hofx}
               - ${data.stage.test.vars.hofx}
       lat:
         load:
-          _target_: forward_utilities.io.load_stack
+          _target_: forward.utilities.io.load_stack
+          _recursive_: false
           stack:
               - ${data.stage.train.vars.lat}
               - ${data.stage.valid.vars.lat}
               - ${data.stage.test.vars.lat}
       lon:
         load:
-          _target_: forward_utilities.io.load_stack
+          _target_: forward.utilities.io.load_stack
+          _recursive_: false
           stack:
             - ${data.stage.train.vars.lon}
             - ${data.stage.valid.vars.lon}
             - ${data.stage.test.vars.lon}
       scans:
         load:
-          _target_: forward_utilities.io.load_stack
+          _target_: forward.utilities.io.load_stack
+          _recursive_: false
           stack:
             - ${data.stage.train.vars.scans}
             - ${data.stage.valid.vars.scans}
             - ${data.stage.test.vars.scans}
       pressure:
         load:
-          _target_: forward_utilities.io.load_stack
+          _target_: forward.utilities.io.load_stack
+          _recursive_: false
           stack:
             - ${data.stage.train.vars.pressure}
             - ${data.stage.valid.vars.pressure}

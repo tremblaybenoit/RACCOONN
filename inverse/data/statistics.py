@@ -3,8 +3,9 @@ import numpy as np
 import pickle
 import torch
 import hydra
-from omegaconf import DictConfig, ListConfig
+from omegaconf import DictConfig
 from forward.utilities.instantiators import instantiate
+from forward.utilities.io import load_var
 from forward.utilities.logic import get_config_path
 import logging
 
@@ -125,51 +126,6 @@ def statistics(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = 
     return stats
 
 
-def compute_statistics_stack(input: ListConfig, output: DictConfig) -> None:
-    """ Compute statistics of a given dataset.
-
-        Parameters
-        ----------
-        input: DictConfig. Main hydra configuration file containing all model hyperparameters.
-        output: DictConfig. Main hydra configuration file containing all model hyperparameters.
-
-        Returns
-        -------
-        None.
-    """
-
-    # Check if multiple datasets are provided
-    if len(input) == 1:
-        compute_statistics(input[0], output)
-    # If multiple datasets are provided, compute statistics for each dataset and then combine them
-    else:
-        # Compute statistics per variable and dataset
-        stats = {}
-        stats_ds = {}
-        variables = list(input[0].keys())
-        # Loop over datasets and then variables
-        for ds, ds_config in enumerate(input):
-            stats_ds[ds] = {}
-            for v, variable in enumerate(variables):
-                # Load data
-                data = np.array(instantiate(ds_config[variable].load)).astype(np.float64)
-                # Compute statistics per height
-                stats_ds[ds][variable] = statistics(data, axis=0)
-        # Combine statistics across datasets if more than one dataset is provided
-        for variable in variables:
-            stats[variable] = combine_statistics([stats_ds[ds][variable] for ds in range(len(input))])
-
-        # Save statistics to file
-        logger.info(f"Saving statistics to file {output.path}.")
-        with open(output.path, 'wb') as file:
-            # noinspection PyTypeChecker
-            pickle.dump(stats, file)
-        # Clear memory
-        io = None
-
-    return
-
-
 def compute_statistics(input: DictConfig, output: DictConfig = None) -> dict:
     """ Compute statistics of a given dataset.
 
@@ -189,7 +145,7 @@ def compute_statistics(input: DictConfig, output: DictConfig = None) -> dict:
     # Loop sequentially for memory efficiency (over speed)
     for v, variable in enumerate(variables):
         # Load data
-        data = np.array(instantiate(input[variable].load)).astype(np.float64)
+        data = load_var(input[variable])
         # Compute statistics per height
         logger.info(f"Computing statistics of variable {variable} ({v + 1}/{len(variables)})...")
         stats[variable] = statistics(data, axis=0)

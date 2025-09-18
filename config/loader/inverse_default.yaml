@@ -93,10 +93,10 @@ stage:
       cloud_filter: ${data.stage.test.vars.cloud_filter}
     # Results
     results:
-      # Path
-      path: ${paths.run_dir}/test_prof.npy
       # Atmospheric profile predictions
       prof:
+        # Path
+        path: ${paths.run_dir}/test_prof.npy
         # Save function
         save:
           _target_: numpy.save
