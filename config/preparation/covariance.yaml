@@ -11,6 +11,7 @@ covariance:
       err:
         load:
           _target_: forward.utilities.io.load_stack_and_normalize
+          _recursive_: false
           stack:
             - ${data.stage.train.vars.prof_increment}
             - ${data.stage.valid.vars.prof_increment}
@@ -42,11 +43,13 @@ covariance:
     input:
       # Innovation estimates for the observation variables
       err:
-        _target_: forward.utilities.io.load_stack_and_normalize
-        stack:
-          - ${data.stage.train.vars.hofx_innovation}
-          - ${data.stage.valid.vars.hofx_innovation}
-          - ${data.stage.test.vars.hofx_innovation}
+        load:
+          _target_: forward.utilities.io.load_stack_and_normalize
+          _recursive_: false
+          stack:
+            - ${data.stage.train.vars.hofx_innovation}
+            - ${data.stage.valid.vars.hofx_innovation}
+            - ${data.stage.test.vars.hofx_innovation}
     # What the method produces as output
     output:
       # File path to save/load the covariance matrix
