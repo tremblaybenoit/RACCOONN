@@ -1,0 +1,27 @@
+# Model
+_target_: inverse.model.model.InverseEmulator
+_recursive_: false
+
+# Optimizer function and parameters
+optimizer:
+  # Function
+  _target_: torch.optim.Adam
+  # Learning rate
+  lr: 0.001
+  # Weight decay (L2 regularization)
+  weight_decay: 0.000
+
+# Learning rate scheduler
+lr_scheduler:
+  # Function
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  # Mode for the scheduler
+  mode: min
+  # Factor to reduce the learning rate
+  factor: 0.2
+  # Number of epochs with no improvement after which learning rate will be reduced
+  patience: 3
+  # Minimum learning rate
+  min_lr: 1.0e-6
+  # Threshold for measuring the new optimum, to only focus on significant changes
+  threshold: 0.01

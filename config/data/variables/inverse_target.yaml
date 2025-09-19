@@ -1,0 +1,98 @@
+# Atmospheric profiles
+prof:
+  # Profile types
+  type: [ 'Air temperature', 'Water vapor mixing ratio', 'Cloud ice mass', 'Cloud water mass', 'Snow mass',
+          'Ice particle effective radius', 'Water particle effective radius',
+          'Snow particle effective radius', 'Ozone mixing ratio' ]
+  # Loading function
+  load:
+    _target_: utilities.io.load_npy
+    path: ${....dir}/prof.npy
+    split: ${....split}
+  # Normalization function and parameters
+  normalization:
+    _target_: inverse.data.transformations.min_max
+    _partial_: true
+    stats:
+      _target_: inverse.data.statistics.read_statistics_var
+      _args_:
+        - ${preparation.statistics.data.output.path}
+        - 'prof'
+    axis: 1  # null
+# Surface variables
+surf:
+  # Surface variable types
+  type: [ 'Ice area fraction', 'Land area fraction', 'Land type', 'Leaf area index', 'Soil temperature',
+          'Snow area fraction', 'Snow thickness', 'Soil temperature',
+          'Surface temperature (ice, land, sea, snow)', 'Wind direction', 'Wind speed',
+          'Vegetation area fraction', 'Water area fraction', 'Volumetric water ratio (soil)' ]
+  # Loading function
+  load:
+    _target_: utilities.io.load_npy
+    path: ${....dir}/surf.npy
+    split: ${....split}
+  # Normalization function and parameters
+  normalization:
+    _target_: forward.data.transformations.NormalizeSurface
+    surfmax:
+      _target_: numpy.loadtxt
+      _args_:
+        - forward/data/normalization/surfmax.txt
+    surfmin:
+      _target_: numpy.loadtxt
+      _args_:
+        - forward/data/normalization/surfmin.txt
+# Metadata
+meta:
+  # Metadata variable types
+  type: [ 'Sensor scan angle', 'Sensor zenith angle', 'Sensor view angle', 'Sensor azimuth angle',
+          'Sensor elevation angle', 'Solar azimuth angle', 'Solar zenith angle' ]
+  # Loading function
+  load:
+    _target_: utilities.io.load_npy
+    path: ${....dir}/meta.npy
+    split: ${....split}
+  # Normalization function and parameters
+  normalization:
+    _target_: forward.data.transformations.NormalizeMeta
+    settings:
+      meta_cos_vars: [ 6 ]
+      meta_scale_factor: 180
+      meta_scale_offset: -180
+      meta_scale_vars: [ ]
+      meta_sin_vars: [ 0, 1, 2, 3, 4, 5 ]
+# Brightness temperatures
+hofx:
+  # Loading function
+  load:
+    _target_: utilities.io.load_npy
+    path: ../forward_outputs/forward_emulator/runs/version_000/test_hofx.npy
+    split: ${....split}
+# Cloud filter
+cloud_filter:
+  # Loading function
+  load:
+    _target_: inverse.data.filters.cloud_filter
+    _args_:
+      - ${....prof.load}
+# Atmospheric profile background
+prof_background:
+  # Loading function
+  load:
+    _target_: inverse.data.covariance.background_climatology
+    data: ${...prof.load}
+  # Normalization function and parameters
+  normalization: ${..prof.normalization}
+# Atmospheric profile increment
+prof_increment:
+  # Loading function
+  load:
+    _target_: inverse.data.covariance.background_increment
+    config_true: ${...prof}  # We use the normalized true profiles
+    config_background: ${...prof_background}  # We use the normalized background profiles
+# Brightness temperature innovation
+hofx_innovation:
+  # Loading function
+  load:
+    _target_: inverse.data.covariance.innovation_uncertainty
+    data: ${...hofx.load}

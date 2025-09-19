@@ -1,0 +1,67 @@
+# Error covariance matrices
+covariance:
+  # Error covariance matrix in model space
+  B:
+    # Function
+    _target_: inverse.data.covariance.covariance_matrix
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Increment estimates for the profile variables
+      err:
+        load:
+          _target_: utilities.io.load_stack_and_normalize
+          _recursive_: false
+          stack:
+            - ${data.stage.train.vars.prof_increment}
+            - ${data.stage.valid.vars.prof_increment}
+            - ${data.stage.test.vars.prof_increment}
+      # Pressure filter: Consider only pressure levels with non-zero variance
+      pressure_filter: ${data.pressure_filter}
+    # What the method produces as output
+    output:
+      # File path to save/load the covariance matrix
+      path: ${paths.data_dir}/normalization/model_covariance_cloud_filter_pressure_filter.npy
+      # Save function
+      save:
+        _target_: numpy.save
+        _partial_: true
+        _args_:
+          - ${preparation.covariance.B.output.path}
+      # Load function
+      load:
+        _target_: numpy.load
+        _args_:
+          - ${preparation.covariance.B.output.path}
+
+  # Error covariance matrix in observation space
+  R:
+    # Function
+    _target_: inverse.data.covariance.covariance_matrix
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Innovation estimates for the observation variables
+      err:
+        load:
+          _target_: utilities.io.load_stack_and_normalize
+          _recursive_: false
+          stack:
+            - ${data.stage.train.vars.hofx_innovation}
+            - ${data.stage.valid.vars.hofx_innovation}
+            - ${data.stage.test.vars.hofx_innovation}
+    # What the method produces as output
+    output:
+      # File path to save/load the covariance matrix
+      path: ${paths.data_dir}/normalization/observation_covariance_cloud_filter.npy
+      # Save function
+      save:
+        _target_: numpy.save
+        _partial_: true
+        _args_:
+          - ${preparation.covariance.R.output.path}
+      # Load function
+      load:
+        _target_: numpy.load
+        _args_:
+          - ${preparation.covariance.R.output.path}

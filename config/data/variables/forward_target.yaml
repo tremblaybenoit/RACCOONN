@@ -1,0 +1,14 @@
+# Brightness temperatures
+hofx:
+  # Loading function
+  load:
+    _target_: utilities.io.load_npy
+    path: ${....dir}/hofx.npy
+    split: ${....split}
+# Cloud filter
+cloud_filter:
+  # Loading function
+  load:
+    _target_: inverse.data.filters.cloud_filter
+    _args_:
+      - ${....prof.load}

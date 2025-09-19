@@ -1,0 +1,12 @@
+mlflow:
+  _target_: lightning.pytorch.loggers.mlflow.MLFlowLogger  # Lightning logger
+  save_dir: ${paths.log_dir}/mlflow # Default directory where to save logs
+  experiment_name: ${task_name}  # Name of the experiment
+  run_name: ${paths.run_id}  # Name of the run
+  tags:
+    project: "RACCOONN"  # Project name
+    dataset: "MIDAS"  # Dataset name
+    user: "RACCOONN_Trainer"  # User name
+    version: "0.5"  # Version of the project
+offline: True  # Whether to log offline
+ui: True  # Whether to open the UI after logging

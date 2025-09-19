@@ -1,0 +1,7 @@
+wandb:
+  _target_: lightning.pytorch.loggers.wandb.WandbLogger  # Lightning logger
+  save_dir: ${paths.log_dir} # Default directory where to save logs
+  project: ${task_name}  # Name of the project
+  name: ${paths.run_id}  # Name of the logging instance
+offline: True  # Whether to log offline
+ui: True  # Whether to open the UI after logging

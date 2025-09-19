@@ -1,0 +1,10 @@
+# Use multiple loggers at once
+
+# Loggers to combine
+defaults:
+  - mlflow
+  # - tensorboard
+
+# Global parameters
+offline: True  # Whether to log offline
+ui: True  # Whether to open the UI after logging

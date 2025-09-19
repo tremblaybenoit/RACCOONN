@@ -1,0 +1,24 @@
+# https://hydra.cc/docs/configure_hydra/intro/
+
+# Options for logging runs
+defaults:
+  - override hydra_logging: colorlog
+  - override job_logging: colorlog
+
+# For each run, an output directory is generated dynamically
+run:
+  # dir: ${paths.log_dir}/${task_name}/runs/${now:%Y-%m-%d}_${now:%H-%M-%S}
+  dir: ${paths.task_dir}/${task_name}
+sweep:
+  # dir: ${paths.log_dir}/${task_name}/multiruns/${now:%Y-%m-%d}_${now:%H-%M-%S}
+  dir: ${paths.task_dir}/${task_name}/multiruns
+  subdir: ${hydra.job.num}
+
+# Log
+job_logging:
+  handlers:
+    file:
+      # ${hydra.runtime.output_dir} refers to the run.dir above
+      # filename: ${hydra.runtime.output_dir}/${task_name}.log
+      # filename: ${paths.run_dir}/${task_name}.log
+      filename: ${paths.run_dir}/${task_name}_${now:%Y-%m-%d}_${now:%H-%M-%S}.log

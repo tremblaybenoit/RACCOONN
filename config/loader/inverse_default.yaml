@@ -1,0 +1,150 @@
+# Data loader configuration for inverse model training
+_target_: forward.model.data_loader.Dataloader
+_recursive_: false
+batch_size: 32  # Batch size for training
+# TODO: Due to Windows limitations, num_workers must be set to 0. Change this to a higher value for Linux/MacOS for better performance.
+num_workers: 0  # Number of workers for data loading
+# TODO: Set persistent_workers to true if num_workers > 0 for better performance.
+persistent_workers: false  # Keep workers alive between epochs
+
+# Split the data into training, validation, and test sets
+stage:
+  # Training set
+  train:
+    # Dataset class
+    _target_: forward.model.data_loader.CRTMDataset
+    _recursive_: false
+    # Variables to use as input
+    input:
+      # Input coordinates
+      lat: ${data.stage.train.vars.lat}
+      lon: ${data.stage.train.vars.lon}
+      scans: ${data.stage.train.vars.scans}
+      pressure: ${data.stage.train.vars.pressure}
+    # Variables to use as targets or additional inputs
+    target:
+      # Forward model additional inputs
+      surf: ${data.stage.train.vars.surf}
+      meta: ${data.stage.train.vars.meta}
+      # Optimization targets
+      prof_norm: ${data.stage.train.vars.prof}
+      prof_norm_background: ${data.stage.train.vars.prof_background}
+      prof_norm_increment: ${data.stage.train.vars.prof_increment}
+      prof:
+        load: ${data.stage.train.vars.prof.load}
+      prof_background:
+        load: ${data.stage.train.vars.prof_background.load}
+      hofx: ${data.stage.train.vars.hofx}
+      cloud_filter: ${data.stage.train.vars.cloud_filter}
+
+  # Validation set
+  valid:
+    # Dataset class
+    _target_: forward.model.data_loader.CRTMDataset
+    _recursive_: false
+    # Variables to use as input
+    input:
+      # Input coordinates
+      lat: ${data.stage.valid.vars.lat}
+      lon: ${data.stage.valid.vars.lon}
+      scans: ${data.stage.valid.vars.scans}
+      pressure: ${data.stage.valid.vars.pressure}
+    # Variables to use as targets or additional inputs
+    target:
+      # Forward model additional inputs
+      surf: ${data.stage.valid.vars.surf}
+      meta: ${data.stage.valid.vars.meta}
+      # Optimization targets
+      prof_norm: ${data.stage.valid.vars.prof}
+      prof_norm_background: ${data.stage.valid.vars.prof_background}
+      prof_norm_increment: ${data.stage.valid.vars.prof_increment}
+      prof:
+        load: ${data.stage.valid.vars.prof.load}
+      prof_background:
+        load: ${data.stage.valid.vars.prof_background.load}
+      hofx: ${data.stage.valid.vars.hofx}
+      cloud_filter: ${data.stage.valid.vars.cloud_filter}
+  # Test set
+  test:
+    # Dataset class
+    _target_: forward.model.data_loader.CRTMDataset
+    _recursive_: false
+    # Variables to use as input
+    input:
+      # Input coordinates
+      lat: ${data.stage.test.vars.lat}
+      lon: ${data.stage.test.vars.lon}
+      scans: ${data.stage.test.vars.scans}
+      pressure: ${data.stage.test.vars.pressure}
+    # Variables to use as targets or additional inputs
+    target:
+      # Forward model additional inputs
+      surf: ${data.stage.test.vars.surf}
+      meta: ${data.stage.test.vars.meta}
+      # Optimization targets
+      prof_norm: ${data.stage.test.vars.prof}
+      prof_norm_background: ${data.stage.test.vars.prof_background}
+      prof_norm_increment: ${data.stage.test.vars.prof_increment}
+      prof:
+        load: ${data.stage.test.vars.prof.load}
+      prof_background:
+        load: ${data.stage.test.vars.prof_background.load}
+      hofx: ${data.stage.test.vars.hofx}
+      cloud_filter: ${data.stage.test.vars.cloud_filter}
+    # Results
+    results:
+      # Atmospheric profile predictions
+      prof:
+        # Path
+        path: ${paths.run_dir}/test_prof.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${loader.stage.test.results.prof.path}
+        # Load function
+        load:
+          _target_: utilities.io.load_npy
+          path: ${loader.stage.test.results.prof.path}
+      # Forward model simulations
+      hofx:
+        # Path
+        path: ${paths.run_dir}/test_hofx.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${loader.stage.test.results.hofx.path}
+        # Load function
+        load:
+          _target_: utilities.io.load_npy
+          path: ${loader.stage.test.results.hofx.path}
+  # Prediction set
+  predict:
+    # Dataset class
+    _target_: forward.model.data_loader.CRTMDataset
+    _recursive_: false
+    # Variables to use as input
+    input:
+      lat: ${data.stage.predict.vars.lat}
+      lon: ${data.stage.predict.vars.lon}
+      scans: ${data.stage.predict.vars.scans}
+      pressure: ${data.stage.predict.vars.pressure}
+    # Results
+    results:
+      # Atmospheric profile predictions
+      prof:
+        # Path
+        path: ${paths.run_dir}/predict_prof.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${loader.stage.predict.results.prof.path}
+        # Load function
+        load:
+          _target_: utilities.io.load_npy
+          path: ${loader.stage.predict.results.prof.path}

@@ -1,0 +1,27 @@
+---
+title: DAG
+---
+flowchart TB
+	id0[predict]
+	id1[data]
+	id2[statistics_data]
+	id3[train]
+	id4[covariance_R]
+	id5[covariance_B]
+	style id0 fill:#7CD957,stroke-width:2px,color:#333333
+	style id1 fill:#C6D957,stroke-width:2px,color:#333333
+	style id2 fill:#57D97C,stroke-width:2px,color:#333333
+	style id3 fill:#57A1D9,stroke-width:2px,color:#333333
+	style id4 fill:#D9A157,stroke-width:2px,color:#333333
+	style id5 fill:#D95757,stroke-width:2px,color:#333333
+	id2 --> id0
+	id1 --> id0
+	id3 --> id0
+	id1 --> id2
+	id2 --> id3
+	id1 --> id3
+	id4 --> id3
+	id5 --> id3
+	id1 --> id4
+	id2 --> id5
+	id1 --> id5

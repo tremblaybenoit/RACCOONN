@@ -1,0 +1,10 @@
+tensorboard:
+  _target_: pytorch_lightning.loggers.tensorboard.TensorBoardLogger  # Lightning logger
+  save_dir: ${paths.log_dir}/tensorboard  # Default directory where to save logs
+  name: ${task_name}  # Name of the logging instance
+  prefix: ""  # String added at the beginning of metric keys
+  log_graph: False  # Computational graph
+  default_hp_metric: True  # Logging a placeholder metric
+  version: ${paths.run_id}  # Version of the experiment
+  # sub_dir: None  # Subdirectory to group logs: /save_dir/name/version/sub_dir
+ui: True  # Whether to open the UI after logging

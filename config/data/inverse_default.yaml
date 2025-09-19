@@ -1,0 +1,85 @@
+defaults:
+  - variables/inverse_input@stage.train.vars
+  - variables/inverse_input@stage.valid.vars
+  - variables/inverse_input@stage.test.vars
+  - variables/inverse_input@stage.predict.vars
+  - variables/inverse_target@stage.train.vars
+  - variables/inverse_target@stage.valid.vars
+  - variables/inverse_target@stage.test.vars
+
+# Configuration to download the training and testing data
+download:
+  dir: ${paths.data_dir}
+  url: "https://zenodo.org/record/1482223/files/GOES-16_ML_Training_Testing_Data.zip?download=1"
+
+# Pressure filter
+pressure_filter:
+  load:
+    _target_: inverse.data.filters.pressure_filter
+    prof:
+      _target_: utilities.io.load_stack
+      _recursive_: false
+      stack:
+        - ${data.stage.train.vars.prof}
+        - ${data.stage.valid.vars.prof}
+        - ${data.stage.test.vars.prof}
+
+# Split the data into training, validation, and test sets
+stage:
+  # Training set
+  train:
+    # Path to training data
+    dir: ${paths.data_dir}/Test2
+    # Split
+    split:
+      _target_: utilities.io.extract_indices
+      _args_:
+        - _target_: numpy.arange
+          _args_:
+            - 0
+            - 256608
+        - _target_: ${data.stage.train.vars.cloud_filter.load._target_}
+          _args_:
+            - _target_: ${data.stage.train.vars.prof.load._target_}
+              path: ${data.stage.train.vars.prof.load.path}
+
+  # Validation set
+  valid:
+    # Path to validation data
+    dir: ${paths.data_dir}/Test2
+    # Split
+    split:
+      _target_: utilities.io.extract_indices
+      _args_:
+        - _target_: numpy.arange
+          _args_:
+            - 256608
+            - 320760
+        - _target_: ${data.stage.valid.vars.cloud_filter.load._target_}
+          _args_:
+            - _target_: ${data.stage.valid.vars.prof.load._target_}
+              path: ${data.stage.valid.vars.prof.load.path}
+
+  # Test set
+  test:
+    # Path to test data
+    dir: ${paths.data_dir}/Test2
+    # Split
+    split:
+      _target_: utilities.io.extract_indices
+      _args_:
+        - _target_: numpy.arange
+          _args_:
+            - 320760
+            - 426872
+        - _target_: ${data.stage.test.vars.cloud_filter.load._target_}
+          _args_:
+            - _target_: ${data.stage.test.vars.prof.load._target_}
+              path: ${data.stage.test.vars.prof.load.path}
+
+  # Prediction set (NOTE: By default, we use the test set as the prediction set for demonstration purposes)
+  predict:
+    # Path to prediction data
+    dir: ${paths.data_dir}/Test2
+    # Split
+    split: ${data.stage.test.split}
