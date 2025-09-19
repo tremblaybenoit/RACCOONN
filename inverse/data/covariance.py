@@ -29,7 +29,7 @@ def innovation_uncertainty(data: np.ndarray) -> np.ndarray:
     return data[:, 10:]
 
 
-def background_climatology(data: np.ndarray, axis: int=0, keepdims: bool=True) \
+def background_climatology(data: np.ndarray, axis: int=0, keepdims: bool=False) \
         -> np.ndarray:
     """ Compute spatiotemporal mean of a given dataset.
 
@@ -62,7 +62,17 @@ def background_increment(config_true: DictConfig, config_background: DictConfig)
     """
 
     # Truth - Background
-    return load_var_and_normalize(config_true) - load_var_and_normalize(config_background)
+    x_true = load_var_and_normalize(config_true)
+    x_background = load_var_and_normalize(config_background)
+
+    # Check dimensions and add new axis if necessary
+    if x_true.shape != x_background.shape:
+        if x_background.ndim == x_true.ndim - 1:
+            x_background = x_background[np.newaxis, :]
+        else:
+            raise ValueError("The shapes of the true and background data do not match.")
+
+    return x_true-x_background
 
 
 def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=True, recenter: bool=True) -> None:

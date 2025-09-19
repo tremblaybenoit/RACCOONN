@@ -11,14 +11,12 @@ from utilities.logic import get_config_path
 # torch.set_float32_matmul_precision('high')
 torch.set_default_dtype(torch.float64)
 
-
 # Initialize logger
 logger = logging.getLogger(__name__)
 
 
-class CRTMEmulator:
-    """Class for training the RACCOONN model """
-
+class Operator:
+    """Class for training a neural network operator."""
     def __init__(self, config: DictConfig) -> None:
         """ Initialization of trainer and its configuration.
 
@@ -31,6 +29,7 @@ class CRTMEmulator:
             None.
 
         """
+        logger.info("Reading Hydra configuration...")
 
         # Load config object and resolve paths
         OmegaConf.resolve(config)
@@ -121,8 +120,13 @@ class CRTMEmulator:
         self.model = instantiate(self.config.model)
 
         # Train the model ⚡
-        logger.info("Training CRTM emulator...")
-        self.trainer.fit(self.model, self.data_loader)
+        resume_ckpt = self.config.get("resume_from_checkpoint", None)
+        if resume_ckpt and os.path.exists(resume_ckpt):
+            logger.info(f"Resuming training from checkpoint: {resume_ckpt}")
+            self.trainer.fit(self.model, self.data_loader, ckpt_path=resume_ckpt)
+        else:
+            logger.info("Training model...")
+            self.trainer.fit(self.model, self.data_loader)
         logger.info("Done!")
 
         # Save optimal model checkpoint along with configuration
@@ -162,9 +166,12 @@ class CRTMEmulator:
 
         # Save test results to file
         logger.info("Saving results to file...")
-        if hasattr(self.config.loader.stage.test.results, 'hofx'):
-            save_function = instantiate(self.config.loader.stage.test.results.hofx.save)
-            save_function(self.model.test_results['hofx'].reshape(self.model.test_results['hofx'].shape[0], -1))
+        if hasattr(self.config.loader.stage.test, 'results'):
+            # Loop over all results in the config and save them
+            for result_name, result_config in self.config.loader.stage.test.results.items():
+                if hasattr(self.model.test_results, result_name) and hasattr(result_config, 'save'):
+                    save_function = instantiate(result_config.save)
+                    save_function(self.model.test_results[result_name])
 
     def predict(self, loader_config: DictConfig) -> np.ndarray:
         """ Predicts the output of the model on a given dataset.
@@ -216,15 +223,15 @@ def main(config: DictConfig) -> None:
     """
 
     # Initialize trainer object
-    logger.info("Initializing CRTM emulator...")
-    crtm = CRTMEmulator(config)
+    logger.info("Initializing the forward model...")
+    forward_model = Operator(config)
 
     # Train the model
-    logger.info("Training CRTM emulator...")
-    crtm.train()
+    logger.info("Training the forward model...")
+    forward_model.train()
 
 if __name__ == '__main__':
-    """ Train CRTM emulator.
+    """ Train the forward model.
 
         Parameters
         ----------

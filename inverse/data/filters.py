@@ -45,8 +45,8 @@ def pressure_filter(prof: Union[np.ndarray, torch.Tensor], threshold: float = 1.
 
     if isinstance(prof, torch.Tensor):
         # Compute variance of the profiles
-        prof_var = torch.var(prof, dim=0, keepdim=False)
+        prof_var = torch.var(prof, dim=0, keepdim=True).squeeze()
     else:
-        prof_var = prof.var(axis=0, keepdims=False)
+        prof_var = prof.var(axis=0, keepdims=True).squeeze()
 
     return prof_var > threshold

@@ -2,7 +2,7 @@ import logging
 import hydra
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
-from forward.train import CRTMEmulator
+from forward.train import Operator
 from utilities.logic import get_config_path
 import torch
 # torch.set_float32_matmul_precision('high')
@@ -26,12 +26,12 @@ def main(config: DictConfig) -> None:
     """
 
     # Initialize trainer object
-    logger.info("Initializing CRTM emulator...")
-    crtm = CRTMEmulator(config)
+    logger.info("Initializing forward model...")
+    forward_model = Operator(config)
 
-    # Evaluate on test set
-    logger.info("Testing CRTM emulator...")
-    pred = crtm.predict(config.loader)
+    # Evaluate on prediction set
+    logger.info("Predicting using the forward model...")
+    pred = forward_model.predict(config.loader)
 
     # Save predictions to file
     logger.info("Saving predictions to file...")
@@ -40,7 +40,7 @@ def main(config: DictConfig) -> None:
 
 
 if __name__ == '__main__':
-    """ Predict using the CRTM emulator.
+    """ Predict using the forward model.
 
         Parameters
         ----------

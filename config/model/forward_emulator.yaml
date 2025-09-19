@@ -1,11 +1,11 @@
 # Model
 _target_: forward.model.model.CRTMModel
+_recursive_: false
 
 # Optimizer function and parameters
 optimizer:
   # Function
   _target_: torch.optim.Adam
-  _partial_: true
   # Learning rate
   lr: 0.0005
   # Weight decay (L2 regularization)
@@ -15,7 +15,6 @@ optimizer:
 lr_scheduler:
   # Function
   _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
-  _partial_: true
   # Mode for the scheduler
   mode: min
   # Factor to reduce the learning rate

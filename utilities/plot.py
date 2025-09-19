@@ -498,7 +498,8 @@ def plot_vertical_profiles(ax, data, err=None, font_size=13, title='Mean vertica
               markerscale=lg_scale, fancybox=False)
 
 
-def fig_vertical_profiles(sources: list[np.ndarray], y: np.ndarray=None, y_label: Union[list, str]=None,
+def fig_vertical_profiles(sources: list[np.ndarray], label: list[str], y: np.ndarray=None,
+                          x_label: str = None, y_label: Union[list, str]=None, color: Union[list, str]=None,
                           title: Union[list, str] = None, x_range=None):
     """
     Plot vertical profiles for target and prediction data using flexible gridspec.
@@ -506,8 +507,11 @@ def fig_vertical_profiles(sources: list[np.ndarray], y: np.ndarray=None, y_label
     Parameters
     ----------
     sources : list of numpy.ndarray. List containing target and prediction data. Each array should have shape (n_samples, n_profiles, n_levels).
+    label : list of str. Labels for the target and prediction data.
     y : np.ndarray, optional. Vertical levels. If None, levels will be generated as 0, 1, ..., n_levels-1.
     y_label : Union[list[str, ...], str], optional. Labels for the vertical levels. If None, default labels will be used.
+    x_label : str, optional. Label for the x-axis. If None, default label will be used.
+    color : Union[list[str, ...], str], optional. Colors for the target and prediction data. If None, default colors will be used.
     title : str, optional. Title for the plots. If None, default titles will be used.
     x_range : tuple, optional. Range for the x-axis. If None, computed from data.
 
@@ -521,6 +525,10 @@ def fig_vertical_profiles(sources: list[np.ndarray], y: np.ndarray=None, y_label
     for src in sources:
         if src.shape != (n_samples, n_profiles, n_levels):
             raise ValueError("All source arrays must have the same shape (n_samples, n_profiles, n_levels).")
+
+    # If no colors, assign default colors
+    if color is None:
+        color = [colors[list(colors.keys())[c]] for c in range(len(sources))]
 
     # From n_profiles, determine optimal layout for flexible_gridspec
     n_rows = int(np.ceil(np.sqrt(n_profiles)))
@@ -540,8 +548,8 @@ def fig_vertical_profiles(sources: list[np.ndarray], y: np.ndarray=None, y_label
         # Plot the vertical profile for each channel
         stacked = np.stack([src[:, i, :] for src in sources], axis=1)
         plot_title = f'Vertical profile #{i + 1}' if title is None else title[i]
-        plot_vertical_profiles(ax, stacked, title=plot_title, y=y, y_label=y_label, label=['Target', 'Prediction'],
-                               x_label='Profile value (units)', x_range=x_range)
+        plot_vertical_profiles(ax, stacked, title=plot_title, y=y, y_label=y_label, label=label,
+                               x_label=x_label, x_range=x_range, color=color)
 
     return fig
 

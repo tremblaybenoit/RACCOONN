@@ -364,8 +364,9 @@ class ForwardModel(torch.nn.Module):
         """
 
         # Apply the forward model to the prediction
-        forward_pred = self.forward_model((pred, target['surf'], target['meta'])) if self.prof_norm is None else (
-            self.forward_model((self.prof_norm(pred), target['surf'], target['meta'])))
+        input = {'prof': pred if self.prof_norm is None else self.prof_norm(pred),
+                 'surf': target['surf'], 'meta': target['meta']}
+        forward_pred = self.forward_model(input)
 
         return forward_pred
 
@@ -433,16 +434,16 @@ class VarLoss(torch.nn.Module):
         if getattr(getattr(self.loss_obs, "func", self.loss_obs), "__name__", None) == 'diagonal_quadratic_form':
             loss['obs'] = self.loss_obs(hofx_pred[:, :10], target['hofx'][:, :10], target['hofx'][:, 10:])
         else:
-            loss['obs'] = self.loss_obs(hofx_pred, target['hofx'])
+            loss['obs'] = self.loss_obs(hofx_pred[:, :10], target['hofx'][:, :10])
         # Total
         loss['total'] += self.lambda_obs * torch.nanmean(loss['obs'])
 
         # Model losses: Some model losses may require additional inputs
         if self.loss_model is not None:
             if getattr(getattr(self.loss_model, "func", self.loss_model), "__name__", None) == 'diagonal_quadratic_form':
-                loss['model'] = self.loss_model(pred['prof_norm'][:, pressure_filter], target['prof_norm'][:, pressure_filter], target['prof_norm_increment'])
+                loss['model'] = self.loss_model(pred['prof_norm'][:, pressure_filter], target['prof_norm_background'][:, pressure_filter], target['prof_norm_increment'])
             else:
-                loss['model'] = self.loss_model(pred['prof_norm'][:, pressure_filter], target['prof_norm'][:, pressure_filter])
+                loss['model'] = self.loss_model(pred['prof_norm'][:, pressure_filter], target['prof_norm_background'][:, pressure_filter])
             # Total
             loss['total'] += self.lambda_model * torch.nanmean(loss['model'])
 
@@ -455,6 +456,17 @@ class VarLoss(torch.nn.Module):
         return loss, hofx_pred
 
     def to(self, device):
+        """
+        Move the module and its components to a specified device.
+
+        Parameters
+        ----------
+        device: torch.device. Device to move the module and its components to.
+
+        Returns
+        -------
+        self: The module itself after moving to the specified device.
+        """
         super().to(device)
         # Forward model
         if hasattr(self.forward_model, 'to'):

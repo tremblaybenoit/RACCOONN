@@ -2,7 +2,7 @@ import logging
 import hydra
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
-from inverse.train import InverseOperator
+from inverse.train import Operator
 from utilities.logic import get_config_path
 import torch
 # torch.set_float32_matmul_precision('high')
@@ -26,10 +26,12 @@ def main(config: DictConfig) -> None:
     """
 
     # Initialize trainer object
-    inv = InverseOperator(config)
+    logger.info("Initializing inverse model...")
+    inverse_model = Operator(config)
 
-    # Evaluate on test set
-    pred = inv.predict(config.loader)
+    # Evaluate on prediction set
+    logger.info("Predicting using the inverse model...")
+    pred = inverse_model.predict(config.loader)
 
     # Save predictions to file
     logger.info("Saving predictions to file...")

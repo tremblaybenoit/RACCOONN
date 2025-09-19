@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from typing import Callable, Union, Any
+from typing import Union, Any
 from pytorch_lightning import LightningModule
 from forward.model.activation import Swish, Scale
 from omegaconf import DictConfig
@@ -14,15 +14,15 @@ class BaseModel(LightningModule):
     This is translation from Keras to Pytorch of the CRTM emulator by Howard et al. (2025).
     Link: https://zenodo.org/records/13963758.
     """
-    def __init__(self, optimizer: Callable = None, lr_scheduler: Callable = None, loss_func: Callable = None,
+    def __init__(self, optimizer: DictConfig = None, lr_scheduler: DictConfig = None, loss_func: DictConfig = None,
                  log_valid: bool = True):
         """ Initialize LightningCRTMModel.
 
         Parameters
         ----------
-        optimizer: Callable. Optimizer for the model.
-        lr_scheduler: Callable. Configuration object for the learning rate scheduler (optional).
-        loss_func: Callable. Loss function for the model.
+        optimizer: DictConfig. Optimizer for the model.
+        lr_scheduler: DictConfig. Configuration object for the learning rate scheduler (optional).
+        loss_func: DictConfig. Loss function for the model.
         log_valid: bool. If True, log validation results at the end of each validation epoch.
 
         Returns
@@ -37,7 +37,7 @@ class BaseModel(LightningModule):
         # Optimizer initialization
         self.optimizer = optimizer
         # Loss function
-        self.loss_func = loss_func
+        self.loss_func = instantiate(loss_func) if loss_func is not None else None
         # Store hyperparameters
         self.save_hyperparameters(ignore=['optimizer', 'lr_scheduler', 'loss_func'])
 
@@ -193,6 +193,7 @@ class BaseModel(LightningModule):
             Optimizer instance.
         """
 
+        # Check if optimizer is defined
         if self.optimizer is not None:
 
             # Instantiate optimizer
@@ -244,16 +245,16 @@ class CRTMModel(BaseModel):
     This is translation from Keras to Pytorch of the CRTM emulator by Howard et al. (2025).
     Link: https://zenodo.org/records/13963758.
     """
-    def __init__(self, parameters: DictConfig, optimizer: Callable = None, lr_scheduler: Callable = None,
-                 loss_func: Callable = None, log_valid: bool = True):
+    def __init__(self, parameters: DictConfig, optimizer: DictConfig = None, lr_scheduler: DictConfig = None,
+                 loss_func: DictConfig = None, log_valid: bool = True):
         """ Initialize LightningCRTMModel.
 
         Parameters
         ----------
-        optimizer: Callable. Optimizer for the model.
-        loss_func: Callable. Loss function for the model.
+        optimizer: DictConfig. Optimizer for the model.
+        loss_func: DictConfig. Loss function for the model.
         parameters: DictConfig. Configuration object containing model parameters.
-        lr_scheduler: Callable. Configuration object for the learning rate scheduler (optional).
+        lr_scheduler: DictConfig. Configuration object for the learning rate scheduler (optional).
         log_valid: bool. If True, log validation results at the end of each validation epoch.
 
         Returns
@@ -308,7 +309,7 @@ class CRTMModel(BaseModel):
         else:
             self.std_scale = None
 
-    def forward(self, input: dict):
+    def forward(self, input: dict) -> torch.Tensor:
         """ Forward pass for the model.
 
         Parameters

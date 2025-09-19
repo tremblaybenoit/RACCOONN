@@ -11,7 +11,7 @@ from copy import deepcopy
 
 class InverseEmulator(LightningModule):
     """Class for radiance transfer (PINN) inverse emulator."""
-    def __init__(self, optimizer: DictConfig = None, loss_func: Callable = None, lr_scheduler: DictConfig = None):
+    def __init__(self, optimizer: DictConfig = None, loss_func: DictConfig = None, lr_scheduler: DictConfig = None):
         """ Initialize model.
 
         Parameters
@@ -33,8 +33,8 @@ class InverseEmulator(LightningModule):
 
 class PINNverseOperator(BaseModel):
     """Class for the Physics-Informed Neural Network (PINN) inverse model."""
-    def __init__(self, optimizer: DictConfig = None, loss_func: Callable = None, lr_scheduler: DictConfig = None,
-                 positional_encoding: Callable = None, activation_in: Callable = None, activation_out: Callable = None,
+    def __init__(self, optimizer: DictConfig = None, loss_func: DictConfig = None, lr_scheduler: DictConfig = None,
+                 positional_encoding: DictConfig = None, activation_in: DictConfig = None, activation_out: DictConfig = None,
                  transform_out: ListConfig = None, parameters: DictConfig = None, log_valid: bool = False):
         """ Initialize model.
 
@@ -76,7 +76,7 @@ class PINNverseOperator(BaseModel):
         self.test_results = {'hofx': [], 'prof': []}
 
         # Normalization transformations
-        self.transform_out = transform_out if transform_out is not None else [identity]
+        self.transform_out = [instantiate(t) for t in transform_out] if transform_out is not None else [identity]
 
         # Model architecture
         self.n_prof = parameters.data.n_prof
@@ -84,15 +84,15 @@ class PINNverseOperator(BaseModel):
         self.prof_vars = parameters.data.prof_vars
         self.model = self._build_model(positional_encoding, activation_in, activation_out, parameters)
 
-    def _build_model(self, positional_encoding: Callable, activation_in: Callable, activation_out: Callable,
+    def _build_model(self, positional_encoding: DictConfig, activation_in: DictConfig, activation_out: DictConfig,
                      parameters: DictConfig) -> nn.Module:
         """ Build the neural network model.
 
             Parameters
             ----------
-            positional_encoding: Callable. Function for the positional encoding.
-            activation_in: Callable. Activation function (in).
-            activation_out: Callable. Activation function (out).
+            positional_encoding: DictConfig. Function for the positional encoding.
+            activation_in: DictConfig. Activation function (in).
+            activation_out: DictConfig. Activation function (out).
             parameters: DictConfig. Configuration for the model parameters.
 
             Returns
@@ -130,7 +130,7 @@ class PINNverseOperator(BaseModel):
 
         return model
 
-    def forward(self, x: dict) -> torch.Tensor:
+    def _retrieve_prof(self, x: dict) -> torch.Tensor:
         """ Pass forward through neural network architecture.
 
             Parameters
@@ -151,7 +151,7 @@ class PINNverseOperator(BaseModel):
         # Reshape profiles to match the expected output shape
         return profiles.view(-1, self.n_prof, 1)
 
-    def _retrieve_prof(self, x: dict):
+    def forward(self, x: dict):
         """ Retrieve atmospheric profile over multiple pressure levels.
 
             Parameters
@@ -167,7 +167,7 @@ class PINNverseOperator(BaseModel):
         n_levels = x['pressure'].shape[-1]
         x_vector = {k: v.repeat_interleave(n_levels, dim=0) if k != 'pressure' else x['pressure'].reshape(-1, 1)
                     for k, v in x.items()}
-        prof = self.forward(x_vector).view(-1, n_levels, self.n_prof).transpose(1, 2)
+        prof = self._retrieve_prof(x_vector).view(-1, n_levels, self.n_prof).transpose(1, 2)
         return prof
 
     def _logging(self, stage: str, loss: dict, input: dict, target: dict, pred: dict) -> None:
@@ -202,7 +202,7 @@ class PINNverseOperator(BaseModel):
                 for k, v in {'prof_target': target['prof'], 'prof_pred': pred['prof'],
                              'prof_norm_target': target['prof_norm'], 'prof_norm_pred': pred['prof_norm'],
                              'hofx_target': target['hofx'], 'hofx_pred': pred['hofx'],
-                             'pressure': input['pressure'], 'cloud_filter': target['cloud_filter']}.items():
+                             'pressure': input['pressure'], 'cloud_filter': target['cloud_filter'].bool()}.items():
                     self.valid_results[k].append(v.detach().cpu().numpy())
                 # Store background if available
                 if 'prof_background' in target:
@@ -223,10 +223,20 @@ class PINNverseOperator(BaseModel):
         for key in ['model', 'bcs']:
             if key in loss:
                 self.log(f"{stage}_loss_{key}", loss[key].mean(), on_epoch=True, prog_bar=True, logger=logger_flag)
+                # Detailed logging per profile and variable
                 if loss[key].ndim == 3:
                     for i, var in enumerate(self.prof_vars):
                         self.log(f"{stage}_loss_{key}_{i}_{var}", loss[key][:, i, :].mean(), on_epoch=True,
                                  prog_bar=False, logger=logger_flag)
+                # If pressure-level filtering is involved, log only the relevant levels
+                elif loss[key].ndim == 2 and self.loss_func.pressure_filter is not None:
+                    n_pressure = torch.cumsum(self.loss_func.pressure_filter.sum(axis=1), dim=0)
+                    for i, var in enumerate(self.prof_vars):
+                        # Log loss only for the relevant pressure levels
+                        start_index, end_index = n_pressure[i-1] if i > 0 else 0, n_pressure[i]
+                        self.log(f"{stage}_loss_{key}_{i}_{var}", loss[key][:, start_index:end_index].mean(), on_epoch=True,
+                                 prog_bar=False, logger=logger_flag)
+
         # Log observation loss
         if 'obs' in loss:
             self.log(f"{stage}_loss_obs", loss['obs'].mean(), on_epoch=True, prog_bar=True, logger=logger_flag)
@@ -250,7 +260,7 @@ class PINNverseOperator(BaseModel):
         """
 
         # Compute profiles
-        pred = {'prof_norm': self._retrieve_prof(batch['input'])}
+        pred = {'prof_norm': self.forward(batch['input'])}
         # Apply output transformations
         for t, transform in enumerate(self.transform_out):
             pred['prof'] = transform(pred['prof']) if t > 0 else transform(pred['prof_norm'])
@@ -278,7 +288,7 @@ class PINNverseOperator(BaseModel):
         """
 
         # Compute profiles
-        prof = self._retrieve_prof(batch['input'])
+        prof = self.forward(batch['input'])
         # Apply output transformations
         for transform in self.transform_out:
             prof = transform(prof)
@@ -326,18 +336,18 @@ class PINNverseOperators(PINNverseOperator):
     """Physics-Informed Neural Network (PINN) inverse model with one neural network per profile type."""
 
     def __init__(self, optimizer: DictConfig = None, loss_func: Callable = None, lr_scheduler: DictConfig = None,
-                 positional_encoding: Callable = None, activation_in: Callable = None, activation_out: Callable = None,
+                 positional_encoding: DictConfig = None, activation_in: DictConfig = None, activation_out: DictConfig = None,
                  transform_out: ListConfig = None, parameters: DictConfig = None, log_valid: bool = False):
         """ Initialize model.
 
         Parameters
         ----------
-        optimizer: Callable. Optimizer for the model.
-        loss_func: Callable. Loss function for the model.
-        lr_scheduler: Callable. Learning rate scheduler for the model.
-        positional_encoding: Callable. Function for the positional encoding.
-        activation_in: Callable. Activation function (in).
-        activation_out: Callable. Activation function (out).
+        optimizer: DictConfig. Optimizer for the model.
+        loss_func: DictConfig. Loss function for the model.
+        lr_scheduler: DictConfig. Learning rate scheduler for the model.
+        positional_encoding: DictConfig. Function for the positional encoding.
+        activation_in: DictConfig. Activation function (in).
+        activation_out: DictConfig. Activation function (out).
         transform_out: ListConfig. List of functions to apply to the model output.
         parameters: DictConfig. Configuration for the model parameters.
         log_valid: bool. Whether to log validation results.
@@ -362,12 +372,12 @@ class PINNverseOperators(PINNverseOperator):
         ])
 
     @staticmethod
-    def _patch_profiles(self, parameters):
+    def _patch_profiles(parameters):
         """Set n_prof=1 in parameters for sub-model construction."""
         parameters.data.n_prof = 1
         return parameters
 
-    def forward(self, x: dict) -> list:
+    def _retrieve_prof(self, x: dict) -> list:
         """
         Pass forward through all neural networks, one per profile type.
 
@@ -388,7 +398,7 @@ class PINNverseOperators(PINNverseOperator):
         outputs = [model(encoded_inputs) for model in self.models]
         return outputs
 
-    def _retrieve_prof(self, x: dict):
+    def forward(self, x: dict):
         """ Retrieve atmospheric profile over multiple pressure levels.
 
             Parameters
@@ -404,5 +414,5 @@ class PINNverseOperators(PINNverseOperator):
         n_levels = x['pressure'].shape[-1]
         x_vector = {k: v.repeat_interleave(n_levels, dim=0) if k != 'pressure' else x['pressure'].reshape(-1, 1)
                     for k, v in x.items()}
-        prof = torch.cat([output.view(-1, 1, n_levels) for output in self.forward(x_vector)], dim=1)
-        return prof if self.clip is None else self.clip(prof)
+        prof = torch.cat([output.view(-1, 1, n_levels) for output in self._retrieve_prof(x_vector)], dim=1)
+        return prof

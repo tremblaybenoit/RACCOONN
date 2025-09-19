@@ -1,7 +1,7 @@
 import logging
 import hydra
 from omegaconf import DictConfig
-from forward.train import CRTMEmulator
+from forward.train import Operator
 from utilities.logic import get_config_path
 import torch
 # torch.set_float32_matmul_precision('high')
@@ -25,16 +25,16 @@ def main(config: DictConfig) -> None:
     """
 
     # Initialize trainer object
-    logger.info("Initializing CRTM emulator...")
-    crtm = CRTMEmulator(config)
+    logger.info("Initializing forward model...")
+    forward_model = Operator(config)
 
     # Evaluate on test set
-    logger.info("Testing CRTM emulator...")
-    crtm.test()
+    logger.info("Testing forward model...")
+    forward_model.test()
 
 
 if __name__ == '__main__':
-    """ Test CRTM emulator.
+    """ Test forward model.
 
         Parameters
         ----------

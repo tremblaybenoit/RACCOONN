@@ -9,7 +9,7 @@ defaults:
   - override /preparation: inverse_default
   - override /loader: inverse_default
   - override /model: inverse_operator
-  - override /trainer: gpu
+  - override /trainer: cpu
   - override /callbacks: default
   - override /logger: default
 
@@ -34,3 +34,23 @@ trainer:
 model:
   # Model
   _target_: inverse.model.model.PINNverseOperator
+  # Loss function
+  loss_func:
+    # Weights for observation (obs), model, and boundary condition (bcs) errors
+    lambda_obs: 0.
+    lambda_model: 1.
+    lambda_bcs: 1.
+
+# Loader
+loader:
+  stage:
+    train:
+      target:
+        prof_norm_background: ${data.stage.train.vars.prof}
+        prof_background:
+          load: ${data.stage.train.vars.prof.load}
+    valid:
+      target:
+        prof_norm_background: ${data.stage.valid.vars.prof}
+        prof_background:
+          load: ${data.stage.valid.vars.prof.load}

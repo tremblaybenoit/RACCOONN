@@ -51,7 +51,7 @@ class FigureLogger(Callback):
         prof_norm_err = (prof_norm_pred - prof_norm_target)**2
         # Pressure_levels
         pressure_levels = 0.01*(
-            instantiate(trainer.datamodule.stage.valid.obs.pressure.normalization, inverse_transform=True)
+            instantiate(trainer.datamodule.stage.valid.input.pressure.normalization, inverse_transform=True)
             (model.valid_results['pressure'][0][0]))
         # Cloud mask
         cloud_filter = np.concatenate(model.valid_results['cloud_filter'], axis=0)
@@ -62,25 +62,35 @@ class FigureLogger(Callback):
 
         # Profiles (original units)
         sources = [prof_target, prof_pred]
+        sources_labels = ['Target', 'Prediction']
+        sources_colors = ['#1f77b4', '#ff7f0e']
         if 'prof_background' in model.valid_results and len(model.valid_results['prof_background']) > 0:
            prof_background = np.concatenate(model.valid_results['prof_background'], axis=0)
            sources.insert(0, prof_background)
-        figs.append(fig_vertical_profiles(sources, y=pressure_levels, y_label='Pressure (hPa)',
-                                          title=[f"Epoch {current_epoch:02d} - {prof_label} profiles" for prof_label in prof_labels]))
+           sources_labels.insert(0, 'Background')
+           sources_colors.insert(0, '#2ca02c')
+        figs.append(fig_vertical_profiles(sources, sources_labels, y=pressure_levels, y_label='Pressure (hPa)',
+                                          x_label='Profile value (units)', color=sources_colors,
+                                          title=[f"Epoch {current_epoch:02d} - {prof_label}" for prof_label in prof_labels]))
 
         # Normalized profiles
         norm_sources = [prof_norm_target, prof_norm_pred]
+        norm_sources_labels = ['Target', 'Prediction']
+        norm_sources_colors = ['#1f77b4', '#ff7f0e']
         if 'prof_norm_background' in model.valid_results and len(model.valid_results['prof_norm_background']) > 0:
            prof_norm_background = np.concatenate(model.valid_results['prof_norm_background'], axis=0)
            norm_sources.insert(0, prof_norm_background)
-        figs.append(fig_vertical_profiles(sources, y=pressure_levels, y_label='Pressure (hPa)',
-                                          title=[f"Epoch {current_epoch:02d} - {prof_label} normalized profiles" for prof_label in prof_labels]))
+           norm_sources_labels.insert(0, 'Background')
+           norm_sources_colors.insert(0, '#2ca02c')
+        figs.append(fig_vertical_profiles(norm_sources, norm_sources_labels, y=pressure_levels, y_label='Pressure (hPa)',
+                                          x_label='Normalized profile value (no units)', color=norm_sources_colors,
+                                          title=[f"Epoch {current_epoch:02d} - {prof_label}" for prof_label in prof_labels]))
 
         # Profile errors
-        figs.append(fig_vertical_profiles([prof_err], y=pressure_levels, y_label='Pressure (hPa)',
-                                          title=[f"Epoch {current_epoch:02d} - {prof_label} profile errors" for prof_label in prof_labels]))
-        figs.append(fig_vertical_profiles([prof_norm_err], y=pressure_levels, y_label='Pressure (hPa)',
-                                          title=[f"Epoch {current_epoch:02d} - {prof_label} normalized profile errors" for prof_label in prof_labels]))
+        figs.append(fig_vertical_profiles([prof_err], ['Target-Prediction'], y=pressure_levels, y_label='Pressure (hPa)',
+                                          x_label='Profile errors (units)', title=[f"Epoch {current_epoch:02d} - {prof_label}" for prof_label in prof_labels]))
+        figs.append(fig_vertical_profiles([prof_norm_err], ['Target-Prediction'], y=pressure_levels, y_label='Pressure (hPa)',
+                                          x_label='Normalized profile errors (no units)', title=[f"Epoch {current_epoch:02d} - {prof_label}" for prof_label in prof_labels]))
 
         # Forward model RMSE
         figs.append(fig_rmse_bars(hofx_target, hofx_pred, clrsky, title=[f"Epoch {current_epoch:02d} - Forward model errors",
@@ -104,6 +114,7 @@ class FigureLogger(Callback):
                     with tempfile.TemporaryDirectory() as tmpdir:
                         filename = os.path.join(tmpdir, f"{tag}_Epoch_{current_epoch:02d}.png")
                         fig.savefig(filename)
+                        logger.experiment.log_artifact(logger.run_id, filename, artifact_path="figures")
 
         # Close figures to free memory
         plt.close('all')
