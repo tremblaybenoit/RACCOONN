@@ -30,10 +30,10 @@ To account for missing dependencies, add the `--rerun-incomplete` flag:
 snakemake --dry-run --rerun-incomplete --verbose test --config hydra-experiment=inverse_operator
 ```
 
-To draw a directed acyclic graph (DAG) of the training workflow (e.g., `test.mmd` of rule `test`):
+To draw a directed acyclic graph (DAG) of the training workflow (e.g., `train.mmd` of rule `test`):
 
 ```bash
-snakemake test --rulegraph mermaid-js --config hydra-experiment=pinnverse_operator_000 > dag.mmd
+snakemake test --rulegraph mermaid-js --config hydra-experiment=inverse_operator > train.mmd
 ```
 Replace `--rulegraph` with `--dag` to highlight completed rules with dashed boxes.
 
@@ -72,7 +72,7 @@ flowchart TB
 ```
 ## Manual execution of individual steps
 Each step of the workflow can be run manually using the corresponding Python script and 
-the desired experiment configuration (e.g., inverse_operator for the inverse model).
+the desired experiment configuration (e.g., `inverse_operator` for the inverse model).
 
 1. Data preparation for the inverse model:
 ```bash
