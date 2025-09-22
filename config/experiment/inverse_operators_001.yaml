@@ -25,6 +25,12 @@ paths:
   run_id: "version_001"
   data_dir: "../../GOES_ML-main/Data"
 
+# Logger configuration
+logger:
+  # Ports
+  ports:
+    mlflow: 5001  # MLflow port
+
 # Trainer configuration
 trainer:
   min_epochs: 1  # To prevent early stopping

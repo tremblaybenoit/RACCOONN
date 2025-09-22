@@ -69,6 +69,8 @@ class TrainerLogger:
 
         # Wandb
         if "wandb" in self.config:
+            # Select port
+            port = getattr(self.config.ports, "wandb", 8080)
             # Command for terminal
             command = "wandb server start"
             # Start the wandb UI
@@ -77,31 +79,35 @@ class TrainerLogger:
             # Open UI in the browser
             if show:
                 logger.info("Opening wandb UI in browser...")
-                webbrowser.open("http://127.0.0.1:8080")
+                webbrowser.open(f"http://127.0.0.1:{port}")
 
         # MLflow
         if "mlflow" in self.config:
+            # Select port
+            port = getattr(self.config.ports, "mlflow", 5000)
             # Command for terminal
-            command = f"mlflow ui --backend-store-uri  file:///{os.path.abspath(self.config.mlflow.save_dir)}"
+            command = f"mlflow ui --backend-store-uri file:///{os.path.abspath(self.config.mlflow.save_dir)} --port {port}"
             # Start the mlflow UI
             logger.info("Starting mlflow UI...")
             subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             # Open UI in the browser
             if show:
                 logger.info("Opening mlflow UI in browser...")
-                webbrowser.open("http://127.0.0.1:5000")
+                webbrowser.open(f"http://127.0.0.1:{port}")
 
         # Tensorboard
         if "tensorboard" in self.config:
+            # Select port
+            port = getattr(self.config.ports, "tensorboard", 6006)
             # Command for terminal
-            command = f"tensorboard --logdir {self.config.tensorboard.save_dir} --port 6006"
+            command = f"tensorboard --logdir {self.config.tensorboard.save_dir} --port {port}"
             # Start the tensorboard UI
             logger.info("Starting tensorboard UI...")
             subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             # Open UI in the browser
             if show:
                 logger.info("Opening tensorboard UI in browser...")
-                webbrowser.open("http://127.0.0.1:6006")
+                webbrowser.open(f"http://127.0.0.1:{port}")
 
 
 @hydra.main(version_base=None, config_path=get_config_path(), config_name="default")
