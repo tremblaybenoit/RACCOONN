@@ -471,6 +471,11 @@ class VarLoss(torch.nn.Module):
         # Forward model
         if hasattr(self.forward_model, 'to'):
             self.forward_model = self.forward_model.to(device)
+        # Loss functions
+        for attr in ['loss_obs', 'loss_model', 'loss_bcs']:
+            loss_fn = getattr(self, attr, None)
+            if loss_fn is not None and hasattr(loss_fn, 'to'):
+                setattr(self, attr, loss_fn.to(device))
         # Pressure filter
         if self.pressure_filter is not None and hasattr(self.pressure_filter, 'to'):
             self.pressure_filter = self.pressure_filter.to(device)
