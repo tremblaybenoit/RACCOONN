@@ -9,7 +9,7 @@ defaults:
   - override /preparation: forward_default
   - override /loader: forward_default
   - override /model: forward_emulator
-  - override /trainer: cpu
+  - override /trainer: gpu
   - override /callbacks: default
   - override /logger: default
 

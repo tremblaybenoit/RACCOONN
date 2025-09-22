@@ -169,7 +169,7 @@ class Operator:
         if hasattr(self.config.loader.stage.test, 'results'):
             # Loop over all results in the config and save them
             for result_name, result_config in self.config.loader.stage.test.results.items():
-                if hasattr(self.model.test_results, result_name) and hasattr(result_config, 'save'):
+                if result_name in self.model.test_results and hasattr(result_config, 'save'):
                     save_function = instantiate(result_config.save)
                     save_function(self.model.test_results[result_name])
 
