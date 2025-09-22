@@ -3,7 +3,7 @@ import numpy as np
 
 # RMSE computations
 def rmse(errors, axis=0):
-    """ Computes the root mean square error (RMSE) between predicted and true values.
+    """ Computes the root mean squared error (RMSE) between predicted and true values.
 
     Parameters
     ----------

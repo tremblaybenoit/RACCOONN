@@ -8,8 +8,7 @@ import pytorch_lightning as lightning
 from utilities.logger import TrainerLogger
 from utilities.instantiators import instantiate, instantiate_list
 from utilities.logic import get_config_path
-# torch.set_float32_matmul_precision('high')
-torch.set_default_dtype(torch.float64)
+torch.set_float32_matmul_precision('high')
 
 # Initialize logger
 logger = logging.getLogger(__name__)

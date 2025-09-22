@@ -34,7 +34,7 @@ def read_statistics(path: str, tensor: bool = False) -> dict:
     # Convert statistics to torch tensors if required
     if tensor:
         # Loop through each variable in stats and convert numpy arrays to torch tensors
-        stats = {var: {key: torch.tensor(value, dtype=torch.float64) if isinstance(value, np.ndarray) else value
+        stats = {var: {key: torch.tensor(value, dtype=torch.float32) if isinstance(value, np.ndarray) else value
                        for key, value in var_stats.items()} for var, var_stats in stats.items()}
 
     return stats
@@ -59,7 +59,7 @@ def read_statistics_var(path: str, var: str, tensor: bool = False) -> dict:
 
     # Convert statistics to torch tensors if required
     if tensor:
-        stats = {key: torch.tensor(value, dtype=torch.float64) if isinstance(value, np.ndarray) else value
+        stats = {key: torch.tensor(value, dtype=torch.float32) if isinstance(value, np.ndarray) else value
                  for key, value in stats.items()}
 
     # Return statistics for the specified variable

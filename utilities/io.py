@@ -96,7 +96,7 @@ def load_var(config: DictConfig, split: np.ndarray = None) -> np.ndarray:
     """
 
     # Load and normalize variable
-    data = np.array(instantiate(config['load']), dtype=np.float64)
+    data = np.array(instantiate(config['load']), dtype=np.float32)
     # Apply split if available
     if split is not None and data.shape[0] == len(split):
         data = data[split]

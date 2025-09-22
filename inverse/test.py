@@ -4,8 +4,7 @@ from omegaconf import DictConfig
 from inverse.train import Operator
 from utilities.logic import get_config_path
 import torch
-# torch.set_float32_matmul_precision('high')
-torch.set_default_dtype(torch.float64)
+torch.set_float32_matmul_precision('high')
 
 # Initialize logger
 logger = logging.getLogger(__name__)

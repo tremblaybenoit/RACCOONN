@@ -99,7 +99,7 @@ class QuadraticForm(torch.nn.Module):
         None.
         """
         super().__init__()
-        self.matrix = torch.from_numpy(matrix).to(torch.float64)
+        self.matrix = torch.from_numpy(matrix).to(torch.float32)
 
     def to(self, device):
         """ Move the module to a specified device.

@@ -22,11 +22,11 @@ class NormalizeProfiles:
         super().__init__()
 
         # Load min and max profiles
-        self.profmin = profmin.astype(np.float64) if len(profmin.shape) >= 2 \
-            else profmin.reshape([9, 1]).astype(np.float64)
+        self.profmin = profmin.astype(np.float32) if len(profmin.shape) >= 2 \
+            else profmin.reshape([9, 1]).astype(np.float32)
 
-        self.profmax = profmax.astype(np.float64)  if len(profmax.shape) >= 2 \
-            else profmax.reshape([9, 1]).astype(np.float64)
+        self.profmax = profmax.astype(np.float32)  if len(profmax.shape) >= 2 \
+            else profmax.reshape([9, 1]).astype(np.float32)
 
         # Inverse transform flag
         self.inverse_transform = inverse_transform
@@ -67,9 +67,9 @@ class NormalizeProfiles:
 
         # If called, convert profmin and profmax to torch tensors and move to device
         if not isinstance(self.profmin, torch.Tensor):
-            self.profmin = torch.tensor(self.profmin, dtype=torch.float64)
+            self.profmin = torch.tensor(self.profmin, dtype=torch.float32)
         if not isinstance(self.profmax, torch.Tensor):
-            self.profmax = torch.tensor(self.profmax, dtype=torch.float64)
+            self.profmax = torch.tensor(self.profmax, dtype=torch.float32)
         self.profmin = self.profmin.to(device)
         self.profmax = self.profmax.to(device)
         return self
@@ -97,8 +97,8 @@ class NormalizeSurface:
         surfmin[[0, 1, 2, 3, 6, 11, 12]] = 0
         surfmax[[0, 1, 5, 13, 14, 15]] = 1
         # Load min and max surfaces
-        self.surfmin = surfmin.astype(np.float64)
-        self.surfmax = surfmax.astype(np.float64)
+        self.surfmin = surfmin.astype(np.float32)
+        self.surfmax = surfmax.astype(np.float32)
 
         # Inverse transform flag
         self.inverse_transform = inverse_transform
@@ -141,9 +141,9 @@ class NormalizeSurface:
 
         # If called, convert surfmin and surfmax to torch tensors and move to device
         if not isinstance(self.surfmin, torch.Tensor):
-            self.surfmin = torch.tensor(self.surfmin, dtype=torch.float64)
+            self.surfmin = torch.tensor(self.surfmin, dtype=torch.float32)
         if not isinstance(self.surfmax, torch.Tensor):
-            self.surfmax = torch.tensor(self.surfmax, dtype=torch.float64)
+            self.surfmax = torch.tensor(self.surfmax, dtype=torch.float32)
         self.surfmin = self.surfmin.to(device)
         self.surfmax = self.surfmax.to(device)
         return self
