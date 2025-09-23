@@ -26,7 +26,7 @@ def innovation_uncertainty(data: np.ndarray) -> np.ndarray:
     """
 
     # Return the standard deviation (last 10 values)
-    return data[:, 10:]
+    return data[:, 10:].astype(np.float32)
 
 
 def background_climatology(data: np.ndarray, axis: int=0, keepdims: bool=False) \
