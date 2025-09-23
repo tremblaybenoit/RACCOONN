@@ -9,6 +9,7 @@ prof:
     _target_: utilities.io.load_npy
     path: ${....dir}/prof.npy
     split: ${....split}
+    dtype: ${data.dtype}
   # Normalization function and parameters
   normalization:
     # Function
@@ -22,6 +23,7 @@ prof:
       _target_: numpy.loadtxt
       _args_:
         - forward/data/normalization/prof_div.txt
+    dtype: ${data.dtype}
 # Surface variables
 surf:
   # Surface variable types
@@ -34,6 +36,7 @@ surf:
     _target_: utilities.io.load_npy
     path: ${....dir}/surf.npy
     split: ${....split}
+    dtype: ${data.dtype}
   # Normalization function and parameters
   normalization:
     _target_: forward.data.transformations.NormalizeSurface
@@ -45,6 +48,7 @@ surf:
       _target_: numpy.loadtxt
       _args_:
         - forward/data/normalization/surfmin.txt
+    dtype: ${data.dtype}
 # Metadata
 meta:
   # Metadata variable types

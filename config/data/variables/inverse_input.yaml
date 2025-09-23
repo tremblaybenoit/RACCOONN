@@ -8,15 +8,16 @@ lat:
       _target_: ${....scans.load._target_}
       path: ${....scans.load.path}
     split: ${....split}
+    dtype: ${data.dtype}
   # Normalization function and parameters
   normalization:
     _target_: inverse.data.transformations.min_max
     _partial_: true
     stats:
       _target_: inverse.data.statistics.read_statistics_var
-      _args_:
-        - ${preparation.statistics.data.output.path}
-        - 'lat'
+      path: ${preparation.statistics.data.output.path}
+      var: 'lat'
+      dtype: ${data.dtype}
 # Longitude
 lon:
   # Loading function
@@ -27,15 +28,16 @@ lon:
       _target_: ${....scans.load._target_}
       path: ${....scans.load.path}
     split: ${....split}
+    dtype: ${data.dtype}
   # Normalization function and parameters
   normalization:
     _target_: inverse.data.transformations.min_max
     _partial_: true
     stats:
       _target_: inverse.data.statistics.read_statistics_var
-      _args_:
-        - ${preparation.statistics.data.output.path}
-        - 'lon'
+      path: ${preparation.statistics.data.output.path}
+      var: 'lon'
+      dtype: ${data.dtype}
 # Scans
 scans:
   # Loading function
@@ -46,27 +48,29 @@ scans:
       _target_: ${....lat.load._target_}
       path: ${....lat.load.path}
     split: ${....split}
+    dtype: ${data.dtype}
   # Normalization function and parameters
   normalization:
     _target_: inverse.data.transformations.min_max
     _partial_: true
     stats:
       _target_: inverse.data.statistics.read_statistics_var
-      _args_:
-        - ${preparation.statistics.data.output.path}
-        - 'scans'
+      path: ${preparation.statistics.data.output.path}
+      var: 'scans'
+      dtype: ${data.dtype}
 # Pressure
 pressure:
   # Loading function
   load:
     _target_: utilities.io.load_npy
     path: ${....dir}/pressure.npy
+    dtype: ${data.dtype}
   # Normalization function and parameters
   normalization:
     _target_: inverse.data.transformations.min_max
     _partial_: true
     stats:
       _target_: inverse.data.statistics.read_statistics_var
-      _args_:
-        - ${preparation.statistics.data.output.path}
-        - 'pressure'
+      path: ${preparation.statistics.data.output.path}
+      var: 'pressure'
+      dtype: ${data.dtype}

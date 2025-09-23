@@ -99,7 +99,7 @@ class QuadraticForm(torch.nn.Module):
         None.
         """
         super().__init__()
-        self.matrix = torch.from_numpy(matrix).to(torch.float32)
+        self.matrix = torch.from_numpy(matrix)
 
     def to(self, device):
         """ Move the module to a specified device.
@@ -428,7 +428,7 @@ class VarLoss(torch.nn.Module):
         hofx_pred = self.forward_model(pred['prof'], target)
 
         # Initialize loss dictionary
-        loss = {'total': torch.tensor(0.0, dtype=torch.float32, device=pred['prof'].device)}
+        loss = {'total': torch.tensor(0.0, device=pred['prof'].device)}
 
         # Observation loss: Some observation losses may require additional inputs
         if getattr(getattr(self.loss_obs, "func", self.loss_obs), "__name__", None) == 'diagonal_quadratic_form':

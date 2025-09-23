@@ -30,6 +30,8 @@ lr_scheduler:
 parameters:
   # Data parameters
   data:
+    # dtype
+    dtype: ${data.dtype}
     # Number of variables
     n_lat: 1
     n_lon: 1

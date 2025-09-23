@@ -221,19 +221,21 @@ class BaseModel(LightningModule):
             return optimizer
         return None
 
-    def to(self, device):
+    def to(self, device, dtype: torch.dtype =None, non_blocking: bool = False) -> 'BaseModel':
         """ Move the model and loss function to the specified device.
 
         Parameters
         ----------
         device: torch.device. The device to move the model and loss function to.
+        dtype: torch.dtype. The desired data type of the model parameters (optional).
+        non_blocking: bool. If True, and the source is in pinned memory, the
 
         Returns
         -------
         BaseModel. The instance with model and loss function moved to the specified device.
         """
 
-        super().to(device)
+        super().to(device, dtype=dtype, non_blocking=non_blocking)
         if hasattr(self.loss_func, 'to'):
             self.loss_func = self.loss_func.to(device)
         return self
@@ -271,6 +273,7 @@ class CRTMModel(BaseModel):
         self.nmetavars = len(parameters.data.use_meta_vars)
         self.nlevels = int(parameters.data.nlevels)
         self.prof_vars = parameters.data.prof_vars
+        self.data_dtype = getattr(torch, parameters.data.dtype)
 
         # Neural network parameters
         nnodes_bt = parameters.architecture.nnodes_bt

@@ -26,7 +26,7 @@ def innovation_uncertainty(data: np.ndarray) -> np.ndarray:
     """
 
     # Return the standard deviation (last 10 values)
-    return data[:, 10:].astype(np.float32)
+    return data[:, 10:]
 
 
 def background_climatology(data: np.ndarray, axis: int=0, keepdims: bool=False) \
@@ -45,7 +45,7 @@ def background_climatology(data: np.ndarray, axis: int=0, keepdims: bool=False) 
     """
 
     # Compute mean
-    return np.mean(data, axis=axis, keepdims=keepdims).astype(np.float32)
+    return np.mean(data, axis=axis, keepdims=keepdims)
 
 
 def background_increment(config_true: DictConfig, config_background: DictConfig) -> np.ndarray:
@@ -109,7 +109,11 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
         cov = np.cov(err.reshape(err.shape[0], -1), rowvar=False)
     # Compute inverse covariance matrix
     logger.info("Computing inverse covariance matrix...")
-    cov_inv = np.linalg.inv(cov).astype(np.float32)
+    cov_inv = np.linalg.inv(cov)
+
+    # Check if covariance matrix is positive definite
+    if np.any(np.linalg.eigvals(cov_inv) <= 0):
+        raise ValueError("Inverse covariance matrix is not positive definite.")
 
     # Save statistics to file
     logger.info("Saving inverse covariance matrix to file...")

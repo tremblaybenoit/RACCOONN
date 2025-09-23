@@ -26,6 +26,7 @@ class CRTMForward:
         # Instantiate the model
         self.model = instantiate(config_forward)
         self.model.load_state_dict(checkpoint['state_dict'])
+        self.model = self.model.to(None, dtype=self.model.data_dtype)
         # Set the model to evaluation mode
         self.model.eval()
 

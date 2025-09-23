@@ -9,15 +9,16 @@ prof:
     _target_: utilities.io.load_npy
     path: ${....dir}/prof.npy
     split: ${....split}
+    dtype: ${data.dtype}
   # Normalization function and parameters
   normalization:
     _target_: inverse.data.transformations.min_max
     _partial_: true
     stats:
       _target_: inverse.data.statistics.read_statistics_var
-      _args_:
-        - ${preparation.statistics.data.output.path}
-        - 'prof'
+      path: ${preparation.statistics.data.output.path}
+      var: 'prof'
+      dtype: ${data.dtype}
     axis: 1  # null
 # Surface variables
 surf:
@@ -31,6 +32,7 @@ surf:
     _target_: utilities.io.load_npy
     path: ${....dir}/surf.npy
     split: ${....split}
+    dtype: ${data.dtype}
   # Normalization function and parameters
   normalization:
     _target_: forward.data.transformations.NormalizeSurface
@@ -42,6 +44,7 @@ surf:
       _target_: numpy.loadtxt
       _args_:
         - forward/data/normalization/surfmin.txt
+    dtype: ${data.dtype}
 # Metadata
 meta:
   # Metadata variable types
@@ -52,6 +55,7 @@ meta:
     _target_: utilities.io.load_npy
     path: ${....dir}/meta.npy
     split: ${....split}
+    dtype: ${data.dtype}
   # Normalization function and parameters
   normalization:
     _target_: forward.data.transformations.NormalizeMeta
@@ -68,6 +72,7 @@ hofx:
     _target_: utilities.io.load_npy
     path: ../forward_outputs/forward_emulator/runs/version_000/test_hofx.npy
     split: ${....split}
+    dtype: ${data.dtype}
 # Cloud filter
 cloud_filter:
   # Loading function

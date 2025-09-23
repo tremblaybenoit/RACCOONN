@@ -117,6 +117,10 @@ class Operator:
         # Model
         logger.info("Initializing model...")
         self.model = instantiate(self.config.model)
+        if hasattr(self.config.data, 'dtype'):
+            self.model = self.model.to(None, dtype=getattr(torch, self.config.data.dtype))
+        else:
+            self.model = self.model.to(None, dtype=getattr(torch, 'float64'))
 
         # Train the model ⚡
         resume_ckpt = self.config.get("resume_from_checkpoint", None)
@@ -158,6 +162,10 @@ class Operator:
             self.model = instantiate(self.config.model)
             checkpoint = torch.load(self.checkpoint_path, map_location='cpu', weights_only=True)
             self.model.load_state_dict(checkpoint['state_dict'], strict=False)
+            if hasattr(self.config.data, 'dtype'):
+                self.model = self.model.to(None, dtype=getattr(torch, self.config.data.dtype))
+            else:
+                self.model = self.model.to(None, dtype=getattr(torch, 'float64'))
 
         # Evaluate on test set
         logger.info("Running against test set...")
@@ -198,6 +206,10 @@ class Operator:
             self.model = instantiate(self.config.model)
             checkpoint = torch.load(self.checkpoint_path, map_location='cpu', weights_only=True)
             self.model.load_state_dict(checkpoint['state_dict'], strict=False)
+            if hasattr(self.config.data, 'dtype'):
+                self.model = self.model.to(None, dtype=getattr(torch, self.config.data.dtype))
+            else:
+                self.model = self.model.to(None, dtype=getattr(torch, 'float64'))
 
         # Predict on dataset
         logger.info("Predicting on dataset...")

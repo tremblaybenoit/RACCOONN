@@ -5,6 +5,7 @@ hofx:
     _target_: utilities.io.load_npy
     path: ${....dir}/hofx.npy
     split: ${....split}
+    dtype: ${data.dtype}
 # Cloud filter
 cloud_filter:
   # Loading function
