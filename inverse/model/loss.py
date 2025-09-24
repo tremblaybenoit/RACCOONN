@@ -317,7 +317,7 @@ class Wasserstein2Normal(torch.nn.Module):
 
 class ForwardModel(torch.nn.Module):
     """ Forward loss module."""
-    def __init__(self, prof_norm: Callable = None):
+    def __init__(self, prof_norm: Callable = None, dtype: str = None):
         """ Initialize the Forward module.
 
         Parameters
@@ -332,6 +332,8 @@ class ForwardModel(torch.nn.Module):
 
         # Forward operator
         self.forward_model = forward
+        if dtype:
+            self.forward_model.to(None, dtype=getattr(torch, dtype))
         # Apply normalization to profiles
         self.prof_norm = prof_norm
 

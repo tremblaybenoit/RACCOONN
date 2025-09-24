@@ -22,7 +22,7 @@ task_name: "inverse_operators"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "version_001"
+  run_id: "version_003"
   data_dir: "../../GOES_ML-main/Data"
 
 # Trainer configuration
@@ -48,10 +48,10 @@ data:
             _partial_: true
             stats:
               _target_: inverse.data.statistics.read_statistics_var
-              _args_:
-                - ${preparation.statistics.data.output.path}
-                - 'prof'
-            axis: 1  # null
+              path: ${preparation.statistics.data.output.path}
+              var: 'prof'
+              dtype: ${data.dtype}
+            axis: null
     # Validation set
     valid:
       # Variables
@@ -95,6 +95,19 @@ loader:
         prof_background:
           load: ${data.stage.test.vars.prof.load}
 
+# Preparation configuration
+preparation:
+  # Covariance matrices
+  covariance:
+    # Method
+    B:
+      # Recenter
+      recenter: true
+      # Output
+      output:
+        # Path to the covariance matrix
+        path: ${paths.data_dir}/normalization/model_covariance_z_cloud_filter_pressure_filter.npy
+
 # Model parameters
 model:
   # Model
@@ -102,7 +115,7 @@ model:
   # Optimizer function and parameters
   optimizer:
     # Learning rate
-    lr: 0.001
+    lr: 0.0001
     # Weight decay (L2 regularization)
     weight_decay: 0.000
   # Learning rate scheduler

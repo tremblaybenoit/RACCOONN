@@ -29,8 +29,6 @@ lr_scheduler:
 # Parameters
 parameters:
   data:
-    # dtype
-    dtype: 'float64'
     # Normalization parameters
     prof_max:
       _target_: numpy.loadtxt

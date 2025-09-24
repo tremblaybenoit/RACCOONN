@@ -273,7 +273,6 @@ class CRTMModel(BaseModel):
         self.nmetavars = len(parameters.data.use_meta_vars)
         self.nlevels = int(parameters.data.nlevels)
         self.prof_vars = parameters.data.prof_vars
-        self.data_dtype = getattr(torch, parameters.data.dtype)
 
         # Neural network parameters
         nnodes_bt = parameters.architecture.nnodes_bt

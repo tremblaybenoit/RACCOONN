@@ -79,7 +79,6 @@ class PINNverseOperator(BaseModel):
         self.transform_out = [instantiate(t) for t in transform_out] if transform_out is not None else [identity]
 
         # Model architecture
-        self.data_dtype = getattr(torch, parameters.data.dtype)
         self.n_prof = parameters.data.n_prof
         self.n_levels = parameters.data.n_levels
         self.prof_vars = parameters.data.prof_vars

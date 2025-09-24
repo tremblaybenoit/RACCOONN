@@ -120,7 +120,7 @@ class Operator:
         if hasattr(self.config.data, 'dtype'):
             self.model = self.model.to(None, dtype=getattr(torch, self.config.data.dtype))
         else:
-            self.model = self.model.to(None, dtype=getattr(torch, 'float64'))
+            self.model = self.model.to(None, dtype=getattr(torch, 'float32'))
 
         # Train the model ⚡
         resume_ckpt = self.config.get("resume_from_checkpoint", None)
@@ -165,7 +165,7 @@ class Operator:
             if hasattr(self.config.data, 'dtype'):
                 self.model = self.model.to(None, dtype=getattr(torch, self.config.data.dtype))
             else:
-                self.model = self.model.to(None, dtype=getattr(torch, 'float64'))
+                self.model = self.model.to(None, dtype=getattr(torch, 'float32'))
 
         # Evaluate on test set
         logger.info("Running against test set...")
@@ -209,7 +209,7 @@ class Operator:
             if hasattr(self.config.data, 'dtype'):
                 self.model = self.model.to(None, dtype=getattr(torch, self.config.data.dtype))
             else:
-                self.model = self.model.to(None, dtype=getattr(torch, 'float64'))
+                self.model = self.model.to(None, dtype=getattr(torch, 'float32'))
 
         # Predict on dataset
         logger.info("Predicting on dataset...")

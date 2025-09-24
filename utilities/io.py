@@ -4,13 +4,13 @@ from utilities.instantiators import instantiate
 from forward.data.transformations import identity
 
 
-def load_npy(path: str, split: np.ndarray = None, dtype: str = 'float64') -> np.ndarray:
+def load_npy(path: str, split: np.ndarray = None, dtype: str = 'float32') -> np.ndarray:
     """ Load a numpy array from a .npy file and optionally split it.
 
         Parameters:
         path: str. The file path to the .npy file.
         split: np.ndarray, optional. An array of indices to split the loaded array. Defaults to None.
-        dtype: str. The desired data type of the loaded array. Defaults to 'float64'.
+        dtype: str. The desired data type of the loaded array. Defaults to 'float32'.
 
         Returns:
         data: np.ndarray. The loaded (and possibly split) numpy array.
@@ -25,7 +25,7 @@ def load_npy(path: str, split: np.ndarray = None, dtype: str = 'float64') -> np.
     return data
 
 
-def load_latlon(path: str, scans: np.ndarray = None, split: np.ndarray = None, dtype: str = 'float64') -> np.ndarray:
+def load_latlon(path: str, scans: np.ndarray = None, split: np.ndarray = None, dtype: str = 'float32') -> np.ndarray:
     """ Load latitude or longitude variable and tile it to match the number of scans.
 
         Parameters
@@ -33,7 +33,7 @@ def load_latlon(path: str, scans: np.ndarray = None, split: np.ndarray = None, d
         path: str. The file path to the .npy file.
         scans: np.ndarray. Array of scan indices to determine the number of scans.
         split: np.ndarray, optional. An array of indices to split the loaded array. Defaults to None.
-        dtype: str. The desired data type of the loaded array. Defaults to 'float64'.
+        dtype: str. The desired data type of the loaded array. Defaults to 'float32'.
 
         Returns
         -------
@@ -56,7 +56,7 @@ def load_latlon(path: str, scans: np.ndarray = None, split: np.ndarray = None, d
     return latlon
 
 
-def load_scans(path: str, lat: np.ndarray = None, split: np.ndarray = None, dtype: str = 'float64') -> np.ndarray:
+def load_scans(path: str, lat: np.ndarray = None, split: np.ndarray = None, dtype: str = 'float32') -> np.ndarray:
     """ Load scan variable and repeat it to match the number of coordinates.
 
         Parameters
@@ -64,7 +64,7 @@ def load_scans(path: str, lat: np.ndarray = None, split: np.ndarray = None, dtyp
         path: str. The file path to the .npy file containing the scan variable.
         lat: np.ndarray. Array of latitude values to determine the number of coordinates.
         split: np.ndarray, optional. An array of indices to split the loaded array. Defaults to None.
-        dtype: str. The desired data type of the loaded array. Defaults to 'float64'.
+        dtype: str. The desired data type of the loaded array. Defaults to 'float32'.
 
         Returns
         -------
@@ -86,14 +86,13 @@ def load_scans(path: str, lat: np.ndarray = None, split: np.ndarray = None, dtyp
     return scans
 
 
-def load_var(config: DictConfig, split: np.ndarray = None, dtype: str = 'float64') -> np.ndarray:
+def load_var(config: DictConfig, split: np.ndarray = None) -> np.ndarray:
     """ Load variable.
 
         Parameters
         ----------
         config: DictConfig. Configuration object for the variables.
-        split : np.ndarray. Array of indices for the specified stage.<
-        dtype: str. The desired data type of the loaded array. Defaults to 'float64'.
+        split : np.ndarray. Array of indices for the specified stage.
 
         Returns
         -------
@@ -101,7 +100,7 @@ def load_var(config: DictConfig, split: np.ndarray = None, dtype: str = 'float64
     """
 
     # Load and normalize variable
-    data = np.array(instantiate(config['load']), dtype=dtype)
+    data = np.array(instantiate(config['load']))
     # Apply split if available
     if split is not None and data.shape[0] == len(split):
         data = data[split]

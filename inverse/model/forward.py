@@ -26,22 +26,23 @@ class CRTMForward:
         # Instantiate the model
         self.model = instantiate(config_forward)
         self.model.load_state_dict(checkpoint['state_dict'])
-        self.model = self.model.to(None, dtype=self.model.data_dtype)
         # Set the model to evaluation mode
         self.model.eval()
 
-    def to(self, device):
+    def to(self, device, dtype=None, non_blocking=False):
         """ Move the model to the specified device.
 
         Parameters
         ----------
         device: torch.device. The device to move the model to.
+        dtype: torch.dtype, optional. The desired data type of the model parameters.
+        non_blocking: bool, optional. If True and the source is in pinned memory, the copy will be asynchronous with respect to the host.
 
         Returns
         -------
         None.
         """
-        self.model.to(device)
+        self.model.to(device, dtype=dtype, non_blocking=non_blocking)
         return self
 
     def __call__(self, x):

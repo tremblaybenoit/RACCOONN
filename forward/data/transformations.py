@@ -6,7 +6,7 @@ from typing import Union
 class NormalizeProfiles:
     """ Normalize profiles using min-max scaling. """
 
-    def __init__(self, profmin: np.ndarray, profmax: np.ndarray, inverse_transform: bool=False, dtype: str='float64'):
+    def __init__(self, profmin: np.ndarray, profmax: np.ndarray, inverse_transform: bool=False, dtype: str='float32'):
         """ Initialize NormalizeProfiles.
 
         Parameters
@@ -78,7 +78,7 @@ class NormalizeProfiles:
 
 class NormalizeSurface:
     """ Normalize surface using min-max scaling. """
-    def __init__(self, surfmin, surfmax, inverse_transform=False, dtype='float64'):
+    def __init__(self, surfmin, surfmax, inverse_transform=False, dtype='float32'):
         """ Initialize NormalizeSurface.
 
         Parameters

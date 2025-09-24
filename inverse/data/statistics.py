@@ -14,7 +14,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def read_statistics(path: str, tensor: bool = False, dtype: str = 'float64') -> dict:
+def read_statistics(path: str, tensor: bool = False, dtype: str = 'float32') -> dict:
     """ Read statistics from a file.
 
         Parameters
@@ -41,7 +41,7 @@ def read_statistics(path: str, tensor: bool = False, dtype: str = 'float64') -> 
     return stats
 
 
-def read_statistics_var(path: str, var: str, tensor: bool = False, dtype: str = 'float64') -> dict:
+def read_statistics_var(path: str, var: str, tensor: bool = False, dtype: str = 'float32') -> dict:
     """ Read statistics of a specific variable from a file.
 
         Parameters

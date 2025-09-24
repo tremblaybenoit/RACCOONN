@@ -32,6 +32,8 @@ trainer:
 
 # Data configuration
 data:
+  # Precision
+  dtype: 'float64'
   # Split ratios for training, validation, and test sets
   stage:
     # Training set
