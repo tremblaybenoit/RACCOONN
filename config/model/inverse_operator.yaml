@@ -57,6 +57,8 @@ loss_func:
   forward_model:
     # Function
     _target_: inverse.model.loss.ForwardModel
+    # Precision
+    dtype: ${data.dtype}
     # Normalization for the profile variables
     prof_norm:
       # Function
@@ -70,6 +72,7 @@ loss_func:
         _target_: numpy.loadtxt
         _args_:
           - forward/data/normalization/prof_div.txt
+      dtype: ${data.dtype}
   # Weights for observation (obs), model, and boundary condition (bcs) errors
   lambda_obs: 0.
   lambda_model: 1.

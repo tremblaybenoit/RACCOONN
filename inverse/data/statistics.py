@@ -14,13 +14,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def read_statistics(path: str, tensor: bool = False) -> dict:
+def read_statistics(path: str, tensor: bool = False, dtype: str = 'float32') -> dict:
     """ Read statistics from a file.
 
         Parameters
         ----------
         path: str. Path to the file containing statistics.
         tensor: bool. If True, returns statistics as torch tensors, otherwise as numpy arrays.
+        dtype: str. Data type of the torch tensors (if tensor=True).
 
         Returns
         -------
@@ -34,13 +35,13 @@ def read_statistics(path: str, tensor: bool = False) -> dict:
     # Convert statistics to torch tensors if required
     if tensor:
         # Loop through each variable in stats and convert numpy arrays to torch tensors
-        stats = {var: {key: torch.tensor(value, dtype=torch.float64) if isinstance(value, np.ndarray) else value
+        stats = {var: {key: torch.tensor(value, dtype=getattr(torch, dtype)) if isinstance(value, np.ndarray) else value
                        for key, value in var_stats.items()} for var, var_stats in stats.items()}
 
     return stats
 
 
-def read_statistics_var(path: str, var: str, tensor: bool = False) -> dict:
+def read_statistics_var(path: str, var: str, tensor: bool = False, dtype: str = 'float32') -> dict:
     """ Read statistics of a specific variable from a file.
 
         Parameters
@@ -48,6 +49,7 @@ def read_statistics_var(path: str, var: str, tensor: bool = False) -> dict:
         path: str. Path to the file containing statistics.
         var: str. Variable to read statistics for.
         tensor: bool. If True, returns statistics as torch tensors, otherwise as numpy arrays.
+        dtype: str. Data type of the torch tensors (if tensor=True).
 
         Returns
         -------
@@ -55,11 +57,11 @@ def read_statistics_var(path: str, var: str, tensor: bool = False) -> dict:
     """
 
     # Load statistics from file
-    stats = read_statistics(path)[var]
+    stats = read_statistics(path, dtype=dtype)[var]
 
     # Convert statistics to torch tensors if required
     if tensor:
-        stats = {key: torch.tensor(value, dtype=torch.float64) if isinstance(value, np.ndarray) else value
+        stats = {key: torch.tensor(value, dtype=getattr(torch, dtype)) if isinstance(value, np.ndarray) else value
                  for key, value in stats.items()}
 
     # Return statistics for the specified variable

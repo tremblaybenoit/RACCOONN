@@ -12,6 +12,9 @@ download:
   dir: ${paths.data_dir}
   url: "https://zenodo.org/record/1482223/files/GOES-16_ML_Training_Testing_Data.zip?download=1"
 
+# dtype
+dtype: 'float32'
+
 # Pressure filter
 pressure_filter:
   load:

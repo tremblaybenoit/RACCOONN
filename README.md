@@ -12,7 +12,54 @@ git clone https://github.com/tremblaybenoit/RACCOONN.git
 RACCOONN is built with [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/) and [Hydra](https://hydra.cc/docs/intro/).
 
 # Usage
+## Manual execution of individual steps
+Each step of the workflow can be run manually using the corresponding Python script and 
+the desired experiment configuration.
 
+### Forward model (e.g., `experiment=forward_emulator`)
+
+1. Configure directories:
+```bash
+python -m config.setup -overrides "+experiment=forward_emulator"
+```
+2. Train the forward model:
+```bash
+python -m forward.train +experiment=forward_emulator
+```
+3. Test and evaluate the forward model:
+```bash
+python -m forward.test +experiment=forward_emulator
+python -m forward.evaluation.validation +experiment=forward_emulator
+```
+4. Predict using the forward model:
+```bash
+python -m forward.predict +experiment=forward_emulator
+```
+
+### Inverse model (e.g., `experiment=inverse_operator`)
+
+1. Configure directories:
+```bash
+python -m config.setup -overrides "+experiment=inverse_operator"
+```
+2. Prepare data for the inverse model:
+```bash
+python -m inverse.data.statistics +experiment=inverse_operator
+python -m inverse.data.covariance +experiment=inverse_operator
+```
+2. Train the inverse model:
+```bash
+python -m inverse.train +experiment=inverse_operator
+```
+3. Test and evaluate the inverse model:
+```bash
+python -m inverse.test +experiment=inverse_operator
+python -m inverse.evaluation.validation +experiment=inverse_operator
+```
+4. Predict using the inverse model:
+```bash
+python -m inverse.predict +experiment=inverse_operator
+```
 ## Automated workflow (recommended)
 RACCOONN uses the [Snakemake workflow management system](https://snakemake.readthedocs.io/en/stable/) for reproducibility.
 
@@ -30,10 +77,10 @@ To account for missing dependencies, add the `--rerun-incomplete` flag:
 snakemake --dry-run --rerun-incomplete --verbose test --config hydra-experiment=inverse_operator
 ```
 
-To draw a directed acyclic graph (DAG) of the training workflow (e.g., `test.mmd` of rule `test`):
+To draw a directed acyclic graph (DAG) of the training workflow (e.g., `train.mmd` of rule `test`):
 
 ```bash
-snakemake test --rulegraph mermaid-js --config hydra-experiment=pinnverse_operator_000 > dag.mmd
+snakemake test --rulegraph mermaid-js --config hydra-experiment=inverse_operator > train.mmd
 ```
 Replace `--rulegraph` with `--dag` to highlight completed rules with dashed boxes.
 
@@ -70,31 +117,12 @@ flowchart TB
 	id3 --> id5
 	id4 --> id5
 ```
-## Manual execution of individual steps
-Each step of the workflow can be run manually using the corresponding Python script and 
-the desired experiment configuration (e.g., inverse_operator for the inverse model).
-
-1. Data preparation for the inverse model:
-```bash
-python -m inverse.data.statistics +experiment=inverse_operator
-python -m inverse.data.covariance +experiment=inverse_operator
-```
-2. Train the inverse model:
-```bash
-python -m inverse.train +experiment=inverse_operator
-```
-3. Test and evaluate the inverse model:
-```bash
-python -m inverse.test +experiment=inverse_operator
-python -m inverse.evaluation.validation +experiment=inverse_operator
-```
-
 
 # Documentation
 The RACCOON project documentation is available at https://raccoonn.readthedocs.io/.
 
 # References and Acknowledgements
-- The forward model is a translation from Keras to Pytorch Lightning of an emulator published in the following paper and repository: 
+- The forward model is a translation from Keras to Pytorch Lightning of an emulator published in the following paper and repository (full credit goes to the original authors): 
   - Paper by Howard et al. (2025): https://www.arxiv.org/abs/2504.16192.
   - Repository: https://zenodo.org/records/13963758.
 - Inspiration for the PyTorch Lightning + Hydra framework comes from the following repositories: 

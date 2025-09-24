@@ -8,8 +8,7 @@ import pytorch_lightning as lightning
 from utilities.logger import TrainerLogger
 from utilities.instantiators import instantiate, instantiate_list
 from utilities.logic import get_config_path
-# torch.set_float32_matmul_precision('high')
-torch.set_default_dtype(torch.float64)
+torch.set_float32_matmul_precision('high')
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -118,6 +117,10 @@ class Operator:
         # Model
         logger.info("Initializing model...")
         self.model = instantiate(self.config.model)
+        if hasattr(self.config.data, 'dtype'):
+            self.model = self.model.to(None, dtype=getattr(torch, self.config.data.dtype))
+        else:
+            self.model = self.model.to(None, dtype=getattr(torch, 'float32'))
 
         # Train the model ⚡
         resume_ckpt = self.config.get("resume_from_checkpoint", None)
@@ -159,6 +162,10 @@ class Operator:
             self.model = instantiate(self.config.model)
             checkpoint = torch.load(self.checkpoint_path, map_location='cpu', weights_only=True)
             self.model.load_state_dict(checkpoint['state_dict'], strict=False)
+            if hasattr(self.config.data, 'dtype'):
+                self.model = self.model.to(None, dtype=getattr(torch, self.config.data.dtype))
+            else:
+                self.model = self.model.to(None, dtype=getattr(torch, 'float32'))
 
         # Evaluate on test set
         logger.info("Running against test set...")
@@ -169,7 +176,7 @@ class Operator:
         if hasattr(self.config.loader.stage.test, 'results'):
             # Loop over all results in the config and save them
             for result_name, result_config in self.config.loader.stage.test.results.items():
-                if hasattr(self.model.test_results, result_name) and hasattr(result_config, 'save'):
+                if result_name in self.model.test_results and hasattr(result_config, 'save'):
                     save_function = instantiate(result_config.save)
                     save_function(self.model.test_results[result_name])
 
@@ -199,6 +206,10 @@ class Operator:
             self.model = instantiate(self.config.model)
             checkpoint = torch.load(self.checkpoint_path, map_location='cpu', weights_only=True)
             self.model.load_state_dict(checkpoint['state_dict'], strict=False)
+            if hasattr(self.config.data, 'dtype'):
+                self.model = self.model.to(None, dtype=getattr(torch, self.config.data.dtype))
+            else:
+                self.model = self.model.to(None, dtype=getattr(torch, 'float32'))
 
         # Predict on dataset
         logger.info("Predicting on dataset...")

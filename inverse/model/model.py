@@ -311,19 +311,21 @@ class PINNverseOperator(BaseModel):
             for k in self.valid_results:
                 self.valid_results[k].clear()
 
-    def to(self, device):
+    def to(self, device, dtype: torch.dtype=None, non_blocking: bool = False):
         """ Move model to the specified device.
 
             Parameters
             ----------
             device: torch.device. Device to move the model to.
+            dtype: torch.dtype. Data type to move the model to.
+            non_blocking: bool. Whether to use non-blocking transfers.
 
             Returns
             -------
             self: PINNverseOperator. The model moved to the specified device.
         """
 
-        super().to(device)
+        super().to(device, dtype=dtype, non_blocking=non_blocking)
         # Move normalization modules if needed
         for attr in ['normalize_prof', 'unnormalize_prof']:
             norm = getattr(self, attr, None)
@@ -364,7 +366,7 @@ class PINNverseOperators(PINNverseOperator):
                          log_valid=log_valid)
 
         # Replace the single model with a list of models, one per profile type
-        self.models = nn.ModuleList([
+        self.model = nn.ModuleList([
             self._build_model(
                 positional_encoding, activation_in, activation_out, self._patch_profiles(deepcopy(parameters))
             )
@@ -395,7 +397,7 @@ class PINNverseOperators(PINNverseOperator):
         # Apply positional encoding
         encoded_inputs = self.positional_encoding(inputs)
         # Each model predicts its profile type
-        outputs = [model(encoded_inputs) for model in self.models]
+        outputs = [model(encoded_inputs) for model in self.model]
         return outputs
 
     def forward(self, x: dict):

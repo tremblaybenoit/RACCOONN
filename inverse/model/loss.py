@@ -99,7 +99,7 @@ class QuadraticForm(torch.nn.Module):
         None.
         """
         super().__init__()
-        self.matrix = torch.from_numpy(matrix).to(torch.float64)
+        self.matrix = torch.from_numpy(matrix)
 
     def to(self, device):
         """ Move the module to a specified device.
@@ -317,7 +317,7 @@ class Wasserstein2Normal(torch.nn.Module):
 
 class ForwardModel(torch.nn.Module):
     """ Forward loss module."""
-    def __init__(self, prof_norm: Callable = None):
+    def __init__(self, prof_norm: Callable = None, dtype: str = None):
         """ Initialize the Forward module.
 
         Parameters
@@ -332,6 +332,8 @@ class ForwardModel(torch.nn.Module):
 
         # Forward operator
         self.forward_model = forward
+        if dtype:
+            self.forward_model.to(None, dtype=getattr(torch, dtype))
         # Apply normalization to profiles
         self.prof_norm = prof_norm
 
@@ -428,7 +430,7 @@ class VarLoss(torch.nn.Module):
         hofx_pred = self.forward_model(pred['prof'], target)
 
         # Initialize loss dictionary
-        loss = {'total': torch.tensor(0.0, dtype=torch.float32, device=pred['prof'].device)}
+        loss = {'total': torch.tensor(0.0, device=pred['prof'].device)}
 
         # Observation loss: Some observation losses may require additional inputs
         if getattr(getattr(self.loss_obs, "func", self.loss_obs), "__name__", None) == 'diagonal_quadratic_form':
@@ -471,6 +473,11 @@ class VarLoss(torch.nn.Module):
         # Forward model
         if hasattr(self.forward_model, 'to'):
             self.forward_model = self.forward_model.to(device)
+        # Loss functions
+        for attr in ['loss_obs', 'loss_model', 'loss_bcs']:
+            loss_fn = getattr(self, attr, None)
+            if loss_fn is not None and hasattr(loss_fn, 'to'):
+                setattr(self, attr, loss_fn.to(device))
         # Pressure filter
         if self.pressure_filter is not None and hasattr(self.pressure_filter, 'to'):
             self.pressure_filter = self.pressure_filter.to(device)

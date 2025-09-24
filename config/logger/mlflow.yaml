@@ -5,8 +5,10 @@ mlflow:
   run_name: ${paths.run_id}  # Name of the run
   tags:
     project: "RACCOONN"  # Project name
-    dataset: "MIDAS"  # Dataset name
+    dataset: "CRTM"  # Dataset name
     user: "RACCOONN_Trainer"  # User name
     version: "0.5"  # Version of the project
+ports:
+  mlflow: 5000  # Port for the MLflow server
 offline: True  # Whether to log offline
 ui: True  # Whether to open the UI after logging

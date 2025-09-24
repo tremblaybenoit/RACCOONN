@@ -30,6 +30,11 @@ trainer:
   min_epochs: 1  # To prevent early stopping
   max_epochs: 32  # Number of epochs
 
+# Data configuration
+data:
+  # Precision
+  dtype: 'float32'
+
 # Model parameters
 model:
   # Model

@@ -9,7 +9,7 @@ defaults:
   - override /preparation: forward_default
   - override /loader: forward_default
   - override /model: forward_emulator
-  - override /trainer: cpu
+  - override /trainer: gpu
   - override /callbacks: default
   - override /logger: default
 
@@ -30,3 +30,8 @@ paths:
 trainer:
   min_epochs: 1  # To prevent early stopping
   max_epochs: 32  # Number of epochs
+
+# Data configuration
+data:
+  # Precision
+  dtype: 'float32'
