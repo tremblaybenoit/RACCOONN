@@ -27,7 +27,7 @@ Create a new conda environment and install pre-requisites from [`environment.yam
 ```bash
 conda create -n raccoonn python=3.10
 conda activate raccoonn
-conda env update -f environment.y
+conda env update -f environment.yaml
 ```
 
 # Usage

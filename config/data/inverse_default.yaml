@@ -20,12 +20,39 @@ pressure_filter:
   load:
     _target_: inverse.data.filters.pressure_filter
     prof:
-      _target_: utilities.io.load_stack
+      _target_: utilities.io.load_stack_and_normalize
       _recursive_: false
       stack:
-        - ${data.stage.train.vars.prof}
-        - ${data.stage.valid.vars.prof}
-        - ${data.stage.test.vars.prof}
+        - load: ${data.stage.train.vars.prof.load}
+          normalization:
+            _target_: inverse.data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: inverse.data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'prof'
+              dtype: ${data.dtype}
+            axis: null
+        - load: ${data.stage.valid.vars.prof.load}
+          normalization:
+            _target_: inverse.data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: inverse.data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'prof'
+              dtype: ${data.dtype}
+            axis: null
+        - load: ${data.stage.test.vars.prof.load}
+          normalization:
+            _target_: inverse.data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: inverse.data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'prof'
+              dtype: ${data.dtype}
+            axis: null
 
 # Split the data into training, validation, and test sets
 stage:
