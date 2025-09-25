@@ -90,17 +90,17 @@ flowchart LR
   C4 --> C41["dtype"]
 
   %% Couleurs par catégorie (texte blanc ou noir selon le fond)
-  classDef experiment fill:#000,stroke:#333,stroke-width:1px,color:#fff;
-  classDef final_overrides fill:#000,stroke:#333,stroke-width:1px,color:#fff;
-  classDef paths fill:#FFD580,stroke:#333,stroke-width:1px,color:#000;
-  classDef hydra fill:#A97FFF,stroke:#333,stroke-width:1px,color:#000;
-  classDef data fill:#B0E57C,stroke:#333,stroke-width:1px,color:#000;
-  classDef preparation fill:#FFB347,stroke:#333,stroke-width:1px,color:#000;
-  classDef loader fill:#FF7F7F,stroke:#333,stroke-width:1px,color:#000;
-  classDef model fill:#FFB3B3,stroke:#333,stroke-width:1px,color:#000;
-  classDef trainer fill:#80B3FF,stroke:#333,stroke-width:1px,color:#000;
-  classDef callbacks fill:#57D9AD,stroke:#333,stroke-width:1px,color:#000;
-  classDef logger fill:#D99157,stroke:#333,stroke-width:1px,color:#000;
+  classDef experiment fill:#22313F,stroke:#888,stroke-width:1px,color:#fff;
+  classDef final_overrides fill:#22313F,stroke:#888,stroke-width:1px,color:#fff;
+  classDef paths fill:#FFD580,stroke:#888,stroke-width:1px,color:#000;
+  classDef hydra fill:#A97FFF,stroke:#888,stroke-width:1px,color:#000;
+  classDef data fill:#B0E57C,stroke:#888,stroke-width:1px,color:#000;
+  classDef preparation fill:#FFB347,stroke:#888,stroke-width:1px,color:#000;
+  classDef loader fill:#FF7F7F,stroke:#888,stroke-width:1px,color:#000;
+  classDef model fill:#FFB3B3,stroke:#888,stroke-width:1px,color:#000;
+  classDef trainer fill:#80B3FF,stroke:#888,stroke-width:1px,color:#000;
+  classDef callbacks fill:#57D9AD,stroke:#888,stroke-width:1px,color:#000;
+  classDef logger fill:#D99157,stroke:#888,stroke-width:1px,color:#000;
 
   %% Assignation des classes
   class A,B,C1 experiment;
