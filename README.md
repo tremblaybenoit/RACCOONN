@@ -2,6 +2,18 @@
 RACCOONN uses deep learning to estimate atmospheric thermodynamic profiles from raw radiance observations. 
 It can work with or without a prior/background state of the atmosphere. 
 The goal is to create an inverse observation operator for assimilating radiances in the form of thermodynamic profiles.
+
+## Table of Contents
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Getting started](#getting-started)
+  - [Manual execution of individual steps](#manual-execution-of-individual-steps)
+    - [Forward model](#forward-model-eg-experimentforward_emulator)
+    - [Inverse model](#inverse-model-eg-experimentinverse_operator)
+  - [Automated workflow (recommended)](#automated-workflow-recommended)
+- [Documentation](#documentation)
+- [References and Acknowledgements](#references-and-acknowledgements)
+
 # Installation
 
 Clone the repository:
@@ -12,11 +24,23 @@ git clone https://github.com/tremblaybenoit/RACCOONN.git
 RACCOONN is built with [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/) and [Hydra](https://hydra.cc/docs/intro/).
 
 # Usage
+## Getting started
+Steps to perform after cloning the repository:
+
+1. Create a new conda environment and install pre-requisites from [`environment.yaml`](environment.yaml):
+```bash
+conda create -n raccoonn python=3.10
+conda activate raccoonn
+conda env update -f environment.yaml
+```
+2. Edit the [`config/paths/default.yaml`](config/paths/default.yaml) configuration file to specify the paths to your data and output directories. If preferred, create a new configuration file.
+3. In the [`config/experiment`](config/experiment) folder, create or edit an existing configuration file to set the hyperparameters and dependencies for your experiment.
+
 ## Manual execution of individual steps
 Each step of the workflow can be run manually using the corresponding Python script and 
 the desired experiment configuration.
 
-### Forward model (e.g., `experiment=forward_emulator`)
+### Forward model (e.g., [`experiment=forward_emulator`](config/experiment/forward_emulator.yaml))
 
 1. Configure directories:
 ```bash
@@ -36,7 +60,7 @@ python -m forward.evaluation.validation +experiment=forward_emulator
 python -m forward.predict +experiment=forward_emulator
 ```
 
-### Inverse model (e.g., `experiment=inverse_operator`)
+### Inverse model (e.g., [`experiment=inverse_operator`](config/experiment/inverse_operator.yaml))
 
 1. Configure directories:
 ```bash
@@ -63,7 +87,7 @@ python -m inverse.predict +experiment=inverse_operator
 ## Automated workflow (recommended)
 RACCOONN uses the [Snakemake workflow management system](https://snakemake.readthedocs.io/en/stable/) for reproducibility.
 
-To perform a dry-run (i.e., to check the workflow prior to execution) of the `test` rule with the `inverse_operator` experiment configuration:
+To perform a dry-run (i.e., to check the workflow prior to execution) of the Snakefile rule [`test`](Snakefile) with the [`inverse_operator`](config/experiment/inverse_operator.yaml) experiment configuration:
 
 ```bash
 snakemake --dry-run --verbose test --config hydra-experiment=inverse_operator
@@ -77,14 +101,14 @@ To account for missing dependencies, add the `--rerun-incomplete` flag:
 snakemake --dry-run --rerun-incomplete --verbose test --config hydra-experiment=inverse_operator
 ```
 
-To draw a directed acyclic graph (DAG) of the training workflow (e.g., `train.mmd` of rule `test`):
+To draw a [directed acyclic graph (DAG)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) of the training workflow (e.g., [`inverse/train.mmd`](inverse/train.mmd) for Snakefile rule [`test`](Snakefile)):
 
 ```bash
 snakemake test --rulegraph mermaid-js --config hydra-experiment=inverse_operator > train.mmd
 ```
 Replace `--rulegraph` with `--dag` to highlight completed rules with dashed boxes.
 
-The following graph shows the workflow for the `test` rule with the `inverse_operator` experiment configuration: 
+The following graph shows the workflow for the Snakefile rule [`test`](Snakefile) with the [`inverse_operator`](config/experiment/inverse_operator.yaml) experiment configuration: 
 
 ```mermaid
 ---
