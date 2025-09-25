@@ -2,6 +2,18 @@
 RACCOONN uses deep learning to estimate atmospheric thermodynamic profiles from raw radiance observations. 
 It can work with or without a prior/background state of the atmosphere. 
 The goal is to create an inverse observation operator for assimilating radiances in the form of thermodynamic profiles.
+
+## Table of Contents
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Experiment configuration](#experiment-configuration)
+  - [Manual execution of individual steps](#manual-execution-of-individual-steps)
+    - [Forward model](#forward-model-eg-experimentforward_emulator)
+    - [Inverse model](#inverse-model-eg-experimentinverse_operator)
+  - [Automated workflow (recommended)](#automated-workflow-recommended)
+- [Documentation](#documentation)
+- [References and Acknowledgements](#references-and-acknowledgements)
+
 # Installation
 
 Clone the repository:
@@ -9,14 +21,106 @@ Clone the repository:
 ```bash
 git clone https://github.com/tremblaybenoit/RACCOONN.git
 ```
-RACCOONN is built with [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/) and [Hydra](https://hydra.cc/docs/intro/).
+RACCOONN is built with [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/) and [Hydra](https://hydra.cc/docs/intro/). 
+
+Create a new conda environment and install pre-requisites from [`environment.yaml`](environment.yaml):
+```bash
+conda create -n raccoonn python=3.10
+conda activate raccoonn
+conda env update -f environment.y
+```
 
 # Usage
+## Experiment configuration
+Create or edit an existing configuration file in the [`config/experiment`](config/experiment) folder to specify the parameters of your experiment.
+
+1. At the beginning of the experiment configuration file, specify the `defaults`, i.e. the default configurations:
+    - The `path` configuration (e.g., from folder [`config/paths`](config/paths)) to specify the directories for data and output.
+    - The `hydra` configuration (e.g., from folder [`config/hydra`](config/hydra)) to specify Hydra settings.
+    - The `data` configuration (e.g., from folder [`config/data`](config/data)) to specify dataset parameters.
+    - The `preparation` configuration (e.g., from folder [`config/preparation`](config/preparation)) to specify data preparation steps.
+    - The `loader` configuration (e.g., from folder [`config/loader`](config/loader)) to specify data loading parameters.
+    - The `model` configuration (e.g., from folder [`config/model`](config/model)) to specify the model architecture and parameters.
+    - The `trainer` configuration (e.g., from folder [`config/trainer`](config/trainer)) to specify training parameters.
+    - The `callbacks` configuration (e.g., from folder [`config/callbacks`](config/callbacks)) to specify callbacks during training.
+    - The `logger` configuration (e.g., from folder [`config/logger`](config/logger)) to specify logging parameters.
+2. Below the defaults, override specific default configuration parameters as needed for your experiment. 
+
+**Note**: The order of the defaults matters. For example, if you specify `data` before `preparation`, the `data` configuration will be loaded before the `preparation` configuration, allowing the `preparation` configuration to override any overlapping parameters from the `data` configuration.
+
+The following diagram illustrates the structure of the experiment configuration file [`config/experiment/inverse_operator.yaml`](config/experiment/inverse_operator.yaml) as an example. It shows 1. the defaults used and 2. the parameter overriddes for this specific experiment.
+```mermaid
+---
+title: Structure of the experiment configuration file "config/experiment/inverse_operator.yaml"
+---
+flowchart LR
+  A["experiment/inverse_operator.yaml"]
+  A --> B["defaults"]
+  B --> B1["/paths: default (i.e., config/paths/default.yaml)"]
+  B --> B2["/hydra: default (i.e., config/hydra/default.yaml)"]
+  B --> B3["/data: inverse_default (i.e., config/data/inverse_default.yaml)"]
+  B --> B4["/preparation: inverse_default (i.e., config/preparation/inverse_default.yaml)"]
+  B --> B5["/loader: inverse_default (i.e., config/loader/inverse_default.yaml)"]
+  B --> B6["/model: inverse_operator (i.e., config/model/inverse_operator.yaml)"]
+  B --> B7["/trainer: gpu (i.e., config/trainer/gpu.yaml)"]
+  B --> B8["/callbacks: default (i.e., config/callbacks/default.yaml)"]
+  B --> B9["/logger: default (i.e., config/logger/default.yaml)"]
+
+  %% Chaque override pointe vers final_overrides
+  B1 --> C
+  B2 --> C
+  B3 --> C
+  B4 --> C
+  B5 --> C
+  B6 --> C
+  B7 --> C
+  B8 --> C
+  B9 --> C
+
+  C["Overrides"]
+  C --> C1["task_name"]
+  C --> C2["/paths"]
+  C2 --> C21["task_dir"]
+  C2 --> C22["run_id"]
+  C2 --> C23["data_dir"]
+  C --> C3["/trainer"]
+  C3 --> C31["min_epochs"]
+  C3 --> C32["max_epochs"]
+  C --> C4["/data"]
+  C4 --> C41["dtype"]
+
+  %% Couleurs par catégorie (texte blanc ou noir selon le fond)
+  classDef experiment fill:#22313F,stroke:#888,stroke-width:1px,color:#fff;
+  classDef final_overrides fill:#22313F,stroke:#888,stroke-width:1px,color:#fff;
+  classDef paths fill:#FFD580,stroke:#888,stroke-width:1px,color:#000;
+  classDef hydra fill:#A97FFF,stroke:#888,stroke-width:1px,color:#000;
+  classDef data fill:#B0E57C,stroke:#888,stroke-width:1px,color:#000;
+  classDef preparation fill:#FFB347,stroke:#888,stroke-width:1px,color:#000;
+  classDef loader fill:#FF7F7F,stroke:#888,stroke-width:1px,color:#000;
+  classDef model fill:#FFB3B3,stroke:#888,stroke-width:1px,color:#000;
+  classDef trainer fill:#80B3FF,stroke:#888,stroke-width:1px,color:#000;
+  classDef callbacks fill:#57D9AD,stroke:#888,stroke-width:1px,color:#000;
+  classDef logger fill:#D99157,stroke:#888,stroke-width:1px,color:#000;
+
+  %% Assignation des classes
+  class A,B,C1 experiment;
+  class C final_overrides;
+  class B1,C2,C21,C22,C23 paths;
+  class B2 hydra;
+  class B3,C4,C41 data;
+  class B4 preparation;
+  class B5 loader;
+  class B6,C5,C51 model;
+  class B7,C3,C31,C32 trainer;
+  class B8 callbacks;
+  class B9 logger;
+```
+
 ## Manual execution of individual steps
 Each step of the workflow can be run manually using the corresponding Python script and 
 the desired experiment configuration.
 
-### Forward model (e.g., `experiment=forward_emulator`)
+### Forward model (e.g., [`experiment=forward_emulator`](config/experiment/forward_emulator.yaml))
 
 1. Configure directories:
 ```bash
@@ -36,7 +140,7 @@ python -m forward.evaluation.validation +experiment=forward_emulator
 python -m forward.predict +experiment=forward_emulator
 ```
 
-### Inverse model (e.g., `experiment=inverse_operator`)
+### Inverse model (e.g., [`experiment=inverse_operator`](config/experiment/inverse_operator.yaml))
 
 1. Configure directories:
 ```bash
@@ -63,7 +167,7 @@ python -m inverse.predict +experiment=inverse_operator
 ## Automated workflow (recommended)
 RACCOONN uses the [Snakemake workflow management system](https://snakemake.readthedocs.io/en/stable/) for reproducibility.
 
-To perform a dry-run (i.e., to check the workflow prior to execution) of the `test` rule with the `inverse_operator` experiment configuration:
+To perform a dry-run (i.e., to check the workflow prior to execution) of the Snakefile rule [`test`](Snakefile) with the [`inverse_operator`](config/experiment/inverse_operator.yaml) experiment configuration:
 
 ```bash
 snakemake --dry-run --verbose test --config hydra-experiment=inverse_operator
@@ -77,14 +181,14 @@ To account for missing dependencies, add the `--rerun-incomplete` flag:
 snakemake --dry-run --rerun-incomplete --verbose test --config hydra-experiment=inverse_operator
 ```
 
-To draw a directed acyclic graph (DAG) of the training workflow (e.g., `train.mmd` of rule `test`):
+To draw a [directed acyclic graph (DAG)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) of the training workflow (e.g., [`inverse/train.mmd`](inverse/train.mmd) for Snakefile rule [`test`](Snakefile)):
 
 ```bash
 snakemake test --rulegraph mermaid-js --config hydra-experiment=inverse_operator > train.mmd
 ```
 Replace `--rulegraph` with `--dag` to highlight completed rules with dashed boxes.
 
-The following graph shows the workflow for the `test` rule with the `inverse_operator` experiment configuration: 
+The following graph shows the workflow for the Snakefile rule [`test`](Snakefile) with the [`inverse_operator`](config/experiment/inverse_operator.yaml) experiment configuration: 
 
 ```mermaid
 ---
