@@ -30,7 +30,7 @@ def cloud_filter(prof: Union[np.ndarray, torch.Tensor], split: Union[np.ndarray,
     return ~clrsky
 
 
-def pressure_filter(prof: Union[np.ndarray, torch.Tensor], threshold: float = 1.e-10) -> Union[np.ndarray, torch.Tensor]:
+def pressure_filter(prof: Union[np.ndarray, torch.Tensor], threshold: float = 1.e-6) -> Union[np.ndarray, torch.Tensor]:
     """ Filter out profiles based on a pressure threshold.
 
         Parameters
@@ -46,9 +46,7 @@ def pressure_filter(prof: Union[np.ndarray, torch.Tensor], threshold: float = 1.
     if isinstance(prof, torch.Tensor):
         # Compute variance of the profiles
         prof_var = torch.var(prof, dim=0, keepdim=True).squeeze()
-        prof_var_mean = prof_var.mean(dim=0, keepdim=True) + 1.e-10
     else:
         prof_var = prof.var(axis=0, keepdims=True).squeeze()
-        prof_var_mean = prof_var.mean(axis=0, keepdims=True) + 1.e-10
-
-    return prof_var/prof_var_mean > threshold
+    breakpoint()
+    return prof_var > threshold

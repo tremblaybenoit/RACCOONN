@@ -1,7 +1,7 @@
 # RACCOONN: Retrieval of Atmospheric Conditions Computed using Observations, Optimization, and Neural Networks. 
 RACCOONN uses deep learning to estimate atmospheric thermodynamic profiles from raw radiance observations. 
-It can work with or without a prior/background state of the atmosphere. 
-The goal is to create an inverse observation operator for assimilating radiances in the form of thermodynamic profiles.
+A prior/background state of the atmosphere can be provided. 
+The goal is to create an inverse observation operator for the assimilation of radiances in the form of thermodynamic profiles.
 
 ## Table of Contents
 - [Installation](#installation)
@@ -27,44 +27,45 @@ Create a new conda environment and install pre-requisites from [`environment.yam
 ```bash
 conda create -n raccoonn python=3.10
 conda activate raccoonn
-conda env update -f environment.y
+conda env update -f environment.yaml
 ```
 
 # Usage
 ## Experiment configuration
-Create or edit an existing configuration file in the [`config/experiment`](config/experiment) folder to specify the parameters of your experiment.
+Create or edit a configuration file in the [`config/experiment`](config/experiment) folder to set your experiment parameters.
 
-1. At the beginning of the experiment configuration file, specify the `defaults`, i.e. the default configurations:
-    - The `path` configuration (e.g., from folder [`config/paths`](config/paths)) to specify the directories for data and output.
-    - The `hydra` configuration (e.g., from folder [`config/hydra`](config/hydra)) to specify Hydra settings.
-    - The `data` configuration (e.g., from folder [`config/data`](config/data)) to specify dataset parameters.
-    - The `preparation` configuration (e.g., from folder [`config/preparation`](config/preparation)) to specify data preparation steps.
-    - The `loader` configuration (e.g., from folder [`config/loader`](config/loader)) to specify data loading parameters.
-    - The `model` configuration (e.g., from folder [`config/model`](config/model)) to specify the model architecture and parameters.
-    - The `trainer` configuration (e.g., from folder [`config/trainer`](config/trainer)) to specify training parameters.
-    - The `callbacks` configuration (e.g., from folder [`config/callbacks`](config/callbacks)) to specify callbacks during training.
-    - The `logger` configuration (e.g., from folder [`config/logger`](config/logger)) to specify logging parameters.
-2. Below the defaults, override specific default configuration parameters as needed for your experiment. 
+1. Start with the `defaults` section to set the default configurations:
+    - `paths` (from folder [`config/paths`](config/paths)): Directories for data and outputs.
+    - `hydra` (from folder [`config/hydra`](config/hydra)): Hydra settings.
+    - `data` (from folder [`config/data`](config/data)): Dataset parameters.
+    - `preparation` (from folder [`config/preparation`](config/preparation)): Data preparation steps.
+    - `loader` (from folder [`config/loader`](config/loader)): Data loading parameters.
+    - `model` (from folder [`config/model`](config/model)): Model architecture and parameters.
+    - `trainer` (from folder [`config/trainer`](config/trainer)): Training parameters.
+    - `callbacks` (from folder [`config/callbacks`](config/callbacks)): Callbacks during training.
+    - `logger` (from folder [`config/logger`](config/logger)): Logging parameters.
+2. Add `overrides` below the `defaults` to change specific default parameters as needed. 
 
-**Note**: The order of the defaults matters. For example, if you specify `data` before `preparation`, the `data` configuration will be loaded before the `preparation` configuration, allowing the `preparation` configuration to override any overlapping parameters from the `data` configuration.
+**Note**: The order of the `defaults` matters, as later entries can override earlier ones.
 
-The following diagram illustrates the structure of the experiment configuration file [`config/experiment/inverse_operator.yaml`](config/experiment/inverse_operator.yaml) as an example. It shows 1. the defaults used and 2. the parameter overriddes for this specific experiment.
+**Example**: The following diagram illustrates the structure of [`config/experiment/inverse_operator.yaml`](config/experiment/inverse_operator.yaml). 
+It sets the `defaults` and then performs parameter `overrides`.
 ```mermaid
 ---
 title: Structure of the experiment configuration file "config/experiment/inverse_operator.yaml"
 ---
 flowchart LR
-  A["experiment/inverse_operator.yaml"]
+  A["/experiment: inverse_operator"]
   A --> B["defaults"]
-  B --> B1["/paths: default (i.e., config/paths/default.yaml)"]
-  B --> B2["/hydra: default (i.e., config/hydra/default.yaml)"]
-  B --> B3["/data: inverse_default (i.e., config/data/inverse_default.yaml)"]
-  B --> B4["/preparation: inverse_default (i.e., config/preparation/inverse_default.yaml)"]
-  B --> B5["/loader: inverse_default (i.e., config/loader/inverse_default.yaml)"]
-  B --> B6["/model: inverse_operator (i.e., config/model/inverse_operator.yaml)"]
-  B --> B7["/trainer: gpu (i.e., config/trainer/gpu.yaml)"]
-  B --> B8["/callbacks: default (i.e., config/callbacks/default.yaml)"]
-  B --> B9["/logger: default (i.e., config/logger/default.yaml)"]
+  B --> B1["/paths: default"]
+  B --> B2["/hydra: default"]
+  B --> B3["/data: inverse_default"]
+  B --> B4["/preparation: inverse_default"]
+  B --> B5["/loader: inverse_default"]
+  B --> B6["/model: inverse_operator"]
+  B --> B7["/trainer: gpu"]
+  B --> B8["/callbacks: default"]
+  B --> B9["/logger: default"]
 
   %% Chaque override pointe vers final_overrides
   B1 --> C
@@ -118,7 +119,7 @@ flowchart LR
 
 ## Manual execution of individual steps
 Each step of the workflow can be run manually using the corresponding Python script and 
-the desired experiment configuration.
+experiment configuration.
 
 ### Forward model (e.g., [`experiment=forward_emulator`](config/experiment/forward_emulator.yaml))
 
@@ -188,7 +189,7 @@ snakemake test --rulegraph mermaid-js --config hydra-experiment=inverse_operator
 ```
 Replace `--rulegraph` with `--dag` to highlight completed rules with dashed boxes.
 
-The following graph shows the workflow for the Snakefile rule [`test`](Snakefile) with the [`inverse_operator`](config/experiment/inverse_operator.yaml) experiment configuration: 
+**Example**: The following graph shows the workflow for the Snakefile rule [`test`](Snakefile) for experiment [`inverse_operator`](config/experiment/inverse_operator.yaml). 
 
 ```mermaid
 ---
