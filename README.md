@@ -48,7 +48,7 @@ Create or edit a configuration file in the [`config/experiment`](config/experime
 
 **Note**: The order of the `defaults` matters, as later entries can override earlier ones.
 
-**Example**: The following diagram illustrates the structure of the experiment [`config/experiment/inverse_operator.yaml`](config/experiment/inverse_operator.yaml). 
+**Example**: The following diagram illustrates the structure of [`config/experiment/inverse_operator.yaml`](config/experiment/inverse_operator.yaml). 
 The configuration sets the `defaults` and then performs parameter `overrides`.
 ```mermaid
 ---
@@ -119,7 +119,7 @@ flowchart LR
 
 ## Manual execution of individual steps
 Each step of the workflow can be run manually using the corresponding Python script and 
-the desired experiment configuration.
+experiment configuration.
 
 ### Forward model (e.g., [`experiment=forward_emulator`](config/experiment/forward_emulator.yaml))
 
