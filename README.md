@@ -48,7 +48,7 @@ Create or edit a configuration file in the [`config/experiment`](config/experime
 
 **Note**: The order of the `defaults` matters, as later entries can override earlier ones.
 
-As an example, the following diagram illustrates the structure of the experiment [`config/experiment/inverse_operator.yaml`](config/experiment/inverse_operator.yaml). 
+**Example**: The following diagram illustrates the structure of the experiment [`config/experiment/inverse_operator.yaml`](config/experiment/inverse_operator.yaml). 
 The configuration sets the `defaults` and then performs parameter `overrides`.
 ```mermaid
 ---
