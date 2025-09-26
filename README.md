@@ -49,7 +49,7 @@ Create or edit a configuration file in the [`config/experiment`](config/experime
 **Note**: The order of the `defaults` matters, as later entries can override earlier ones.
 
 **Example**: The following diagram illustrates the structure of [`config/experiment/inverse_operator.yaml`](config/experiment/inverse_operator.yaml). 
-The configuration sets the `defaults` and then performs parameter `overrides`.
+It sets the `defaults` and then performs parameter `overrides`.
 ```mermaid
 ---
 title: Structure of the experiment configuration file "config/experiment/inverse_operator.yaml"
@@ -189,7 +189,7 @@ snakemake test --rulegraph mermaid-js --config hydra-experiment=inverse_operator
 ```
 Replace `--rulegraph` with `--dag` to highlight completed rules with dashed boxes.
 
-The following graph shows the workflow for the Snakefile rule [`test`](Snakefile) with the [`inverse_operator`](config/experiment/inverse_operator.yaml) experiment configuration: 
+**Example**: The following graph shows the workflow for the Snakefile rule [`test`](Snakefile) for experiment [`inverse_operator`](config/experiment/inverse_operator.yaml). 
 
 ```mermaid
 ---
