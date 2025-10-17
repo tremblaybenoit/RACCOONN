@@ -98,10 +98,10 @@ rule data:
 for prep_type, step_dict in prep_config.items():
     # Set module and exclude_keys based on prep_type
     if prep_type == 'statistics':
-        module_to_run = 'inverse.data.preparation.statistics'
+        module_to_run = 'inverse.data.statistics'
         exclude_keys = 'normalization'
     elif prep_type == 'covariance':
-        module_to_run = 'inverse.data.preparation.covariance'
+        module_to_run = 'inverse.data.covariance'
         exclude_keys = None
     else:
         continue  # Skip unknown prep types or handle as needed
