@@ -27,7 +27,7 @@ stage:
   # Validation set
   valid:
     # Path to validation data
-    dir: ${paths.data_dir}/Valid2
+    dir: ${paths.data_dir}/Val2
     # Split
     split: null
 

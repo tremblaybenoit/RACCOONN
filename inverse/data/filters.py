@@ -48,5 +48,5 @@ def pressure_filter(prof: Union[np.ndarray, torch.Tensor], threshold: float = 1.
         prof_var = torch.var(prof, dim=0, keepdim=True).squeeze()
     else:
         prof_var = prof.var(axis=0, keepdims=True).squeeze()
-    breakpoint()
+
     return prof_var > threshold

@@ -59,53 +59,23 @@ stage:
   # Training set
   train:
     # Path to training data
-    dir: ${paths.data_dir}/Test2
+    dir: ${paths.data_dir}/Train2
     # Split
-    split:
-      _target_: utilities.io.extract_indices
-      _args_:
-        - _target_: numpy.arange
-          _args_:
-            - 0
-            - 256608
-        - _target_: ${data.stage.train.vars.cloud_filter.load._target_}
-          _args_:
-            - _target_: ${data.stage.train.vars.prof.load._target_}
-              path: ${data.stage.train.vars.prof.load.path}
+    split: null
 
   # Validation set
   valid:
     # Path to validation data
-    dir: ${paths.data_dir}/Test2
+    dir: ${paths.data_dir}/Val2
     # Split
-    split:
-      _target_: utilities.io.extract_indices
-      _args_:
-        - _target_: numpy.arange
-          _args_:
-            - 256608
-            - 320760
-        - _target_: ${data.stage.valid.vars.cloud_filter.load._target_}
-          _args_:
-            - _target_: ${data.stage.valid.vars.prof.load._target_}
-              path: ${data.stage.valid.vars.prof.load.path}
+    split: null
 
   # Test set
   test:
     # Path to test data
     dir: ${paths.data_dir}/Test2
     # Split
-    split:
-      _target_: utilities.io.extract_indices
-      _args_:
-        - _target_: numpy.arange
-          _args_:
-            - 320760
-            - 426872
-        - _target_: ${data.stage.test.vars.cloud_filter.load._target_}
-          _args_:
-            - _target_: ${data.stage.test.vars.prof.load._target_}
-              path: ${data.stage.test.vars.prof.load.path}
+    split: null
 
   # Prediction set (NOTE: By default, we use the test set as the prediction set for demonstration purposes)
   predict:
