@@ -17,7 +17,7 @@ def load_npy(path: str, split: np.ndarray = None, dtype: str = 'float32') -> np.
     """
 
     # Load the numpy array from the specified path
-    data = np.load(path).astype(dtype)
+    data = np.load(path, mmap_mode='r').astype(dtype)
 
     # If a split is provided, return the split data
     if split is not None:
@@ -41,7 +41,7 @@ def load_latlon(path: str, scans: np.ndarray = None, split: np.ndarray = None, d
     """
 
     # Load the latitude or longitude variable
-    latlon = np.load(path).astype(dtype)
+    latlon = np.load(path, mmap_mode='r').astype(dtype)
 
     # If scans array is not provided, return the lat/lon as is
     if scans is not None:

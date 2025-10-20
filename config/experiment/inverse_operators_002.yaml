@@ -48,9 +48,9 @@ data:
             _partial_: true
             stats:
               _target_: inverse.data.statistics.read_statistics_var
-              _args_:
-                - ${preparation.statistics.data.output.path}
-                - 'prof'
+              path: ${preparation.statistics.data.output.path}
+              var: 'prof'
+              dtype: ${data.dtype}
             axis: 1  # null
     # Validation set
     valid:

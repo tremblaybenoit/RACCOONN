@@ -70,7 +70,7 @@ hofx:
   # Loading function
   load:
     _target_: utilities.io.load_npy
-    path: ../forward_outputs/forward_emulator/runs/version_000/test_hofx.npy
+    path: ${....dir}/predict_hofx.npy
     split: ${....split}
     dtype: ${data.dtype}
 # Cloud filter

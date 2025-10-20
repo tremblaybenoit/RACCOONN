@@ -33,7 +33,7 @@ trainer:
 # Data configuration
 data:
   # Precision
-  dtype: 'float64'
+  dtype: 'float32'
   # Split ratios for training, validation, and test sets
   stage:
     # Training set
@@ -48,10 +48,10 @@ data:
             _partial_: true
             stats:
               _target_: inverse.data.statistics.read_statistics_var
-              _args_:
-                - ${preparation.statistics.data.output.path}
-                - 'prof'
-            axis: 1  # null
+              path: ${preparation.statistics.data.output.path}
+              var: 'prof'
+              dtype: ${data.dtype}
+            axis: null
     # Validation set
     valid:
       # Variables
@@ -134,7 +134,7 @@ model:
     # Weights for observation (obs), model, and boundary condition (bcs) errors
     lambda_obs: 0.
     lambda_model: 1.
-    lambda_bcs: 10000.
+    lambda_bcs: 1.
     # Loss term for observations
     loss_obs:
       _target_: inverse.model.loss.MSE

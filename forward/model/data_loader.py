@@ -4,6 +4,7 @@ from omegaconf import DictConfig
 from utilities.io import load_var_and_normalize
 from utilities.instantiators import instantiate
 import os
+from tqdm import tqdm
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
 
@@ -218,11 +219,11 @@ class CRTMDataset(BaseDataset):
         self.results = results
 
         # Load input
-        x = {'input': {var: load_var_and_normalize(config) for var, config in input.items()}}
+        x = {'input': {var: load_var_and_normalize(config) for var, config in tqdm(input.items())}}
 
         # Load variables (if provided)
         if target is not None:
-            x['target'] = {var: load_var_and_normalize(config) for var, config in target.items()}
+            x['target'] = {var: load_var_and_normalize(config) for var, config in tqdm(target.items())}
 
         # Class inheritance
         super().__init__(x)
