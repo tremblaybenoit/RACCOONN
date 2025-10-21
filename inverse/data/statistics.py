@@ -63,6 +63,10 @@ def read_statistics_var(path: str, var: str, tensor: bool = False, dtype: str = 
     if tensor:
         stats = {key: torch.tensor(value, dtype=getattr(torch, dtype)) if isinstance(value, np.ndarray) else value
                  for key, value in stats.items()}
+    else:
+        # Convert to correct numpy dtype
+        stats = {key: value.astype(getattr(np, dtype)) if isinstance(value, np.ndarray) else value
+                 for key, value in stats.items()}
 
     # Return statistics for the specified variable
     return stats

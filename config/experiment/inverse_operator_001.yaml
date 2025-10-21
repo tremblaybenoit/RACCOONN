@@ -30,6 +30,14 @@ trainer:
   min_epochs: 1  # To prevent early stopping
   max_epochs: 32  # Number of epochs
 
+# Preparation configuration
+#preparation:
+#  # Statistics configuration
+#  statistics:
+#    data:
+#      output:
+#        path: ${paths.data_dir}/normalization/statistics_cloud_filter_{$data.dtype}.pkl
+
 # Data configuration
 data:
   # Precision
@@ -71,6 +79,8 @@ data:
 
 # Loader configuration
 loader:
+  # Number of workers for data loading
+  num_workers: 8
   # Stage
   stage:
     # Training set
@@ -104,7 +114,7 @@ model:
     # Learning rate
     lr: 0.001
     # Weight decay (L2 regularization)
-    weight_decay: 0.000
+    weight_decay: 1e-8
   # Learning rate scheduler
   lr_scheduler: null
   #  # Function
@@ -124,9 +134,9 @@ model:
     # Model architecture
     architecture:
       # Number of neurons in the hidden layers
-      n_neurons: 64
+      n_neurons: 128
       # Number of hidden layers
-      n_layers: 4
+      n_layers: 6
       # Dropout rate
       dropout: 0.1
   # Loss function and parameters
