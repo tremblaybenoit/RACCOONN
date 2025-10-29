@@ -1,0 +1,7 @@
+defaults:
+  - model_checkpoint
+  - figure_logger
+  - _self_
+
+figure_logger:
+  _target_: inverse.model.callback.FigureLogger

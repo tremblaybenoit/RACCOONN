@@ -1,2 +1,2 @@
 figure_logger:
-  _target_: inverse.model.callback.FigureLogger
+  _target_: forward.model.callback.FigureLogger
