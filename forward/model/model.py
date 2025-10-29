@@ -80,11 +80,16 @@ class BaseModel(LightningModule):
             self.log(f"{stage}_loss", loss.mean(), on_epoch=True, prog_bar=True, logger=True)
             # Store validation outputs
             if self.log_valid:
-                self.valid_results['cloud_filter'].append(batch['cloud_filter'].detach().cpu().numpy())
+                self.valid_results['cloud_filter'].append(batch['input']['cloud_filter'].detach().cpu().numpy())
                 self.valid_results['hofx_target'].append(batch['target']['hofx'].detach().cpu().numpy())
                 self.valid_results['hofx_pred'].append(pred.detach().cpu().numpy())
+        elif stage == 'train':
+            # Log metrics
+            self.log(f"{stage}_loss", loss.mean(), on_epoch=True, prog_bar=True, logger=True)
+            l2_norm = sum((p ** 2).sum() for p in self.parameters() if p.requires_grad)
+            self.log(f"{stage}_l2_norm", l2_norm, on_epoch=True, prog_bar=False, logger=True)
 
-        return loss
+        return loss.mean()
 
     def training_step(self, batch: dict, batch_nb: int) -> torch.Tensor:
         """ Perform training step.
