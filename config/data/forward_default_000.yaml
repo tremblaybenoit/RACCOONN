@@ -1,0 +1,260 @@
+# dtype
+dtype: 'float32'
+
+# Split the data into training, validation, and test sets
+stage:
+  # Training set
+  train:
+    # Path to training data
+    dir: ${paths.data_dir}/Train2
+    # Split
+    split: null
+    # Variables
+    vars:
+      # Atmospheric profiles
+      prof:
+        # Profile types
+        type: [ 'Air temperature', 'Water vapor mixing ratio', 'Cloud ice mass', 'Cloud water mass', 'Snow mass',
+                'Ice particle effective radius', 'Water particle effective radius',
+                'Snow particle effective radius', 'Ozone mixing ratio' ]
+        # Loading function
+        load:
+          _target_: utilities.io.load_npy
+          path: ${....dir}/prof.npy
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Normalization function and parameters
+        normalization:
+          # Function
+          _target_: forward.data.transformations.NormalizeProfiles
+          # Min/max values for normalization
+          profmin:
+            _target_: numpy.loadtxt
+            _args_:
+              - forward/data/normalization/prof_m.txt
+          profmax:
+            _target_: numpy.loadtxt
+            _args_:
+              - forward/data/normalization/prof_div.txt
+          dtype: ${data.dtype}
+      # Surface variables
+      surf:
+        # Surface variable types
+        type: [ 'Ice area fraction', 'Land area fraction', 'Land type', 'Leaf area index', 'Soil temperature',
+                'Snow area fraction', 'Snow thickness', 'Soil temperature',
+                'Surface temperature (ice, land, sea, snow)', 'Wind direction', 'Wind speed',
+                'Vegetation area fraction', 'Water area fraction', 'Volumetric water ratio (soil)' ]
+        # Loading function
+        load:
+          _target_: utilities.io.load_npy
+          path: ${....dir}/surf.npy
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Normalization function and parameters
+        normalization:
+          _target_: forward.data.transformations.NormalizeSurface
+          surfmax:
+            _target_: numpy.loadtxt
+            _args_:
+              - forward/data/normalization/surfmax.txt
+          surfmin:
+            _target_: numpy.loadtxt
+            _args_:
+              - forward/data/normalization/surfmin.txt
+          dtype: ${data.dtype}
+      # Metadata
+      meta:
+        # Metadata variable types
+        type: [ 'Sensor scan angle', 'Sensor zenith angle', 'Sensor view angle', 'Sensor azimuth angle',
+                'Sensor elevation angle', 'Solar azimuth angle', 'Solar zenith angle' ]
+        # Loading function
+        load:
+          _target_: utilities.io.load_npy
+          path: ${....dir}/meta.npy
+          split: ${....split}
+        # Normalization function and parameters
+        normalization:
+          _target_: forward.data.transformations.NormalizeMeta
+          settings:
+            meta_cos_vars: [ 6 ]
+            meta_scale_factor: 180
+            meta_scale_offset: -180
+            meta_scale_vars: [ ]
+            meta_sin_vars: [ 0, 1, 2, 3, 4, 5 ]
+      # Brightness temperatures
+      hofx:
+        # Loading function
+        load:
+          _target_: utilities.io.load_npy
+          path: ${....dir}/hofx.npy
+          split: ${....split}
+          dtype: ${data.dtype}
+      # Cloud filter
+      cloud_filter:
+        # Loading function
+        load:
+          _target_: inverse.data.filters.cloud_filter
+          _args_:
+            - ${....prof.load}
+
+  # Validation set
+  valid:
+    # Path to validation data
+    dir: ${paths.data_dir}/Val2
+    # Split
+    split: null
+    # Variables
+    vars:
+      # Atmospheric profiles
+      prof:
+        # Profile types
+        type: ${data.stage.train.vars.prof.type}
+        # Loading function
+        load:
+          _target_: utilities.io.load_npy
+          path: ${....dir}/prof.npy
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Normalization function and parameters
+        normalization: ${data.stage.train.vars.prof.normalization}
+      # Surface variables
+      surf:
+        # Surface variable types
+        type: ${data.stage.train.vars.surf.type}
+        # Loading function
+        load:
+          _target_: utilities.io.load_npy
+          path: ${....dir}/surf.npy
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Normalization function and parameters
+        normalization: ${data.stage.train.vars.surf.normalization}
+      # Metadata
+      meta:
+        # Metadata variable types
+        type: ${data.stage.train.vars.meta.type}
+        # Loading function
+        load:
+          _target_: utilities.io.load_npy
+          path: ${....dir}/meta.npy
+          split: ${....split}
+        # Normalization function and parameters
+        normalization: ${data.stage.train.vars.meta.normalization}
+      # Brightness temperatures
+      hofx:
+        # Loading function
+        load:
+          _target_: utilities.io.load_npy
+          path: ${....dir}/hofx.npy
+          split: ${....split}
+          dtype: ${data.dtype}
+      # Cloud filter
+      cloud_filter:
+        # Loading function
+        load:
+          _target_: inverse.data.filters.cloud_filter
+          _args_:
+            - ${....prof.load}
+
+  # Test set
+  test:
+    # Path to validation data
+    dir: ${paths.data_dir}/Val2
+    # Split
+    split: null
+    # Variables
+    vars:
+      # Atmospheric profiles
+      prof:
+        # Profile types
+        type: ${data.stage.train.vars.prof.type}
+        # Loading function
+        load:
+          _target_: utilities.io.load_npy
+          path: ${....dir}/prof.npy
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Normalization function and parameters
+        normalization: ${data.stage.train.vars.prof.normalization}
+      # Surface variables
+      surf:
+        # Surface variable types
+        type: ${data.stage.train.vars.surf.type}
+        # Loading function
+        load:
+          _target_: utilities.io.load_npy
+          path: ${....dir}/surf.npy
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Normalization function and parameters
+        normalization: ${data.stage.train.vars.surf.normalization}
+      # Metadata
+      meta:
+        # Metadata variable types
+        type: ${data.stage.train.vars.meta.type}
+        # Loading function
+        load:
+          _target_: utilities.io.load_npy
+          path: ${....dir}/meta.npy
+          split: ${....split}
+        # Normalization function and parameters
+        normalization: ${data.stage.train.vars.meta.normalization}
+      # Brightness temperatures
+      hofx:
+        # Loading function
+        load:
+          _target_: utilities.io.load_npy
+          path: ${....dir}/hofx.npy
+          split: ${....split}
+          dtype: ${data.dtype}
+      # Cloud filter
+      cloud_filter:
+        # Loading function
+        load:
+          _target_: inverse.data.filters.cloud_filter
+          _args_:
+            - ${....prof.load}
+
+  # Prediction set (NOTE: By default, we use the test set as the prediction set for demonstration purposes)
+  predict:
+    # Path to prediction data
+    dir: ${paths.data_dir}/Test2
+    # Split
+    split: null
+    # Variables
+    vars:
+      # Atmospheric profiles
+      prof:
+        # Profile types
+        type: ${data.stage.train.vars.prof.type}
+        # Loading function
+        load:
+          _target_: utilities.io.load_npy
+          path: ${....dir}/prof.npy
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Normalization function and parameters
+        normalization: ${data.stage.train.vars.prof.normalization}
+      # Surface variables
+      surf:
+        # Surface variable types
+        type: ${data.stage.train.vars.surf.type}
+        # Loading function
+        load:
+          _target_: utilities.io.load_npy
+          path: ${....dir}/surf.npy
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Normalization function and parameters
+        normalization: ${data.stage.train.vars.surf.normalization}
+      # Metadata
+      meta:
+        # Metadata variable types
+        type: ${data.stage.train.vars.meta.type}
+        # Loading function
+        load:
+          _target_: utilities.io.load_npy
+          path: ${....dir}/meta.npy
+          split: ${....split}
+        # Normalization function and parameters
+        normalization: ${data.stage.train.vars.meta.normalization}
