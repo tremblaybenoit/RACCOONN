@@ -41,14 +41,10 @@ class FigureLogger(Callback):
         # Radiances
         hofx_target = np.concatenate(model.valid_results['hofx_target'], axis=0)
         hofx_pred = np.concatenate(model.valid_results['hofx_pred'], axis=0)
-        # Profiles (in original units)
+        # Profiles
         prof_target = np.concatenate(model.valid_results['prof_target'], axis=0)
         prof_pred = np.concatenate(model.valid_results['prof_pred'], axis=0)
         prof_err = (prof_pred - prof_target)**2
-        # Profiles (in normalized units)
-        prof_norm_target = np.concatenate(model.valid_results['prof_norm_target'], axis=0)
-        prof_norm_pred = np.concatenate(model.valid_results['prof_norm_pred'], axis=0)
-        prof_norm_err = (prof_norm_pred - prof_norm_target)**2
         # Pressure_levels
         pressure_levels = 0.01*(
             instantiate(trainer.datamodule.stage.valid.input.pressure.normalization, inverse_transform=True)
@@ -60,7 +56,7 @@ class FigureLogger(Callback):
         # List of figures to log
         figs = []
 
-        # Profiles (original units)
+        # Profiles
         sources = [prof_target, prof_pred]
         sources_labels = ['Target', 'Prediction']
         sources_colors = ['#1f77b4', '#ff7f0e']
@@ -70,26 +66,11 @@ class FigureLogger(Callback):
            sources_labels.insert(0, 'Background')
            sources_colors.insert(0, '#2ca02c')
         figs.append(fig_vertical_profiles(sources, sources_labels, y=pressure_levels, y_label='Pressure (hPa)',
-                                          x_label='Profile value (units)', color=sources_colors,
-                                          title=[f"Epoch {current_epoch:02d} - {prof_label}" for prof_label in prof_labels]))
-
-        # Normalized profiles
-        norm_sources = [prof_norm_target, prof_norm_pred]
-        norm_sources_labels = ['Target', 'Prediction']
-        norm_sources_colors = ['#1f77b4', '#ff7f0e']
-        if 'prof_norm_background' in model.valid_results and len(model.valid_results['prof_norm_background']) > 0:
-           prof_norm_background = np.concatenate(model.valid_results['prof_norm_background'], axis=0)
-           norm_sources.insert(0, prof_norm_background)
-           norm_sources_labels.insert(0, 'Background')
-           norm_sources_colors.insert(0, '#2ca02c')
-        figs.append(fig_vertical_profiles(norm_sources, norm_sources_labels, y=pressure_levels, y_label='Pressure (hPa)',
-                                          x_label='Normalized profile value (no units)', color=norm_sources_colors,
+                                          x_label='Normalized profile value (no units)', color=sources_colors,
                                           title=[f"Epoch {current_epoch:02d} - {prof_label}" for prof_label in prof_labels]))
 
         # Profile errors
         figs.append(fig_vertical_profiles([prof_err], ['Target-Prediction'], y=pressure_levels, y_label='Pressure (hPa)',
-                                          x_label='Profile errors (units)', title=[f"Epoch {current_epoch:02d} - {prof_label}" for prof_label in prof_labels]))
-        figs.append(fig_vertical_profiles([prof_norm_err], ['Target-Prediction'], y=pressure_levels, y_label='Pressure (hPa)',
                                           x_label='Normalized profile errors (no units)', title=[f"Epoch {current_epoch:02d} - {prof_label}" for prof_label in prof_labels]))
 
         # Forward model RMSE
@@ -97,7 +78,7 @@ class FigureLogger(Callback):
                                                                          f"Epoch {current_epoch:02d} - Normalized forward model errors"]))
 
         # Tags for each figure
-        tags = ["VerticalProfiles", "VerticalNormalizedProfiles", "VerticalErrors", "VerticalNormalizedErrors", "RadianceRMSE"]
+        tags = ["VerticalProfiles", "VerticalErrors", "RadianceRMSE"]
 
         # Save figures to a buffer
         for logger in trainer.loggers if hasattr(trainer, "loggers") else [trainer.logger]:

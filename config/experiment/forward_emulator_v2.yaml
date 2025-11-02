@@ -70,6 +70,14 @@ data:
         prof:
           # Normalization function and parameters
           normalization: ${data.stage.train.vars.prof.normalization}
+    # Prediction set
+    predict:
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Normalization function and parameters
+          normalization: ${data.stage.train.vars.prof.normalization}
 
 # Logger configuration
 logger:

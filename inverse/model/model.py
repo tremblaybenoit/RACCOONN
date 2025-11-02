@@ -65,10 +65,7 @@ class PINNverseOperator(BaseModel):
                 'hofx_pred': [],
                 'prof_target': [],
                 'prof_pred': [],
-                'prof_norm_target': [],
-                'prof_norm_pred': [],
                 'prof_background': [],
-                'prof_norm_background': [],
                 'pressure': [],
                 'cloud_filter': []
             }
@@ -200,14 +197,12 @@ class PINNverseOperator(BaseModel):
             if self.log_valid:
                 # Store validation outputs
                 for k, v in {'prof_target': target['prof'], 'prof_pred': pred['prof'],
-                             'prof_norm_target': target['prof_norm'], 'prof_norm_pred': pred['prof_norm'],
                              'hofx_target': target['hofx'], 'hofx_pred': pred['hofx'],
                              'pressure': input['pressure'], 'cloud_filter': target['cloud_filter'].bool()}.items():
                     self.valid_results[k].append(v.detach().cpu().numpy())
                 # Store background if available
                 if 'prof_background' in target:
-                    for k, v in {'prof_background': target['prof_background'],
-                                 'prof_norm_background': target['prof_norm_background']}.items():
+                    for k, v in {'prof_background': target['prof_background']}.items():
                         self.valid_results[k].append(v.detach().cpu().numpy())
         else:
             # Logger flag
@@ -260,15 +255,14 @@ class PINNverseOperator(BaseModel):
         """
 
         # Compute profiles
-        pred = {'prof_norm': self.forward(batch['input'])}
+        pred = {'prof': self.forward(batch['input'])}
         # Apply output transformations
         for t, transform in enumerate(self.transform_out):
-            pred['prof'] = transform(pred['prof']) if t > 0 else transform(pred['prof_norm'])
+            pred['prof'] = transform(pred['prof'])
 
         # Mask
-        mask = torch.zeros_like(pred['prof_norm'])
+        mask = torch.zeros_like(pred['prof'])
         mask[:, 0:1, :] = 1.0
-        pred['prof_norm'] = pred['prof_norm'] * mask + batch['target']['prof_norm'] * (1 - mask)
         pred['prof'] = pred['prof'] * mask + batch['target']['prof'] * (1 - mask)
 
         # Compute loss function
@@ -316,28 +310,6 @@ class PINNverseOperator(BaseModel):
         if self.log_valid:
             for k in self.valid_results:
                 self.valid_results[k].clear()
-
-    def to(self, device, dtype: torch.dtype=None, non_blocking: bool = False):
-        """ Move model to the specified device.
-
-            Parameters
-            ----------
-            device: torch.device. Device to move the model to.
-            dtype: torch.dtype. Data type to move the model to.
-            non_blocking: bool. Whether to use non-blocking transfers.
-
-            Returns
-            -------
-            self: PINNverseOperator. The model moved to the specified device.
-        """
-
-        super().to(device, dtype=dtype, non_blocking=non_blocking)
-        # Move normalization modules if needed
-        for attr in ['normalize_prof', 'unnormalize_prof']:
-            norm = getattr(self, attr, None)
-            if hasattr(norm, 'to'):
-                setattr(self, attr, norm.to(device))
-        return self
 
 
 class PINNverseOperators(PINNverseOperator):

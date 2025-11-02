@@ -27,13 +27,9 @@ stage:
       surf: ${data.stage.train.vars.surf}
       meta: ${data.stage.train.vars.meta}
       # Optimization targets
-      prof_norm: ${data.stage.train.vars.prof}
-      prof_norm_background: ${data.stage.train.vars.prof_background}
-      prof_norm_increment: ${data.stage.train.vars.prof_increment}
-      prof:
-        load: ${data.stage.train.vars.prof.load}
-      prof_background:
-        load: ${data.stage.train.vars.prof_background.load}
+      prof: ${data.stage.train.vars.prof}
+      prof_background: ${data.stage.train.vars.prof_background}
+      prof_increment: ${data.stage.train.vars.prof_increment}
       hofx: ${data.stage.train.vars.hofx}
       cloud_filter: ${data.stage.train.vars.cloud_filter}
 
@@ -55,13 +51,9 @@ stage:
       surf: ${data.stage.valid.vars.surf}
       meta: ${data.stage.valid.vars.meta}
       # Optimization targets
-      prof_norm: ${data.stage.valid.vars.prof}
-      prof_norm_background: ${data.stage.valid.vars.prof_background}
-      prof_norm_increment: ${data.stage.valid.vars.prof_increment}
-      prof:
-        load: ${data.stage.valid.vars.prof.load}
-      prof_background:
-        load: ${data.stage.valid.vars.prof_background.load}
+      prof: ${data.stage.valid.vars.prof}
+      prof_background: ${data.stage.valid.vars.prof_background}
+      prof_increment: ${data.stage.valid.vars.prof_increment}
       hofx: ${data.stage.valid.vars.hofx}
       cloud_filter: ${data.stage.valid.vars.cloud_filter}
   # Test set
@@ -82,13 +74,9 @@ stage:
       surf: ${data.stage.test.vars.surf}
       meta: ${data.stage.test.vars.meta}
       # Optimization targets
-      prof_norm: ${data.stage.test.vars.prof}
-      prof_norm_background: ${data.stage.test.vars.prof_background}
-      prof_norm_increment: ${data.stage.test.vars.prof_increment}
-      prof:
-        load: ${data.stage.test.vars.prof.load}
-      prof_background:
-        load: ${data.stage.test.vars.prof_background.load}
+      prof: ${data.stage.test.vars.prof}
+      prof_background: ${data.stage.test.vars.prof_background}
+      prof_increment: ${data.stage.test.vars.prof_increment}
       hofx: ${data.stage.test.vars.hofx}
       cloud_filter: ${data.stage.test.vars.cloud_filter}
     # Results
