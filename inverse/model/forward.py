@@ -17,7 +17,7 @@ class CRTMForward:
         None.
         """
         # Load the checkpoint
-        checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=True)
+        checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
         # Load the configuration
         config = OmegaConf.load(config_path)
         # Trim the configuration to only extract the model parameters
