@@ -10,7 +10,7 @@ defaults:
   - override /loader: inverse_default
   - override /model: inverse_operator
   - override /trainer: gpu
-  - override /callbacks: default
+  - override /callbacks: inverse_default
   - override /logger: default
 
 # All parameters below will be merged with parameters from default configurations set above.
@@ -59,7 +59,7 @@ data:
               path: ${preparation.statistics.data.output.path}
               var: 'prof'
               dtype: ${data.dtype}
-            axis: null
+            axis: 1
     # Validation set
     valid:
       # Variables
@@ -112,7 +112,7 @@ model:
   # Optimizer function and parameters
   optimizer:
     # Learning rate
-    lr: 0.001
+    lr: 0.0001
     # Weight decay (L2 regularization)
     weight_decay: 1e-8
   # Learning rate scheduler
@@ -134,9 +134,9 @@ model:
     # Model architecture
     architecture:
       # Number of neurons in the hidden layers
-      n_neurons: 128
+      n_neurons: 256
       # Number of hidden layers
-      n_layers: 6
+      n_layers: 8
       # Dropout rate
       dropout: 0.1
   # Loss function and parameters

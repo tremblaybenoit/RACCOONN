@@ -67,6 +67,7 @@ class FigureLogger(Callback):
                     with tempfile.TemporaryDirectory() as tmpdir:
                         filename = os.path.join(tmpdir, f"{tag}_Epoch_{current_epoch:02d}.png")
                         fig.savefig(filename)
+                        logger.experiment.log_artifact(logger.run_id, filename, artifact_path="figures")
 
         # Close figures to free memory
         plt.close('all')

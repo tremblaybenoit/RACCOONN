@@ -1,0 +1,44 @@
+# Statistics of the dataset
+statistics:
+  # Statistics of the training set
+  data:
+    # Function
+    _target_: inverse.data.statistics.compute_statistics
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      prof:
+        load:
+          _target_: utilities.io.load_stack
+          _recursive_: false
+          stack:
+            - ${data.stage.train.vars.prof}
+            - ${data.stage.valid.vars.prof}
+            - ${data.stage.test.vars.prof}
+      surf:
+        load:
+          _target_: utilities.io.load_stack
+          _recursive_: false
+          stack:
+            - ${data.stage.train.vars.surf}
+            - ${data.stage.valid.vars.surf}
+            - ${data.stage.test.vars.surf}
+      meta:
+        load:
+          _target_: utilities.io.load_stack
+          _recursive_: false
+          stack:
+              - ${data.stage.train.vars.meta}
+              - ${data.stage.valid.vars.meta}
+              - ${data.stage.test.vars.meta}
+      hofx:
+        load:
+          _target_: utilities.io.load_stack
+          _recursive_: false
+          stack:
+              - ${data.stage.train.vars.hofx}
+              - ${data.stage.valid.vars.hofx}
+              - ${data.stage.test.vars.hofx}
+    # What the method produces as output (pickle file)
+    output:
+      path: ${paths.data_dir}/normalization/statistics_cloud_filter.pkl

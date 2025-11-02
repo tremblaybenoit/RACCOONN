@@ -11,19 +11,7 @@ prof:
     split: ${....split}
     dtype: ${data.dtype}
   # Normalization function and parameters
-  normalization:
-    # Function
-    _target_: forward.data.transformations.NormalizeProfiles
-    # Min/max values for normalization
-    profmin:
-      _target_: numpy.loadtxt
-      _args_:
-        - forward/data/normalization/prof_m.txt
-    profmax:
-      _target_: numpy.loadtxt
-      _args_:
-        - forward/data/normalization/prof_div.txt
-    dtype: ${data.dtype}
+  normalization: null
 # Surface variables
 surf:
   # Surface variable types

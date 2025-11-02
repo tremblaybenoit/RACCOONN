@@ -10,7 +10,7 @@ defaults:
   - override /loader: inverse_default
   - override /model: inverse_operator
   - override /trainer: gpu
-  - override /callbacks: default
+  - override /callbacks: inverse_default
   - override /logger: default
 
 # All parameters below will be merged with parameters from default configurations set above.

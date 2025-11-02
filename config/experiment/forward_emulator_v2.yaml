@@ -1,0 +1,78 @@
+# @package _global_
+# Experiment-specific Hydra structure
+
+# Overriding default structure
+defaults:
+  - override /paths: default
+  - override /hydra: default
+  - override /data: forward_default
+  - override /preparation: forward_statistics
+  - override /loader: forward_default
+  - override /model: forward_emulator
+  - override /trainer: gpu
+  - override /callbacks: forward_default
+  - override /logger: default
+
+# All parameters below will be merged with parameters from default configurations set above.
+# This allows you to overwrite only specified parameters
+
+# Task name. Note that it determines the output directory path
+task_name: "forward_emulator"  # Experiment
+
+# Run id (unique identifier for the run)
+paths:
+  task_dir: "../forward_outputs"
+  run_id: "v2"
+  data_dir: "../../GOES_ML-main/Data"
+
+# Trainer configuration
+trainer:
+  min_epochs: 1  # To prevent early stopping
+  max_epochs: 64  # Number of epochs
+
+# Data configuration
+data:
+  # Precision
+  dtype: 'float32'
+  # Split ratios for training, validation, and test sets
+  stage:
+    # Training set
+    train:
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Normalization function and parameters
+          normalization:
+            # Function
+            _target_: inverse.data.transformations.min_max
+            _partial_: true
+            # Min/max values for normalization
+            stats:
+              _target_: inverse.data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'prof'
+              dtype: ${data.dtype}
+            axis: 1
+    # Validation set
+    valid:
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Normalization function and parameters
+          normalization: ${data.stage.train.vars.prof.normalization}
+    # Test set
+    test:
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Normalization function and parameters
+          normalization: ${data.stage.train.vars.prof.normalization}
+
+# Logger configuration
+logger:
+  # MLflow logger
+  ports:
+    mlflow: 5001

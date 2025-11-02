@@ -160,7 +160,7 @@ class Operator:
         if self.model is None:
             logger.info("Loading model...")
             self.model = instantiate(self.config.model)
-            checkpoint = torch.load(self.checkpoint_path, map_location='cpu', weights_only=True)
+            checkpoint = torch.load(self.checkpoint_path, map_location='cpu', weights_only=False)
             self.model.load_state_dict(checkpoint['state_dict'], strict=False)
             if hasattr(self.config.data, 'dtype'):
                 self.model = self.model.to(None, dtype=getattr(torch, self.config.data.dtype))

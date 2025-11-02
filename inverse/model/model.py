@@ -265,6 +265,12 @@ class PINNverseOperator(BaseModel):
         for t, transform in enumerate(self.transform_out):
             pred['prof'] = transform(pred['prof']) if t > 0 else transform(pred['prof_norm'])
 
+        # Mask
+        mask = torch.zeros_like(pred['prof_norm'])
+        mask[:, 0:1, :] = 1.0
+        pred['prof_norm'] = pred['prof_norm'] * mask + batch['target']['prof_norm'] * (1 - mask)
+        pred['prof'] = pred['prof'] * mask + batch['target']['prof'] * (1 - mask)
+
         # Compute loss function
         loss, pred['hofx'] = self.loss_func(pred, batch['target'])
 
