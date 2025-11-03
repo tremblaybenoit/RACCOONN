@@ -24,6 +24,13 @@ paths:
   task_dir: "../forward_outputs"
   run_id: "v2"
   data_dir: "../../GOES_ML-main/Data"
+  checkpoint_dir: "forward/model/checkpoints"
+
+# Callback configuration
+callbacks:
+  # Model checkpoint callback
+  model_checkpoint:
+    filename: "model_v2"
 
 # Trainer configuration
 trainer:
