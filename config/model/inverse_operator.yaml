@@ -60,19 +60,7 @@ loss_func:
     # Precision
     dtype: ${data.dtype}
     # Normalization for the profile variables
-    prof_norm:
-      # Function
-      _target_: forward.data.transformations.NormalizeProfiles
-      # Min/max values for normalization
-      profmin:
-        _target_: numpy.loadtxt
-        _args_:
-          - forward/data/normalization/prof_m.txt
-      profmax:
-        _target_: numpy.loadtxt
-        _args_:
-          - forward/data/normalization/prof_div.txt
-      dtype: ${data.dtype}
+    prof_norm: null
   # Weights for observation (obs), model, and boundary condition (bcs) errors
   lambda_obs: 0.
   lambda_model: 1.
