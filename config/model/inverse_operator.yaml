@@ -90,13 +90,7 @@ activation_out:
   _target_: torch.nn.Sigmoid
 
 # Transformations (to apply after the output layer)
-transform_out:
-  # Inverse normalization for profile variables
-  - _target_: ${data.stage.train.vars.prof.normalization._target_}
-    _partial_: true
-    stats: ${data.stage.train.vars.prof.normalization.stats}
-    axis: ${data.stage.train.vars.prof.normalization.axis}  # Axis for normalization
-    inverse_transform: true
+transform_out: null
 
 # Plot logger
 log_valid: true
