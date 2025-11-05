@@ -7,7 +7,7 @@ optimizer:
   # Function
   _target_: torch.optim.Adam
   # Learning rate
-  lr: 0.001
+  lr: 0.0005
   # Weight decay (L2 regularization)
   weight_decay: 0.000
 

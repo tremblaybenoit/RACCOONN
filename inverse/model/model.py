@@ -1,9 +1,12 @@
 import torch
 import torch.nn as nn
-from typing import Callable
+from typing import Callable, Union
 from omegaconf import DictConfig, ListConfig
 from pytorch_lightning import LightningModule
+from torch.nn import Sigmoid
 from forward.model.model import BaseModel
+from forward.model.activation import Sine
+from inverse.model.encoding import IdentityPositionalEncoding
 from utilities.instantiators import instantiate
 from data.transformations import identity
 from copy import deepcopy
@@ -76,13 +79,17 @@ class PINNverseOperator(BaseModel):
         self.transform_out = [instantiate(t) for t in transform_out] if transform_out is not None else [identity]
 
         # Model architecture
-        self.n_prof = parameters.data.n_prof
-        self.n_levels = parameters.data.n_levels
-        self.prof_vars = parameters.data.prof_vars
+        self.n_prof = parameters.data.n_prof if parameters is not None and hasattr(parameters.data, 'n_prof') \
+            else 1
+        self.n_levels = parameters.data.n_levels if parameters is not None and hasattr(parameters.data, 'n_levels') \
+            else 1
+        self.prof_vars = parameters.data.prof_vars if parameters is not None and hasattr(parameters.data, 'prof_vars') \
+            else [f'var_{i}' for i in range(self.n_prof)]
+
         self.model = self._build_model(positional_encoding, activation_in, activation_out, parameters)
 
-    def _build_model(self, positional_encoding: DictConfig, activation_in: DictConfig, activation_out: DictConfig,
-                     parameters: DictConfig) -> nn.Module:
+    def _build_model(self, positional_encoding: Union[DictConfig, None], activation_in: Union[DictConfig, None],
+                     activation_out: Union[DictConfig, None], parameters: Union[DictConfig, None]) -> nn.Module:
         """ Build the neural network model.
 
             Parameters
@@ -97,29 +104,53 @@ class PINNverseOperator(BaseModel):
             None.
         """
 
+        # Parameters check
+        dropout_rate = parameters.architecture.dropout if parameters is not None and \
+            hasattr(parameters.architecture, 'dropout') else 0.0
+        n_neurons = parameters.architecture.n_neurons if parameters is not None and \
+            hasattr(parameters.architecture, 'n_neurons') else 128
+        n_layers = parameters.architecture.n_layers if parameters is not None and \
+            hasattr(parameters.architecture, 'n_layers') else 4
+        n_lat = parameters.data.n_lat if parameters is not None and \
+            hasattr(parameters.data, 'n_lat') else 1
+        n_lon = parameters.data.n_lon if parameters is not None and \
+            hasattr(parameters.data, 'n_lon') else 1
+        n_scans = parameters.data.n_scans if parameters is not None and \
+            hasattr(parameters.data, 'n_scans') else 1
+        n_pressure = parameters.data.n_pressure if parameters is not None and \
+            hasattr(parameters.data, 'n_pressure') else 1
+        n_cloud = parameters.data.n_cloud if parameters is not None and \
+            hasattr(parameters.data, 'n_cloud') else 0
+        n_prof = parameters.data.n_prof if parameters is not None and \
+            hasattr(parameters.data, 'n_prof') else 1
+        n_levels = parameters.data.n_levels if parameters is not None and \
+            hasattr(parameters.data, 'n_levels') else 1
+
         # Positional encoding
-        d_input = (parameters.data.n_lat + parameters.data.n_lon + parameters.data.n_scans + parameters.data.n_pressure + parameters.data.n_cloud)
-        self.positional_encoding = instantiate(positional_encoding, d_input=d_input)
+        d_input = n_lat + n_lon + n_scans + n_pressure + n_cloud
+        self.positional_encoding = instantiate(positional_encoding, d_input=d_input) if positional_encoding is not None \
+            else IdentityPositionalEncoding(d_input=d_input)
         # Input layer
-        self.d_in = nn.Linear(self.positional_encoding.d_output, parameters.architecture.n_neurons)
-        self.activation_in = instantiate(activation_in)
-        self.dropout_in = nn.Dropout(parameters.architecture.dropout)
+        self.d_in = nn.Linear(self.positional_encoding.d_output, n_neurons)
+        self.activation_in = instantiate(activation_in) if activation_in is not None else Sine()
+        self.dropout_in = nn.Dropout(dropout_rate)
         # Output layer
-        self.d_out = nn.Linear(parameters.architecture.n_neurons, parameters.data.n_prof*parameters.data.n_levels)
-        self.activation_out = instantiate(activation_out)
+        self.d_out = nn.Linear(n_neurons, n_prof*n_levels)
+        self.activation_out = instantiate(activation_out) if activation_out is not None else nn.Identity()
 
         # Model architecture
-        self.layers = nn.ModuleList([nn.Linear(parameters.architecture.n_neurons, parameters.architecture.n_neurons)
-                                     for _ in range(parameters.architecture.n_layers)])
-        self.batchnorm_layers = nn.ModuleList([nn.BatchNorm1d(parameters.architecture.n_neurons)
-                                               for _ in range(parameters.architecture.n_layers)])
-        self.activations = nn.ModuleList([instantiate(activation_in) for _ in range(parameters.architecture.n_layers)])
-        self.dropouts = nn.ModuleList([nn.Dropout(parameters.architecture.dropout)
-                                       for _ in range(parameters.architecture.n_layers)])
+        self.layers = nn.ModuleList([nn.Linear(n_neurons, n_neurons)
+                                     for _ in range(n_layers)])
+        self.batchnorm_layers = nn.ModuleList([nn.BatchNorm1d(n_neurons)
+                                               for _ in range(n_layers)])
+        self.activations = nn.ModuleList([instantiate(activation_in) if activation_in is not None else Sine()
+                                          for _ in range(n_layers)])
+        self.dropouts = nn.ModuleList([nn.Dropout(dropout_rate)
+                                       for _ in range(n_layers)])
         model = nn.Sequential(
             self.d_in,
             self.activation_in,
-            nn.Dropout(parameters.architecture.dropout),
+            nn.Dropout(dropout_rate),
             *[layer for hidden in zip(self.layers, self.batchnorm_layers, self.activations, self.dropouts) for layer in hidden],
             self.d_out,
             self.activation_out
@@ -315,7 +346,7 @@ class PINNverseOperator(BaseModel):
 class PINNverseOperators(PINNverseOperator):
     """Physics-Informed Neural Network (PINN) inverse model with one neural network per profile type."""
 
-    def __init__(self, optimizer: DictConfig = None, loss_func: Callable = None, lr_scheduler: DictConfig = None,
+    def __init__(self, optimizer: DictConfig = None, loss_func: DictConfig = None, lr_scheduler: DictConfig = None,
                  positional_encoding: DictConfig = None, activation_in: DictConfig = None, activation_out: DictConfig = None,
                  transform_out: ListConfig = None, parameters: DictConfig = None, log_valid: bool = False):
         """ Initialize model.
@@ -352,7 +383,7 @@ class PINNverseOperators(PINNverseOperator):
         ])
 
     @staticmethod
-    def _patch_profiles(parameters):
+    def _patch_profiles(parameters: DictConfig) -> DictConfig:
         """Set n_prof=1 in parameters for sub-model construction."""
         parameters.data.n_prof = 1
         return parameters
