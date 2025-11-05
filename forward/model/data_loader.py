@@ -1,7 +1,7 @@
 import pytorch_lightning as pl
 from torch.utils.data import Dataset, DataLoader
 from omegaconf import DictConfig
-from utilities.io import load_var_and_normalize
+from data.io import load_var_and_normalize
 from utilities.instantiators import instantiate
 import os
 from tqdm import tqdm

@@ -2,20 +2,11 @@
 defaults:
   - hydra: default
   - paths: default
-  - data: forward
-  - preparation: default
+  - data: inverse_
+  - preparation: inverse_default
   - loader: inverse_train  # Training only
-  - model: forward_emulator
+  - model: inverse_operator
   - trainer: default
-  - callbacks: default
+  - callbacks: inverse_default
   - logger: default
   - _self_
-
-# Task name. Note that it determines the output directory path
-task_name: "default"  # Experiment
-task_seed: 3210  # For reproducibility
-
-paths:
-  task_dir: "../forward_outputs"
-  run_id: "version_001"
-  data_dir: "../../GOES_ML-main/Data"

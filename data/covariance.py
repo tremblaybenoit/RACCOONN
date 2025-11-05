@@ -1,7 +1,7 @@
 import numpy as np
 import hydra
 from omegaconf import DictConfig
-from utilities.io import load_var_and_normalize
+from data.io import load_var_and_normalize
 from utilities.instantiators import instantiate
 from utilities.logic import get_config_path
 from utilities.plot import plot_map, save_plot, flexible_gridspec

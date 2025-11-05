@@ -3,7 +3,6 @@ from pylab import *
 import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
 import mpl_scatter_density
-from  forward.evaluation.metrics import rmse
 from typing import Union, Callable, Optional
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -177,6 +176,23 @@ def apply_colorbar(ax, plot, font_size: float=13, label: str='Density', label_pa
             cbar.set_label(label, labelpad=label_pad, rotation=rotation if rotation is not None else (270 if side=='right' else 90), size=font_size)
 
     return cbar
+
+
+# RMSE computations
+def rmse(errors, axis=0):
+    """ Computes the root mean squared error (RMSE) between predicted and true values.
+
+    Parameters
+    ----------
+    errors : np.ndarray. Array of errors (predicted - true values).
+    axis : int. Axis along which to compute the RMSE (default is 0).
+
+    Returns
+    -------
+    np.ndarray. RMSE values.
+    """
+
+    return np.sqrt(np.mean(errors ** 2, axis=axis))
 
 
 def compute_min_max(data: np.ndarray, symmetric: bool=False) -> tuple[float, float]:

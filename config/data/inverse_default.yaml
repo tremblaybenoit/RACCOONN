@@ -18,37 +18,37 @@ dtype: 'float32'
 # Pressure filter
 pressure_filter:
   load:
-    _target_: inverse.data.filters.pressure_filter
+    _target_: data.filters.pressure_filter
     prof:
-      _target_: utilities.io.load_stack_and_normalize
+      _target_: data.io.load_stack_and_normalize
       _recursive_: false
       stack:
         - load: ${data.stage.train.vars.prof.load}
           normalization:
-            _target_: inverse.data.transformations.min_max
+            _target_: data.transformations.min_max
             _partial_: true
             stats:
-              _target_: inverse.data.statistics.read_statistics_var
+              _target_: data.statistics.read_statistics_var
               path: ${preparation.statistics.data.output.path}
               var: 'prof'
               dtype: ${data.dtype}
             axis: null
         - load: ${data.stage.valid.vars.prof.load}
           normalization:
-            _target_: inverse.data.transformations.min_max
+            _target_: data.transformations.min_max
             _partial_: true
             stats:
-              _target_: inverse.data.statistics.read_statistics_var
+              _target_: data.statistics.read_statistics_var
               path: ${preparation.statistics.data.output.path}
               var: 'prof'
               dtype: ${data.dtype}
             axis: null
         - load: ${data.stage.test.vars.prof.load}
           normalization:
-            _target_: inverse.data.transformations.min_max
+            _target_: data.transformations.min_max
             _partial_: true
             stats:
-              _target_: inverse.data.statistics.read_statistics_var
+              _target_: data.statistics.read_statistics_var
               path: ${preparation.statistics.data.output.path}
               var: 'prof'
               dtype: ${data.dtype}

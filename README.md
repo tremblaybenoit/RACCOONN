@@ -149,8 +149,8 @@ python -m config.setup -overrides "+experiment=inverse_operator"
 ```
 2. Prepare data for the inverse model:
 ```bash
-python -m inverse.data.statistics +experiment=inverse_operator
-python -m inverse.data.covariance +experiment=inverse_operator
+python -m data.statistics +experiment=inverse_operator
+python -m data.covariance +experiment=inverse_operator
 ```
 2. Train the inverse model:
 ```bash

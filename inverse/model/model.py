@@ -5,7 +5,7 @@ from omegaconf import DictConfig, ListConfig
 from pytorch_lightning import LightningModule
 from forward.model.model import BaseModel
 from utilities.instantiators import instantiate
-from inverse.data.transformations import identity
+from data.transformations import identity
 from copy import deepcopy
 
 

@@ -1,5 +1,5 @@
 # Configuration to load multiple preparation methods
 defaults:
-  - inverse_statistics
-  - inverse_covariance
+  - statistics
+  - covariance
   - _self_

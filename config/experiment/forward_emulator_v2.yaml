@@ -6,7 +6,7 @@ defaults:
   - override /paths: default
   - override /hydra: default
   - override /data: forward_default
-  - override /preparation: forward_statistics
+  - override /preparation: statistics
   - override /loader: forward_default
   - override /model: forward_emulator
   - override /trainer: gpu
@@ -52,11 +52,11 @@ data:
           # Normalization function and parameters
           normalization:
             # Function
-            _target_: inverse.data.transformations.min_max
+            _target_: data.transformations.min_max
             _partial_: true
             # Min/max values for normalization
             stats:
-              _target_: inverse.data.statistics.read_statistics_var
+              _target_: data.statistics.read_statistics_var
               path: ${preparation.statistics.data.output.path}
               var: 'prof'
               dtype: ${data.dtype}

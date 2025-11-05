@@ -5,7 +5,7 @@ import torch
 import hydra
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
-from utilities.io import load_var
+from data.io import load_var
 from utilities.logic import get_config_path
 import logging
 

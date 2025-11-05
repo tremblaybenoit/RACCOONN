@@ -6,16 +6,16 @@ prof:
           'Snow particle effective radius', 'Ozone mixing ratio' ]
   # Loading function
   load:
-    _target_: utilities.io.load_npy
+    _target_: data.io.load_npy
     path: ${....dir}/prof.npy
     split: ${....split}
     dtype: ${data.dtype}
   # Normalization function and parameters
   normalization:
-    _target_: inverse.data.transformations.min_max
+    _target_: data.transformations.min_max
     _partial_: true
     stats:
-      _target_: inverse.data.statistics.read_statistics_var
+      _target_: data.statistics.read_statistics_var
       path: ${preparation.statistics.data.output.path}
       var: 'prof'
       dtype: ${data.dtype}
@@ -29,13 +29,13 @@ surf:
           'Vegetation area fraction', 'Water area fraction', 'Volumetric water ratio (soil)' ]
   # Loading function
   load:
-    _target_: utilities.io.load_npy
+    _target_: data.io.load_npy
     path: ${....dir}/surf.npy
     split: ${....split}
     dtype: ${data.dtype}
   # Normalization function and parameters
   normalization:
-    _target_: forward.data.transformations.NormalizeSurface
+    _target_: data.transformations.NormalizeSurface
     surfmax:
       _target_: numpy.loadtxt
       _args_:
@@ -52,13 +52,13 @@ meta:
           'Sensor elevation angle', 'Solar azimuth angle', 'Solar zenith angle' ]
   # Loading function
   load:
-    _target_: utilities.io.load_npy
+    _target_: data.io.load_npy
     path: ${....dir}/meta.npy
     split: ${....split}
     dtype: ${data.dtype}
   # Normalization function and parameters
   normalization:
-    _target_: forward.data.transformations.NormalizeMeta
+    _target_: data.transformations.NormalizeMeta
     settings:
       meta_cos_vars: [ 6 ]
       meta_scale_factor: 180
@@ -69,7 +69,7 @@ meta:
 hofx:
   # Loading function
   load:
-    _target_: utilities.io.load_npy
+    _target_: data.io.load_npy
     path: ${....dir}/predict_hofx.npy
     split: ${....split}
     dtype: ${data.dtype}
@@ -77,14 +77,14 @@ hofx:
 cloud_filter:
   # Loading function
   load:
-    _target_: inverse.data.filters.cloud_filter
+    _target_: data.filters.cloud_filter
     _args_:
       - ${....prof.load}
 # Atmospheric profile background
 prof_background:
   # Loading function
   load:
-    _target_: inverse.data.covariance.background_climatology
+    _target_: data.covariance.background_climatology
     data: ${...prof.load}
   # Normalization function and parameters
   normalization: ${..prof.normalization}
@@ -92,12 +92,12 @@ prof_background:
 prof_increment:
   # Loading function
   load:
-    _target_: inverse.data.covariance.background_increment
+    _target_: data.covariance.background_increment
     config_true: ${...prof}  # We use the normalized true profiles
     config_background: ${...prof_background}  # We use the normalized background profiles
 # Brightness temperature innovation
 hofx_innovation:
   # Loading function
   load:
-    _target_: inverse.data.covariance.innovation_uncertainty
+    _target_: data.covariance.innovation_uncertainty
     data: ${...hofx.load}

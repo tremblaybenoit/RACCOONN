@@ -1,28 +1,41 @@
 import numpy as np
 from omegaconf import DictConfig, ListConfig
 from utilities.instantiators import instantiate
-from forward.data.transformations import identity
+from data.transformations import identity
+from typing import Optional
 
 
-def load_npy(path: str, split: np.ndarray = None, dtype: str = 'float32') -> np.ndarray:
+def load_npy(path: str, split: np.ndarray = None, dtype: str = 'float32', item: Optional[int] = None) -> np.ndarray:
     """ Load a numpy array from a .npy file and optionally split it.
 
         Parameters:
         path: str. The file path to the .npy file.
         split: np.ndarray, optional. An array of indices to split the loaded array. Defaults to None.
         dtype: str. The desired data type of the loaded array. Defaults to 'float32'.
+        item: int, optional. If provided, load the array in a memory-mapped mode. Defaults to None.
 
         Returns:
         data: np.ndarray. The loaded (and possibly split) numpy array.
     """
 
     # Load the numpy array from the specified path
-    data = np.load(path, mmap_mode='r').astype(dtype)
+    data = np.load(path, mmap_mode='r')
 
-    # If a split is provided, return the split data
-    if split is not None:
-        return data[split]
-    return data
+    # lazy loading is handled by mmap_mode in np.load
+    if item is not None:
+        # If there is no split
+        if split is None:
+            return np.asarray(data[item], dtype=dtype)
+        # If there is a split
+        else:
+            # If split is a boolean array
+            if split.dtype == np.bool_:
+                return np.asarray(data[np.where(split)[0][item]], dtype=dtype)
+            # If split is an array of indices
+            else:
+                return np.asarray(data[split[item]], dtype=dtype)
+    # If lazy loading is not requested
+    return np.array(data, dtype=dtype) if split is None else np.array(data[split], dtype=dtype)
 
 
 def load_latlon(path: str, scans: np.ndarray = None, split: np.ndarray = None, dtype: str = 'float32') -> np.ndarray:
@@ -41,19 +54,31 @@ def load_latlon(path: str, scans: np.ndarray = None, split: np.ndarray = None, d
     """
 
     # Load the latitude or longitude variable
-    latlon = np.load(path, mmap_mode='r').astype(dtype)
+    latlon = np.load(path, mmap_mode='r')
 
     # If scans array is not provided, return the lat/lon as is
     if scans is not None:
         # Extract number of scans from the shape of the loaded array
         n_scans = scans.shape[0]
+        n_coords = latlon.shape[0]
+
+        # If split is provided, adjust the number of scans accordingly
+        if split is not None:
+            # If split is a boolean array
+            if split.dtype == np.bool_:
+                pos = np.flatnonzero(split)
+                idx = pos % n_coords
+            else:
+                idx = split % n_coords
+            return np.asarray(latlon[idx], dtype=dtype)
+
         # Tile the latitude or longitude variable to match the number of scans
-        latlon = np.tile(latlon, n_scans)
+        return np.tile(np.asarray(latlon, dtype=dtype), n_scans)
 
     # If a split is provided, return the split data
     if split is not None:
-        return latlon[split]
-    return latlon
+        return np.asarray(latlon[split], dtype=dtype)
+    return np.asarray(latlon, dtype=dtype)
 
 
 def load_scans(path: str, lat: np.ndarray = None, split: np.ndarray = None, dtype: str = 'float32') -> np.ndarray:

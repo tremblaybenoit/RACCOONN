@@ -26,10 +26,16 @@ paths:
   data_dir: "../../GOES_ML-main/Data"
   checkpoint_dir: "forward/model/checkpoints"
 
+# Callback configuration
+callbacks:
+  # Model checkpoint callback
+  model_checkpoint:
+    filename: "model"
+
 # Trainer configuration
 trainer:
   min_epochs: 1  # To prevent early stopping
-  max_epochs: 32  # Number of epochs
+  max_epochs: 64  # Number of epochs
 
 # Data configuration
 data:
@@ -46,16 +52,16 @@ data:
           # Normalization function and parameters
           normalization:
             # Function
-            _target_: forward.data.transformations.NormalizeProfiles
+            _target_: data.transformations.NormalizeProfiles
             # Min/max values for normalization
             profmin:
               _target_: numpy.loadtxt
               _args_:
-                - forward/data/normalization/prof_m.txt
+                - data/normalization/prof_m.txt
             profmax:
               _target_: numpy.loadtxt
               _args_:
-                - forward/data/normalization/prof_div.txt
+                - data/normalization/prof_div.txt
             dtype: ${data.dtype}
     # Validation set
     valid:
