@@ -1,4 +1,4 @@
-# RACCOONN: Retrieval of Atmospheric Conditions Computed using Observations, Optimization, and Neural Networks. 
+# RACCOONN: Retrieval of Atmospheric Conditions Computed using Observations and Optimized Neural Networks. 
 RACCOONN uses deep learning to estimate atmospheric thermodynamic profiles from raw radiance observations. 
 A prior/background state of the atmosphere can be provided. 
 The goal is to create an inverse observation operator for the assimilation of radiances in the form of thermodynamic profiles.
