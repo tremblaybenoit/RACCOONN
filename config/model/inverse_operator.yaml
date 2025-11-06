@@ -7,7 +7,7 @@ optimizer:
   # Function
   _target_: torch.optim.Adam
   # Learning rate
-  lr: 0.001
+  lr: 0.0005
   # Weight decay (L2 regularization)
   weight_decay: 0.000
 
@@ -60,19 +60,7 @@ loss_func:
     # Precision
     dtype: ${data.dtype}
     # Normalization for the profile variables
-    prof_norm:
-      # Function
-      _target_: forward.data.transformations.NormalizeProfiles
-      # Min/max values for normalization
-      profmin:
-        _target_: numpy.loadtxt
-        _args_:
-          - forward/data/normalization/prof_m.txt
-      profmax:
-        _target_: numpy.loadtxt
-        _args_:
-          - forward/data/normalization/prof_div.txt
-      dtype: ${data.dtype}
+    prof_norm: null
   # Weights for observation (obs), model, and boundary condition (bcs) errors
   lambda_obs: 0.
   lambda_model: 1.
@@ -102,13 +90,7 @@ activation_out:
   _target_: torch.nn.Sigmoid
 
 # Transformations (to apply after the output layer)
-transform_out:
-  # Inverse normalization for profile variables
-  - _target_: ${data.stage.train.vars.prof.normalization._target_}
-    _partial_: true
-    stats: ${data.stage.train.vars.prof.normalization.stats}
-    axis: ${data.stage.train.vars.prof.normalization.axis}  # Axis for normalization
-    inverse_transform: true
+transform_out: null
 
 # Plot logger
 log_valid: true

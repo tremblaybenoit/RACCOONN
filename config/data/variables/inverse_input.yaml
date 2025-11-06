@@ -2,7 +2,7 @@
 lat:
   # Loading function
   load:
-    _target_: utilities.io.load_latlon
+    _target_: data.io.load_latlon
     path: ${....dir}/lat.npy
     scans:
       _target_: ${....scans.load._target_}
@@ -11,10 +11,10 @@ lat:
     dtype: ${data.dtype}
   # Normalization function and parameters
   normalization:
-    _target_: inverse.data.transformations.min_max
+    _target_: data.transformations.min_max
     _partial_: true
     stats:
-      _target_: inverse.data.statistics.read_statistics_var
+      _target_: data.statistics.read_statistics_var
       path: ${preparation.statistics.data.output.path}
       var: 'lat'
       dtype: ${data.dtype}
@@ -22,7 +22,7 @@ lat:
 lon:
   # Loading function
   load:
-    _target_: utilities.io.load_latlon
+    _target_: data.io.load_latlon
     path: ${....dir}/lon.npy
     scans:
       _target_: ${....scans.load._target_}
@@ -31,10 +31,10 @@ lon:
     dtype: ${data.dtype}
   # Normalization function and parameters
   normalization:
-    _target_: inverse.data.transformations.min_max
+    _target_: data.transformations.min_max
     _partial_: true
     stats:
-      _target_: inverse.data.statistics.read_statistics_var
+      _target_: data.statistics.read_statistics_var
       path: ${preparation.statistics.data.output.path}
       var: 'lon'
       dtype: ${data.dtype}
@@ -42,7 +42,7 @@ lon:
 scans:
   # Loading function
   load:
-    _target_: utilities.io.load_scans
+    _target_: data.io.load_scans
     path: ${....dir}/scans.txt
     lat:
       _target_: ${....lat.load._target_}
@@ -51,10 +51,10 @@ scans:
     dtype: ${data.dtype}
   # Normalization function and parameters
   normalization:
-    _target_: inverse.data.transformations.min_max
+    _target_: data.transformations.min_max
     _partial_: true
     stats:
-      _target_: inverse.data.statistics.read_statistics_var
+      _target_: data.statistics.read_statistics_var
       path: ${preparation.statistics.data.output.path}
       var: 'scans'
       dtype: ${data.dtype}
@@ -62,15 +62,15 @@ scans:
 pressure:
   # Loading function
   load:
-    _target_: utilities.io.load_npy
+    _target_: data.io.load_npy
     path: ${....dir}/pressure.npy
     dtype: ${data.dtype}
   # Normalization function and parameters
   normalization:
-    _target_: inverse.data.transformations.min_max
+    _target_: data.transformations.min_max
     _partial_: true
     stats:
-      _target_: inverse.data.statistics.read_statistics_var
+      _target_: data.statistics.read_statistics_var
       path: ${preparation.statistics.data.output.path}
       var: 'pressure'
       dtype: ${data.dtype}

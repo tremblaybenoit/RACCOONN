@@ -8,6 +8,9 @@ import pytorch_lightning as lightning
 from utilities.logger import TrainerLogger
 from utilities.instantiators import instantiate, instantiate_list
 from utilities.logic import get_config_path
+# Force full FP32 matmul on CUDA (disable TF32) for more reproducible numerics
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cudnn.allow_tf32 = False
 torch.set_float32_matmul_precision('high')
 
 # Initialize logger
@@ -160,7 +163,7 @@ class Operator:
         if self.model is None:
             logger.info("Loading model...")
             self.model = instantiate(self.config.model)
-            checkpoint = torch.load(self.checkpoint_path, map_location='cpu', weights_only=True)
+            checkpoint = torch.load(self.checkpoint_path, map_location='cpu', weights_only=False)
             self.model.load_state_dict(checkpoint['state_dict'], strict=False)
             if hasattr(self.config.data, 'dtype'):
                 self.model = self.model.to(None, dtype=getattr(torch, self.config.data.dtype))
@@ -204,7 +207,7 @@ class Operator:
         if self.model is None:
             logger.info("Loading model...")
             self.model = instantiate(self.config.model)
-            checkpoint = torch.load(self.checkpoint_path, map_location='cpu', weights_only=True)
+            checkpoint = torch.load(self.checkpoint_path, map_location='cpu', weights_only=False)
             self.model.load_state_dict(checkpoint['state_dict'], strict=False)
             if hasattr(self.config.data, 'dtype'):
                 self.model = self.model.to(None, dtype=getattr(torch, self.config.data.dtype))

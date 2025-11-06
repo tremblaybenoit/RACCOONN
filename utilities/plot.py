@@ -3,8 +3,7 @@ from pylab import *
 import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
 import mpl_scatter_density
-from  forward.evaluation.metrics import rmse
-from typing import Union, Callable
+from typing import Union, Callable, Optional
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
@@ -177,6 +176,23 @@ def apply_colorbar(ax, plot, font_size: float=13, label: str='Density', label_pa
             cbar.set_label(label, labelpad=label_pad, rotation=rotation if rotation is not None else (270 if side=='right' else 90), size=font_size)
 
     return cbar
+
+
+# RMSE computations
+def rmse(errors, axis=0):
+    """ Computes the root mean squared error (RMSE) between predicted and true values.
+
+    Parameters
+    ----------
+    errors : np.ndarray. Array of errors (predicted - true values).
+    axis : int. Axis along which to compute the RMSE (default is 0).
+
+    Returns
+    -------
+    np.ndarray. RMSE values.
+    """
+
+    return np.sqrt(np.mean(errors ** 2, axis=axis))
 
 
 def compute_min_max(data: np.ndarray, symmetric: bool=False) -> tuple[float, float]:
@@ -556,7 +572,7 @@ def fig_vertical_profiles(sources: list[np.ndarray], label: list[str], y: np.nda
 
 def plot_rmse_bars(ax, values, positions, height=0.3, colors=None, labels=None, x_range=None, x_ascale='linear',
                    font_size=13, title='RMSE by channel', title_pad=1.005, x_label='RMSE (units)', y_label='Channels',
-                   y_labelpad=5, x_labelpad=3, tickw=1, tickl=2.5, tickdir='out', lg_loc='best', lg_font=10,
+                   y_labelpad=5, x_labelpad=3, tickw=1, tickl=2.5, tickdir='out', lg_loc='upper right', lg_font=10,
                    lg_ncol=1, lg_npoints=1, lg_scale=4.0, lg_spacing=0.05, **bar_kwargs):
     """
     Bar plot.
@@ -605,7 +621,8 @@ def plot_rmse_bars(ax, values, positions, height=0.3, colors=None, labels=None, 
     for i in range(n):
         bars = ax.barh(positions + i * height, values[i], color=None if colors is None else colors[i],
                        height=height, align='edge', label=None if labels is None else labels[i], **bar_kwargs)
-        ax.bar_label(bars, fmt="%.2f", fontsize=10)
+        bar_font_size = 10 if n <= 2 else 7
+        ax.bar_label(bars, fmt="%.2f", fontsize=bar_font_size)
 
     # Set axis limits
     ax.set_xlim(x_range)
@@ -693,6 +710,554 @@ def fig_rmse_bars(target, pred, clrsky, figname=None, channels=None, height=0.3,
     values_norm = [rmse(norm_cloudy, axis=0), rmse(norm_clear, axis=0)]
     plot_rmse_bars(ax1, values_norm, channels, height=height, colors=colors, labels=labels, x_range=x_range[1],
                    title=title[1], x_label=x_label[1], y_label=y_label[1])
+
+    # Save plot
+    if figname:
+        save_plot(fig, figname)
+
+    return fig
+
+
+def plot_rmse_bars2(ax, values, positions, height=0.175, colors=None, labels=None, x_range=None, **kwargs):
+    """
+    Bar plot for four groups: Cloudy, Clear Sky, Day, Night.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes. Axes to plot on.
+    values : numpy.ndarray. Values to plot. Must have shape (4, n_values).
+    positions : numpy.ndarray. Positions of the bars on the y-axis. Must have shape (n_values,).
+    height : float. Height of the bars.
+    colors : list or None. Colors for the bars. If None, defaults to ['#D81B60', '#1E88E5', '#FFC107', 'r'].
+    labels : list or None. Labels for the bars. If None, defaults to ['Cloudy', 'Clear Sky', 'Day', 'Night'].
+    x_range : tuple or None. Range for the y-axis. If None, computed from data.
+    kwargs : dict. Additional keyword arguments for the bar plot.
+
+    Return
+    ------
+    None.
+    """
+    # Defaults for 4 groups
+    if colors is None:
+        colors = ['#D81B60', '#1E88E5', '#FFC107', 'r']
+    if labels is None:
+        labels = ['Cloudy', 'Clear Sky', 'Day', 'Night']
+    # Delegate to existing implementation
+    return plot_rmse_bars(ax, values, positions, height=height, colors=colors, labels=labels, x_range=x_range, **kwargs)
+
+
+def fig_rmse_bars2(target, pred, clrsky, daytime, figname=None, channels=None, height=0.175, colors=None, labels=None,
+                   x_range=None, y_label=None, x_label=None, title=None):
+    """
+    Create figure with two panels: raw RMSE and normalized RMSE for four groups:
+    Cloudy, Clear Sky, Day, Night. Returns matplotlib Figure.
+
+    Parameters
+    ----------
+    target : numpy.ndarray. Target data. Shape should be (n_samples, n_channels).
+    pred : numpy.ndarray. Prediction data. Shape should be (n_samples, n_channels).
+    clrsky : numpy.ndarray. Boolean array indicating clear sky samples. Shape should be (n_samples,).
+    daytime : numpy.ndarray. Boolean array indicating daytime samples. Shape should be (n_samples,).
+    figname : str or None. If provided, the figure will be saved to this filename.
+    channels : list or None. List of channel indices to plot. If None, defaults to channels 7 to 16.
+    height : float. Height of the bars. Default is 0.175.
+    colors : list or None. List of colors for the bars. If None, defaults to ['#D81B60', '#1E88E5', '#FFC107', 'r'].
+    labels : list or None. List of labels for the bars. If None, defaults to ['Cloudy', 'Clear Sky', 'Day', 'Night'].
+    x_range : list or None. List of x-axis ranges for the two plots. If None, defaults to [(0, 1.6), (0, 2.0)].
+    y_label : list or None. List of y-axis labels for the two plots. If None, defaults to ['Channels', 'Channels'].
+    x_label : list or None. List of x-axis labels for the two plots.
+              If None, defaults to ['RMSE (K)', 'RMSE (Standard Deviations)']. Default is None.
+    title : list or None. List of titles for the two plots.
+            If None, defaults to ['(a) Forward model errors', '(b) Normalized forward model errors'].
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+
+    Parameters mirror fig_rmse_bars plus `daytime` mask.
+    """
+    # Defaults
+    channels = channels if channels is not None else np.arange(7, 17)
+    colors = colors if colors is not None else ['#D81B60', '#1E88E5', '#FFC107', 'r']
+    labels = labels if labels is not None else ['Cloudy', 'Clear Sky', 'Day', 'Night']
+    x_range = x_range if x_range is not None else [(0, 1.6), (0, 2.0)]
+    y_label = y_label if y_label is not None else ['Channels', 'Channels']
+    x_label = x_label if x_label is not None else [f'RMSE (K)', f'RMSE (Standard Deviations)']
+    title = title if title is not None else [f'(a) Forward model errors', f'(b) Normalized forward model errors']
+
+    # Ensure masks
+    clr = np.asarray(clrsky, dtype=bool)
+    day = np.asarray(daytime, dtype=bool)
+
+    # Safe helpers
+    def safe_rmse_from_slices(pred_slice, targ_slice):
+        if pred_slice.size == 0 or targ_slice.size == 0:
+            return np.full(10, np.nan)
+        return rmse(pred_slice - targ_slice, axis=0)
+
+    def safe_rmse_norm_from_slices(pred_slice, targ_slice, std_slice):
+        if pred_slice.size == 0 or targ_slice.size == 0 or std_slice.size == 0:
+            return np.full(10, np.nan)
+        denom = np.where(std_slice == 0, np.nan, std_slice)
+        return rmse((pred_slice - targ_slice) / denom, axis=0)
+
+    # Extract arrays
+    pred = pred
+    targ = target
+    std = pred[:, 10:] if pred.ndim == 2 and pred.shape[1] >= 20 else (pred[:, 10:] if pred.ndim >= 2 else None)
+
+    # Compute raw errors
+    err_cloudy = safe_rmse_from_slices(pred[~clr, :10], targ[~clr, :10])
+    err_clear = safe_rmse_from_slices(pred[clr, :10], targ[clr, :10])
+    err_day = safe_rmse_from_slices(pred[day, :10], targ[day, :10])
+    err_night = safe_rmse_from_slices(pred[~day, :10], targ[~day, :10])
+
+    # Compute normalized errors (protect zero std)
+    norm_cloudy = safe_rmse_norm_from_slices(pred[~clr, :10], targ[~clr, :10], std[~clr]) if std is not None else np.full(10, np.nan)
+    norm_clear = safe_rmse_norm_from_slices(pred[clr, :10], targ[clr, :10], std[clr]) if std is not None else np.full(10, np.nan)
+    norm_day = safe_rmse_norm_from_slices(pred[day, :10], targ[day, :10], std[day]) if std is not None else np.full(10, np.nan)
+    norm_night = safe_rmse_norm_from_slices(pred[~day, :10], targ[~day, :10], std[~day]) if std is not None else np.full(10, np.nan)
+
+    values_raw = [err_cloudy, err_clear, err_day, err_night]
+    values_norm = [norm_cloudy, norm_clear, norm_day, norm_night]
+
+    # Create flexible grid (2 columns)
+    cell_widths = [4.0, 4.0]
+    cell_heights = [4.0]
+    lefts = [0.75, 0.75]
+    rights = [0.75, 0.75]
+    bottoms = [0.75]
+    tops = [0.75]
+    fig, get_axes = flexible_gridspec(cell_widths, cell_heights, lefts, rights, bottoms, tops)
+    ax0 = get_axes(0, 0)
+    ax1 = get_axes(0, 1)
+
+    # Plot raw and normalized using the wrapper
+    plot_rmse_bars2(ax0, values_raw, channels, height=height, colors=colors, labels=labels, x_range=x_range[0],
+                    font_size=13, title=title[0], x_label=x_label[0], y_label=y_label[0])
+    plot_rmse_bars2(ax1, values_norm, channels, height=height, colors=colors, labels=labels, x_range=x_range[1],
+                    font_size=13, title=title[1], x_label=x_label[1], y_label=y_label[1])
+
+    # Save plot
+    if figname:
+        save_plot(fig, figname)
+
+    return fig
+
+
+def histedges_equalN(x, nbin):
+    """
+    Compute histogram edges that split data `x` into `nbin` bins with approximately equal counts.
+
+    Parameters
+    ----------
+    x : array_like
+        1D array of numeric values to bin.
+    nbin : int
+        Number of histogram bins desired.
+
+    Returns
+    -------
+    numpy.ndarray
+        Array of length `nbin + 1` containing bin edges.
+    """
+    npt = len(x)
+    return np.interp(np.linspace(0, npt, nbin + 1), np.arange(npt), np.sort(x))
+
+
+def plot_errs_by_channel_vert(ax: plt.Axes, ypred: np.ndarray, bt: np.ndarray, j: int,
+                              nbins: int = 10, xmax_percentile: float = 99.0, xmax_factor: float = 2.0,
+                              beta: float = 0.5, font_size: int = 13, title: Optional[str] = None,
+                              title_pad: float = 1.005, x_range: Optional[list] = None,
+                              x_label: Optional[str] = None, y_label: Optional[str] = None,
+                              y_labelpad=5, x_labelpad=3,
+                              tickw: float = 1.0, tickl: float = 2.5, tickdir: str = 'out',
+                              lg_loc='lower right', lg_font=10,
+                              lg_ncol=1, lg_npoints=1, lg_scale=4.0, lg_spacing=0.05):
+    """
+    Plot binned predicted/std vs actual error statistics for one channel with 95% CI.
+    Layout and styling mimic `plot_vertical_profiles` style.
+    """
+
+    # Extract arrays, flatten
+    err = (ypred[:, j] - bt[:, j]).ravel()
+    # predicted std expected at column 10 + j if available
+    std_col = 10 + j
+    if ypred.ndim == 2 and ypred.shape[1] > std_col:
+        std_pred = ypred[:, std_col].ravel()
+    else:
+        std_pred = np.full_like(err, np.nan)
+
+    # xmax from percentile of absolute actual errors
+    try:
+        xmax = float(np.nanpercentile(np.abs(err), xmax_percentile)) * xmax_factor
+    except Exception:
+        xmax = np.nan
+
+    if not np.isfinite(xmax) or xmax <= 0:
+        xmax = np.nanmax(np.abs(std_pred[np.isfinite(std_pred)])) if np.any(np.isfinite(std_pred)) else 1.0
+
+    # candidate bins: linear and equal-count, then blend
+    bins1 = np.linspace(0.0, xmax, nbins + 1)
+    masked_std = std_pred[np.isfinite(std_pred) & (std_pred < xmax)]
+    bins2 = histedges_equalN(masked_std, nbins)
+    edges = bins1 * beta + bins2 * (1.0 - beta)
+
+    # Histogram counts and per-bin statistics
+    count, _ = np.histogram(std_pred, bins=edges)
+    std_pred_mean = np.full(nbins, np.nan)
+    std_pred_std = np.full(nbins, np.nan)
+    std_actual = np.full(nbins, np.nan)
+
+    for i in range(nbins):
+        mask = (std_pred >= edges[i]) & (std_pred < edges[i+1])
+        sel = std_pred[mask]
+        if sel.size > 0:
+            std_pred_mean[i] = np.nanmean(sel)
+            std_pred_std[i] = np.nanstd(sel)
+            err_sel = err[mask]
+            std_actual[i] = rmse(err_sel) if err_sel.size > 0 else np.nan
+
+    # uncertainties: protect divisions by zero / nan
+    with np.errstate(invalid='ignore', divide='ignore'):
+        denom_x = np.sqrt(count)
+        denom_x[denom_x == 0] = np.nan
+        xerr = 1.96 * std_pred_std / denom_x
+
+        denom_y = np.sqrt(2.0 * count)
+        denom_y[denom_y == 0] = np.nan
+        yerr = 1.96 * std_actual / denom_y
+
+    # Main plot (errorbar)
+    eb = ax.errorbar(std_pred_mean, std_actual, xerr=xerr, yerr=yerr, color='k',
+                     marker='.', linestyle='', capsize=2, capthick=0.5, markersize=4, linewidth=0.5,
+                     label='NN - 95% CI')
+
+    # y=x reference
+    max_val = np.nanmax(std_actual) if np.isfinite(np.nanmax(std_actual)) else np.nanmax(std_pred_mean)
+    if not np.isfinite(max_val) or max_val <= 0:
+        max_val = xmax if np.isfinite(xmax) and xmax > 0 else 1.0
+
+    # Axis styling similar to plot_vertical_profiles
+    if isinstance(x_range, tuple):
+        xlim = x_range
+    elif isinstance(x_range, list):
+        xlim = x_range[j]
+    else:
+        xlim = [0.0, 1.125*max_val]
+    ylim = xlim
+    yx = ax.plot(xlim, ylim, 'r--', linewidth=0.6, label='y=x')
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+
+    if x_label is not None:
+        ax.set_xlabel(x_label, fontsize=font_size, labelpad=x_labelpad)
+    else:
+        ax.set_xlabel('Predicted Error StDev (K)', fontsize=font_size, labelpad=x_labelpad)
+    if y_label is not None:
+        ax.set_ylabel(y_label, fontsize=font_size, labelpad=y_labelpad)
+    else:
+        ax.set_ylabel('Actual Error StDev (K)', fontsize=font_size, labelpad=5)
+    ax.tick_params(axis='both', which='both', direction=tickdir, width=tickw, length=tickl, labelsize=font_size - 2,
+                   bottom=True, top=True, left=True, right=True)
+
+    # Secondary axis: cumulative distribution of |predicted std|
+    ax2 = ax.twinx()
+    valid = std_pred[np.isfinite(std_pred)]
+    if valid.size > 0:
+        xs = np.sort(np.abs(valid))
+        ys = np.linspace(0.0, 1.0, xs.size)
+        cdf_line, = ax2.plot(xs, ys, linestyle=':', color='b', label='CDF')
+        ax2.set_ylim(0.0, 1.0)
+    else:
+        cdf_line = None
+    ax2.tick_params(axis='y', which='both', direction=tickdir, width=tickw, length=tickl, labelsize=font_size - 2)
+    ax2.set_ylabel('Cumulative distribution function (no units)', fontsize=font_size, labelpad=5)
+
+    # Title / channel label
+    title = title if title is not None else f'Channel {j+1}'
+    ax.set_title(title, fontsize=font_size, y=title_pad)
+
+    # Set legend
+    # Legend composition
+    handles = []
+    labels = []
+    if eb is not None:
+        # errorbar's first element is Line2D for markers in many mpl versions
+        try:
+            h = eb[0]
+        except Exception:
+            h = None
+        if h is not None:
+            handles.append(h); labels.append('NN')
+    if yx:
+        handles.append(yx[0]); labels.append('y=x')
+    if cdf_line is not None:
+        handles.append(cdf_line); labels.append('CDF')
+    if handles:
+        ax.legend(handles, labels, loc=lg_loc, fontsize=lg_font, labelspacing=lg_spacing, numpoints=lg_npoints,
+                  ncol=lg_ncol, markerscale=lg_scale, fancybox=False)
+
+
+def plot_errs_by_channel(ax: plt.Axes, ypred: np.ndarray, bt: np.ndarray, j: int,
+                         yref: np.ndarray = None,
+                         nbins: int = 10, xmax_percentile: float = 99.0, xmax_factor: float = 2.0,
+                         beta: float = 0.5, font_size: int = 13, title: Optional[str] = None,
+                         title_pad: float = 1.005, x_range: Optional[list] = None,
+                         x_label: Optional[str] = None, y_label: Optional[str] = None,
+                         y_labelpad=5, x_labelpad=3,
+                         tickw: float = 1.0, tickl: float = 2.5, tickdir: str = 'out',
+                         lg_loc='lower right', lg_font=10,
+                         lg_ncol=1, lg_npoints=1, lg_scale=2.0, lg_spacing=0.05):
+    """
+    Plot binned predicted/std vs actual error statistics for one channel.
+    If `yref` is provided it is treated as a reference: edges/xmax are computed from the reference
+    (if possible) and both reference and prediction are overplotted using the same bins.
+    """
+
+    # helper to extract err and predicted std column
+    def _extract_err_std(y, bt, col_j):
+        err = (y[:, col_j] - bt[:, col_j]).ravel()
+        std_col = 10 + col_j
+        if y.ndim == 2 and y.shape[1] > std_col:
+            std = y[:, std_col].ravel()
+        else:
+            std = np.full_like(err, np.nan)
+        return err, std
+
+    # extract for prediction
+    err_p, std_p = _extract_err_std(ypred, bt, j)
+
+    # extract for reference if provided
+    if yref is not None:
+        err_r, std_r = _extract_err_std(yref, bt, j)
+    else:
+        err_r, std_r = None, None
+
+    # choose arrays to compute bins/xmax: prefer reference when available and finite
+    use_err = None
+    use_std = None
+    if err_r is not None and np.any(np.isfinite(err_r)):
+        use_err = err_r
+    else:
+        use_err = err_p
+
+    if std_r is not None and np.any(np.isfinite(std_r)):
+        use_std = std_r
+    else:
+        use_std = std_p
+
+    # compute xmax from chosen errors
+    try:
+        xmax = float(np.nanpercentile(np.abs(use_err), xmax_percentile)) * xmax_factor
+    except Exception:
+        xmax = np.nan
+    if not np.isfinite(xmax) or xmax <= 0:
+        xmax = np.nanmax(np.abs(use_std[np.isfinite(use_std)])) if np.any(np.isfinite(use_std)) else 1.0
+
+    # candidate bins: linear and equal-count, then blend
+    bins1 = np.linspace(0.0, xmax, nbins + 1)
+    masked_std = use_std[np.isfinite(use_std) & (use_std < xmax)]
+    bins2 = histedges_equalN(masked_std, nbins) if masked_std.size > 0 else bins1.copy()
+    edges = bins1 * beta + bins2 * (1.0 - beta)
+
+    # per-bin stats function
+    def _per_bin_stats(std_arr, err_arr):
+        n = nbins
+        count, _ = np.histogram(std_arr, bins=edges)
+        mean = np.full(n, np.nan)
+        sdev = np.full(n, np.nan)
+        actual = np.full(n, np.nan)
+        for i in range(n):
+            mask = (std_arr >= edges[i]) & (std_arr < edges[i+1])
+            sel = std_arr[mask]
+            if sel.size > 0:
+                mean[i] = np.nanmean(sel)
+                sdev[i] = np.nanstd(sel)
+                err_sel = err_arr[mask]
+                actual[i] = rmse(err_sel) if err_sel.size > 0 else np.nan
+        with np.errstate(invalid='ignore', divide='ignore'):
+            denom_x = np.sqrt(count).astype(float)
+            denom_x[denom_x == 0] = np.nan
+            xerr = 1.96 * sdev / denom_x
+            denom_y = np.sqrt(2.0 * count).astype(float)
+            denom_y[denom_y == 0] = np.nan
+            yerr = 1.96 * actual / denom_y
+        return mean, actual, xerr, yerr, count
+
+    # compute stats for reference (if any) and prediction
+    if err_r is not None:
+        mean_r, actual_r, xerr_r, yerr_r, count_r = _per_bin_stats(std_r, err_r)
+    else:
+        mean_r = actual_r = xerr_r = yerr_r = count_r = None
+
+    mean_p, actual_p, xerr_p, yerr_p, count_p = _per_bin_stats(std_p, err_p)
+
+    # Main plotting: reference first (if present), then prediction
+    handles = []
+    labels = []
+
+    # y=x reference using combined extent
+    all_actuals = np.hstack([a for a in [actual_r, actual_p] if a is not None])
+    all_means = np.hstack([m for m in [mean_r, mean_p] if m is not None])
+    max_val = np.nanmax(all_actuals) if np.isfinite(np.nanmax(all_actuals)) else np.nanmax(all_means)
+    if not np.isfinite(max_val) or max_val <= 0:
+        max_val = xmax if np.isfinite(xmax) and xmax > 0 else 1.0
+
+    if isinstance(x_range, tuple):
+        xlim = x_range
+    elif isinstance(x_range, list):
+        xlim = x_range[j]
+    else:
+        xlim = [0.0, 1.125 * max_val]
+    ylim = xlim
+    yx = ax.plot(xlim, ylim, 'k--', linewidth=0.6, label='y=x')
+    handles.append(yx[0]); labels.append('y=x')
+
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+
+    if mean_r is not None:
+        label = 'Paper - 95% CI'
+        h_ref = ax.errorbar(mean_r, actual_r, xerr=xerr_r, yerr=yerr_r, color=colors['blue'],
+                            marker='.', linestyle='', capsize=2, capthick=1, markersize=6, linewidth=1,
+                            label=label)
+        try:
+            handles.append(h_ref[0])
+            labels.append(label)
+        except Exception:
+            pass
+
+    label = 'Model - 95% CI'
+    eb = ax.errorbar(mean_p, actual_p, xerr=xerr_p, yerr=yerr_p, color=colors['red'],
+                     marker='.', linestyle='', capsize=2, capthick=1, markersize=6, linewidth=1,
+                     label=label)
+    try:
+        handles.append(eb[0])
+        labels.append(label)
+    except Exception:
+        pass
+
+    # Labels and ticks
+    if x_label is not None:
+        ax.set_xlabel(x_label, fontsize=font_size, labelpad=x_labelpad)
+    else:
+        ax.set_xlabel('Predicted Error StDev (K)', fontsize=font_size, labelpad=x_labelpad)
+    if y_label is not None:
+        ax.set_ylabel(y_label, fontsize=font_size, labelpad=y_labelpad)
+    else:
+        ax.set_ylabel('Actual Error StDev (K)', fontsize=font_size, labelpad=5)
+    ax.tick_params(axis='both', which='both', direction=tickdir, width=tickw, length=tickl, labelsize=font_size - 2,
+                   bottom=True, top=True, left=True, right=True)
+
+    # Secondary axis: CDFs for absolute predicted std (plot both if available)
+    ax2 = ax.twinx()
+    cdf_handles = []
+    if std_r is not None:
+        valid_r = std_r[np.isfinite(std_r)]
+        if valid_r.size > 0:
+            xs = np.sort(np.abs(valid_r))
+            ys = np.linspace(0.0, 1.0, xs.size)
+            h_r, = ax2.plot(xs, ys, linestyle=':', color=colors['blue'], label='Paper - CDF')
+            cdf_handles.append(h_r)
+    valid_p = std_p[np.isfinite(std_p)]
+    if valid_p.size > 0:
+        xs = np.sort(np.abs(valid_p))
+        ys = np.linspace(0.0, 1.0, xs.size)
+        h_p, = ax2.plot(xs, ys, linestyle=':', color=colors['red'], label='Model - CDF')
+        cdf_handles.append(h_p)
+
+    if cdf_handles:
+        # include CDF in legend set
+        handles.extend(cdf_handles)
+        labels.extend([h.get_label() for h in cdf_handles])
+        ax2.set_ylim(0.0, 1.0)
+    ax2.tick_params(axis='y', which='both', direction=tickdir, width=tickw, length=tickl, labelsize=font_size - 2)
+    ax2.set_ylabel('Cumulative distribution function (no units)', fontsize=font_size, labelpad=5)
+
+    # Title
+    title = title if title is not None else f'Channel {j+1}'
+    ax.set_title(title, fontsize=font_size, y=title_pad)
+
+    # Legend
+    if handles:
+        ax.legend(handles, labels, loc=lg_loc, fontsize=lg_font, labelspacing=lg_spacing, numpoints=lg_npoints,
+                  ncol=lg_ncol, markerscale=lg_scale, fancybox=False)
+
+
+def fig_errs_by_channel(target: np.ndarray, pred: np.ndarray, ref: np.ndarray=None, figname: Optional[str] = None,
+                        nbins: int = 10, xmax_percentile: float = 99.0, xmax_factor: float = 2.0,
+                        beta: float = 0.5, channels: Optional[Union[list, np.ndarray]] = None,
+                        font_size: int = 13, x_range: Optional[list] = None,
+                        x_label: Union[str, list] = 'Predicted Error StDev (K)',
+                        y_label: Union[str, list] = 'Actual Error StDev (K)',
+                        title: Optional[Union[str, list]] = None,
+                        orientation: str = 'vertical'):
+    """
+    Create a multi-panel layout and plot errors per channel using plot_errs_by_channel_vert.
+    orientation: 'vertical' (default, 2 columns) or 'horizontal' (2 rows).
+    """
+    if channels is None:
+        channels = np.arange(7, 17)
+    channels = list(channels)
+    nchan = len(channels)
+
+    # Determine layout from orientation
+    orientation = orientation.lower()
+    if orientation not in ('vertical', 'horizontal'):
+        raise ValueError("orientation must be 'vertical' or 'horizontal'")
+
+    if orientation == 'vertical':
+        ncols = 2
+        nrows = int(np.ceil(nchan / ncols))
+    else:  # horizontal -> 2 rows
+        nrows = 2
+        ncols = int(np.ceil(nchan / nrows))
+
+    # cell sizes and paddings (per-column/row)
+    cell_widths = [4.0] * ncols
+    cell_heights = [4.0] * nrows
+    lefts = [0.75] * ncols
+    rights = [0.75] * ncols
+    bottoms = [0.75] * nrows
+    tops = [0.75] * nrows
+
+    fig, get_ax = flexible_gridspec(cell_widths, cell_heights, lefts, rights, bottoms, tops)
+
+    def pick(val, idx, default=None):
+        if val is None:
+            return default
+        if isinstance(val, (list, tuple, np.ndarray)):
+            return val[idx] if idx < len(val) else default
+        return val
+
+    for idx in range(nchan):
+        row = idx // ncols
+        col = idx % ncols
+        ax = get_ax(row, col)
+
+        per_title = pick(title, idx, f'Channel {channels[idx]}')
+        per_xlabel = pick(x_label, idx, None)
+        per_ylabel = pick(y_label, idx, None)
+
+        # call per-channel plotting function (keeps original j indexing as before)
+        if ref is not None:
+            plot_errs_by_channel(ax, pred, target, j=idx,
+                                 yref=ref,
+                                 nbins=nbins,
+                                 xmax_percentile=xmax_percentile,
+                                 xmax_factor=xmax_factor,
+                                 beta=beta,
+                                 font_size=font_size,
+                                 title=per_title,
+                                 x_label=per_xlabel,
+                                 y_label=per_ylabel,
+                                 x_range=x_range)
+        else:
+            plot_errs_by_channel_vert(ax, pred, target, j=idx, nbins=nbins,
+                                      xmax_percentile=xmax_percentile, xmax_factor=xmax_factor,
+                                      beta=beta, font_size=font_size, title=per_title,
+                                      x_label=per_xlabel, y_label=per_ylabel, x_range=x_range)
 
     # Save plot
     if figname:

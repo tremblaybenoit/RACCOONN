@@ -10,7 +10,7 @@ defaults:
   - override /loader: forward_default
   - override /model: forward_emulator
   - override /trainer: gpu
-  - override /callbacks: default
+  - override /callbacks: forward_default
   - override /logger: default
 
 # All parameters below will be merged with parameters from default configurations set above.
@@ -26,12 +26,70 @@ paths:
   data_dir: "../../GOES_ML-main/Data"
   checkpoint_dir: "forward/model/checkpoints"
 
+# Callback configuration
+callbacks:
+  # Model checkpoint callback
+  model_checkpoint:
+    filename: "model"
+
 # Trainer configuration
 trainer:
   min_epochs: 1  # To prevent early stopping
-  max_epochs: 32  # Number of epochs
+  max_epochs: 64  # Number of epochs
 
 # Data configuration
 data:
   # Precision
   dtype: 'float32'
+  # Split ratios for training, validation, and test sets
+  stage:
+    # Training set
+    train:
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Normalization function and parameters
+          normalization:
+            # Function
+            _target_: data.transformations.NormalizeProfiles
+            # Min/max values for normalization
+            profmin:
+              _target_: numpy.loadtxt
+              _args_:
+                - data/normalization/prof_m.txt
+            profmax:
+              _target_: numpy.loadtxt
+              _args_:
+                - data/normalization/prof_div.txt
+            dtype: ${data.dtype}
+    # Validation set
+    valid:
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Normalization function and parameters
+          normalization: ${data.stage.train.vars.prof.normalization}
+    # Test set
+    test:
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Normalization function and parameters
+          normalization: ${data.stage.train.vars.prof.normalization}
+    # Prediction set
+    predict:
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Normalization function and parameters
+          normalization: ${data.stage.train.vars.prof.normalization}
+
+# Logger configuration
+logger:
+  # MLflow logger
+  ports:
+    mlflow: 5001

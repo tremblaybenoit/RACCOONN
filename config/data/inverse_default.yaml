@@ -18,37 +18,37 @@ dtype: 'float32'
 # Pressure filter
 pressure_filter:
   load:
-    _target_: inverse.data.filters.pressure_filter
+    _target_: data.filters.pressure_filter
     prof:
-      _target_: utilities.io.load_stack_and_normalize
+      _target_: data.io.load_stack_and_normalize
       _recursive_: false
       stack:
         - load: ${data.stage.train.vars.prof.load}
           normalization:
-            _target_: inverse.data.transformations.min_max
+            _target_: data.transformations.min_max
             _partial_: true
             stats:
-              _target_: inverse.data.statistics.read_statistics_var
+              _target_: data.statistics.read_statistics_var
               path: ${preparation.statistics.data.output.path}
               var: 'prof'
               dtype: ${data.dtype}
             axis: null
         - load: ${data.stage.valid.vars.prof.load}
           normalization:
-            _target_: inverse.data.transformations.min_max
+            _target_: data.transformations.min_max
             _partial_: true
             stats:
-              _target_: inverse.data.statistics.read_statistics_var
+              _target_: data.statistics.read_statistics_var
               path: ${preparation.statistics.data.output.path}
               var: 'prof'
               dtype: ${data.dtype}
             axis: null
         - load: ${data.stage.test.vars.prof.load}
           normalization:
-            _target_: inverse.data.transformations.min_max
+            _target_: data.transformations.min_max
             _partial_: true
             stats:
-              _target_: inverse.data.statistics.read_statistics_var
+              _target_: data.statistics.read_statistics_var
               path: ${preparation.statistics.data.output.path}
               var: 'prof'
               dtype: ${data.dtype}
@@ -59,36 +59,25 @@ stage:
   # Training set
   train:
     # Path to training data
-    dir: ${paths.data_dir}/Test2
+    dir: ${paths.data_dir}/Train2
     # Split
     split:
-      _target_: utilities.io.extract_indices
+      _target_: ${data.stage.train.vars.cloud_filter.load._target_}
       _args_:
-        - _target_: numpy.arange
-          _args_:
-            - 0
-            - 256608
-        - _target_: ${data.stage.train.vars.cloud_filter.load._target_}
-          _args_:
-            - _target_: ${data.stage.train.vars.prof.load._target_}
-              path: ${data.stage.train.vars.prof.load.path}
+        - _target_: ${data.stage.train.vars.prof.load._target_}
+          path: ${data.stage.train.vars.prof.load.path}
+
 
   # Validation set
   valid:
     # Path to validation data
-    dir: ${paths.data_dir}/Test2
+    dir: ${paths.data_dir}/Val2
     # Split
     split:
-      _target_: utilities.io.extract_indices
+      _target_: ${data.stage.valid.vars.cloud_filter.load._target_}
       _args_:
-        - _target_: numpy.arange
-          _args_:
-            - 256608
-            - 320760
-        - _target_: ${data.stage.valid.vars.cloud_filter.load._target_}
-          _args_:
-            - _target_: ${data.stage.valid.vars.prof.load._target_}
-              path: ${data.stage.valid.vars.prof.load.path}
+        - _target_: ${data.stage.valid.vars.prof.load._target_}
+          path: ${data.stage.valid.vars.prof.load.path}
 
   # Test set
   test:
@@ -96,16 +85,10 @@ stage:
     dir: ${paths.data_dir}/Test2
     # Split
     split:
-      _target_: utilities.io.extract_indices
+      _target_: ${data.stage.test.vars.cloud_filter.load._target_}
       _args_:
-        - _target_: numpy.arange
-          _args_:
-            - 320760
-            - 426872
-        - _target_: ${data.stage.test.vars.cloud_filter.load._target_}
-          _args_:
-            - _target_: ${data.stage.test.vars.prof.load._target_}
-              path: ${data.stage.test.vars.prof.load.path}
+        - _target_: ${data.stage.test.vars.prof.load._target_}
+          path: ${data.stage.test.vars.prof.load.path}
 
   # Prediction set (NOTE: By default, we use the test set as the prediction set for demonstration purposes)
   predict:

@@ -6,7 +6,7 @@ try:
     from inverse.model.forward import CRTMForward
     from utilities.logic import get_config_path
     # Initialize CRTM forward model
-    checkpoint_path = os.path.abspath(os.path.join(os.path.dirname(__name__), 'forward/model/checkpoints/model.ckpt'))
+    checkpoint_path = os.path.abspath(os.path.join(os.path.dirname(__name__), 'forward/model/checkpoints/model_v2.ckpt'))
     config_path = os.path.join(get_config_path(), 'model/forward_emulator.yaml')
     forward = CRTMForward(checkpoint_path=checkpoint_path, config_path=config_path)
 except (ImportError, FileNotFoundError, Exception) as e:
@@ -443,15 +443,15 @@ class VarLoss(torch.nn.Module):
         # Model losses: Some model losses may require additional inputs
         if self.loss_model is not None:
             if getattr(getattr(self.loss_model, "func", self.loss_model), "__name__", None) == 'diagonal_quadratic_form':
-                loss['model'] = self.loss_model(pred['prof_norm'][:, pressure_filter], target['prof_norm_background'][:, pressure_filter], target['prof_norm_increment'])
+                loss['model'] = self.loss_model(pred['prof'][:, pressure_filter], target['prof_background'][:, pressure_filter], target['prof_increment'])
             else:
-                loss['model'] = self.loss_model(pred['prof_norm'][:, pressure_filter], target['prof_norm_background'][:, pressure_filter])
+                loss['model'] = self.loss_model(pred['prof'][:, pressure_filter], target['prof_background'][:, pressure_filter])
             # Total
             loss['total'] += self.lambda_model * torch.nanmean(loss['model'])
 
         # Boundary condition losses (where the variance is zero)
         if self.loss_bcs is not None and self.pressure_filter is not None:
-            loss['bcs'] = self.loss_bcs(pred['prof_norm'][:, ~pressure_filter], target['prof_norm'][:, ~pressure_filter])
+            loss['bcs'] = self.loss_bcs(pred['prof'][:, ~pressure_filter], target['prof'][:, ~pressure_filter])
             # Total
             loss['total'] += self.lambda_bcs * torch.nanmean(loss['bcs'])
 

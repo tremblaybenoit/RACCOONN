@@ -1,0 +1,4 @@
+defaults:
+  - model_checkpoint
+  - figure_logger
+  - _self_

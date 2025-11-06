@@ -1,9 +1,12 @@
 import pytorch_lightning as pl
 from torch.utils.data import Dataset, DataLoader
 from omegaconf import DictConfig
-from utilities.io import load_var_and_normalize
+from data.io import load_var_and_normalize
 from utilities.instantiators import instantiate
 import os
+from tqdm import tqdm
+import numpy as np
+import torch
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
 
@@ -198,31 +201,97 @@ class BaseDataset(Dataset):
 
 
 class CRTMDataset(BaseDataset):
-    """ Dataset class for the CRTM dataset."""
+    """CRTMDataset supporting either numpy.memmap (disk-backed) or torch shared tensors.
 
-    def __init__(self, input: DictConfig, target: DictConfig = None, results: DictConfig = None) -> None:
-        """ Initialize the dataset.
+    Args:
+      input: DictConfig for input vars.
+      target: optional DictConfig for target vars.
+      results: optional results config.
+      memmap_dir: directory for memmap files (required for memmap mode).
+      share_memory: 'memmap' | 'torch' -- storage strategy. Use 'torch' on Windows to avoid WinError 8.
+    """
+    def __init__(self, input: DictConfig, target: DictConfig = None, results: DictConfig = None,
+                 memmap_dir: str = '../mm', share_memory: str = 'torch') -> None:
+        if share_memory not in ('memmap', 'torch'):
+            raise ValueError("share_memory must be 'memmap' or 'torch'")
+        if share_memory == 'memmap' and memmap_dir is None:
+            raise ValueError("memmap_dir must be provided for memmap mode")
 
-            Parameters
-            ----------
-            input: DictConfig. Configuration object for the input variables.
-            target: DictConfig. Configuration object for the target variables.
-            results: DictConfig. Configuration object for the results.
-
-            Returns
-            -------
-            None.
-        """
-
-        # Store results configuration
         self.results = results
+        self.memmap_dir = memmap_dir
+        self.share_memory = share_memory
+        self._raw_x = {'input': {}}
+        self._memmaps_opened = False
 
-        # Load input
-        x = {'input': {var: load_var_and_normalize(config) for var, config in input.items()}}
+        if self.share_memory == 'memmap':
+            os.makedirs(self.memmap_dir, exist_ok=True)
 
-        # Load variables (if provided)
+        # load and store input vars
+        for var, config in tqdm(input.items()):
+            arr = load_var_and_normalize(config)
+            if self.share_memory == 'torch':
+                t = torch.from_numpy(np.ascontiguousarray(arr))
+                t.share_memory_()
+                self._raw_x['input'][var] = t
+                del arr
+            else:  # memmap
+                shape = arr.shape
+                dtype = arr.dtype
+                fname = os.path.join(self.memmap_dir, f"{var}.dat")
+                mm = np.memmap(fname, dtype=dtype, mode='w+', shape=shape)
+                mm[:] = arr[:]
+                mm.flush()
+                del arr
+                self._raw_x['input'][var] = {'_memmap_path': fname, 'dtype': str(dtype), 'shape': shape}
+
+        # load and store target vars if provided
         if target is not None:
-            x['target'] = {var: load_var_and_normalize(config) for var, config in target.items()}
+            self._raw_x['target'] = {}
+            for var, config in target.items():
+                arr = load_var_and_normalize(config)
+                if self.share_memory == 'torch':
+                    t = torch.from_numpy(np.ascontiguousarray(arr))
+                    t.share_memory_()
+                    self._raw_x['target'][var] = t
+                    del arr
+                else:
+                    shape = arr.shape
+                    dtype = arr.dtype
+                    fname = os.path.join(self.memmap_dir, f"target_{var}.dat")
+                    mm = np.memmap(fname, dtype=dtype, mode='w+', shape=shape)
+                    mm[:] = arr[:]
+                    mm.flush()
+                    del arr
+                    self._raw_x['target'][var] = {'_memmap_path': fname, 'dtype': str(dtype), 'shape': shape}
 
-        # Class inheritance
-        super().__init__(x)
+        # initialize BaseDataset with descriptor; memmaps opened lazily
+        super().__init__(self._raw_x)
+
+    def _ensure_memmaps_opened(self):
+        """Open memmaps in current process (only used in memmap mode)."""
+        if self._memmaps_opened or self.share_memory == 'torch':
+            return
+
+        for grouping in ('input', 'target'):
+            if grouping not in self._raw_x:
+                continue
+            for var, val in list(self._raw_x[grouping].items()):
+                if isinstance(val, dict) and '_memmap_path' in val:
+                    path = val['_memmap_path']
+                    dtype = np.dtype(val['dtype'])
+                    shape = tuple(val['shape'])
+                    mm = np.memmap(path, dtype=dtype, mode='r', shape=shape)
+                    self._raw_x[grouping][var] = mm
+
+        self.x = self._raw_x
+        self._memmaps_opened = True
+
+    def __len__(self) -> int:
+        if self.share_memory == 'memmap' and not self._memmaps_opened:
+            self._ensure_memmaps_opened()
+        return super().__len__()
+
+    def __getitem__(self, idx: int) -> dict:
+        if self.share_memory == 'memmap' and not self._memmaps_opened:
+            self._ensure_memmaps_opened()
+        return super().__getitem__(idx)

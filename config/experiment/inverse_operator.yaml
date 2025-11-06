@@ -10,7 +10,7 @@ defaults:
   - override /loader: inverse_default
   - override /model: inverse_operator
   - override /trainer: gpu
-  - override /callbacks: default
+  - override /callbacks: inverse_default
   - override /logger: default
 
 # All parameters below will be merged with parameters from default configurations set above.
@@ -34,6 +34,40 @@ trainer:
 data:
   # Precision
   dtype: 'float32'
+  # Split ratios for training, validation, and test sets
+  stage:
+    # Training set
+    train:
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Normalization function and parameters
+          normalization:
+            _target_: data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'prof'
+              dtype: ${data.dtype}
+            axis: 1
+    # Validation set
+    valid:
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Normalization function and parameters
+          normalization: ${data.stage.train.vars.prof.normalization}
+    # Test set
+    test:
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Normalization function and parameters
+          normalization: ${data.stage.train.vars.prof.normalization}
 
 # Model parameters
 model:

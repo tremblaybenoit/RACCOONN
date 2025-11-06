@@ -1,4 +1,4 @@
-from typing import List, Union, Callable, Any
+from typing import List, Union, Any
 import hydra
 from pytorch_lightning import Callback
 from pytorch_lightning.loggers import Logger

@@ -2,10 +2,9 @@ import numpy as np
 import logging
 import hydra
 from omegaconf import DictConfig
-import matplotlib.pyplot as plt
 from utilities.logic import get_config_path
 from utilities.instantiators import instantiate
-from utilities.plot import fig_rmse_bars
+from utilities.plot import fig_rmse_bars, fig_rmse_bars2, fig_errs_by_channel, save_plot
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -35,12 +34,22 @@ def main(config: DictConfig) -> None:
     prof = np.array(instantiate(config.data.stage.test.vars.prof.load)).astype(np.float32)
     hofx = np.array(instantiate(config.data.stage.test.vars.hofx.load)).astype(np.float32)
     clear = ~instantiate(config.data.stage.test.vars.cloud_filter.load)
+    meta = instantiate(config.data.stage.test.vars.meta.load).astype(np.float32)
+    daytime = meta[:, 6] < 90
 
-    # Plot
+    # Plots
     logger.info("Plot comparison...")
-    fig_rmse_bars(hofx, hofx_pred, clear, title=["(a) Test Set - Forward model errors",
-                                                 "(b) Test Set - Normalized forward model errors"])
-    plt.savefig(config.paths.run_dir + '/rmse_bars_test.png')
+    fig1 = fig_rmse_bars(hofx, hofx_pred, clear, x_range=[[0, 1.0], [0, 2.0]],
+                         title=["(a) Forward model - Forward model errors",
+                                "(b) Forward model - Normalized forward model errors"])
+    save_plot(fig1, config.paths.run_dir + '/Figure3_rmse_bars_test.png')
+    fig2 = fig_rmse_bars2(hofx, hofx_pred, clear, daytime, x_range=[[0, 1.5], [0, 2.0]],
+                          title=["(a) Forward model - Daytime forward model errors",
+                                 "(b) Forward model - Nighttime forward model errors"])
+    save_plot(fig2, config.paths.run_dir + '/Figure2_rmse_bars2_test.png')
+    fig3 = fig_errs_by_channel(hofx, hofx_pred, title=[f'Channel {i + 7}' for i in range(hofx.shape[1])],
+                               orientation='horizontal', x_range=[[0, 7.0], [0, 0.9], [0, 1.1], [0, 1.3], [0, 1.9],
+                                                                  [0, 1.0], [0, 1.6], [0, 1.8], [0, 2.1], [0, 1.6]])
     # TODO: Add profile plots
 
 

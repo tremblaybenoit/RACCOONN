@@ -33,11 +33,11 @@ parameters:
     prof_max:
       _target_: numpy.loadtxt
       _args_:
-        - forward/data/normalization/prof_div.txt
+        - data/normalization/prof_div.txt
     prof_min:
       _target_: numpy.loadtxt
       _args_:
-        - forward/data/normalization/prof_m.txt
+        - data/normalization/prof_m.txt
     use_meta_vars: [1, 2, 3, 4, 5, 6, 7]
     use_prof_vars: [1, 2, 3, 4, 5, 6, 7, 8, 9]
     use_surf_vars: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
