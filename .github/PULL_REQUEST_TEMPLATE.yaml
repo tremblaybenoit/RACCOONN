@@ -1,0 +1,5 @@
+pull_request_templates:
+  - name: Minimal Template
+    path: .github/PULL_REQUEST_TEMPLATE/minimal.md
+  - name: Full Template
+    path: .github/PULL_REQUEST_TEMPLATE/template.md
