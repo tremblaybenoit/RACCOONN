@@ -31,11 +31,11 @@ surf:
     surfmax:
       _target_: numpy.loadtxt
       _args_:
-        - forward/data/normalization/surfmax.txt
+        - data/normalization/surfmax.txt
     surfmin:
       _target_: numpy.loadtxt
       _args_:
-        - forward/data/normalization/surfmin.txt
+        - data/normalization/surfmin.txt
     dtype: ${data.dtype}
 # Metadata
 meta:
