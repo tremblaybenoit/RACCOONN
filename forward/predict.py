@@ -5,6 +5,9 @@ from utilities.instantiators import instantiate
 from forward.train import Operator
 from utilities.logic import get_config_path
 import torch
+# Force full FP32 matmul on CUDA (disable TF32) for more reproducible numerics
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cudnn.allow_tf32 = False
 torch.set_float32_matmul_precision('high')
 
 # Initialize logger
