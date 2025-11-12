@@ -537,9 +537,9 @@ def fig_vertical_profiles(sources: list[np.ndarray], label: list[str], y: np.nda
     """
 
     # Check shapes
-    n_samples, n_profiles, n_levels = sources[0].shape
+    n_profiles, n_levels = sources[0].shape
     for src in sources:
-        if src.shape != (n_samples, n_profiles, n_levels):
+        if src.shape != (n_profiles, n_levels):
             raise ValueError("All source arrays must have the same shape (n_samples, n_profiles, n_levels).")
 
     # If no colors, assign default colors
@@ -562,7 +562,7 @@ def fig_vertical_profiles(sources: list[np.ndarray], label: list[str], y: np.nda
     for i in range(n_profiles):
         ax = get_axes(i // n_cols, i % n_cols)
         # Plot the vertical profile for each channel
-        stacked = np.stack([src[:, i, :] for src in sources], axis=1)
+        stacked = np.stack([src[i, :] for src in sources], axis=0)
         plot_title = f'Vertical profile #{i + 1}' if title is None else title[i]
         plot_vertical_profiles(ax, stacked, title=plot_title, y=y, y_label=y_label, label=label,
                                x_label=x_label, x_range=x_range, color=color)
@@ -647,16 +647,15 @@ def plot_rmse_bars(ax, values, positions, height=0.3, colors=None, labels=None, 
 
 
 
-def fig_rmse_bars(target, pred, clrsky, figname=None, channels=None, height=0.3, colors=None, labels=None,
-                  x_range=None, y_label=None, x_label=None, title=None):
+def fig_rmse_bars(rmse_raw: list, rmse_norm: list, figname=None, channels=None, height=0.35, colors=None,
+                  labels=None, x_range=None, y_label=None, x_label=None, title=None):
     """
     Plot raw and normalized RMSE bars side by side using a flexible gridspec.
 
     Parameters
     ----------
-    target : numpy.ndarray. Target data. Shape should be (n_samples, n_channels).
-    pred : numpy.ndarray. Prediction data. Shape should be (n_samples, n_channels).
-    clrsky : numpy.ndarray. Boolean array indicating clear sky samples. Shape should be (n_samples,).
+    rmse_raw : dict. Dictionary containing 'cloudy' and 'clear' keys with error arrays.
+    rmse_norm : dict. Dictionary containing 'cloudy' and 'clear' keys with normalized error arrays.
     figname : str or None. If provided, the figure will be saved to this filename.
     channels : list or None. List of channel indices to plot. If None, defaults to channels 7 to 16.
     height : float. Height of the bars. Default is 0.3.
@@ -681,14 +680,11 @@ def fig_rmse_bars(target, pred, clrsky, figname=None, channels=None, height=0.3,
     x_range = x_range if x_range is not None else [None, None]  # [(0, 1.6), (0, 2.0)]
     title = title if title is not None else ['(a) Forward model errors', '(b) Normalized forward model errors']
     # Colors and labels
-    colors = colors if colors is not None else ['#D81B60', '#1E88E5']
-    labels = labels if labels is not None else ['Cloudy', 'Clear Sky']
-
-    # Prepare error values
-    err_cloudy = pred[~clrsky, :10] - target[~clrsky, :10]
-    err_clear = pred[clrsky, :10] - target[clrsky, :10]
-    norm_cloudy = err_cloudy / pred[~clrsky, 10:]
-    norm_clear = err_clear / pred[clrsky, 10:]
+    labels = labels if labels is not None else ['Clear sky', 'Cloudy', 'Day', 'Night']
+    colors_dict = {'Clear sky': '#D81B60', 'Cloudy': '#1E88E5', 'Day': '#FFC107', 'Night': 'r'}
+    colors = colors if colors is not None else [colors_dict[label] for label in labels]
+    if height is None:
+        height = 0.35 if len(labels) <= 2 else 0.175
 
     # Create flexible grid (2 columns)
     cell_widths = [4.0, 4.0]
@@ -702,141 +698,12 @@ def fig_rmse_bars(target, pred, clrsky, figname=None, channels=None, height=0.3,
     ax1 = get_axes(0, 1)
 
     # Plot raw RMSE
-    values_raw = [rmse(err_cloudy, axis=0), rmse(err_clear, axis=0)]
-    plot_rmse_bars(ax0, values_raw, channels, height=height, colors=colors, labels=labels, x_range=x_range[0],
+    plot_rmse_bars(ax0, rmse_raw, channels, height=height, colors=colors, labels=labels, x_range=x_range[0],
                    title=title[0], x_label=x_label[0], y_label=y_label[0])
 
     # Plot normalized RMSE
-    values_norm = [rmse(norm_cloudy, axis=0), rmse(norm_clear, axis=0)]
-    plot_rmse_bars(ax1, values_norm, channels, height=height, colors=colors, labels=labels, x_range=x_range[1],
+    plot_rmse_bars(ax1, rmse_norm, channels, height=height, colors=colors, labels=labels, x_range=x_range[1],
                    title=title[1], x_label=x_label[1], y_label=y_label[1])
-
-    # Save plot
-    if figname:
-        save_plot(fig, figname)
-
-    return fig
-
-
-def plot_rmse_bars2(ax, values, positions, height=0.175, colors=None, labels=None, x_range=None, **kwargs):
-    """
-    Bar plot for four groups: Cloudy, Clear Sky, Day, Night.
-
-    Parameters
-    ----------
-    ax : matplotlib.axes.Axes. Axes to plot on.
-    values : numpy.ndarray. Values to plot. Must have shape (4, n_values).
-    positions : numpy.ndarray. Positions of the bars on the y-axis. Must have shape (n_values,).
-    height : float. Height of the bars.
-    colors : list or None. Colors for the bars. If None, defaults to ['#D81B60', '#1E88E5', '#FFC107', 'r'].
-    labels : list or None. Labels for the bars. If None, defaults to ['Cloudy', 'Clear Sky', 'Day', 'Night'].
-    x_range : tuple or None. Range for the y-axis. If None, computed from data.
-    kwargs : dict. Additional keyword arguments for the bar plot.
-
-    Return
-    ------
-    None.
-    """
-    # Defaults for 4 groups
-    if colors is None:
-        colors = ['#D81B60', '#1E88E5', '#FFC107', 'r']
-    if labels is None:
-        labels = ['Cloudy', 'Clear Sky', 'Day', 'Night']
-    # Delegate to existing implementation
-    return plot_rmse_bars(ax, values, positions, height=height, colors=colors, labels=labels, x_range=x_range, **kwargs)
-
-
-def fig_rmse_bars2(target, pred, clrsky, daytime, figname=None, channels=None, height=0.175, colors=None, labels=None,
-                   x_range=None, y_label=None, x_label=None, title=None):
-    """
-    Create figure with two panels: raw RMSE and normalized RMSE for four groups:
-    Cloudy, Clear Sky, Day, Night. Returns matplotlib Figure.
-
-    Parameters
-    ----------
-    target : numpy.ndarray. Target data. Shape should be (n_samples, n_channels).
-    pred : numpy.ndarray. Prediction data. Shape should be (n_samples, n_channels).
-    clrsky : numpy.ndarray. Boolean array indicating clear sky samples. Shape should be (n_samples,).
-    daytime : numpy.ndarray. Boolean array indicating daytime samples. Shape should be (n_samples,).
-    figname : str or None. If provided, the figure will be saved to this filename.
-    channels : list or None. List of channel indices to plot. If None, defaults to channels 7 to 16.
-    height : float. Height of the bars. Default is 0.175.
-    colors : list or None. List of colors for the bars. If None, defaults to ['#D81B60', '#1E88E5', '#FFC107', 'r'].
-    labels : list or None. List of labels for the bars. If None, defaults to ['Cloudy', 'Clear Sky', 'Day', 'Night'].
-    x_range : list or None. List of x-axis ranges for the two plots. If None, defaults to [(0, 1.6), (0, 2.0)].
-    y_label : list or None. List of y-axis labels for the two plots. If None, defaults to ['Channels', 'Channels'].
-    x_label : list or None. List of x-axis labels for the two plots.
-              If None, defaults to ['RMSE (K)', 'RMSE (Standard Deviations)']. Default is None.
-    title : list or None. List of titles for the two plots.
-            If None, defaults to ['(a) Forward model errors', '(b) Normalized forward model errors'].
-
-    Returns
-    -------
-    fig : matplotlib.figure.Figure
-
-    Parameters mirror fig_rmse_bars plus `daytime` mask.
-    """
-    # Defaults
-    channels = channels if channels is not None else np.arange(7, 17)
-    colors = colors if colors is not None else ['#D81B60', '#1E88E5', '#FFC107', 'r']
-    labels = labels if labels is not None else ['Cloudy', 'Clear Sky', 'Day', 'Night']
-    x_range = x_range if x_range is not None else [(0, 1.6), (0, 2.0)]
-    y_label = y_label if y_label is not None else ['Channels', 'Channels']
-    x_label = x_label if x_label is not None else [f'RMSE (K)', f'RMSE (Standard Deviations)']
-    title = title if title is not None else [f'(a) Forward model errors', f'(b) Normalized forward model errors']
-
-    # Ensure masks
-    clr = np.asarray(clrsky, dtype=bool)
-    day = np.asarray(daytime, dtype=bool)
-
-    # Safe helpers
-    def safe_rmse_from_slices(pred_slice, targ_slice):
-        if pred_slice.size == 0 or targ_slice.size == 0:
-            return np.full(10, np.nan)
-        return rmse(pred_slice - targ_slice, axis=0)
-
-    def safe_rmse_norm_from_slices(pred_slice, targ_slice, std_slice):
-        if pred_slice.size == 0 or targ_slice.size == 0 or std_slice.size == 0:
-            return np.full(10, np.nan)
-        denom = np.where(std_slice == 0, np.nan, std_slice)
-        return rmse((pred_slice - targ_slice) / denom, axis=0)
-
-    # Extract arrays
-    pred = pred
-    targ = target
-    std = pred[:, 10:] if pred.ndim == 2 and pred.shape[1] >= 20 else (pred[:, 10:] if pred.ndim >= 2 else None)
-
-    # Compute raw errors
-    err_cloudy = safe_rmse_from_slices(pred[~clr, :10], targ[~clr, :10])
-    err_clear = safe_rmse_from_slices(pred[clr, :10], targ[clr, :10])
-    err_day = safe_rmse_from_slices(pred[day, :10], targ[day, :10])
-    err_night = safe_rmse_from_slices(pred[~day, :10], targ[~day, :10])
-
-    # Compute normalized errors (protect zero std)
-    norm_cloudy = safe_rmse_norm_from_slices(pred[~clr, :10], targ[~clr, :10], std[~clr]) if std is not None else np.full(10, np.nan)
-    norm_clear = safe_rmse_norm_from_slices(pred[clr, :10], targ[clr, :10], std[clr]) if std is not None else np.full(10, np.nan)
-    norm_day = safe_rmse_norm_from_slices(pred[day, :10], targ[day, :10], std[day]) if std is not None else np.full(10, np.nan)
-    norm_night = safe_rmse_norm_from_slices(pred[~day, :10], targ[~day, :10], std[~day]) if std is not None else np.full(10, np.nan)
-
-    values_raw = [err_cloudy, err_clear, err_day, err_night]
-    values_norm = [norm_cloudy, norm_clear, norm_day, norm_night]
-
-    # Create flexible grid (2 columns)
-    cell_widths = [4.0, 4.0]
-    cell_heights = [4.0]
-    lefts = [0.75, 0.75]
-    rights = [0.75, 0.75]
-    bottoms = [0.75]
-    tops = [0.75]
-    fig, get_axes = flexible_gridspec(cell_widths, cell_heights, lefts, rights, bottoms, tops)
-    ax0 = get_axes(0, 0)
-    ax1 = get_axes(0, 1)
-
-    # Plot raw and normalized using the wrapper
-    plot_rmse_bars2(ax0, values_raw, channels, height=height, colors=colors, labels=labels, x_range=x_range[0],
-                    font_size=13, title=title[0], x_label=x_label[0], y_label=y_label[0])
-    plot_rmse_bars2(ax1, values_norm, channels, height=height, colors=colors, labels=labels, x_range=x_range[1],
-                    font_size=13, title=title[1], x_label=x_label[1], y_label=y_label[1])
 
     # Save plot
     if figname:

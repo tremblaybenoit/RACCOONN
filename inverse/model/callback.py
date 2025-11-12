@@ -38,9 +38,6 @@ class FigureLogger(Callback):
         prof_labels = model.prof_vars if hasattr(model, 'prof_vars') else None
 
         # Extract results from the model
-        # Radiances
-        hofx_target = np.concatenate(model.valid_results['hofx_target'], axis=0)
-        hofx_pred = np.concatenate(model.valid_results['hofx_pred'], axis=0)
         # Profiles
         prof_target = np.concatenate(model.valid_results['prof_target'], axis=0)
         prof_pred = np.concatenate(model.valid_results['prof_pred'], axis=0)
@@ -48,10 +45,7 @@ class FigureLogger(Callback):
         # Pressure_levels
         pressure_levels = 0.01*(
             instantiate(trainer.datamodule.stage.valid.input.pressure.normalization, inverse_transform=True)
-            (model.valid_results['pressure'][0][0]))
-        # Cloud mask
-        cloud_filter = np.concatenate(model.valid_results['cloud_filter'], axis=0)
-        clrsky = ~cloud_filter
+            (model.results['pressure']))
 
         # List of figures to log
         figs = []
@@ -74,8 +68,12 @@ class FigureLogger(Callback):
                                           x_label='Normalized profile errors (no units)', title=[f"Epoch {current_epoch:02d} - {prof_label}" for prof_label in prof_labels]))
 
         # Forward model RMSE
-        figs.append(fig_rmse_bars(hofx_target, hofx_pred, clrsky, title=[f"Epoch {current_epoch:02d} - Forward model errors",
-                                                                         f"Epoch {current_epoch:02d} - Normalized forward model errors"]))
+        figs.append(fig_rmse_bars([model.metrics['hofx'][key]['rmse'] for key in model.metrics['hofx'].keys()],
+                                  [model.metrics['hofx_norm'][key]['rmse'] for key in
+                                   model.metrics['hofx_norm'].keys()],
+                                  labels=list(model.metrics['hofx'].keys()),
+                                  title=[f"Epoch {current_epoch:02d} - Forward model errors",
+                                         f"Epoch {current_epoch:02d} - Normalized forward model errors"]))
 
         # Tags for each figure
         tags = ["VerticalProfiles", "VerticalErrors", "RadianceRMSE"]

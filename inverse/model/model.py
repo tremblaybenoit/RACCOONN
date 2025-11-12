@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
-from typing import Callable, Union
+from typing import Union
 from omegaconf import DictConfig, ListConfig
 from pytorch_lightning import LightningModule
 from torch.nn import Sigmoid
+from data.statistics import statistics, accumulate_statistics
 from forward.model.model import BaseModel
 from forward.model.activation import Sine
 from inverse.model.encoding import IdentityPositionalEncoding
@@ -38,7 +39,7 @@ class PINNverseOperator(BaseModel):
     """Class for the Physics-Informed Neural Network (PINN) inverse model."""
     def __init__(self, optimizer: DictConfig = None, loss_func: DictConfig = None, lr_scheduler: DictConfig = None,
                  positional_encoding: DictConfig = None, activation_in: DictConfig = None, activation_out: DictConfig = None,
-                 transform_out: ListConfig = None, parameters: DictConfig = None, log_valid: bool = False):
+                 transform_out: ListConfig = None, parameters: DictConfig = None):
         """ Initialize model.
 
         Parameters
@@ -51,7 +52,6 @@ class PINNverseOperator(BaseModel):
         activation_out: Callable. Activation function (out).
         transform_out: ListConfig. List of functions to apply to the model output.
         parameters: DictConfig. Configuration for the model parameters.
-        log_valid: bool. Whether to log validation results.
 
         Returns
         -------
@@ -59,21 +59,11 @@ class PINNverseOperator(BaseModel):
         """
 
         # Class inheritance
-        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func, log_valid=log_valid)
+        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func)
 
-        # Initialize empty lists for validation and test results
-        if self.log_valid:
-            self.valid_results = {
-                'hofx_target': [],
-                'hofx_pred': [],
-                'prof_target': [],
-                'prof_pred': [],
-                'prof_background': [],
-                'pressure': [],
-                'cloud_filter': []
-            }
-        # Test results
-        self.test_results = {'hofx': [], 'prof': []}
+        # Results & metrics
+        self.results['prof'] = []
+        self.metrics['prof'], self.metrics['background'] = {}, {}
 
         # Normalization transformations
         self.transform_out = [instantiate(t) for t in transform_out] if transform_out is not None else [identity]
@@ -198,6 +188,37 @@ class PINNverseOperator(BaseModel):
         prof = self._retrieve_prof(x_vector).view(-1, n_levels, self.n_prof).transpose(1, 2)
         return prof
 
+    def _logging_prof(self, pred: torch.Tensor, target: torch.Tensor, background: torch.Tensor=None) -> None:
+        """ Log profile metrics.
+
+            Parameters
+            ----------
+            pred: tensor. Predicted profiles.
+            target: tensor. Target profiles.
+            background: tensor. Background profiles.
+
+            Returns
+            -------
+            None.
+        """
+
+        # Log mean profiles and rmse
+        stats = statistics(pred, axis=0, which=['mean', 'stdev', 'rmse', 'mae'], target=target)
+        # Check if statistics dictionaries are empty
+        if self.metrics.get('prof'):
+            self.metrics['prof'] = accumulate_statistics([self.metrics['prof'], stats])
+        else:
+            self.metrics['prof'] = stats
+
+        # Log mean background profiles and rmse if available
+        if background is not None:
+            stats = statistics(background, axis=0, which=['mean', 'stdev', 'rmse', 'mae'], target=target)
+            # Check if statistics dictionaries are empty
+            if self.metrics.get('background'):
+                self.metrics['background'] = accumulate_statistics([self.metrics['background'], stats])
+            else:
+                self.metrics['background'] = stats
+
     def _logging(self, stage: str, loss: dict, input: dict, target: dict, pred: dict) -> None:
         """ Log training/validation/test metrics.
 
@@ -214,33 +235,27 @@ class PINNverseOperator(BaseModel):
             None.
         """
 
+        # Log pressure levels
+        self.results['pressure'] = input['pressure'][0].detach().cpu().numpy()
+
         # If testing, return predictions in addition to loss
         if stage == 'test':
             # Logger flag
             logger_flag = False
             # Store test outputs
             for k, v in {'prof': pred['prof'], 'hofx': pred['hofx']}.items():
-                self.test_results[k].append(v.detach().cpu().numpy())
-        elif stage == 'valid':
-            # Logger flag
-            logger_flag = True
-            # Store validation outputs for logging
-            if self.log_valid:
-                # Store validation outputs
-                for k, v in {'prof_target': target['prof'], 'prof_pred': pred['prof'],
-                             'hofx_target': target['hofx'], 'hofx_pred': pred['hofx'],
-                             'pressure': input['pressure'], 'cloud_filter': target['cloud_filter'].bool()}.items():
-                    self.valid_results[k].append(v.detach().cpu().numpy())
-                # Store background if available
-                if 'prof_background' in target:
-                    for k, v in {'prof_background': target['prof_background']}.items():
-                        self.valid_results[k].append(v.detach().cpu().numpy())
+                self.results[k].append(v.detach().cpu().numpy())
         else:
             # Logger flag
             logger_flag = True
-            # Compute L2 norm of the model parameters
-            l2_norm = sum((p ** 2).sum() for p in self.parameters() if p.requires_grad)
-            self.log(f"{stage}_l2_norm", l2_norm, on_epoch=True, prog_bar=False, logger=logger_flag)
+            # Log metrics for hofx and profiles
+            self._logging_hofx(pred['hofx'], target['hofx'], target['meta'], target['cloud_filter'].bool())
+            self._logging_prof(pred['prof'], target['prof'], background=target.get('prof_background', None))
+            # Log L2 norm of model parameters during training
+            if stage == 'train':
+                # Compute L2 norm of the model parameters
+                l2_norm = sum((p ** 2).sum() for p in self.parameters() if p.requires_grad)
+                self.log(f"{stage}_l2_norm", l2_norm, on_epoch=True, prog_bar=False, logger=logger_flag)
 
         # Log total loss
         if 'total' in loss:
@@ -260,8 +275,8 @@ class PINNverseOperator(BaseModel):
                     for i, var in enumerate(self.prof_vars):
                         # Log loss only for the relevant pressure levels
                         start_index, end_index = n_pressure[i-1] if i > 0 else 0, n_pressure[i]
-                        self.log(f"{stage}_loss_{key}_{i}_{var}", loss[key][:, start_index:end_index].mean(), on_epoch=True,
-                                 prog_bar=False, logger=logger_flag)
+                        self.log(f"{stage}_loss_{key}_{i}_{var}", loss[key][:, start_index:end_index].mean(),
+                                 on_epoch=True, prog_bar=False, logger=logger_flag)
 
         # Log observation loss
         if 'obs' in loss:
@@ -293,7 +308,7 @@ class PINNverseOperator(BaseModel):
 
         # Mask
         mask = torch.zeros_like(pred['prof'])
-        mask[:, 0:1, :] = 1.0
+        mask[:, 1:2, :] = 1.0
         pred['prof'] = pred['prof'] * mask + batch['target']['prof'] * (1 - mask)
 
         # Compute loss function
@@ -325,30 +340,13 @@ class PINNverseOperator(BaseModel):
             prof = transform(prof)
         return prof
 
-    def on_validation_epoch_end(self):
-        """ Callback to log validation results at the end of each validation epoch.
-
-            Parameters
-            ----------
-            None.
-
-            Returns
-            -------
-            None.
-        """
-
-        # Clear the lists for the next epoch
-        if self.log_valid:
-            for k in self.valid_results:
-                self.valid_results[k].clear()
-
 
 class PINNverseOperators(PINNverseOperator):
     """Physics-Informed Neural Network (PINN) inverse model with one neural network per profile type."""
 
     def __init__(self, optimizer: DictConfig = None, loss_func: DictConfig = None, lr_scheduler: DictConfig = None,
                  positional_encoding: DictConfig = None, activation_in: DictConfig = None, activation_out: DictConfig = None,
-                 transform_out: ListConfig = None, parameters: DictConfig = None, log_valid: bool = False):
+                 transform_out: ListConfig = None, parameters: DictConfig = None):
         """ Initialize model.
 
         Parameters
@@ -361,7 +359,6 @@ class PINNverseOperators(PINNverseOperator):
         activation_out: DictConfig. Activation function (out).
         transform_out: ListConfig. List of functions to apply to the model output.
         parameters: DictConfig. Configuration for the model parameters.
-        log_valid: bool. Whether to log validation results.
 
         Returns
         -------
@@ -371,8 +368,7 @@ class PINNverseOperators(PINNverseOperator):
         # Inherit all attributes and logic from PINNverseOperator
         super().__init__(optimizer=optimizer, loss_func=loss_func, lr_scheduler=lr_scheduler,
                          positional_encoding=positional_encoding, activation_in=activation_in,
-                         activation_out=activation_out, transform_out=transform_out, parameters=parameters,
-                         log_valid=log_valid)
+                         activation_out=activation_out, transform_out=transform_out, parameters=parameters)
 
         # Replace the single model with a list of models, one per profile type
         self.model = nn.ModuleList([

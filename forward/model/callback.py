@@ -1,7 +1,6 @@
 from pytorch_lightning.callbacks import Callback
 import matplotlib.pyplot as plt
 from utilities.plot import fig_rmse_bars
-import numpy as np
 import wandb
 import tempfile
 import os
@@ -35,19 +34,15 @@ class FigureLogger(Callback):
         # Labels
         current_epoch = trainer.current_epoch
 
-        # Extract results from the model
-        hofx_target = np.concatenate(model.valid_results['hofx_target'], axis=0)
-        hofx_pred = np.concatenate(model.valid_results['hofx_pred'], axis=0)
-        # Make clear sky mask
-        cloud_filter = np.concatenate(model.valid_results['cloud_filter'], axis=0)
-        clrsky = ~cloud_filter
-
         # List of figures to log
         figs = []
 
         # Forward model RMSE
-        figs.append(fig_rmse_bars(hofx_target, hofx_pred, clrsky, title=[f"Epoch {current_epoch:02d} - Forward model errors",
-                                                                         f"Epoch {current_epoch:02d} - Normalized forward model errors"]))
+        figs.append(fig_rmse_bars([model.metrics['hofx'][key]['rmse'] for key in model.metrics['hofx'].keys()],
+                                  [model.metrics['hofx_norm'][key]['rmse'] for key in model.metrics['hofx_norm'].keys()],
+                                  labels = list(model.metrics['hofx'].keys()),
+                                  title=[f"Epoch {current_epoch:02d} - Forward model errors",
+                                         f"Epoch {current_epoch:02d} - Normalized forward model errors"]))
 
         # Tags for each figure
         tags = ["RadianceRMSE"]

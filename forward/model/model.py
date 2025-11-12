@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from typing import Union, Any
 from pytorch_lightning import LightningModule
+from data.statistics import statistics, accumulate_statistics
 from forward.model.activation import Swish, Scale
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
@@ -14,8 +15,7 @@ class BaseModel(LightningModule):
     This is translation from Keras to Pytorch of the CRTM emulator by Howard et al. (2025).
     Link: https://zenodo.org/records/13963758.
     """
-    def __init__(self, optimizer: DictConfig = None, lr_scheduler: DictConfig = None, loss_func: DictConfig = None,
-                 log_valid: bool = True):
+    def __init__(self, optimizer: DictConfig = None, lr_scheduler: DictConfig = None, loss_func: DictConfig = None):
         """ Initialize LightningCRTMModel.
 
         Parameters
@@ -23,7 +23,6 @@ class BaseModel(LightningModule):
         optimizer: DictConfig. Optimizer for the model.
         lr_scheduler: DictConfig. Configuration object for the learning rate scheduler (optional).
         loss_func: DictConfig. Loss function for the model.
-        log_valid: bool. If True, log validation results at the end of each validation epoch.
 
         Returns
         -------
@@ -41,14 +40,49 @@ class BaseModel(LightningModule):
         # Store hyperparameters
         self.save_hyperparameters(ignore=['optimizer', 'lr_scheduler', 'loss_func'])
 
-        # Validation results
-        self.log_valid = log_valid
-        if self.log_valid:
-            self.valid_results = {'hofx_target': [],
-                                  'hofx_pred': [],
-                                  'cloud_filter': []}
-        # Test set results
-        self.test_results = {'hofx': []}
+        # Stage results
+        self.results: dict[str, list] = {'hofx': []}
+        self.metrics: dict[str, dict] = {'hofx': {}, 'hofx_norm': {}}
+
+    def _logging_hofx(self, pred: torch.Tensor, target: torch.Tensor, meta: torch.Tensor,
+                      cloud_filter: torch.Tensor) -> None:
+        """ Compute and store metrics for hofx predictions.
+
+            Parameters
+            ----------
+            pred: torch.Tensor. Predicted hofx values.
+            target: torch.Tensor. Target hofx values.
+            meta: torch.Tensor. Meta information for the batch.
+            cloud_filter: torch.Tensor. Cloud filter mask for the batch.
+
+            Returns
+            -------
+            None.
+        """
+
+        # Create masks
+        mask = {
+            'Clear sky': ~cloud_filter,
+            'Cloudy': cloud_filter,
+            'Day': meta[:, 6] < 90,
+            'Night': meta[:, 6] >= 90
+        }
+
+        # Aggregate metrics per batch and combine with previous batches
+        for key, m in mask.items():
+            # Check is there are samples in the mask
+            if not torch.any(m):
+                continue
+            # Compute and accumulate statistics
+            stats = statistics(pred[m, :10], axis=0, which=['rmse'], target=target[m, :10])
+            stats_norm = statistics(pred[m, :10]/pred[m, 10:], axis=0, which=['rmse'], target=target[m, :10]/pred[m, 10:])
+            # Check if the key exists in the metrics dictionary
+            if key not in self.metrics['hofx']:
+                self.metrics['hofx'][key] = stats['rmse']
+                self.metrics['hofx_norm'][key] = stats_norm['rmse']
+            else:
+                self.metrics['hofx'][key] = accumulate_statistics([self.metrics['hofx'][key], stats])
+                self.metrics['hofx_norm'][key] = accumulate_statistics([self.metrics['hofx_norm'][key], stats_norm])
 
     def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
         """ Perform training/validation/test step.
@@ -71,23 +105,19 @@ class BaseModel(LightningModule):
 
         # If testing, return predictions in addition to loss
         if stage == 'test':
-            # Log metrics
             self.log(f"{stage}_loss", loss.mean(), on_epoch=True, prog_bar=True, logger=False)
-            # Store test outputs
-            self.test_results['hofx'].append(pred.detach().cpu().numpy())
-        elif stage == 'valid':
-            # Log metrics
+            self.results['hofx'].append(pred.detach().cpu().numpy())
+        else:
+            # Log loss
             self.log(f"{stage}_loss", loss.mean(), on_epoch=True, prog_bar=True, logger=True)
-            # Store validation outputs
-            if self.log_valid:
-                self.valid_results['cloud_filter'].append(batch['input']['cloud_filter'].detach().cpu().numpy())
-                self.valid_results['hofx_target'].append(batch['target']['hofx'].detach().cpu().numpy())
-                self.valid_results['hofx_pred'].append(pred.detach().cpu().numpy())
-        elif stage == 'train':
-            # Log metrics
-            self.log(f"{stage}_loss", loss.mean(), on_epoch=True, prog_bar=True, logger=True)
-            l2_norm = sum((p ** 2).sum() for p in self.parameters() if p.requires_grad)
-            self.log(f"{stage}_l2_norm", l2_norm, on_epoch=True, prog_bar=False, logger=True)
+            # Log L2 norm of model parameters
+            if stage == 'train':
+                l2_norm = sum((p ** 2).sum() for p in self.parameters() if p.requires_grad)
+                self.log(f"{stage}_l2_norm", l2_norm, on_epoch=True, prog_bar=False, logger=True)
+
+        # Log metrics for hofx
+        self._logging_hofx(pred, batch['target']['hofx'], batch['input']['meta'],
+                           batch['input']['cloud_filter'].bool())
 
         return loss.mean()
 
@@ -136,6 +166,39 @@ class BaseModel(LightningModule):
 
         return self.base_step(batch, batch_nb, stage='test')
 
+    def on_stage_epoch_end(self):
+        """ Callback to log validation results at the end of each validation epoch.
+
+            Parameters
+            ----------
+            None.
+
+            Returns
+            -------
+            None.
+        """
+
+        # Clear the lists for the next epoch
+        for k in self.results:
+            self.results[k] = []
+        for k in self.metrics:
+            self.metrics[k] = {}
+
+    def on_train_epoch_end(self):
+        """ Callback to log training results at the end of each training epoch.
+
+            Parameters
+            ----------
+            None.
+
+            Returns
+            -------
+            None.
+        """
+
+        # Clear the lists for the next epoch
+        self.on_stage_epoch_end()
+
     def on_validation_epoch_end(self):
         """ Callback to log validation results at the end of each validation epoch.
 
@@ -149,9 +212,7 @@ class BaseModel(LightningModule):
         """
 
         # Clear the lists for the next epoch
-        if self.log_valid:
-            for k in self.valid_results:
-                self.valid_results[k].clear()
+        self.on_stage_epoch_end()
 
     def on_test_epoch_start(self):
         """ Perform test epoch start.
@@ -166,8 +227,7 @@ class BaseModel(LightningModule):
         """
 
         # Empty lists for test results
-        for k in self.test_results:
-            self.test_results[k] = []
+        self.on_stage_epoch_end()
 
     def on_test_epoch_end(self):
         """ Perform test epoch end.
@@ -182,9 +242,8 @@ class BaseModel(LightningModule):
         """
 
         # Aggregate test results and convert to numpy array
-        for k in self.test_results:
-            if k in ['prof', 'hofx']:
-                self.test_results[k] = np.concatenate(self.test_results[k], axis=0)  # type: ignore
+        for k in self.results:
+            self.results[k] = np.concatenate(self.results[k], axis=0)  # type: ignore
 
     def configure_optimizers(self) -> Union[dict[str, Union[torch.optim.Optimizer, dict[str, Any]]], None]:
         """ Instantiate optimizer.
@@ -253,7 +312,7 @@ class CRTMModel(BaseModel):
     Link: https://zenodo.org/records/13963758.
     """
     def __init__(self, parameters: DictConfig, optimizer: DictConfig = None, lr_scheduler: DictConfig = None,
-                 loss_func: DictConfig = None, log_valid: bool = True):
+                 loss_func: DictConfig = None):
         """ Initialize LightningCRTMModel.
 
         Parameters
@@ -262,7 +321,6 @@ class CRTMModel(BaseModel):
         loss_func: DictConfig. Loss function for the model.
         parameters: DictConfig. Configuration object containing model parameters.
         lr_scheduler: DictConfig. Configuration object for the learning rate scheduler (optional).
-        log_valid: bool. If True, log validation results at the end of each validation epoch.
 
         Returns
         -------
@@ -270,7 +328,7 @@ class CRTMModel(BaseModel):
         """
 
         # Class inheritance
-        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func, log_valid=log_valid)
+        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func)
 
         # Input parameters
         self.nprofvars = len(parameters.data.use_prof_vars)

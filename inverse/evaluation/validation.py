@@ -2,9 +2,10 @@ import numpy as np
 import logging
 import hydra
 from omegaconf import DictConfig
+from data.statistics import statistics
 from utilities.logic import get_config_path
 from utilities.instantiators import instantiate
-from utilities.plot import fig_rmse_bars, fig_rmse_bars2, fig_errs_by_channel, save_plot
+from utilities.plot import fig_rmse_bars, fig_errs_by_channel, save_plot
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -33,23 +34,35 @@ def main(config: DictConfig) -> None:
     logger.info("Load test set references...")
     prof = np.array(instantiate(config.data.stage.test.vars.prof.load)).astype(np.float32)
     hofx = np.array(instantiate(config.data.stage.test.vars.hofx.load)).astype(np.float32)
-    clear = ~instantiate(config.data.stage.test.vars.cloud_filter.load)
+    cloud_filter = instantiate(config.data.stage.test.vars.cloud_filter.load)
     meta = instantiate(config.data.stage.test.vars.meta.load).astype(np.float32)
-    daytime = meta[:, 6] < 90
+
+    # Create masks and compute rmse by condition
+    mask = {
+        'Clear sky': ~cloud_filter,
+        'Cloudy': cloud_filter,
+        'Day': meta[:, 6] < 90,
+        'Night': meta[:, 6] >= 90
+    }
+    stats = {'hofx': {}, 'hofx_norm': {}}
+    for key, m in mask.items():
+        # Compute rmse
+        stats['hofx'][key] = statistics(hofx_pred[m, :10], axis=0, which=['rmse'], target=hofx[m, :10])
+        stats['hofx_norm'][key] = statistics(hofx_pred[m, :10] / hofx_pred[m, 10:], axis=0, which=['rmse'],
+                                             target=hofx[m, :10] / hofx_pred[m, 10:])
 
     # Plots
     logger.info("Plot comparison...")
-    fig1 = fig_rmse_bars(hofx, hofx_pred, clear, x_range=[[0, 1.0], [0, 2.0]],
-                         title=["(a) Forward model - Forward model errors",
-                                "(b) Forward model - Normalized forward model errors"])
-    save_plot(fig1, config.paths.run_dir + '/Figure3_rmse_bars_test.png')
-    fig2 = fig_rmse_bars2(hofx, hofx_pred, clear, daytime, x_range=[[0, 1.5], [0, 2.0]],
-                          title=["(a) Forward model - Daytime forward model errors",
-                                 "(b) Forward model - Nighttime forward model errors"])
+    fig2 = fig_rmse_bars([stats['hofx'][key]['rmse'] for key in stats['hofx'].keys()],
+                         [stats['hofx_norm'][key]['rmse'] for key in stats['hofx_norm'].keys()],
+                         x_range=[[0, 1.5], [0, 2.0]], labels=list(stats['hofx'].keys()),
+                         title=["(a) Forward model - Daytime forward model errors",
+                                "(b) Forward model - Nighttime forward model errors"])
     save_plot(fig2, config.paths.run_dir + '/Figure2_rmse_bars2_test.png')
     fig3 = fig_errs_by_channel(hofx, hofx_pred, title=[f'Channel {i + 7}' for i in range(hofx.shape[1])],
                                orientation='horizontal', x_range=[[0, 7.0], [0, 0.9], [0, 1.1], [0, 1.3], [0, 1.9],
                                                                   [0, 1.0], [0, 1.6], [0, 1.8], [0, 2.1], [0, 1.6]])
+    save_plot(fig3, config.paths.run_dir + '/Figure4_errs_by_channel_vert_test.png')
     # TODO: Add profile plots
 
 
