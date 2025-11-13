@@ -1,4 +1,6 @@
 from typing import Union
+
+import numpy
 import numpy as np
 import pickle
 import torch
@@ -12,6 +14,144 @@ import logging
 
 # Initialize logger
 logger = logging.getLogger(__name__)
+
+
+def torch_nanmin(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
+    """ Compute nanmin along specified axis/axes.
+
+        Parameters
+        ----------
+        a: torch.Tensor. Input tensor.
+        axis: int or tuple. Axis/axes along which to compute nanmin. If None,
+              compute over all elements.
+
+        Returns
+        -------
+        torch.Tensor containing nanmin values.
+    """
+
+    # If axis is a tuple, compute nanmin sequentially along each axis
+    if isinstance(axis, tuple):
+        for d in sorted(axis, reverse=True):
+            a = torch.nanmin(a, dim=d).values
+        return a
+    # If axis is an int or None, compute nanmin along that axis
+    return torch.nanmin(a, dim=axis).values
+
+
+def torch_nanmax(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
+    """ Compute nanmax along specified axis/axes.
+
+        Parameters
+        ----------
+        a: torch.Tensor. Input tensor.
+        axis: int or tuple. Axis/axes along which to compute nanmax. If None,
+              compute over all elements.
+
+        Returns
+        -------
+        torch.Tensor containing nanmax values.
+    """
+
+    # If axis is a tuple, compute nanmax sequentially along each axis
+    if isinstance(axis, tuple):
+        for d in sorted(axis, reverse=True):
+            a = torch.nanmax(a, dim=d).values
+        return a
+    # If axis is an int or None, compute nanmax along that axis
+    return torch.nanmax(a, dim=axis).values
+
+
+def torch_nanmean(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
+    """ Compute nanmean along specified axis/axes.
+
+        Parameters
+        ----------
+        a: torch.Tensor. Input tensor.
+        axis: int or tuple. Axis/axes along which to compute nanmean. If None,
+              compute over all elements.
+
+        Returns
+        -------
+        torch.Tensor containing nanmean values.
+    """
+
+    # If axis is a tuple, compute nanmean sequentially along each axis
+    if isinstance(axis, tuple):
+        for d in sorted(axis, reverse=True):
+            a = torch.nanmean(a, dim=d)
+        return a
+    # If axis is an int or None, compute nanmean along that axis
+    return torch.nanmean(a, dim=axis)
+
+
+def torch_nanvar(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
+    """ Compute nanvar along specified axis/axes.
+
+        Parameters
+        ----------
+        a: torch.Tensor. Input tensor.
+        axis: int or tuple. Axis/axes along which to compute nanvar. If None,
+              compute over all elements.
+
+        Returns
+        -------
+        torch.Tensor containing nanvar values.
+    """
+
+    # If axis is a tuple, compute nanvar sequentially along each axis
+    if isinstance(axis, tuple):
+        for d in sorted(axis, reverse=True):
+            a = torch.nanvar(a, dim=d)
+        return a
+    # If axis is an int or None, compute nanvar along that axis
+    return torch.nanvar(a, dim=axis)
+
+
+def torch_nanstd(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
+    """ Compute nanstd along specified axis/axes.
+
+        Parameters
+        ----------
+        a: torch.Tensor. Input tensor.
+        axis: int or tuple. Axis/axes along which to compute nanstd. If None,
+              compute over all elements.
+
+        Returns
+        -------
+        torch.Tensor containing nanstd values.
+    """
+
+    # If axis is a tuple, compute nanstd sequentially along each axis
+    if isinstance(axis, tuple):
+        for d in sorted(axis, reverse=True):
+            a = torch.nanstd(a, dim=d)
+        return a
+    # If axis is an int or None, compute nanstd along that axis
+    return torch.nanstd(a, dim=axis)
+
+
+def torch_nansum_mask(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
+    """ Compute number of non-nan elements along specified axis/axes.
+
+        Parameters
+        ----------
+        a: torch.Tensor. Input tensor.
+        axis: int or tuple. Axis/axes along which to compute number of non-nan elements. If None,
+              compute over all elements.
+
+        Returns
+        -------
+        torch.Tensor containing number of non-nan elements.
+    """
+
+    # If axis is a tuple, compute number of non-nan elements sequentially along each axis
+    if isinstance(axis, tuple):
+        for d in sorted(axis, reverse=True):
+            a = (~torch.isnan(a)).sum(dim=d)
+        return a
+    # If axis is an int or None, compute number of non-nan elements along that axis
+    return (~torch.isnan(a)).sum(dim=axis)
 
 
 def read_statistics(path: str, tensor: bool = False, dtype: str = 'float32') -> dict:
@@ -72,61 +212,9 @@ def read_statistics_var(path: str, var: str, tensor: bool = False, dtype: str = 
     return stats
 
 
-def accumulate_rmse(stats: list[dict[str, Union[np.ndarray, int]]]) -> dict[str, np.ndarray]:
-    """ Combine RMSE of multiple datasets based on the mathematical definition of RMSE.
-        The datasets make come from different sources, e.g. different instruments, different heights, etc.
-        Thus, they may have been computed from a different number of samples.
-
-        Parameters
-        ----------
-        stats: List[Dict[str, Union[np.ndarray, int]]]. List of RMSE statistics of different datasets.
-
-        Returns
-        -------
-        Dictionary containing combined RMSE (as if in a single dataset).
-    """
-    logger.info("Combining RMSE of all datasets...")
-
-    # Total number of samples
-    n_samples = np.sum([stat["n_samples"] for stat in stats], axis=0)
-
-    # Combine RMSE (based on its mathematical definition)
-    combined_rmse = np.sqrt(np.sum([stat["n_samples"] * stat["rmse"]**2 for stat in stats], axis=0) / n_samples)
-
-    combined_stats = {"rmse": combined_rmse,
-                      "n_samples": n_samples}
-
-    return combined_stats
-
-
-def compute_rmse(err: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = None) \
-        -> dict[str, Union[np.ndarray, torch.Tensor]]:
-    """ Compute RMSE of a given dataset.
-
-        Parameters
-        ----------
-        err: np.ndarray or torch.Tensor. Dataset to compute RMSE on.
-        axis: int or tuple. Axis to compute RMSE along.
-
-        Returns
-        -------
-        Dictionary containing RMSE of the dataset.
-    """
-
-    # Convert torch tensor to a numpy array
-    if isinstance(err, torch.Tensor):
-        err = err.detach().cpu().numpy()
-    # Compute RMSE
-    rmse_value = np.sqrt(np.nanmean(err**2, axis=axis))
-
-    stats = {"rmse": rmse_value,
-             "n_samples": np.sum(~np.isnan(err), axis=axis)}
-
-    return stats
-
-
-def accumulate_mean(stats: list[dict[str, Union[np.ndarray, int]]]) -> np.ndarray:
-    """ accumulate mean from multiple datasets.
+def accumulate_mean(stats: list[dict[str, Union[np.ndarray, torch.Tensor, int, torch.int]]]) \
+        -> Union[np.ndarray, torch.Tensor]:
+    """ Accumulate mean from multiple datasets.
 
         Parameters
         ----------
@@ -134,15 +222,31 @@ def accumulate_mean(stats: list[dict[str, Union[np.ndarray, int]]]) -> np.ndarra
 
         Returns
         -------
-        np.ndarray containing accumulate mean.
+        np.ndarray or torch.Tensor containing accumulate mean.
     """
     logger.info("Aggregating mean from all datasets...")
-    n_samples = np.sum([stat["n_samples"] for stat in stats], axis=0)
-    return np.sum([stat["n_samples"] * stat["mean"] for stat in stats], axis=0) / n_samples
+
+    # Extract means and number of samples
+    means = [stat["mean"] for stat in stats]
+    n_samples_list = [stat["n_samples"] for stat in stats]
+
+    # If the means are torch tensors
+    if all(isinstance(m, torch.Tensor) for m in means):
+        n_samples = torch.sum(torch.stack(n_samples_list, dim=0), dim=0)
+        weighted_means = torch.stack([n * m for n, m in zip(n_samples_list, means)], dim=0)
+        return torch_nanmean(weighted_means, axis=0) / n_samples
+    # If the means are numpy arrays
+    elif all(isinstance(m, numpy.ndarray) for m in means):
+        n_samples = np.sum(np.stack(n_samples_list, axis=0), axis=0)
+        weighted_means = np.stack([n * m for n, m in zip(n_samples_list, means)], axis=0)
+        return np.nanmean(weighted_means, axis=0) / n_samples
+    else:
+        raise TypeError("All means must be either numpy arrays or torch tensors.")
 
 
-def accumulate_variance(stats: list[dict[str, Union[np.ndarray, int]]]) -> np.ndarray:
-    """ accumulate variance from multiple datasets.
+def accumulate_variance(stats: list[dict[str, Union[np.ndarray, torch.Tensor]]]) \
+        -> Union[np.ndarray, torch.Tensor]:
+    """ Accumulate variance from multiple datasets.
 
         Parameters
         ----------
@@ -150,25 +254,46 @@ def accumulate_variance(stats: list[dict[str, Union[np.ndarray, int]]]) -> np.nd
 
         Returns
         -------
-        np.ndarray containing accumulate variance.
+        np.ndarray or torch.Tensor containing accumulate variance.
     """
     logger.info("Aggregating variance from all datasets...")
-    n_samples = np.sum([stat["n_samples"] for stat in stats], axis=0)
-    var = \
-        (np.sum([stat["n_samples"] * (stat["variance"] + (stat["mean"] - accumulate_mean(stats))**2)
-                 for stat in stats], axis=0) / n_samples)
+
+    # Extract means, variances, and number of samples
+    means = [stat["mean"] for stat in stats]
+    variances = [stat["variance"] for stat in stats]
+    n_samples_list = [stat["n_samples"] for stat in stats]
+    # Accumulate mean for variance calculation
+    accumulated_mean = accumulate_mean(stats)
+
+    # If the statistics are torch tensors
+    if all(isinstance(m, torch.Tensor) for m in means) and \
+       all(isinstance(v, torch.Tensor) for v in variances):
+        n_samples = torch.sum(torch.stack(n_samples_list, dim=0), dim=0)
+        var = torch.sum(torch.stack([(n * (var + (mean - accumulated_mean)**2)) / n_samples
+                                     for n, mean, var in zip(n_samples_list, means, variances)], dim=0), dim=0)
+    # If the statistics are numpy arrays
+    elif all(isinstance(m, numpy.ndarray) for m in means) and \
+         all(isinstance(v, numpy.ndarray) for v in variances):
+        n_samples = np.sum(np.stack(n_samples_list, axis=0), axis=0)
+        var = np.sum(np.stack([n * (var + (mean - accumulated_mean)**2) / n_samples
+                               for n, mean, var in zip(n_samples_list, means, variances)], axis=0), axis=0)
+    else:
+        raise TypeError("All means and variances must be either numpy arrays or torch tensors.")
+
     return var
 
 
-def accumulate_statistics(stats: list[dict[str, Union[np.ndarray, int]]], which: list[str] = None) -> dict[str, np.ndarray]:
+def accumulate_statistics(stats: list[dict[str, Union[np.ndarray, torch.Tensor]]],
+                          which: list[str] = None) -> dict[str, np.ndarray]:
     """ Combine statistics of multiple datasets based on the mathematical definition of mean, var, stdev, etc.
         The datasets make come from different sources, e.g. different instruments, different heights, etc.
         Thus, they may have been computed from a different number of samples.
 
         Parameters
         ----------
-        stats: List[Dict[str, Union[np.ndarray, int]]]. List of statistics of different datasets.
+        stats: List[dict[str, Union[np.ndarray, torch.Tensor, int, torch.int]]]. List of stats of different datasets.
         which: List[str]. List of statistics to accumulate.
+
         Returns
         -------
         Dictionary containing accumulate statistics.
@@ -180,19 +305,29 @@ def accumulate_statistics(stats: list[dict[str, Union[np.ndarray, int]]], which:
     which = ['min', 'max', 'mean', 'variance', 'stdev'] if which is None else which
         
     # Number of samples
-    accumulate_stats['n_samples'] = np.sum([stat["n_samples"] for stat in stats], axis=0)
+    accumulated_samples = [stat["n_samples"] for stat in stats]
+    accumulate_stats['n_samples'] = np.sum(np.stack(accumulated_samples, axis=0), axis=0) if isinstance(accumulated_samples[0], np.ndarray) \
+        else torch.sum(torch.stack(accumulated_samples, dim=0), dim=0)
 
     # Loop through requested statistics
     if 'min' in which:
-        accumulate_stats['min'] = np.min([stat["min"] for stat in stats], axis=0)
+        accumulated_min = [stat["min"] for stat in stats]
+        accumulate_stats['min'] = np.min(accumulated_min, axis=0) if isinstance(accumulated_min[0], np.ndarray) \
+            else torch.min(torch.stack(accumulated_min, dim=0), dim=0).values
     if 'max' in which:
-        accumulate_stats['max'] = np.max([stat["max"] for stat in stats], axis=0)
+        accumulated_max = [stat["max"] for stat in stats]
+        accumulate_stats['max'] = np.max(accumulated_max, axis=0) if isinstance(accumulated_max[0], np.ndarray) \
+            else torch.max(torch.stack(accumulated_max, dim=0), dim=0).values
     if 'mean' in which or 'variance' in which or 'stdev' in which:
         accumulate_stats['mean'] = accumulate_mean(stats)
-    if 'variance' in which or 'stdev' in which:
+    if 'variance' in which:
         accumulate_stats['variance'] = accumulate_variance(stats)
     if 'stdev' in which:
-        accumulate_stats['stdev'] = np.sqrt(accumulate_stats['variance'])
+        if 'variance' not in accumulate_stats:
+            var = accumulate_variance(stats)
+        else:
+            var = accumulate_stats['variance']
+        accumulate_stats['stdev'] = np.sqrt(var) if isinstance(var, np.ndarray) else torch.sqrt(var)
     if 'mae' in which:
         accumulate_stats['mae'] = accumulate_mean([{'mean': stat['mae'], 'n_samples': stat['n_samples']} 
                                                   for stat in stats])
@@ -200,13 +335,15 @@ def accumulate_statistics(stats: list[dict[str, Union[np.ndarray, int]]], which:
         accumulate_stats['mape'] = accumulate_mean([{'mean': stat['mape'], 'n_samples': stat['n_samples']} 
                                                    for stat in stats])
     if 'rmse' in which:
-        accumulate_stats['rmse'] = np.sqrt(accumulate_mean([{'mean': stat['rmse']**2, 'n_samples': stat['n_samples']} 
-                                                           for stat in stats]))
+        accumulated_mean = accumulate_mean([{'mean': stat['rmse']**2, 'n_samples': stat['n_samples']}
+                                            for stat in stats])
+        accumulate_stats['rmse'] = np.sqrt(accumulated_mean) if isinstance(accumulated_mean, np.ndarray) \
+            else torch.sqrt(accumulated_mean)
         
     return accumulate_stats
 
 
-def statistics(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = None, which: list[str] = None,
+def statistics(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = 0, which: list[str] = None,
                target: Union[np.ndarray, torch.Tensor] = None) \
         -> dict[str, Union[np.ndarray, torch.Tensor]]:
     """ Compute statistics of a given dataset.
@@ -215,6 +352,8 @@ def statistics(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = 
         ----------
         data: np.ndarray or torch.Tensor. Dataset to compute statistics on.
         axis: int or tuple. Axis to compute statistics along.
+        which: List[str]. List of statistics to compute.
+        target: np.ndarray or torch.Tensor. Target dataset to compute error-based statistics.
 
         Returns
         -------
@@ -223,48 +362,102 @@ def statistics(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = 
     logger.info("Computing statistics of given dataset...")
     stats = {}
 
-    # Requested statistics
+    # Allowed statistics
     which_allowed = ['min', 'max', 'mean', 'variance', 'stdev', 'rmse', 'mae', 'mape']
     if which is not None:
         which = set(which).intersection(which_allowed)
         which_invalid = set(which).difference(which_allowed)
         if len(which_invalid) > 0:
-            logger.warning(
-                f"Requested statistics {which_invalid} are not supported for aggregation and will be ignored.")
+            logger.warning(f"Requested statistics {which_invalid} are not supported and will be ignored.")
     else:
         which = ['min', 'max', 'mean', 'variance', 'stdev', 'rmse']
 
-    # Convert torch tensor to a numpy array
+    # If the data is a torch tensor
     if isinstance(data, torch.Tensor):
-        data = data.detach().cpu().numpy()
-    # Compute basic statistics
-    stats['n_samples'] = data.shape[0]
-    if 'min' in which:
-        stats['min'] = np.nanmin(data, axis=axis)
-    if 'max' in which:
-        stats['max'] = np.nanmax(data, axis=axis)
-    if 'mean' in which:
-        stats['mean'] = np.nanmean(data, axis=axis)
-    if 'variance' in which:
-        stats['variance'] = np.nanvar(data, axis=axis)
-    if 'stdev' in which:
-        stats['stdev'] = np.nanstd(data, axis=axis)
 
-    # If target is provided, compute error-based statistics
-    if target is not None:
-        if isinstance(target, torch.Tensor):
-            target = target.detach().cpu().numpy()
-        err = data - target
-        if 'rmse' in which:
-            stats['rmse'] = np.sqrt(np.nanmean(err**2, axis=axis))
-        if 'mae' in which:
-            stats['mae'] = np.nanmean(np.abs(err), axis=axis)
-        if 'mape' in which:
-            stats['mape'] = np.nanmean(np.abs(err / target) * 100, axis=axis)
-        err, target = None, None  # Free memory
+        # Compute basic statistics (torch)
+        stats['n_samples'] = torch_nansum_mask(data, axis=axis)
+        if 'min' in which:
+            stats['min'] = torch_nanmin(data, axis=axis)
+        if 'max' in which:
+            stats['max'] = torch_nanmax(data, axis=axis)
+        if 'mean' in which:
+            stats['mean'] = torch_nanmean(data, axis=axis)
+        if 'variance' in which:
+            stats['variance'] = torch_nanvar(data, axis=axis)
+        if 'stdev' in which:
+            stats['stdev'] = torch_nanstd(data, axis=axis)
 
-    # Compute statistics
+        # Compute error-based statistics (torch)
+        if target is not None:
+            # Ensure target is a torch tensor
+            if not isinstance(target, torch.Tensor):
+                raise TypeError("Target must be a torch.Tensor when data is a torch.Tensor.")
+            # Compute error
+            err = data - target
+            if 'rmse' in which:
+                stats['rmse'] = torch.sqrt(torch_nanmean(err**2, axis=axis))
+            if 'mae' in which:
+                stats['mae'] = torch_nanmean(torch.abs(err), axis=axis)
+            if 'mape' in which:
+                stats['mape'] = torch_nanmean(torch.abs(err/target)*100, axis=axis)
+            # Free memory
+            err = None
+
+    # If the data is a numpy array
+    elif isinstance(data, numpy.ndarray):
+        # Compute basic statistics (numpy)
+        stats['n_samples'] = np.sum(~np.isnan(data), axis=axis)
+        if 'min' in which:
+            stats['min'] = np.nanmin(data, axis=axis)
+        if 'max' in which:
+            stats['max'] = np.nanmax(data, axis=axis)
+        if 'mean' in which:
+            stats['mean'] = np.nanmean(data, axis=axis)
+        if 'variance' in which:
+            stats['variance'] = np.nanvar(data, axis=axis)
+        if 'stdev' in which:
+            stats['stdev'] = np.nanstd(data, axis=axis)
+
+        # Compute error-based statistics (numpy)
+        if target is not None:
+            # Ensure target is a numpy array
+            if not isinstance(target, np.ndarray):
+                raise TypeError("Target must be a np.ndarray when data is a np.ndarray.")
+            # Compute error
+            err = data - target
+            if 'rmse' in which:
+                stats['rmse'] = np.sqrt(np.nanmean(err**2, axis=axis))
+            if 'mae' in which:
+                stats['mae'] = np.nanmean(np.abs(err), axis=axis)
+            if 'mape' in which:
+                stats['mape'] = np.nanmean(np.abs(err/target)*100, axis=axis)
+            # Free memory
+            err = None
+
+    # If the data is neither a numpy array nor a torch tensor, raise an error
+    else:
+        raise TypeError("Data must be either a numpy.ndarray or a torch.Tensor.")
+
     return stats
+
+
+# def compute_statistics_lazy(input: DictConfig, output: DictConfig = None, batch_size: int = None) -> dict:
+    """ Compute statistics of a given dataset using lazy loading.
+
+        Parameters
+        ----------
+        input: DictConfig. Main hydra configuration file containing all model hyperparameters.
+        output: DictConfig. Main hydra configuration file containing all model hyperparameters.
+        batch_size: int. Size of the batches (files or chunks) to use for lazy loading.
+
+        Returns
+        -------
+        None.
+    """
+
+    # Compute statistics per variable, per file(s)
+
 
 
 def compute_statistics(input: DictConfig, output: DictConfig = None) -> dict:
