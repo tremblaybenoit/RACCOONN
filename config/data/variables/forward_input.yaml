@@ -96,3 +96,10 @@ pressure:
     _target_: data.io.load_npy
     path: ${....dir}/pressure.npy
     dtype: ${data.dtype}
+# Daytime filter
+daytime_filter:
+  # Loading function
+  load:
+    _target_: data.filters.daytime_filter
+    _args_:
+      - ${....meta.load}

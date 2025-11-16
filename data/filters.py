@@ -50,3 +50,17 @@ def pressure_filter(prof: Union[np.ndarray, torch.Tensor], threshold: float = 1.
         prof_var = prof.var(axis=0, keepdims=True).squeeze()
 
     return prof_var > threshold
+
+def daytime_filter(meta: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:
+    """ Filter out profiles based on daytime/nighttime condition.
+
+        Parameters
+        ----------
+        meta: np.ndarray or torch.Tensor. Metadata array of shape (n_samples, n_features).
+
+        Returns
+        -------
+        np.ndarray or torch.Tensor. Boolean mask indicating daytime profiles.
+    """
+
+    return meta[:, 6] >= 90

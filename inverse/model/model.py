@@ -63,7 +63,7 @@ class PINNverseOperator(BaseModel):
 
         # Results & metrics
         self.results['prof'] = []
-        self.metrics['prof'], self.metrics['background'] = {}, {}
+        self.metrics['prof'], self.metrics['prof_target'], self.metrics['prof_background'] = {}, {}, {}
 
         # Normalization transformations
         self.transform_out = [instantiate(t) for t in transform_out] if transform_out is not None else [identity]
@@ -203,21 +203,24 @@ class PINNverseOperator(BaseModel):
         """
 
         # Log mean profiles and rmse
-        stats = statistics(pred, axis=0, which=['mean', 'stdev', 'rmse', 'mae'], target=target)
+        stats_pred = statistics(pred, axis=0, which=['mean', 'stdev', 'rmse', 'mae'], target=target)
+        stats_target = statistics(target, axis=0, which=['mean', 'stdev'])
         # Check if statistics dictionaries are empty
         if self.metrics.get('prof'):
-            self.metrics['prof'] = accumulate_statistics([self.metrics['prof'], stats])
+            self.metrics['prof'] = accumulate_statistics([self.metrics['prof'], stats_pred])
+            self.metrics['prof_target'] = accumulate_statistics([self.metrics['prof_target'], stats_target])
         else:
-            self.metrics['prof'] = stats
+            self.metrics['prof'] = stats_pred
+            self.metrics['prof_target'] = stats_target
 
         # Log mean background profiles and rmse if available
         if background is not None:
-            stats = statistics(background, axis=0, which=['mean', 'stdev', 'rmse', 'mae'], target=target)
+            stats_background = statistics(background, axis=0, which=['mean', 'stdev', 'rmse', 'mae'], target=target)
             # Check if statistics dictionaries are empty
-            if self.metrics.get('background'):
-                self.metrics['background'] = accumulate_statistics([self.metrics['background'], stats])
+            if self.metrics.get('prof_background'):
+                self.metrics['prof_background'] = accumulate_statistics([self.metrics['prof_background'], stats_background])
             else:
-                self.metrics['background'] = stats
+                self.metrics['prof_background'] = stats_background
 
     def _logging(self, stage: str, loss: dict, input: dict, target: dict, pred: dict) -> None:
         """ Log training/validation/test metrics.
@@ -249,7 +252,8 @@ class PINNverseOperator(BaseModel):
             # Logger flag
             logger_flag = True
             # Log metrics for hofx and profiles
-            self._logging_hofx(pred['hofx'], target['hofx'], target['meta'], target['cloud_filter'].bool())
+            self._logging_hofx(pred['hofx'], target['hofx'], target['cloud_filter'].bool(),
+                               target['daytime_filter'].bool())
             self._logging_prof(pred['prof'], target['prof'], background=target.get('prof_background', None))
             # Log L2 norm of model parameters during training
             if stage == 'train':

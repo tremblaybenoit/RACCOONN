@@ -44,16 +44,16 @@ class BaseModel(LightningModule):
         self.results: dict[str, list] = {'hofx': []}
         self.metrics: dict[str, dict] = {'hofx': {}, 'hofx_norm': {}}
 
-    def _logging_hofx(self, pred: torch.Tensor, target: torch.Tensor, meta: torch.Tensor,
-                      cloud_filter: torch.Tensor) -> None:
+    def _logging_hofx(self, pred: torch.Tensor, target: torch.Tensor,
+                      cloud_filter: torch.Tensor, daytime_filter: torch.Tensor) -> None:
         """ Compute and store metrics for hofx predictions.
 
             Parameters
             ----------
             pred: torch.Tensor. Predicted hofx values.
             target: torch.Tensor. Target hofx values.
-            meta: torch.Tensor. Meta information for the batch.
             cloud_filter: torch.Tensor. Cloud filter mask for the batch.
+            daytime_filter: torch.Tensor. Daytime filter mask for the batch.
 
             Returns
             -------
@@ -64,8 +64,8 @@ class BaseModel(LightningModule):
         mask = {
             'Clear sky': ~cloud_filter,
             'Cloudy': cloud_filter,
-            'Day': meta[:, 6] < 90,
-            'Night': meta[:, 6] >= 90
+            'Day': daytime_filter,
+            'Night': ~daytime_filter
         }
 
         # Aggregate metrics per batch and combine with previous batches
@@ -78,8 +78,8 @@ class BaseModel(LightningModule):
             stats_norm = statistics(pred[m, :10]/pred[m, 10:], axis=0, which=['rmse'], target=target[m, :10]/pred[m, 10:])
             # Check if the key exists in the metrics dictionary
             if key not in self.metrics['hofx']:
-                self.metrics['hofx'][key] = stats['rmse']
-                self.metrics['hofx_norm'][key] = stats_norm['rmse']
+                self.metrics['hofx'][key] = stats
+                self.metrics['hofx_norm'][key] = stats_norm
             else:
                 self.metrics['hofx'][key] = accumulate_statistics([self.metrics['hofx'][key], stats])
                 self.metrics['hofx_norm'][key] = accumulate_statistics([self.metrics['hofx_norm'][key], stats_norm])
@@ -103,21 +103,22 @@ class BaseModel(LightningModule):
         # Compute loss function
         loss = self.loss_func(pred, batch['target']['hofx'])
 
+        # Log loss
+        self.log(f"{stage}_loss", loss.mean(), on_epoch=True, prog_bar=True, logger=stage != 'test')
         # If testing, return predictions in addition to loss
         if stage == 'test':
-            self.log(f"{stage}_loss", loss.mean(), on_epoch=True, prog_bar=True, logger=False)
             self.results['hofx'].append(pred.detach().cpu().numpy())
-        else:
-            # Log loss
-            self.log(f"{stage}_loss", loss.mean(), on_epoch=True, prog_bar=True, logger=True)
-            # Log L2 norm of model parameters
-            if stage == 'train':
-                l2_norm = sum((p ** 2).sum() for p in self.parameters() if p.requires_grad)
-                self.log(f"{stage}_l2_norm", l2_norm, on_epoch=True, prog_bar=False, logger=True)
 
-        # Log metrics for hofx
-        self._logging_hofx(pred, batch['target']['hofx'], batch['input']['meta'],
-                           batch['input']['cloud_filter'].bool())
+        # Training stage
+        if stage == 'train':
+            # Log L2 norm of model parameters
+            l2_norm = sum((p ** 2).sum() for p in self.parameters() if p.requires_grad)
+            self.log(f"{stage}_l2_norm", l2_norm, on_epoch=True, prog_bar=False, logger=True)
+        # Validation, test stages
+        else:
+            # Log metrics for hofx
+            self._logging_hofx(pred, batch['target']['hofx'], batch['input']['cloud_filter'].bool(),
+                               batch['input']['daytime_filter'].bool())
 
         return loss.mean()
 

@@ -32,6 +32,7 @@ stage:
       prof_increment: ${data.stage.train.vars.prof_increment}
       hofx: ${data.stage.train.vars.hofx}
       cloud_filter: ${data.stage.train.vars.cloud_filter}
+      daytime_filter: ${data.stage.train.vars.daytime_filter}
 
   # Validation set
   valid:
@@ -56,6 +57,7 @@ stage:
       prof_increment: ${data.stage.valid.vars.prof_increment}
       hofx: ${data.stage.valid.vars.hofx}
       cloud_filter: ${data.stage.valid.vars.cloud_filter}
+      daytime_filter: ${data.stage.valid.vars.daytime_filter}
   # Test set
   test:
     # Dataset class
@@ -79,6 +81,7 @@ stage:
       prof_increment: ${data.stage.test.vars.prof_increment}
       hofx: ${data.stage.test.vars.hofx}
       cloud_filter: ${data.stage.test.vars.cloud_filter}
+      daytime_filter: ${data.stage.test.vars.daytime_filter}
     # Results
     results:
       # Atmospheric profile predictions

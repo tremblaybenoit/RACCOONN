@@ -91,6 +91,3 @@ activation_out:
 
 # Transformations (to apply after the output layer)
 transform_out: null
-
-# Plot logger
-log_valid: true

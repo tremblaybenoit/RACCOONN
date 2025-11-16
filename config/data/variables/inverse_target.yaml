@@ -101,3 +101,10 @@ hofx_innovation:
   load:
     _target_: data.covariance.innovation_uncertainty
     data: ${...hofx.load}
+# Daytime filter
+daytime_filter:
+  # Loading function
+  load:
+    _target_: data.filters.daytime_filter
+    _args_:
+      - ${....meta.load}

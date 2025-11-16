@@ -20,6 +20,7 @@ stage:
       surf: ${data.stage.train.vars.surf}
       meta: ${data.stage.train.vars.meta}
       cloud_filter: ${data.stage.train.vars.cloud_filter}
+      daytime_filter: ${data.stage.train.vars.daytime_filter}
     # Variables to use as targets
     target:
       hofx: ${data.stage.train.vars.hofx}
@@ -34,6 +35,7 @@ stage:
       surf: ${data.stage.valid.vars.surf}
       meta: ${data.stage.valid.vars.meta}
       cloud_filter: ${data.stage.valid.vars.cloud_filter}
+      daytime_filter: ${data.stage.valid.vars.daytime_filter}
     # Variables to use as targets
     target:
       hofx: ${data.stage.valid.vars.hofx}
@@ -48,6 +50,7 @@ stage:
       surf: ${data.stage.test.vars.surf}
       meta: ${data.stage.test.vars.meta}
       cloud_filter: ${data.stage.test.vars.cloud_filter}
+      daytime_filter: ${data.stage.test.vars.daytime_filter}
     # Variables to use as targets
     target:
       hofx: ${data.stage.test.vars.hofx}
