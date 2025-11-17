@@ -238,28 +238,28 @@ class PINNverseOperator(BaseModel):
             None.
         """
 
-        # Log pressure levels
-        self.results['pressure'] = input['pressure'][0].detach().cpu().numpy()
+        # Logger flag
+        logger_flag = stage != 'test'
 
         # If testing, return predictions in addition to loss
         if stage == 'test':
-            # Logger flag
-            logger_flag = False
+            # Log pressure levels
+            self.results['pressure'] = input['pressure'][0:1].detach().cpu().numpy()
             # Store test outputs
             for k, v in {'prof': pred['prof'], 'hofx': pred['hofx']}.items():
                 self.results[k].append(v.detach().cpu().numpy())
-        else:
-            # Logger flag
-            logger_flag = True
+        elif stage == 'valid':
+            # Log pressure levels
+            self.results['pressure'] = input['pressure'][0:1].detach().cpu().numpy()
             # Log metrics for hofx and profiles
             self._logging_hofx(pred['hofx'], target['hofx'], target['cloud_filter'].bool(),
                                target['daytime_filter'].bool())
             self._logging_prof(pred['prof'], target['prof'], background=target.get('prof_background', None))
-            # Log L2 norm of model parameters during training
-            if stage == 'train':
-                # Compute L2 norm of the model parameters
-                l2_norm = sum((p ** 2).sum() for p in self.parameters() if p.requires_grad)
-                self.log(f"{stage}_l2_norm", l2_norm, on_epoch=True, prog_bar=False, logger=logger_flag)
+        # Log L2 norm of model parameters during training
+        elif stage == 'train':
+            # Compute L2 norm of the model parameters
+            l2_norm = sum((p ** 2).sum() for p in self.parameters() if p.requires_grad)
+            self.log(f"{stage}_l2_norm", l2_norm, on_epoch=True, prog_bar=False, logger=logger_flag)
 
         # Log total loss
         if 'total' in loss:
@@ -312,7 +312,7 @@ class PINNverseOperator(BaseModel):
 
         # Mask
         mask = torch.zeros_like(pred['prof'])
-        mask[:, 1:2, :] = 1.0
+        mask[:, 4:5, :] = 1.0
         pred['prof'] = pred['prof'] * mask + batch['target']['prof'] * (1 - mask)
 
         # Compute loss function

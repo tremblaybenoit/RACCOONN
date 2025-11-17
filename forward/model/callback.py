@@ -63,7 +63,7 @@ class FigureLogger(Callback):
                     logger.experiment.add_figure(tag=tag, figure=fig, global_step=current_epoch)
             # WandB
             elif logger.__class__.__name__.lower().startswith("wandb"):
-                logger.experiment.log({f"{tag}/Epoch_{current_epoch:02d}": wandb.Image(fig) for tag, fig in zip(tags, figs)})
+                logger.experiment.log({f"{tag}/Epoch_{current_epoch:02d}": wandb.Image(fig) for tag, fig in zip(tags, self.figs)})
             # MLflow
             elif logger.__class__.__name__.lower().startswith("mlflow"):
                 for tag, fig in zip(tags, self.figs):

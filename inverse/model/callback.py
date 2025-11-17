@@ -37,7 +37,7 @@ class FigureLogger(ForwardFigureLogger):
         # Pressure_levels
         pressure_levels = 0.01 * (
             instantiate(trainer.datamodule.stage.valid.input.pressure.normalization, inverse_transform=True)
-            (model.results['pressure']))
+            (to_numpy(model.results['pressure']))).flatten()
 
         # Profiles
         prof_mean = [to_numpy(model.metrics['prof_target']['mean']),
@@ -92,33 +92,6 @@ class FigureLogger(ForwardFigureLogger):
         current_epoch = trainer.current_epoch
         # Tags for each figure
         tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE", "Valid_RadianceRMSE"]
-
-        # Call the figure builder and buffer
-        self._figurebuilder(trainer, model, tags, current_epoch)
-        self._figurebuffer(trainer, tags, current_epoch)
-
-    def on_train_epoch_end(self, trainer, model):
-        """
-        Logs figures at the end of each training epoch.
-
-        Parameters
-        ----------
-        trainer: pytorch_lightning.Trainer. The trainer instance.
-        model: pytorch_lightning.LightningModule. The model instance.
-
-        Returns
-        -------
-        None. The figures are logged to the logger associated with the trainer.
-        """
-
-        # If in sanity checking, skip logging
-        if trainer.sanity_checking:
-            return
-
-        # Epoch
-        current_epoch = trainer.current_epoch
-        # Tags for each figure
-        tags = ["Train_ProfilesMean", "Train_ProfilesRMSE", "Train_RadianceRMSE"]
 
         # Call the figure builder and buffer
         self._figurebuilder(trainer, model, tags, current_epoch)
