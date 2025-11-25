@@ -3,7 +3,42 @@ import numpy as np
 import torch
 
 
-def _normalize_torch_dtype(dtype: Optional[Union[str, torch.dtype, np.dtype]]) -> Optional[torch.dtype]:
+def _to_numpy_dtype(dtype: Optional[Union[str, torch.dtype, np.dtype]]) -> Optional[np.dtype]:
+    """
+    Normalize a dtype input to a `np.dtype` or None.
+
+    Accepts: str | torch.dtype | np.dtype | None.
+    - torch.dtype -> mapped to corresponding np.dtype for common types.
+    - str (e.g. 'float32' or 'torch.float32') -> parsed to np.dtype.
+    - np.dtype -> returned as-is.
+    - None or unrecognized -> None.
+    """
+
+    # If already a numpy dtype
+    if isinstance(dtype, np.dtype):
+        return dtype
+
+    # Direct mapping for common torch dtypes (fast & explicit)
+    if isinstance(dtype, torch.dtype):
+        mapping = {
+            torch.float32: np.dtype('float32'),
+            torch.float64: np.dtype('float64'),
+            torch.int32: np.dtype('int32'),
+            torch.int64: np.dtype('int64'),
+            torch.bool: np.dtype('bool'),
+        }
+        return mapping.get(dtype)
+
+    # Strings like 'float32' or 'torch.float32' -> parse name
+    if isinstance(dtype, str):
+        name = dtype.split('.')[-1]
+        return np.dtype(name)
+
+    # Let numpy try to interpret the input
+    return np.dtype(dtype)
+
+
+def _to_torch_dtype(dtype: Optional[Union[str, torch.dtype, np.dtype]]) -> Optional[torch.dtype]:
     """
     Normalize a dtype input to a torch.dtype or None.
 
@@ -18,31 +53,23 @@ def _normalize_torch_dtype(dtype: Optional[Union[str, torch.dtype, np.dtype]]) -
         Corresponding torch.dtype or None if input is None or unrecognized.
     """
 
-    # Handle None
-    if dtype is None:
-        return None
     # If already torch.dtype, return as-is
     if isinstance(dtype, torch.dtype):
         return dtype
     # String like 'float32' => torch.float32
     if isinstance(dtype, str):
-        try:
-            return getattr(torch, dtype)
-        except AttributeError:
-            pass
+        name = dtype.split('.')[-1]
+        return getattr(torch, name)
     # If the previous check fails, numpy dtype -> map common types
-    try:
-        npd = np.dtype(dtype)
-        mapping = {
-            np.dtype('float32'): torch.float32,
-            np.dtype('float64'): torch.float64,
-            np.dtype('int32'): torch.int32,
-            np.dtype('int64'): torch.int64,
-            np.dtype('bool'): torch.bool,
-        }
-        return mapping.get(npd, None)
-    except Exception:
-        return None
+    npd = np.dtype(dtype)
+    mapping = {
+        np.dtype('float32'): torch.float32,
+        np.dtype('float64'): torch.float64,
+        np.dtype('int32'): torch.int32,
+        np.dtype('int64'): torch.int64,
+        np.dtype('bool'): torch.bool,
+    }
+    return mapping.get(npd)
 
 
 def to_torch(obj: Any, dtype: Optional[Union[str, torch.dtype, np.dtype]] = None,
@@ -70,7 +97,9 @@ def to_torch(obj: Any, dtype: Optional[Union[str, torch.dtype, np.dtype]] = None
     Any
         Same structure with numpy arrays and scalars replaced by torch.Tensors.
     """
-    torch_dtype = _normalize_torch_dtype(dtype)
+
+    # Normalize dtype and assign device
+    torch_dtype = _to_torch_dtype(dtype)
     torch_device = torch.device(device) if device is not None else None
 
     # torch.Tensor -> optionally cast/move
@@ -87,14 +116,20 @@ def to_torch(obj: Any, dtype: Optional[Union[str, torch.dtype, np.dtype]] = None
 
     # numpy array -> torch tensor
     if isinstance(obj, np.ndarray):
-        try:
-            t = torch.from_numpy(obj)
-        except Exception:
-            # fallback to safe constructor
-            t = torch.tensor(obj)
-        if torch_dtype is None and torch_device is None:
-            return t
-        return t.to(dtype=torch_dtype) if torch_device is None else t.to(dtype=torch_dtype, device=torch_device)
+        # Map desired torch dtype to numpy dtype to cast on numpy side first
+        np_dtype = _to_numpy_dtype(torch_dtype)
+        arr = obj
+        if np_dtype is not None and arr.dtype != np_dtype:
+            # astype(copy=False) will avoid copy if already correct view-compatible
+            arr = arr.astype(np_dtype, copy=False)
+        # Convert to tensor
+        t = torch.from_numpy(arr)
+        # If torch dtype still doesn't match (e.g. mapping failed), cast in torch
+        if torch_dtype is not None and t.dtype != torch_dtype:
+            t = t.to(dtype=torch_dtype)
+        if torch_device is not None and torch_device.type != 'cpu':
+            t = t.to(device=torch_device)
+        return t
 
     # Python / numpy scalars -> torch.tensor
     if isinstance(obj, (int, float, np.number, bool)):
@@ -121,7 +156,7 @@ def to_torch(obj: Any, dtype: Optional[Union[str, torch.dtype, np.dtype]] = None
     if isinstance(obj, set):
         return {to_torch(v, dtype=dtype, device=device) for v in obj}
 
-    # fallback: return as-is
+    # Fallback: return as-is
     return obj
 
 
@@ -145,17 +180,27 @@ def to_numpy(obj: Any, dtype: Optional[Union[str, np.dtype]] = None) -> Any:
     Any
         Same structure with torch.Tensor replaced by numpy.ndarray.
     """
+
     # Normalize dtype
     np_dtype = np.dtype(dtype) if dtype is not None else None
 
     # torch.Tensor -> numpy
     if isinstance(obj, torch.Tensor):
-        arr = obj.detach().cpu().numpy()
-        return arr.astype(np_dtype) if np_dtype is not None else arr
+        # Detach first
+        t = obj.detach()
+        # Move to CPU only if necessary
+        if t.device.type != 'cpu':
+            t = t.cpu()
+        # Convert to numpy
+        arr = t.numpy()
+        if np_dtype is not None and arr.dtype != np_dtype:
+            # astype(copy=False) will copy only if required
+            return arr.astype(np_dtype, copy=False)
+        return arr
 
     # numpy array -> optionally cast
     if isinstance(obj, np.ndarray):
-        return obj.astype(np_dtype) if np_dtype is not None else obj
+        return obj.astype(np_dtype, copy=False) if np_dtype is not None else obj
 
     # dict -> recurse
     if isinstance(obj, dict):
@@ -183,5 +228,5 @@ def to_numpy(obj: Any, dtype: Optional[Union[str, np.dtype]] = None) -> Any:
                 return obj
         return obj
 
-    # fallback: return as-is
+    # Fallback: return as-is
     return obj

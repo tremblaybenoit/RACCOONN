@@ -2,17 +2,16 @@ import numpy as np
 from omegaconf import DictConfig, ListConfig
 from utilities.instantiators import instantiate
 from data.transformations import identity
-from typing import Optional
+from typing import Union
 
 
-def load_npy(path: str, split: np.ndarray = None, dtype: str = 'float32', item: Optional[int] = None) -> np.ndarray:
+def load_npy(path: str, split: Union[np.ndarray, int, slice] = None, dtype: str = 'float32') -> np.ndarray:
     """ Load a numpy array from a .npy file and optionally split it.
 
         Parameters:
         path: str. The file path to the .npy file.
         split: np.ndarray, optional. An array of indices to split the loaded array. Defaults to None.
         dtype: str. The desired data type of the loaded array. Defaults to 'float32'.
-        item: int, optional. If provided, load the array in a memory-mapped mode. Defaults to None.
 
         Returns:
         data: np.ndarray. The loaded (and possibly split) numpy array.
@@ -21,21 +20,31 @@ def load_npy(path: str, split: np.ndarray = None, dtype: str = 'float32', item: 
     # Load the numpy array from the specified path
     data = np.load(path, mmap_mode='r')
 
-    # lazy loading is handled by mmap_mode in np.load
-    if item is not None:
-        # If there is no split
-        if split is None:
-            return np.asarray(data[item], dtype=dtype)
-        # If there is a split
+    # No split: prefer returning the memmap directly when dtype matches
+    if split is None:
+        if data.dtype == np.dtype(dtype):
+            return data
+        return data.astype(dtype, copy=True)
+    # Apply split
+    else:
+        # Single index
+        if isinstance(split, int):
+            return np.asarray(data[split], dtype=dtype)
+        # Slice of indices
+        elif isinstance(split, slice):
+            if data.dtype == np.dtype(dtype):
+                return data[split]
+            return data[split].astype(dtype=dtype, copy=True)
+        # Array of indices
         else:
-            # If split is a boolean array
+            # If boolean array
             if split.dtype == np.bool_:
-                return np.asarray(data[np.where(split)[0][item]], dtype=dtype)
-            # If split is an array of indices
-            else:
-                return np.asarray(data[split[item]], dtype=dtype)
-    # If lazy loading is not requested
-    return np.array(data, dtype=dtype) if split is None else np.array(data[split], dtype=dtype)
+                split = np.flatnonzero(split)
+            # Preallocate output array and use np.take for efficient indexing
+            out_shape = (split.shape[0],) + data.shape[1:]
+            out = np.empty(out_shape, dtype=dtype)
+            np.take(data, split, axis=0, out=out)
+            return out
 
 
 def load_latlon(path: str, scans: np.ndarray = None, split: np.ndarray = None, dtype: str = 'float32') -> np.ndarray:
@@ -111,13 +120,13 @@ def load_scans(path: str, lat: np.ndarray = None, split: np.ndarray = None, dtyp
     return scans
 
 
-def load_var(config: DictConfig, split: np.ndarray = None) -> np.ndarray:
+def load_var(config: DictConfig, split: Union[np.ndarray, int, slice] = None) -> np.ndarray:
     """ Load variable.
 
         Parameters
         ----------
         config: DictConfig. Configuration object for the variables.
-        split : np.ndarray. Array of indices for the specified stage.
+        split : np.ndarray, slice. Indices for the specified stage.
 
         Returns
         -------
@@ -132,13 +141,13 @@ def load_var(config: DictConfig, split: np.ndarray = None) -> np.ndarray:
     return data
 
 
-def load_var_and_normalize(config: DictConfig, split: np.ndarray = None) -> np.ndarray:
+def load_var_and_normalize(config: DictConfig, split: Union[np.ndarray, int, slice] = None) -> np.ndarray:
     """ Load and normalize variable.
 
         Parameters
         ----------
         config: DictConfig. Configuration object for the variables.
-        split : np.ndarray. Array of indices for the specified stage.
+        split : np.ndarray, slice. Indices for the specified stage.
 
         Returns
         -------

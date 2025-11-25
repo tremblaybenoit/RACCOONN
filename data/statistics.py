@@ -4,7 +4,7 @@ import numpy as np
 import pickle
 import torch
 import hydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig
 from utilities.instantiators import instantiate
 from data.io import load_var
 from utilities.logic import get_config_path
@@ -438,26 +438,61 @@ def statistics(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = 
     return stats
 
 
-# def compute_statistics_lazy(input: DictConfig, output: DictConfig = None, batch_size: int = None) -> dict:
-    """ Compute statistics of a given dataset using lazy loading.
+def compute_statistics(input: DictConfig, output: DictConfig = None, batch_size: int = None) -> dict:
+    """ Compute statistics of a given dataset.
 
         Parameters
         ----------
         input: DictConfig. Main hydra configuration file containing all model hyperparameters.
         output: DictConfig. Main hydra configuration file containing all model hyperparameters.
-        batch_size: int. Size of the batches (files or chunks) to use for lazy loading.
+        batch_size: int. Size of the batches to use for computation. If None, compute on the full dataset.
 
         Returns
         -------
         None.
     """
 
-    # Compute statistics per variable, per file(s)
+    # Compute statistics per variable
+    stats = {}
+    variables = list(input.keys())
+    # Loop sequentially for memory efficiency (over speed)
+    for v, variable in enumerate(variables):
+        # Compute statistics per height
+        logger.info(f"Computing statistics of variable {variable} ({v + 1}/{len(variables)})...")
+        if batch_size is None:
+            # Load data
+            data = load_var(input[variable])
+            # Compute statistics
+            stats[variable] = statistics(data, axis=0)
+        else:
+            # Determine number of samples
+            n_samples = input[variable].get('n_samples', None)  # TODO: Fix this to get n_samples correctly
+            # Loop through batches
+            for start_idx in range(0, n_samples, batch_size):
+                # Determine end index of the batch
+                end_idx = min(start_idx + batch_size, n_samples)
+                # Load data batch
+                data = load_var(input[variable], split=slice(start_idx, end_idx))
+                # Accumulate statistics for the batch
+                if start_idx == 0:
+                    stats[variable] = statistics(data, axis=0)
+                else:
+                    stats[variable] = accumulate_statistics([stats[variable], statistics(data, axis=0)])
+        # Free memory
+        data = None
+
+    # Save statistics to file
+    if output is not None:
+        logger.info(f"Saving statistics to file {output.path}.")
+        with open(output.path, 'wb') as file:
+            # noinspection PyTypeChecker
+            pickle.dump(stats, file)
+
+    return stats
 
 
-
-def compute_statistics(input: DictConfig, output: DictConfig = None) -> dict:
-    """ Compute statistics of a given dataset.
+def compute_statistics_datasets(input: DictConfig, output: DictConfig = None) -> dict:
+    """ Compute statistics of multiple datasets.
 
         Parameters
         ----------
@@ -474,11 +509,21 @@ def compute_statistics(input: DictConfig, output: DictConfig = None) -> dict:
     variables = list(input.keys())
     # Loop sequentially for memory efficiency (over speed)
     for v, variable in enumerate(variables):
-        # Load data
-        data = load_var(input[variable])
         # Compute statistics per height
         logger.info(f"Computing statistics of variable {variable} ({v + 1}/{len(variables)})...")
-        stats[variable] = statistics(data, axis=0)
+        if isinstance(input[variable], ListConfig):
+            # Loop through each dataset
+            for d, dataset in input[variable].items():
+                logger.info(f"  Dataset ({d + 1}/{len(variable)})...")
+                # Load data
+                data = load_var(dataset)
+                # Compute statistics
+                if d == 0:
+                    stats[variable] = statistics(data, axis=0)
+                else:
+                    stats[variable] = accumulate_statistics([stats[variable], statistics(data, axis=0)])
+                # Free memory
+                data = None
 
     # Save statistics to file
     if output is not None:
