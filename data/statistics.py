@@ -1,5 +1,4 @@
 from typing import Union
-import numpy
 import numpy as np
 import pickle
 import torch
@@ -234,7 +233,7 @@ def accumulate_mean(stats: list[dict[str, Union[np.ndarray, torch.Tensor]]]) \
         weighted_means = torch.stack([n * m for n, m in zip(n_samples_list, means)], dim=0)
         return torch.sum(weighted_means, dim=0) / n_samples
     # If the means are numpy arrays
-    elif all(isinstance(m, numpy.ndarray) for m in means):
+    elif all(isinstance(m, np.ndarray) for m in means):
         n_samples = np.sum(np.stack(n_samples_list, axis=0), axis=0)
         weighted_means = np.stack([n * m for n, m in zip(n_samples_list, means)], axis=0)
         return np.sum(weighted_means, axis=0) / n_samples
@@ -269,8 +268,8 @@ def accumulate_variance(stats: list[dict[str, Union[np.ndarray, torch.Tensor]]])
         var = torch.sum(torch.stack([(n * (var + (mean - accumulated_mean)**2)) / n_samples
                                      for n, mean, var in zip(n_samples_list, means, variances)], dim=0), dim=0)
     # If the statistics are numpy arrays
-    elif all(isinstance(m, numpy.ndarray) for m in means) and \
-         all(isinstance(v, numpy.ndarray) for v in variances):
+    elif all(isinstance(m, np.ndarray) for m in means) and \
+         all(isinstance(v, np.ndarray) for v in variances):
         n_samples = np.sum(np.stack(n_samples_list, axis=0), axis=0)
         var = np.sum(np.stack([n * (var + (mean - accumulated_mean)**2) / n_samples
                                for n, mean, var in zip(n_samples_list, means, variances)], axis=0), axis=0)
@@ -340,6 +339,49 @@ def accumulate_statistics(stats: list[dict[str, Union[np.ndarray, torch.Tensor]]
     return accumulate_stats
 
 
+def stream_statistics(config: DictConfig, batch_size: int = None) -> dict:
+    """ Compute statistics of a given dataset in a streaming fashion.
+
+        Parameters
+        ----------
+        config: DictConfig. Configuration object for the variables.
+        batch_size: int. Size of the batches to use for computation.
+
+        Returns
+        -------
+        Dictionary containing statistics of the dataset.
+    """
+
+    # If no batching is required
+    if batch_size is None:
+        # Load data
+        data = load_var(config)
+        # Compute statistics
+        stats = statistics(data, axis=0)
+        # Free memory
+        data = None
+    # If batching is required
+    else:
+        # Initialize stats
+        stats = None
+        # Determine number of samples
+        n_samples = config.get('n_samples', None)  # TODO: Fix this to get n_samples correctly
+        # Loop through batches
+        for start_idx in range(0, n_samples, batch_size):
+            # Determine end index of the batch
+            end_idx = min(start_idx + batch_size, n_samples)
+            # Load data batch
+            data = load_var(config, split=slice(start_idx, end_idx))
+            # Accumulate statistics for the batch
+            if start_idx == 0:
+                stats = statistics(data, axis=0)
+            else:
+                stats = accumulate_statistics([stats, statistics(data, axis=0)])
+            # Free memory
+            data = None
+    return stats
+
+
 def statistics(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = 0, which: list[str] = None,
                target: Union[np.ndarray, torch.Tensor] = None) \
         -> dict[str, Union[np.ndarray, torch.Tensor]]:
@@ -380,9 +422,17 @@ def statistics(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = 
         if 'mean' in which:
             stats['mean'] = torch_nanmean(data, axis=axis)
         if 'variance' in which:
-            stats['variance'] = torch_nanvar(data, axis=axis)
+            if 'mean' in stats:
+                stats['variance'] = torch_nanmean((data - stats['mean'])**2, axis=axis)
+            else:
+                stats['variance'] = torch_nanvar(data, axis=axis)
         if 'stdev' in which:
-            stats['stdev'] = torch_nanstd(data, axis=axis)
+            if 'variance' in stats:
+                stats['stdev'] = torch.sqrt(stats['variance'])
+            elif 'mean' in stats:
+                stats['stdev'] = torch.sqrt(torch_nanmean((data - stats['mean'])**2, axis=axis))
+            else:
+                stats['stdev'] = torch_nanstd(data, axis=axis)
 
         # Compute error-based statistics (torch)
         if target is not None:
@@ -401,7 +451,7 @@ def statistics(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = 
             err = None
 
     # If the data is a numpy array
-    elif isinstance(data, numpy.ndarray):
+    elif isinstance(data, np.ndarray):
         # Compute basic statistics (numpy)
         stats['n_samples'] = np.sum(~np.isnan(data), axis=axis)
         if 'min' in which:
@@ -411,9 +461,17 @@ def statistics(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = 
         if 'mean' in which:
             stats['mean'] = np.nanmean(data, axis=axis)
         if 'variance' in which:
-            stats['variance'] = np.nanvar(data, axis=axis)
+            if 'mean' in stats:
+                stats['variance'] = np.nanmean((data - stats['mean'])**2, axis=axis)
+            else:
+                stats['variance'] = np.nanvar(data, axis=axis)
         if 'stdev' in which:
-            stats['stdev'] = np.nanstd(data, axis=axis)
+            if 'variance' in stats:
+                stats['stdev'] = np.sqrt(stats['variance'])
+            elif 'mean' in stats:
+                stats['stdev'] = np.sqrt(np.nanmean((data - stats['mean'])**2, axis=axis))
+            else:
+                stats['stdev'] = np.nanstd(data, axis=axis)
 
         # Compute error-based statistics (numpy)
         if target is not None:
@@ -459,71 +517,21 @@ def compute_statistics(input: DictConfig, output: DictConfig = None, batch_size:
     for v, variable in enumerate(variables):
         # Compute statistics per height
         logger.info(f"Computing statistics of variable {variable} ({v + 1}/{len(variables)})...")
-        if batch_size is None:
-            # Load data
-            data = load_var(input[variable])
-            # Compute statistics
-            stats[variable] = statistics(data, axis=0)
-        else:
-            # Determine number of samples
-            n_samples = input[variable].get('n_samples', None)  # TODO: Fix this to get n_samples correctly
-            # Loop through batches
-            for start_idx in range(0, n_samples, batch_size):
-                # Determine end index of the batch
-                end_idx = min(start_idx + batch_size, n_samples)
-                # Load data batch
-                data = load_var(input[variable], split=slice(start_idx, end_idx))
-                # Accumulate statistics for the batch
-                if start_idx == 0:
-                    stats[variable] = statistics(data, axis=0)
-                else:
-                    stats[variable] = accumulate_statistics([stats[variable], statistics(data, axis=0)])
-        # Free memory
-        data = None
 
-    # Save statistics to file
-    if output is not None:
-        logger.info(f"Saving statistics to file {output.path}.")
-        with open(output.path, 'wb') as file:
-            # noinspection PyTypeChecker
-            pickle.dump(stats, file)
+        # If the variable is a single dataset
+        if isinstance(input[variable], DictConfig):
+            stats[variable] = stream_statistics(input[variable], batch_size=batch_size)
 
-    return stats
-
-
-def compute_statistics_datasets(input: DictConfig, output: DictConfig = None) -> dict:
-    """ Compute statistics of multiple datasets.
-
-        Parameters
-        ----------
-        input: DictConfig. Main hydra configuration file containing all model hyperparameters.
-        output: DictConfig. Main hydra configuration file containing all model hyperparameters.
-
-        Returns
-        -------
-        None.
-    """
-
-    # Compute statistics per variable
-    stats = {}
-    variables = list(input.keys())
-    # Loop sequentially for memory efficiency (over speed)
-    for v, variable in enumerate(variables):
-        # Compute statistics per height
-        logger.info(f"Computing statistics of variable {variable} ({v + 1}/{len(variables)})...")
-        if isinstance(input[variable], ListConfig):
+        # If the variable contains multiple datasets
+        elif isinstance(input[variable], ListConfig):
             # Loop through each dataset
-            for d, dataset in input[variable].items():
-                logger.info(f"  Dataset ({d + 1}/{len(variable)})...")
-                # Load data
-                data = load_var(dataset)
-                # Compute statistics
-                if d == 0:
-                    stats[variable] = statistics(data, axis=0)
-                else:
-                    stats[variable] = accumulate_statistics([stats[variable], statistics(data, axis=0)])
-                # Free memory
-                data = None
+            for d, dataset in enumerate(input[variable]):
+                logger.info(f"  Dataset {dataset} ({d + 1}/{len(variable)})...")
+                stats_d = stream_statistics(input[variable][dataset], batch_size=batch_size)
+                # Accumulate statistics
+                stats[variable] = stats_d if d == 0 else accumulate_statistics([stats[variable], stats_d])
+        else:
+            raise TypeError("Input variable configuration must be either a DictConfig or a ListConfig.")
 
     # Save statistics to file
     if output is not None:

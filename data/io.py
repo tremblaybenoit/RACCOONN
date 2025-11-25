@@ -1,8 +1,77 @@
 import numpy as np
+import pickle
+import torch
 from omegaconf import DictConfig, ListConfig
 from utilities.instantiators import instantiate
 from data.transformations import identity
 from typing import Union
+
+
+def save_pkl(path: str, data: dict) -> None:
+    """ Save a dictionary as a pickle file.
+
+        Parameters
+        ----------
+        path: str. The file path to save the pickle file.
+        data: dict. The dictionary to be saved.
+
+        Returns
+        -------
+        None.
+    """
+
+    with open(path, 'wb') as file:
+        # noinspection PyTypeChecker
+        pickle.dump(data, file)
+
+
+def load_pkl(path: str) -> dict:
+    """ Load a dictionary from a pickle file.
+
+        Parameters
+        ----------
+        path: str. The file path to the pickle file.
+
+        Returns
+        -------
+        data: dict. The loaded dictionary.
+    """
+
+    with open(path, 'rb') as file:
+        # noinspection PyTypeChecker
+        data = pickle.load(file)
+    return data
+
+
+def save_torch(path: str, data: Union[dict, torch.Tensor]) -> None:
+    """ Save a dictionary as a torch file.
+
+        Parameters
+        ----------
+        path: str. The file path to save the torch file.
+        data: dict. The dictionary to be saved.
+
+        Returns
+        -------
+        None.
+    """
+
+    torch.save(data, path)
+
+
+def load_torch(path: str) -> Union[dict, torch.Tensor]:
+    """ Load a dictionary from a torch file.
+
+        Parameters
+        ----------
+        path: str. The file path to the torch file.
+
+        Returns
+        -------
+        data: dict or tensor. The loaded data.
+    """
+
+    return torch.load(path)
 
 
 def load_npy(path: str, split: Union[np.ndarray, int, slice] = None, dtype: str = 'float32') -> np.ndarray:
@@ -135,10 +204,26 @@ def load_var(config: DictConfig, split: Union[np.ndarray, int, slice] = None) ->
 
     # Load and normalize variable
     data = np.array(instantiate(config['load']))
-    # Apply split if available
-    if split is not None and data.shape[0] == len(split):
-        data = data[split]
-    return data
+
+    # If no split and data is already a memmap/ndarray and dtype matches, return directly or asarray
+    if split is None:
+        # prefer returning memmap unchanged; np.asarray won't copy a memmap
+        return np.asarray(data)
+
+    # With split: handle int / slice / fancy indexing convert to array-like only when needed (np.asarray keeps memmap)
+    data = np.asarray(data)
+    if isinstance(split, int):
+        return np.asarray(data[split])
+    elif isinstance(split, slice):
+        return data[split]
+    else:
+        # Boolean or integer indices: Fancy indexing will produce a copy into a new ndarray
+        if split.dtype == np.bool_:
+            split = np.flatnonzero(split)
+        out_shape = (split.shape[0],) + data.shape[1:]
+        out = np.empty(out_shape, dtype=data.dtype)
+        np.take(data, split, axis=0, out=out)
+        return out
 
 
 def load_var_and_normalize(config: DictConfig, split: Union[np.ndarray, int, slice] = None) -> np.ndarray:
@@ -156,12 +241,24 @@ def load_var_and_normalize(config: DictConfig, split: Union[np.ndarray, int, sli
 
     # Extract normalization function
     f_norm = instantiate(config['normalization']) if hasattr(config, 'normalization') else identity
-    # Load and normalize variable
-    data = f_norm(load_var(config))
-    # Apply split if available
-    if split is not None and data.shape[0] == len(split):
-        data = data[split]
-    return data
+
+    # If no split or split is a slice, load and normalize directly
+    if split is None or isinstance(split, slice) or isinstance(split, int):
+        return f_norm(load_var(config, split=split))
+
+    # If the split is fancy indexing, extract from memory-mapped array
+    if isinstance(split, np.ndarray) and split.dtype == np.bool_:
+        split = np.flatnonzero(split)
+    else:
+        split = np.asarray(split)
+    # Load variable without split (to keep memmap if possible)
+    data = load_var(config, split=None)
+    # Extract efficiently using np.take
+    out_shape = (split.shape[0],) + data.shape[1:]
+    out = np.empty(out_shape, dtype=data.dtype)
+    np.take(data, split, axis=0, out=out)
+    # Normalize and return
+    return f_norm(out)
 
 
 def load_stack(stack: ListConfig) -> np.ndarray:
