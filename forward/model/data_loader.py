@@ -3,6 +3,9 @@ from torch.utils.data import Dataset, DataLoader
 from omegaconf import DictConfig
 from data.io import load_var_and_normalize
 from utilities.instantiators import instantiate
+from typing import Union, Optional
+from utilities.tensors import to_torch
+import multiprocessing
 import os
 from tqdm import tqdm
 import numpy as np
@@ -338,9 +341,9 @@ class TorchDataset(BaseDataset):
                 arr = load_var_and_normalize(config)
                 arr = np.ascontiguousarray(arr)
                 # Create torch tensor and share memory
-                t = torch.from_numpy(arr)
-                t.share_memory_()
-                loaded_vars[var] = t
+                tnsr = torch.from_numpy(arr)
+                tnsr.share_memory_()
+                loaded_vars[var] = tnsr
                 # Free numpy array memory
                 del arr
             return loaded_vars
@@ -357,84 +360,152 @@ class TorchDataset(BaseDataset):
         super().__init__(x)
 
 
-class MemmapDataset(BaseDataset):
-    """ Lazy loading dataset using numpy memmaps stored on disk. """
-    def __init__(self, input: DictConfig, target: DictConfig = None, results: DictConfig = None,
-                 memmap_dir: str = '../mm', chunk_bytes: int = 200_000_000) -> None:
-        os.makedirs(memmap_dir, exist_ok=True)
-        self.results = results
-        self.memmap_dir = memmap_dir
-        self.chunk_bytes = int(chunk_bytes)
-        self._raw_x = {'input': {}}
-        self._memmaps_opened = False
+class MemmapDataset(Dataset):
+    """ Dataset using numpy memmaps stored on disk with lazy loading and per-process handling. """
+    def __init__(self,
+                 input: DictConfig, target: Optional[DictConfig] = None,
+                 split: Union[slice, np.ndarray, int] = None) -> None:
+        """ Initialize the dataset.
 
-        def _write_or_register(var_name, arr, prefix=""):
-            # if arr is already a memmap, register its file path (avoid pickling the memmap)
-            if isinstance(arr, np.memmap):
-                path = getattr(arr, 'filename', None)
-                shape = arr.shape
-                dtype = arr.dtype
-                if path is None:
-                    # fallback: write it to disk as memmap
-                    path = os.path.join(self.memmap_dir, f"{prefix}{var_name}.dat")
-                    mm = np.memmap(path, dtype=dtype, mode='w+', shape=shape)
-                    mm[:] = arr[:]
-                    mm.flush()
-                # don't keep arr object
-                del arr
-                return {'_memmap_path': path, 'dtype': str(dtype), 'shape': shape}
+            Parameters
+            ----------
+            input : DictConfig. Configuration for input variables.
+            target : DictConfig. Configuration for target variables (optional).
+            split : slice | np.ndarray | int. Global split to apply to all variables (optional).
 
-            # else create a memmap file and copy by chunks to limit temporary peaks
-            shape = arr.shape
-            dtype = arr.dtype
-            path = os.path.join(self.memmap_dir, f"{prefix}{var_name}.dat")
-            mm = np.memmap(path, dtype=dtype, mode='w+', shape=shape)
-            # compute bytes per row (assumes first axis is samples)
-            row_bytes = np.prod(shape[1:]) * dtype.itemsize if len(shape) > 1 else dtype.itemsize
-            chunk = max(1, int(self.chunk_bytes // row_bytes))
-            for start in range(0, shape[0], chunk):
-                end = min(shape[0], start + chunk)
-                mm[start:end] = arr[start:end]
-                mm.flush()
-            del arr
-            return {'_memmap_path': path, 'dtype': str(dtype), 'shape': shape}
+            Returns
+            -------
+            None.
+        """
 
-        # inputs
-        for var, config in tqdm(input.items()):
-            arr = load_var_and_normalize(config)
-            self._raw_x['input'][var] = _write_or_register(var, arr, prefix="")
+        # Initialize the configs
+        self.input_config = input
+        self.target_config = target
+        self.split = split
 
-        # targets
+        # Detect multiprocessing method (fork means inherited memmaps are usable)
+        try:
+            start = multiprocessing.get_start_method(allow_none=True)
+        except (RuntimeError, ValueError):
+            start = None
+        self._is_fork = (start == 'fork')
+
+        # Storage for opened arrays (opened per-process in _ensure_open)
+        self.x = {'input': {}}
         if target is not None:
-            self._raw_x['target'] = {}
-            for var, config in target.items():
-                arr = load_var_and_normalize(config)
-                self._raw_x['target'][var] = _write_or_register(var, arr, prefix="target_")
+            self.x['target'] = {}
+        # Process ID
+        self._opened_pid: Optional[int] = None
 
-        super().__init__(self._raw_x)
+        # Compute dataset length once (without applying heavy copies) by probing first input var
+        first_config = next(iter(self.input_config.values()))
+        probe = load_var_and_normalize(first_config, split=None)
+        total = probe.shape[0]
+        # Compute length depending on global split
+        if self.split is None:
+            self._len = total
+        elif isinstance(self.split, slice):
+            start, stop, step = self.split.start, self.split.stop, self.split.step
+            rng = range(*slice(start, stop, step).indices(total))
+            self._len = len(rng)
+        else:
+            arr = np.asarray(self.split)
+            if arr.dtype == np.bool_:
+                arr = np.flatnonzero(arr)
+            self._len = arr.shape[0]
 
-    def _ensure_memmaps_opened(self):
-        if self._memmaps_opened:
+    def _ensure_open(self) -> None:
+        """ Ensure memmaps are opened in the current process with split applied.
+
+            Parameters
+            ----------
+            None.
+
+            Returns
+            -------
+            None.
+        """
+
+        # Current process ID
+        cur_pid = os.getpid()
+
+        # If already opened in this PID, skip
+        if self._opened_pid == cur_pid:
             return
-        for grouping in ('input', 'target'):
-            if grouping not in self._raw_x:
-                continue
-            for var, val in list(self._raw_x[grouping].items()):
-                if isinstance(val, dict) and '_memmap_path' in val:
-                    path = val['_memmap_path']
-                    dtype = np.dtype(val['dtype'])
-                    shape = tuple(val['shape'])
-                    mm = np.memmap(path, dtype=dtype, mode='r', shape=shape)
-                    self._raw_x[grouping][var] = mm
-        self.x = self._raw_x
-        self._memmaps_opened = True
+        # If we use the fork start method, and it is opened in parent, inherited memmaps are valid.
+        # Skip reopen if already opened
+        if self._opened_pid is not None and self._is_fork and self._opened_pid != cur_pid:
+            # Inherited handle is valid; just mark as opened in this PID
+            self._opened_pid = cur_pid
+            return
+
+        # If it's the first time doing open or spawn/forkserver with different PID, open per-config with split applied
+        for group_name, cfg_map in (('input', self.input_config), ('target', self.target_config or {})):
+            # Load and normalize each variable with split applied
+            opened = {}
+            for var_name, cfg in cfg_map.items():
+                arr = load_var_and_normalize(cfg, split=self.split)
+                opened[var_name] = arr
+            # Store opened group
+            self.x[group_name] = opened
+        # Mark as opened in current PID
+        self._opened_pid = cur_pid
 
     def __len__(self) -> int:
-        if not self._memmaps_opened:
-            self._ensure_memmaps_opened()
-        return super().__len__()
+        """ Get the length of the dataset.
+
+            Parameters
+            ----------
+            None.
+
+            Returns
+            -------
+            int. Length of the dataset.
+        """
+        return int(self._len)
 
     def __getitem__(self, idx: int) -> dict:
-        if not self._memmaps_opened:
-            self._ensure_memmaps_opened()
-        return super().__getitem__(idx)
+        """ Get item from data
+
+            Parameters
+            ----------
+            idx : int. Index of the item to retrieve.
+
+            Returns
+            -------
+            Dataset object.
+        """
+
+        # Ensure memmaps are opened in current process
+        self._ensure_open()
+        out = {'input': {}, 'target': {}} if 'target' in self.x else {'input': {}}
+
+        def fetch(group_dict: dict) -> dict:
+            """ Fetch data at index from group dict.
+
+                Parameters
+                ----------
+                group_dict : dict. Dictionary of variables in the group.
+
+                Returns
+                -------
+                dict. Dictionary of fetched variables at index.
+            """
+
+            # Fetch variables at index
+            res = {}
+            for k, v in group_dict.items():
+                # if variable length equals dataset length, index by idx; else leave as-is (broadcasted)
+                if getattr(v, 'shape', None) and v.shape[0] == self._len:
+                    val = v[idx]
+                else:
+                    val = v
+                # Convert to torch tensor
+                res[k] = to_torch(val)
+            return res
+
+        # Fetch input and target data
+        out['input'] = fetch(self.x.get('input', {}))
+        if 'target' in self.x:
+            out['target'] = fetch(self.x.get('target', {}))
+        return out

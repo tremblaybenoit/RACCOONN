@@ -131,7 +131,7 @@ class PINNverseOperator(BaseModel):
         # Model architecture
         self.layers = nn.ModuleList([nn.Linear(n_neurons, n_neurons)
                                      for _ in range(n_layers)])
-        self.batchnorm_layers = nn.ModuleList([nn.BatchNorm1d(n_neurons)
+        self.batchnorm_layers = nn.ModuleList([nn.Identity(n_neurons)
                                                for _ in range(n_layers)])
         self.activations = nn.ModuleList([instantiate(activation_in) if activation_in is not None else Sine()
                                           for _ in range(n_layers)])

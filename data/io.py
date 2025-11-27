@@ -98,7 +98,7 @@ def load_npy(path: str, split: Union[np.ndarray, int, slice] = None, dtype: str 
     else:
         # Single index
         if isinstance(split, int):
-            return np.asarray(data[split], dtype=dtype)
+            return np.asarray(data[split:split+1].squeeze(0), dtype=dtype)
         # Slice of indices
         elif isinstance(split, slice):
             if data.dtype == np.dtype(dtype):
@@ -213,7 +213,7 @@ def load_var(config: DictConfig, split: Union[np.ndarray, int, slice] = None) ->
     # With split: handle int / slice / fancy indexing convert to array-like only when needed (np.asarray keeps memmap)
     data = np.asarray(data)
     if isinstance(split, int):
-        return np.asarray(data[split])
+        return np.asarray(data[split:split+1].squeeze(0))
     elif isinstance(split, slice):
         return data[split]
     else:

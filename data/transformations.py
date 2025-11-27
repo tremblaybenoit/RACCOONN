@@ -28,7 +28,6 @@ class NormalizeProfiles:
 
         self.profmax = profmax.astype(dtype)  if len(profmax.shape) >= 2 \
             else profmax.reshape([9, 1]).astype(dtype)
-
         # Inverse transform flag
         self.inverse_transform = inverse_transform
 
@@ -45,11 +44,7 @@ class NormalizeProfiles:
         """
 
         # Apply transformation
-        if self.inverse_transform:
-            # Inverse normalization
-            return x * self.profmax + self.profmin
-        # Normalize profiles
-        return (x - self.profmin) / self.profmax
+        return affine(x, self.profmax, self.profmin, inverse_transform=self.inverse_transform)
 
     __call__ = forward  # Make the instance callable for normalization
 
@@ -101,7 +96,6 @@ class NormalizeSurface:
         # Load min and max surfaces
         self.surfmin = surfmin.astype(dtype)
         self.surfmax = surfmax.astype(dtype)
-
         # Inverse transform flag
         self.inverse_transform = inverse_transform
 
@@ -119,12 +113,7 @@ class NormalizeSurface:
         """
 
         # Apply transformation
-        if self.inverse_transform:
-            # Inverse normalization
-            return x * (self.surfmax - self.surfmin) + self.surfmin
-        else:
-            # Normalize surface
-            return (x - self.surfmin) / (self.surfmax - self.surfmin)
+        return affine(x, self.surfmax-self.surfmin, self.surfmin, inverse_transform=self.inverse_transform)
 
     __call__ = forward  # Make the instance callable for normalization
 
@@ -199,7 +188,7 @@ class NormalizeMeta:
         # Apply scaling
         if self.meta_scale_vars:
             meta_scale = x[:, self.meta_scale_vars]
-            meta_scale = (meta_scale + self.meta_scale_offset) / self.meta_scale_factor
+            meta_scale = affine(meta_scale, self.meta_scale_factor, self.meta_scale_offset)
             meta_list.append(meta_scale)
         # Convert to radians
         meta_rad = np.pi * meta / 180
@@ -214,13 +203,13 @@ class NormalizeMeta:
             meta_list.append(meta_cos)
 
         # Concatenate all normalized meta variables
-        return torch.cat(meta_list, dim=1) if isinstance(meta_list[0], torch.Tensor) else np.concatenate(meta_list,
-                                                                                                         axis=1)
+        return torch.cat(meta_list, dim=1) if isinstance(meta_list[0], torch.Tensor) \
+            else np.concatenate(meta_list, axis=1)
 
     __call__ = forward  # Make the instance callable for normalization
 
 
-def broadcast(var1: Union[np.ndarray, torch.Tensor], var2: Union[np.ndarray, torch.Tensor]) \
+def broadcast(var1: Union[np.ndarray, torch.Tensor], var2: Union[np.ndarray, torch.Tensor, float, int]) \
         -> Union[np.ndarray, torch.Tensor]:
     """ Broadcast var2 to the same dimensions as var1.
         Works for both numpy arrays and torch tensors.
@@ -236,26 +225,43 @@ def broadcast(var1: Union[np.ndarray, torch.Tensor], var2: Union[np.ndarray, tor
     """
 
     # Handle Python float/int or NumPy scalar
-    if isinstance(var2, (float, int, np.floating, np.integer)):
+    if isinstance(var2, (float, int, np.generic)):
         if isinstance(var1, torch.Tensor):
-            var2 = torch.tensor(var2, dtype=var1.dtype, device=var1.device)
-        elif isinstance(var1, np.ndarray):
-            var2 = np.array(var2, dtype=var1.dtype)
-    # For Numpy arrays
-    elif isinstance(var2, np.ndarray):
-        var2 = np.reshape(var2, (1,) * (var1.ndim - var2.ndim) + var2.shape)
-        # Convert to torch tensor if var1 is a torch tensor
-        if isinstance(var1, torch.Tensor):
-            var2 = torch.from_numpy(var2).to(var1.device, dtype=var1.dtype)
-    # For Torch tensors
-    elif isinstance(var2, torch.Tensor):
-        var2 = var2.view((1,) * (var1.ndim - var2.ndim) + var2.shape)
-        # Convert to numpy if var1 is a numpy array
-        if isinstance(var1, np.ndarray):
-            var2 = var2.cpu().numpy()
+            return torch.tensor(var2, dtype=var1.dtype, device=var1.device)
         else:
-            var2 = var2.to(var1.device, dtype=var1.dtype)
-    return var2
+            return np.array(var2, dtype=var1.dtype)
+    # If var1 is a numpy array
+    elif isinstance(var1, np.ndarray):
+        # If var2 is a tensor
+        if isinstance(var2, torch.Tensor):
+            if var2.device.type != 'cpu':
+                var2 = var2.detach().cpu().numpy()
+        # Else var 2 is a numpy array
+        # Ensure same dtype
+        dtype = np.result_type(var1.dtype, var2.dtype)
+        if var2.dtype != dtype:
+            var2 = var2.astype(dtype, copy=False)
+        # Broadcast dimensions
+        return np.broadcast_to(var2, var1.shape)
+    # If var1 is a torch tensor
+    elif isinstance(var1, torch.Tensor):
+        # If var2 is a numpy array
+        if isinstance(var2, np.ndarray):
+            var2 = torch.as_tensor(var2, device=var1.device)
+        else:
+            var2 = var2.to(var1.device)
+        # Else var2 is a torch tensor
+        # Ensure same dtype and device
+        dtype = torch.promote_types(var1.dtype, var2.dtype)
+        if var2.dtype != dtype:
+            var2 = var2.to(dtype=dtype)
+        # Broadcast dimensions
+        if var2.ndim < var1.ndim:
+            for _ in range(var1.ndim - var2.ndim):
+                var2 = var2.unsqueeze(0)
+        return var2.expand(var1.shape)
+    else:
+        raise TypeError("Input variables must be numpy arrays or torch tensors.")
 
 
 def multiplication(data: Union[np.ndarray, torch.Tensor], factor: Union[np.ndarray, torch.Tensor],
@@ -279,15 +285,16 @@ def multiplication(data: Union[np.ndarray, torch.Tensor], factor: Union[np.ndarr
 
     # Unstandardization or standardization
     if inverse_transform:
-        # Divide
+        # Avoid division by zero
         eps = np.finfo(scaling_factor.dtype).eps if isinstance(scaling_factor, np.ndarray) \
             else torch.finfo(scaling_factor.dtype).eps
-        data_transform = data / (scaling_factor + eps)  # Avoid division by zero
+        denom = scaling_factor + eps
+        # Divide
+        return data.div_(denom) if isinstance(data, torch.Tensor) else np.divide(data, denom, out=data)
     else:
         # Multiply
-        data_transform = data * scaling_factor
-
-    return data_transform
+        return data.mul_(scaling_factor) if isinstance(data, torch.Tensor) \
+            else np.multiply(data, scaling_factor, out=data)
 
 
 def translation(data: Union[np.ndarray, torch.Tensor], value: Union[np.ndarray, torch.Tensor],
@@ -312,12 +319,9 @@ def translation(data: Union[np.ndarray, torch.Tensor], value: Union[np.ndarray, 
     # Unstandardization or standardization
     if inverse_transform:
         # Subtract
-        data_transform = data - shift_value
+        return data.sub_(shift_value) if isinstance(data, torch.Tensor) else np.subtract(data, shift_value, out=data)
     else:
-        # Add
-        data_transform = data + shift_value
-
-    return data_transform
+        return data.add_(shift_value) if isinstance(data, torch.Tensor) else np.add(data, shift_value, out=data)
 
 
 def affine(data: Union[np.ndarray, torch.Tensor], factor: Union[np.ndarray, torch.Tensor],
@@ -340,13 +344,12 @@ def affine(data: Union[np.ndarray, torch.Tensor], factor: Union[np.ndarray, torc
     # Affine transformation
     if inverse_transform:
         # data_transform = (data - value)/factor
-        data_transform = multiplication(translation(data, value, inverse_transform=inverse_transform),
-                                        factor, inverse_transform=inverse_transform)
+        data = translation(data, value, inverse_transform=inverse_transform)
+        return multiplication(data, factor, inverse_transform=inverse_transform)
     else:
         # data_transform = factor*data + value
-        data_transform = translation(multiplication(data, factor), value)
-
-    return data_transform
+        data = multiplication(data, factor, inverse_transform=inverse_transform)
+        return translation(data, value, inverse_transform=inverse_transform)
 
 
 def stdev(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform: bool = False) \
@@ -475,7 +478,24 @@ def sin_cos(data: Union[np.ndarray, torch.Tensor], **kwargs) \
         data_transform: arr or tensor. Transformed dataset.
     """
 
-    return torch.sin(data), torch.cos(data)
+    # If data is a numpy array
+    if isinstance(data, np.ndarray):
+        # Preallocate output arrays
+        sin_out = np.empty_like(data)
+        cos_out = np.empty_like(data)
+        # Compute sine and cosine
+        np.sin(data, out=sin_out)
+        np.cos(data, out=cos_out)
+        return sin_out, cos_out
+    # If data is a torch tensor
+    else:
+        # Preallocate output tensors
+        sin_out = torch.empty_like(data)
+        cos_out = torch.empty_like(data)
+        # Compute sine and cosine
+        torch.sin(data, out=sin_out)
+        torch.cos(data, out=cos_out)
+        return sin_out, cos_out
 
 
 def clip(data: Union[np.ndarray, torch.Tensor], stats: Dict) \
