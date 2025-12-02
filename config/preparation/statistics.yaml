@@ -41,4 +41,4 @@ statistics:
         - ${data.stage.test.vars.pressure}
     # What the method produces as output (pickle file)
     output:
-      path: data/normalization/statistics_${data.dtype}.pkl
+      path: data/normalization/statistics.pkl

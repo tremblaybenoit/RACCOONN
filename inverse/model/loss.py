@@ -377,7 +377,7 @@ class VarLoss(torch.nn.Module):
     """ Universal loss module that combines observation and model losses. """
     def __init__(self, forward_model: Callable, loss_obs: Callable, loss_model: Callable = None, loss_bcs: Callable = None,
                  lambda_obs: float=1.0, lambda_model: float=1.0, lambda_bcs: float=1.0,
-                 pressure_filter: np.ndarray=None):
+                 pressure_filter: np.ndarray=None, clear_sky: bool=False):
         """ Initialize the variational loss module.
 
         Parameters
@@ -390,6 +390,7 @@ class VarLoss(torch.nn.Module):
         lambda_model: float. Weight for the model loss.
         lambda_bcs: float. Weight for the boundary condition loss.
         pressure_filter: Callable. Function to generate a mask for the profile levels to include in the model loss.
+        clear_sky: bool. Whether to apply clear-sky filtering.
 
         Returns
         -------
@@ -405,6 +406,8 @@ class VarLoss(torch.nn.Module):
         self.lambda_obs, self.lambda_model, self.lambda_bcs = lambda_obs, lambda_model, lambda_bcs
         # Pressure mask per profile type
         self.pressure_filter = torch.from_numpy(pressure_filter) if pressure_filter is not None else None
+        # Clear-sky filtering
+        self.clear_sky = clear_sky
 
     def __call__(self, pred: dict, target: dict) -> tuple[dict, torch.Tensor]:
         """ Compute the combined loss between predicted profiles and target data.
@@ -427,7 +430,14 @@ class VarLoss(torch.nn.Module):
             pressure_filter = torch.ones_like(pred['prof'], dtype=torch.bool, device=pred['prof'].device)
 
         # Compute the forward model output
-        hofx_pred = self.forward_model(pred['prof'], target)
+        if not self.clear_sky:
+            hofx_pred = self.forward_model(pred['prof'], target)
+        else:
+            pred_prof = torch.zeros((pred['prof'].shape[0], 9, pred['prof'].shape[2]), device=pred['prof'].device)
+            pred_prof[:, 0:1, ...] = pred['prof'][:, 0:1, :]  #  Air temperature
+            pred_prof[:, 4:5, ...] = pred['prof'][:, 4:5, :]  #  Ice particle effective radius
+            pred_prof[:, 8:9, ...] = pred['prof'][:, 8:9, :]  #  Ozone mixing ratio
+            hofx_pred = self.forward_model(pred_prof, target)
 
         # Initialize loss dictionary
         loss = {'total': torch.tensor(0.0, device=pred['prof'].device)}
