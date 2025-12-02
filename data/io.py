@@ -74,20 +74,21 @@ def load_torch(path: str) -> Union[dict, torch.Tensor]:
     return torch.load(path)
 
 
-def load_npy(path: str, split: Union[np.ndarray, int, slice] = None, dtype: str = 'float32') -> np.ndarray:
+def load_npy(path: str, split: Union[np.ndarray, int, slice] = None, dtype: str = 'float32', mmap_mode=None) -> np.ndarray:
     """ Load a numpy array from a .npy file and optionally split it.
 
         Parameters:
         path: str. The file path to the .npy file.
         split: np.ndarray, optional. An array of indices to split the loaded array. Defaults to None.
         dtype: str. The desired data type of the loaded array. Defaults to 'float32'.
+        mmap_mode: str, optional. The memory-mapping mode. Defaults to None.
 
         Returns:
         data: np.ndarray. The loaded (and possibly split) numpy array.
     """
 
     # Load the numpy array from the specified path
-    data = np.load(path, mmap_mode='r')
+    data = np.load(path, mmap_mode=mmap_mode)
 
     # No split: prefer returning the memmap directly when dtype matches
     if split is None:

@@ -301,7 +301,7 @@ def accumulate_statistics(stats: list[dict[str, Union[np.ndarray, torch.Tensor]]
         
     # Number of samples
     accumulated_samples = [stat["n_samples"] for stat in stats]
-    accumulate_stats['n_samples'] = np.sum(np.stack(accumulated_samples, axis=0), axis=0) if isinstance(accumulated_samples[0], np.ndarray) \
+    accumulate_stats['n_samples'] = np.sum(np.stack(accumulated_samples, axis=0), axis=0) if isinstance(accumulated_samples[0], (np.int32, np.int64)) \
         else torch.sum(torch.stack(accumulated_samples, dim=0), dim=0)
 
     # Loop through requested statistics

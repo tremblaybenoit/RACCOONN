@@ -1,8 +1,8 @@
 defaults:
-  - variables/inverse_input@stage.train.vars
-  - variables/inverse_input@stage.valid.vars
-  - variables/inverse_input@stage.test.vars
-  - variables/inverse_input@stage.predict.vars
+  - variables/inverse_cs_input@stage.train.vars
+  - variables/inverse_cs_input@stage.valid.vars
+  - variables/inverse_cs_input@stage.test.vars
+  - variables/inverse_cs_input@stage.predict.vars
   - variables/inverse_cs_target@stage.train.vars
   - variables/inverse_cs_target@stage.valid.vars
   - variables/inverse_cs_target@stage.test.vars

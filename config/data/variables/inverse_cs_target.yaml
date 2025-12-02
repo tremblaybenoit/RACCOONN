@@ -68,7 +68,7 @@ hofx:
   # Loading function
   load:
     _target_: data.io.load_npy
-    path: ${....dir}/predict_hofx.npy
+    path: ${....dir}/hofx.npy
     split: ${....split}
     dtype: ${data.dtype}
 # Cloud filter
@@ -82,8 +82,10 @@ cloud_filter:
 prof_background:
   # Loading function
   load:
-    _target_: data.covariance.background_climatology
-    data: ${...prof.load}
+    _target_: data.io.load_npy
+    path: ${....dir}/prof_background.npy
+    split: ${....split}
+    dtype: ${data.dtype}
   # Normalization function and parameters
   normalization: ${..prof.normalization}
 # Atmospheric profile increment
@@ -97,12 +99,14 @@ prof_increment:
 hofx_innovation:
   # Loading function
   load:
-    _target_: data.covariance.innovation_uncertainty
-    data: ${...hofx.load}
+    _target_: data.io.load_npy
+    path: ${....dir}/hofx_innovation.npy
+    split: ${....split}
+    dtype: ${data.dtype}
 # Daytime filter
 daytime_filter:
   # Loading function
   load:
-    _target_: data.filters.daytime_filter
-    _args_:
-      - ${....meta.load}
+    _target_: data.io.load_npy
+    path: ${....dir}/daytime_filter.npy
+    split: ${....split}

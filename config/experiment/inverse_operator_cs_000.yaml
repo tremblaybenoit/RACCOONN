@@ -9,7 +9,7 @@ defaults:
   - override /preparation: inverse_default
   - override /loader: inverse_default
   - override /model: inverse_operator
-  - override /trainer: gpu
+  - override /trainer: cpu
   - override /callbacks: inverse_default
   - override /logger: default
 
@@ -23,7 +23,7 @@ task_name: "inverse_operator"  # Experiment
 paths:
   task_dir: "../inverse_outputs"
   run_id: "cs_000"
-  data_dir: ../../GOES_ML-main/Data_ClearSky_${data.dtype}
+  data_dir: ../Data_ClearSky_${data.dtype}
 
 # Trainer configuration
 trainer:
@@ -38,19 +38,19 @@ preparation:
     data:
       # Output path for statistics
       output:
-        path: ${paths.data_dir}/statistics.pkl
+        path: ${paths.data_dir}/normalization/statistics.pkl
   # Covariance computation
   covariance:
     # Error covariance matrix in model space
     B:
       # Output path for covariance matrix B
       output:
-        path: ${paths.data_dir}/covariance_matrix_B_inverse.npy
+        path: ${paths.data_dir}/normalization/covariance_matrix_B_inverse.npy
     # Error covariance matrix in observation space
     R:
       # Output path for covariance matrix R
       output:
-        path: ${paths.data_dir}/covariance_matrix_R_inverse.npy
+        path: ${paths.data_dir}/normalization/covariance_matrix_R_inverse.npy
 
 # Data configuration
 data:
