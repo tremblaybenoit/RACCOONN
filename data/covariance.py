@@ -103,13 +103,14 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
     # Compute covariance matrix
     if recenter:
         logger.info("Computing covariance matrix with recentered data...")
-        cov = np.cov(err.reshape(err.shape[0], -1) - np.mean(err, axis=0).reshape(1, -1), rowvar=False)
-    else:
-        logger.info("Computing covariance matrix...")
-        cov = np.cov(err.reshape(err.shape[0], -1), rowvar=False)
+        err -= np.mean(err, axis=0, keepdims=True)
+    # Compute covariance matrix
+    logger.info("Computing covariance matrix...")
+    cov = np.cov(err.reshape(err.shape[0], -1), rowvar=False)
+
     # Compute inverse covariance matrix
     logger.info("Computing inverse covariance matrix...")
-    cov_inv = np.linalg.inv(cov)
+    cov_inv = np.linalg.inv(cov).astype(err.dtype)
 
     # Check if covariance matrix is positive definite
     if np.any(np.linalg.eigvals(cov_inv) <= 0):
@@ -128,7 +129,7 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
                                           lefts=[1.00], rights=[1.00], bottoms=[1.00], tops=[1.00])
         ax = get_axes(0, 0)
         # Plot covariance matrix
-        plot_map(ax, cov_inv/10000, title=f"Inverse covariance matrix", img_range=(-1, 1), plt_origin='upper',
+        plot_map(ax, cov_inv/10000., title=f"Inverse covariance matrix", img_range=(-1, 1), plt_origin='upper',
                  cb_label=r'Values (divided by 10$^4$)')
         save_plot(fig, filename=os.path.splitext(output.path)[0] + '.png')
 

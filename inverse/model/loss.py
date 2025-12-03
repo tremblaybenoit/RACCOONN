@@ -435,15 +435,15 @@ class VarLoss(torch.nn.Module):
         else:
             pred_prof = torch.zeros((pred['prof'].shape[0], 9, pred['prof'].shape[2]), device=pred['prof'].device)
             pred_prof[:, 0:1, ...] = pred['prof'][:, 0:1, :]  #  Air temperature
-            pred_prof[:, 4:5, ...] = pred['prof'][:, 4:5, :]  #  Ice particle effective radius
-            pred_prof[:, 8:9, ...] = pred['prof'][:, 8:9, :]  #  Ozone mixing ratio
+            pred_prof[:, 4:5, ...] = pred['prof'][:, 1:2, :]  #  Ice particle effective radius
+            pred_prof[:, 8:9, ...] = pred['prof'][:, 2:3, :]  #  Ozone mixing ratio
             hofx_pred = self.forward_model(pred_prof, target)
 
         # Initialize loss dictionary
         loss = {'total': torch.tensor(0.0, device=pred['prof'].device)}
 
         # Observation loss: Some observation losses may require additional inputs
-        if getattr(getattr(self.loss_obs, "func", self.loss_obs), "__name__", None) == 'diagonal_quadratic_form':
+        if isinstance(self.loss_obs, DiagonalQuadraticForm):
             loss['obs'] = self.loss_obs(hofx_pred[:, :10], target['hofx'][:, :10], target['hofx'][:, 10:])
         else:
             loss['obs'] = self.loss_obs(hofx_pred[:, :10], target['hofx'][:, :10])
@@ -452,7 +452,7 @@ class VarLoss(torch.nn.Module):
 
         # Model losses: Some model losses may require additional inputs
         if self.loss_model is not None:
-            if getattr(getattr(self.loss_model, "func", self.loss_model), "__name__", None) == 'diagonal_quadratic_form':
+            if isinstance(self.loss_model, DiagonalQuadraticForm):
                 loss['model'] = self.loss_model(pred['prof'][:, pressure_filter], target['prof_background'][:, pressure_filter], target['prof_increment'])
             else:
                 loss['model'] = self.loss_model(pred['prof'][:, pressure_filter], target['prof_background'][:, pressure_filter])

@@ -312,7 +312,6 @@ class PINNverseOperator(BaseModel):
 
         # Mask
         mask = torch.zeros_like(pred['prof'])
-        mask[:, 4:5, :] = 1.0
         pred['prof'] = pred['prof'] * mask + batch['target']['prof'] * (1 - mask)
 
         # Compute loss function

@@ -7,7 +7,7 @@ defaults:
   - override /hydra: default
   - override /data: inverse_cs
   - override /preparation: inverse_default
-  - override /loader: inverse_default
+  - override /loader: inverse_cs
   - override /model: inverse_operator
   - override /trainer: cpu
   - override /callbacks: inverse_default
@@ -74,6 +74,27 @@ data:
               var: 'prof'
               dtype: ${data.dtype}
             axis: 1
+        # Atmospheric profile background
+        prof_background:
+          # Loading function
+          load:
+            _target_: data.covariance.background_climatology
+            data:
+              _target_: data.io.load_stack
+              _recursive_: false
+              stack:
+                - ${data.stage.train.vars.prof}
+                - ${data.stage.valid.vars.prof}
+                - ${data.stage.test.vars.prof}
+          # Normalization function and parameters
+          normalization: ${..prof.normalization}
+        # Atmospheric profile increment
+        prof_increment:
+          # Loading function
+          load:
+            _target_: data.covariance.background_increment
+            config_true: ${...prof}  # We use the normalized true profiles
+            config_background: ${...prof_background}  # We use the normalized background profiles
     # Validation set
     valid:
       # Variables
@@ -82,6 +103,15 @@ data:
         prof:
           # Normalization function and parameters
           normalization: ${data.stage.train.vars.prof.normalization}
+        # Atmospheric profile background
+        prof_background: ${data.stage.train.vars.prof_background}
+        # Atmospheric profile increment
+        prof_increment:
+          # Loading function
+          load:
+            _target_: data.covariance.background_increment
+            config_true: ${...prof}  # We use the normalized true profiles
+            config_background: ${...prof_background}  # We use the normalized background profiles
     # Test set
     test:
       # Variables
@@ -90,6 +120,15 @@ data:
         prof:
           # Normalization function and parameters
           normalization: ${data.stage.train.vars.prof.normalization}
+        # Atmospheric profile background
+        prof_background: ${data.stage.train.vars.prof_background}
+        # Atmospheric profile increment
+        prof_increment:
+          # Loading function
+          load:
+            _target_: data.covariance.background_increment
+            config_true: ${...prof}  # We use the normalized true profiles
+            config_background: ${...prof_background}  # We use the normalized background profiles
 
 # Loader configuration
 loader:
@@ -127,9 +166,12 @@ model:
       # Number of neurons in the hidden layers
       n_neurons: 128
       # Number of hidden layers
-      n_layers: 8
+      n_layers: 4
       # Dropout rate
       dropout: 0.1
+    # Data
+    data:
+      n_prof: 3  # Number of profile variables
   # Loss function and parameters
   loss_func:
     # Weights for observation (obs), model, and boundary condition (bcs) errors
@@ -139,11 +181,11 @@ model:
     clear_sky: true
     # Loss term for observations
     loss_obs:
-      _target_: inverse.model.loss.diagonal_quadratic_form
+      _target_: inverse.model.loss.DiagonalQuadraticForm
     # Loss term for model variables
     loss_model:
       _target_: inverse.model.loss.QuadraticForm
-      matrix: ${preparation.covariance.B.output.path}
+      matrix: ${preparation.covariance.B.output.load}
     # Loss term for boundary conditions
     loss_bcs:
       _target_: inverse.model.loss.MSE

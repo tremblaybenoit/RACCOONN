@@ -76,6 +76,7 @@ def pressure_filter(prof: Union[np.ndarray, torch.Tensor], threshold: float = 1.
 
     return prof_var > threshold
 
+
 def daytime_filter(meta: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:
     """ Filter out profiles based on daytime/nighttime condition.
 
