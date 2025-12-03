@@ -14,6 +14,34 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def all_torch(l: list) -> bool:
+    """ Check if all elements in the list are torch tensors.
+
+        Parameters
+        ----------
+        l: list. List of elements to check.
+
+        Returns
+        -------
+        bool. True if all elements are torch tensors, False otherwise.
+    """
+    return all(torch.is_tensor(x) for x in l)
+
+
+def all_numpy(l: list) -> bool:
+    """ Check if all elements in the list are numpy arrays or numpy scalars.
+
+        Parameters
+        ----------
+        l: list. List of elements to check.
+
+        Returns
+        -------
+        bool. True if all elements are numpy arrays or numpy scalars, False otherwise.
+    """
+    return all(isinstance(x, (np.ndarray, np.generic, np.float32, np.float64)) for x in l)
+
+
 def torch_nanmin(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
     """ Compute nanmin along specified axis/axes.
 
@@ -228,12 +256,12 @@ def accumulate_mean(stats: list[dict[str, Union[np.ndarray, torch.Tensor]]]) \
     n_samples_list = [stat["n_samples"] for stat in stats]
 
     # If the means are torch tensors
-    if all(isinstance(m, torch.Tensor) for m in means):
+    if all_torch(means):
         n_samples = torch.sum(torch.stack(n_samples_list, dim=0), dim=0)
         weighted_means = torch.stack([n * m for n, m in zip(n_samples_list, means)], dim=0)
         return torch.sum(weighted_means, dim=0) / n_samples
     # If the means are numpy arrays
-    elif all(isinstance(m, np.ndarray) for m in means):
+    elif all_numpy(means):
         n_samples = np.sum(np.stack(n_samples_list, axis=0), axis=0)
         weighted_means = np.stack([n * m for n, m in zip(n_samples_list, means)], axis=0)
         return np.sum(weighted_means, axis=0) / n_samples
@@ -262,14 +290,12 @@ def accumulate_variance(stats: list[dict[str, Union[np.ndarray, torch.Tensor]]])
     accumulated_mean = accumulate_mean(stats)
 
     # If the statistics are torch tensors
-    if all(isinstance(m, torch.Tensor) for m in means) and \
-       all(isinstance(v, torch.Tensor) for v in variances):
+    if all_torch(means) and all_torch(variances):
         n_samples = torch.sum(torch.stack(n_samples_list, dim=0), dim=0)
         var = torch.sum(torch.stack([(n * (var + (mean - accumulated_mean)**2)) / n_samples
                                      for n, mean, var in zip(n_samples_list, means, variances)], dim=0), dim=0)
     # If the statistics are numpy arrays
-    elif all(isinstance(m, np.ndarray) for m in means) and \
-         all(isinstance(v, np.ndarray) for v in variances):
+    elif all_numpy(means) and all_numpy(variances):
         n_samples = np.sum(np.stack(n_samples_list, axis=0), axis=0)
         var = np.sum(np.stack([n * (var + (mean - accumulated_mean)**2) / n_samples
                                for n, mean, var in zip(n_samples_list, means, variances)], axis=0), axis=0)
@@ -301,18 +327,30 @@ def accumulate_statistics(stats: list[dict[str, Union[np.ndarray, torch.Tensor]]
         
     # Number of samples
     accumulated_samples = [stat["n_samples"] for stat in stats]
-    accumulate_stats['n_samples'] = np.sum(np.stack(accumulated_samples, axis=0), axis=0) if isinstance(accumulated_samples[0], (np.int32, np.int64)) \
-        else torch.sum(torch.stack(accumulated_samples, dim=0), dim=0)
+    if all_torch(accumulated_samples):
+        accumulate_stats['n_samples'] = torch.sum(torch.stack(accumulated_samples, dim=0), dim=0)
+    elif all_numpy(accumulated_samples):
+        accumulate_stats['n_samples'] = np.sum(np.stack(accumulated_samples, axis=0), axis=0)
+    else:
+        raise TypeError("All n_samples must be either numpy arrays or torch tensors.")
 
     # Loop through requested statistics
     if 'min' in which:
         accumulated_min = [stat["min"] for stat in stats]
-        accumulate_stats['min'] = np.min(accumulated_min, axis=0) if isinstance(accumulated_min[0], np.ndarray) \
-            else torch.min(torch.stack(accumulated_min, dim=0), dim=0).values
+        if all_torch(accumulated_min):
+            accumulate_stats['min'] = torch.min(torch.stack(accumulated_min, dim=0), dim=0).values
+        elif all_numpy(accumulated_min):
+            accumulate_stats['min'] = np.min(np.stack(accumulated_min, axis=0), axis=0)
+        else:
+            raise TypeError("All min values must be either numpy arrays or torch tensors.")
     if 'max' in which:
         accumulated_max = [stat["max"] for stat in stats]
-        accumulate_stats['max'] = np.max(accumulated_max, axis=0) if isinstance(accumulated_max[0], np.ndarray) \
-            else torch.max(torch.stack(accumulated_max, dim=0), dim=0).values
+        if all_torch(accumulated_max):
+            accumulate_stats['max'] = torch.max(torch.stack(accumulated_max, dim=0), dim=0).values
+        elif all_numpy(accumulated_max):
+            accumulate_stats['max'] = np.max(np.stack(accumulated_max, axis=0), axis=0)
+        else:
+            raise TypeError("All max values must be either numpy arrays or torch tensors.")
     if 'mean' in which or 'variance' in which or 'stdev' in which:
         accumulate_stats['mean'] = accumulate_mean(stats)
     if 'variance' in which:
@@ -323,7 +361,7 @@ def accumulate_statistics(stats: list[dict[str, Union[np.ndarray, torch.Tensor]]
         else:
             var = accumulate_variance([{'variance': stat['stdev']**2, 'mean': stat['mean'],
                                         'n_samples': stat['n_samples']} for stat in stats])
-        accumulate_stats['stdev'] = np.sqrt(var) if isinstance(var, np.ndarray) else torch.sqrt(var)
+        accumulate_stats['stdev'] = torch.sqrt(var) if torch.is_tensor(var) else np.sqrt(var)
     if 'mae' in which:
         accumulate_stats['mae'] = accumulate_mean([{'mean': stat['mae'], 'n_samples': stat['n_samples']} 
                                                   for stat in stats])
@@ -333,8 +371,8 @@ def accumulate_statistics(stats: list[dict[str, Union[np.ndarray, torch.Tensor]]
     if 'rmse' in which:
         accumulated_mean = accumulate_mean([{'mean': stat['rmse']**2, 'n_samples': stat['n_samples']}
                                             for stat in stats])
-        accumulate_stats['rmse'] = np.sqrt(accumulated_mean) if isinstance(accumulated_mean, np.ndarray) \
-            else torch.sqrt(accumulated_mean)
+        accumulate_stats['rmse'] = torch.sqrt(accumulated_mean) if torch.is_tensor(accumulated_mean) \
+            else np.sqrt(accumulated_mean)
         
     return accumulate_stats
 
