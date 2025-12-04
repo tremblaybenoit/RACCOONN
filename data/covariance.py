@@ -98,7 +98,7 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
     if hasattr(input, 'pressure_filter'):
         logger.info("Applying pressure filter...")
         pressure_filter = instantiate(input.pressure_filter.load)
-        err = err[:, pressure_filter]
+        err = np.take(err.reshape(err.shape[0], -1), np.flatnonzero(pressure_filter), axis=1)
 
     # Compute covariance matrix
     if recenter:
