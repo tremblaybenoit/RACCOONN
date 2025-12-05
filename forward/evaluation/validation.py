@@ -31,9 +31,11 @@ def main(config: DictConfig) -> None:
 
     # Load test set references
     logger.info("Load test set references...")
-    hofx = np.array(instantiate(config.data.stage.test.vars.hofx.load)).astype(np.float32)
+    hofx = np.array(instantiate(config.data.stage.test.vars.hofx.load))  #.astype(np.float32)
     cloud_filter = instantiate(config.data.stage.test.vars.cloud_filter.load)
-    meta = instantiate(config.data.stage.test.vars.meta.load).astype(np.float32)
+    meta = instantiate(config.data.stage.test.vars.meta.load)  #.astype(np.float32)
+    prof = instantiate(config.data.stage.test.vars.prof.load)
+    breakpoint()
 
     # Create masks and compute rmse by condition
     mask = {

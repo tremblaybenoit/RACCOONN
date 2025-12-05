@@ -124,7 +124,8 @@ class QuadraticForm(torch.nn.Module):
         -------
         torch.Tensor. Quadratic form of the difference between predicted and target tensors.
         """
-        return quadratic_form(pred, target, self.matrix)
+        return quadratic_form(pred.view(pred.shape[0], -1), target.view(pred.shape[0], -1),
+                              self.matrix)
 
 
 def diagonal_quadratic_form(pred: torch.Tensor, target: torch.Tensor, diag: torch.Tensor) -> torch.Tensor:
@@ -405,7 +406,8 @@ class VarLoss(torch.nn.Module):
         # Weighting factors for the losses
         self.lambda_obs, self.lambda_model, self.lambda_bcs = lambda_obs, lambda_model, lambda_bcs
         # Pressure mask per profile type
-        self.pressure_filter = torch.from_numpy(pressure_filter) if pressure_filter is not None else None
+        self.pressure_filter = torch.from_numpy(pressure_filter) \
+            if pressure_filter is not None and ~pressure_filter.sum() == 0 else None
         # Clear-sky filtering
         self.clear_sky = clear_sky
 
@@ -444,18 +446,32 @@ class VarLoss(torch.nn.Module):
 
         # Observation loss: Some observation losses may require additional inputs
         if isinstance(self.loss_obs, DiagonalQuadraticForm):
-            loss['obs'] = self.loss_obs(hofx_pred[:, :10], target['hofx'][:, :10], target['hofx'][:, 10:])
+            loss['obs'] = self.loss_obs(hofx_pred[:, :10], target['hofx'][:, :10],
+                                        hofx_pred[:, 10:]**2)
         else:
-            loss['obs'] = self.loss_obs(hofx_pred[:, :10], target['hofx'][:, :10])
+            loss['obs'] = self.loss_obs(hofx_pred[:, :10],
+                                        target['hofx'][:, :10])
         # Total
         loss['total'] += self.lambda_obs * torch.nanmean(loss['obs'])
 
         # Model losses: Some model losses may require additional inputs
         if self.loss_model is not None:
             if isinstance(self.loss_model, DiagonalQuadraticForm):
-                loss['model'] = self.loss_model(pred['prof'][:, pressure_filter], target['prof_background'][:, pressure_filter], target['prof_increment'])
+                if self.pressure_filter is not None:
+                    loss['model'] = self.loss_model(pred['prof'][:, pressure_filter],
+                                                    target['prof_background'][:, pressure_filter],
+                                                    target['prof_increment']**2)
+                else:
+                    loss['model'] = self.loss_model(pred['prof'],
+                                                    target['prof_background'],
+                                                    target['prof_increment']**2)
             else:
-                loss['model'] = self.loss_model(pred['prof'][:, pressure_filter], target['prof_background'][:, pressure_filter])
+                if self.pressure_filter is not None:
+                    loss['model'] = self.loss_model(pred['prof'][:, pressure_filter],
+                                                    target['prof_background'][:, pressure_filter])
+                else:
+                    loss['model'] = self.loss_model(pred['prof'],
+                                                    target['prof_background'])
             # Total
             loss['total'] += self.lambda_model * torch.nanmean(loss['model'])
 

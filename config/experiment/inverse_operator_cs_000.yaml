@@ -134,7 +134,7 @@ data:
 loader:
   # Number of workers for data loading
   num_workers: 8
-
+  persistent_workers: true  # Keep workers alive between epochs
 # Model parameters
 model:
   # Model
@@ -144,7 +144,7 @@ model:
     # Learning rate
     lr: 0.0005
     # Weight decay (L2 regularization)
-    weight_decay: 1e-8
+    weight_decay: 0  #1e-8
   # Learning rate scheduler
   lr_scheduler:
     # Function
@@ -181,9 +181,11 @@ model:
     clear_sky: true
     # Loss term for observations
     loss_obs:
+      # _target_: inverse.model.loss.MSE
       _target_: inverse.model.loss.DiagonalQuadraticForm
     # Loss term for model variables
     loss_model:
+      # _target_: inverse.model.loss.MSE
       _target_: inverse.model.loss.QuadraticForm
       matrix: ${preparation.covariance.B.output.load}
     # Loss term for boundary conditions

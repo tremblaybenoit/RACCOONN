@@ -4,6 +4,8 @@ from typing import Union
 from omegaconf import DictConfig, ListConfig
 from pytorch_lightning import LightningModule
 from torch.nn import Sigmoid
+from torch.onnx.symbolic_opset9 import contiguous
+
 from data.statistics import statistics, accumulate_statistics
 from forward.model.model import BaseModel
 from forward.model.activation import Sine
@@ -148,12 +150,13 @@ class PINNverseOperator(BaseModel):
 
         return model
 
-    def _retrieve_prof(self, x: dict) -> torch.Tensor:
+    def _retrieve_prof(self, x: dict, n_levels: int) -> torch.Tensor:
         """ Pass forward through neural network architecture.
 
             Parameters
             ----------
             x: tensor. Inputs: latitude, longitude, surface, and the metadata.
+            n_levels: int. Number of pressure levels.
 
             Returns
             -------
@@ -165,9 +168,9 @@ class PINNverseOperator(BaseModel):
         # Apply positional encoding
         encoded_inputs = self.positional_encoding(inputs)
         # Pass through the model
-        profiles = self.model(encoded_inputs)
+        profiles = self.model(encoded_inputs).view(-1, n_levels, self.n_prof).transpose(1, 2)
         # Reshape profiles to match the expected output shape
-        return profiles.view(-1, self.n_prof, 1)
+        return profiles.contiguous()
 
     def forward(self, x: dict):
         """ Retrieve atmospheric profile over multiple pressure levels.
@@ -185,8 +188,8 @@ class PINNverseOperator(BaseModel):
         n_levels = x['pressure'].shape[-1]
         x_vector = {k: v.repeat_interleave(n_levels, dim=0) if k != 'pressure' else x['pressure'].reshape(-1, 1)
                     for k, v in x.items()}
-        prof = self._retrieve_prof(x_vector).view(-1, n_levels, self.n_prof).transpose(1, 2)
-        return prof
+
+        return self._retrieve_prof(x_vector, n_levels)
 
     def _logging_prof(self, pred: torch.Tensor, target: torch.Tensor, background: torch.Tensor=None) -> None:
         """ Log profile metrics.
@@ -311,8 +314,8 @@ class PINNverseOperator(BaseModel):
             pred['prof'] = transform(pred['prof'])
 
         # Mask
-        mask = torch.zeros_like(pred['prof'])
-        pred['prof'] = pred['prof'] * mask + batch['target']['prof'] * (1 - mask)
+        # mask = torch.zeros_like(pred['prof'])
+        # pred['prof'] = pred['prof'] * mask + batch['target']['prof'] * (1 - mask)
 
         # Compute loss function
         loss, pred['hofx'] = self.loss_func(pred, batch['target'])
