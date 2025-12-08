@@ -29,6 +29,7 @@ paths:
 trainer:
   min_epochs: 1  # To prevent early stopping
   max_epochs: 32  # Number of epochs
+  precision: 32  # 32-bit precision
 
 # Data configuration
 data:

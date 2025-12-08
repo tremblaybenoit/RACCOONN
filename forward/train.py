@@ -99,7 +99,13 @@ class Operator:
 
         # Trainer
         logger.info("Waking up trainer...")
-        self.trainer = instantiate(self.config.trainer, callbacks=self.callbacks, logger=self.trainer_logger)
+        if hasattr(self.config.trainer, "precision"):
+            self.trainer = instantiate(self.config.trainer, callbacks=self.callbacks, logger=self.trainer_logger)
+        else:
+            precision_map = {'float64': 64, 'double': 64, 'float32': 32, 'float': 32, 'float16': 16}
+            self.trainer = instantiate(self.config.trainer,
+                                       precision=precision_map[self.config.data.get("dtype", 'float32')],
+                                       callbacks=self.callbacks, logger=self.trainer_logger)
 
     def train(self) -> None:
         """ Loads data, loggers, callbacks, trainer, and then trains and tests the model.

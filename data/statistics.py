@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Sequence, Tuple
 import numpy as np
 import pickle
 import torch
@@ -12,6 +12,38 @@ import logging
 
 # Initialize logger
 logger = logging.getLogger(__name__)
+
+
+def reduction_shape(shape: Sequence[int], axis: Union[int, Tuple[int, ...], None],
+                    keepdims: bool = False) -> Tuple[int, ...]:
+    """ Determine the shape after reduction along specified axis/axes.
+
+        Parameters
+        ----------
+        shape: Sequence[int]. Original shape of the array/tensor.
+        axis: int, tuple of int, or None. Axis/axes along which the reduction is performed.
+        keepdims: bool. If True, the reduced axes are left in the result as dimensions with size one.
+
+        Returns
+        -------
+        Tuple[int, ...]. Shape after reduction.
+    """
+
+    # If axis is None, reduce over all dimensions
+    if axis is None:
+        return tuple(1 if keepdims else () for _ in []) or (() if not keepdims else (1,))
+    # Convert axis to tuple if it's an int
+    axes = axis if isinstance(axis, tuple) else (axis,)
+    # If keepdims is True, set reduced axes to 1, else remove them
+    if keepdims:
+        s = list(shape)
+        for ax in axes:
+            if ax < 0:
+                ax += len(shape)
+            s[ax] = 1
+        return tuple(s)
+    else:
+        return tuple(s for i, s in enumerate(shape) if i not in axes)
 
 
 def all_torch(l: list) -> bool:
@@ -42,7 +74,7 @@ def all_numpy(l: list) -> bool:
     return all(isinstance(x, (np.ndarray, np.generic, np.float32, np.float64)) for x in l)
 
 
-def torch_nanmin(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
+def torch_min(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
     """ Compute nanmin along specified axis/axes.
 
         Parameters
@@ -65,7 +97,7 @@ def torch_nanmin(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
     return torch.min(a, dim=axis).values
 
 
-def torch_nanmax(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
+def torch_max(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
     """ Compute nanmax along specified axis/axes.
 
         Parameters
@@ -88,7 +120,7 @@ def torch_nanmax(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
     return torch.max(a, dim=axis).values
 
 
-def torch_nanmean(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
+def torch_mean(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
     """ Compute nanmean along specified axis/axes.
 
         Parameters
@@ -111,7 +143,7 @@ def torch_nanmean(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor
     return torch.mean(a, dim=axis)
 
 
-def torch_nanvar(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
+def torch_var(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
     """ Compute nanvar along specified axis/axes.
 
         Parameters
@@ -134,7 +166,7 @@ def torch_nanvar(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
     return torch.var(a, dim=axis)
 
 
-def torch_nanstd(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
+def torch_std(a: torch.Tensor, axis: Union[int, tuple]=None) -> torch.Tensor:
     """ Compute nanstd along specified axis/axes.
 
         Parameters
@@ -447,30 +479,31 @@ def statistics(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = 
             logger.warning(f"Requested statistics {which_invalid} are not supported and will be ignored.")
     else:
         which = ['min', 'max', 'mean', 'variance', 'stdev', 'rmse']
+    # Determine shape for stats computations
+    stats_shape = reduction_shape(data.shape, axis=axis, keepdims=False)
 
     # If the data is a torch tensor
     if isinstance(data, torch.Tensor):
-
         # Compute basic statistics (torch)
         stats['n_samples'] = torch_nansum_mask(data, axis=axis)
         if 'min' in which:
-            stats['min'] = torch_nanmin(data, axis=axis)
+            stats['min'] = torch_min(data, axis=axis)
         if 'max' in which:
-            stats['max'] = torch_nanmax(data, axis=axis)
+            stats['max'] = torch_max(data, axis=axis)
         if 'mean' in which:
-            stats['mean'] = torch_nanmean(data, axis=axis)
+            stats['mean'] = torch_mean(data, axis=axis)
         if 'variance' in which:
             if 'mean' in stats:
-                stats['variance'] = torch_nanmean((data - stats['mean'])**2, axis=axis)
+                stats['variance'] = torch_mean((data - stats['mean'])**2, axis=axis)
             else:
-                stats['variance'] = torch_nanvar(data, axis=axis)
+                stats['variance'] = torch_var(data, axis=axis)
         if 'stdev' in which:
             if 'variance' in stats:
                 stats['stdev'] = torch.sqrt(stats['variance'])
             elif 'mean' in stats:
-                stats['stdev'] = torch.sqrt(torch_nanmean((data - stats['mean'])**2, axis=axis))
+                stats['stdev'] = torch.sqrt(torch_mean((data - stats['mean'])**2, axis=axis))
             else:
-                stats['stdev'] = torch_nanstd(data, axis=axis)
+                stats['stdev'] = torch_std(data, axis=axis)
 
         # Compute error-based statistics (torch)
         if target is not None:
@@ -480,11 +513,11 @@ def statistics(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = 
             # Compute error
             err = data - target
             if 'rmse' in which:
-                stats['rmse'] = torch.sqrt(torch_nanmean(err**2, axis=axis))
+                stats['rmse'] = torch.sqrt(torch_mean(err**2, axis=axis))
             if 'mae' in which:
-                stats['mae'] = torch_nanmean(torch.abs(err), axis=axis)
+                stats['mae'] = torch_mean(torch.abs(err), axis=axis)
             if 'mape' in which:
-                stats['mape'] = torch_nanmean(torch.abs(err/target)*100, axis=axis)
+                stats['mape'] = torch_mean(torch.abs(err/target)*100, axis=axis)
             # Free memory
             err = None
 
@@ -493,23 +526,29 @@ def statistics(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = 
         # Compute basic statistics (numpy)
         stats['n_samples'] = np.sum(~np.isnan(data), axis=axis)
         if 'min' in which:
-            stats['min'] = np.nanmin(data, axis=axis)
+            stats['min'] = np.empty(stats_shape, dtype=data.dtype)
+            np.min(data, axis=axis, out=stats['min'])
         if 'max' in which:
-            stats['max'] = np.nanmax(data, axis=axis)
+            stats['max'] = np.empty(stats_shape, dtype=data.dtype)
+            np.max(data, axis=axis, out=stats['max'])
         if 'mean' in which:
-            stats['mean'] = np.nanmean(data, axis=axis)
+            stats['mean'] = np.empty(stats_shape, dtype=data.dtype)
+            np.mean(data, axis=axis, out=stats['mean'])
         if 'variance' in which:
+            stats['variance'] = np.empty(stats_shape, dtype=data.dtype)
             if 'mean' in stats:
-                stats['variance'] = np.nanmean((data - stats['mean'])**2, axis=axis)
+                np.mean((data - stats['mean'])**2, axis=axis, out=stats['variance'])
             else:
-                stats['variance'] = np.nanvar(data, axis=axis)
+                np.var(data, axis=axis, out=stats['variance'])
         if 'stdev' in which:
+            stats['stdev'] = np.empty(stats_shape, dtype=data.dtype)
             if 'variance' in stats:
-                stats['stdev'] = np.sqrt(stats['variance'])
+                np.sqrt(stats['variance'], out=stats['stdev'])
             elif 'mean' in stats:
-                stats['stdev'] = np.sqrt(np.nanmean((data - stats['mean'])**2, axis=axis))
+                np.mean((data - stats['mean'])**2, axis=axis, out=stats['stdev'])
+                np.sqrt(stats['stdev'], out=stats['stdev'])
             else:
-                stats['stdev'] = np.nanstd(data, axis=axis)
+                np.std(data, axis=axis, out=stats['stdev'])
 
         # Compute error-based statistics (numpy)
         if target is not None:
@@ -519,11 +558,15 @@ def statistics(data: Union[np.ndarray, torch.Tensor], axis: Union[int, tuple] = 
             # Compute error
             err = data - target
             if 'rmse' in which:
-                stats['rmse'] = np.sqrt(np.nanmean(err**2, axis=axis))
+                stats['rmse'] = np.empty(stats_shape, dtype=data.dtype)
+                np.mean(err**2, axis=axis, out=stats['rmse'])
+                np.sqrt(stats['rmse'], out=stats['rmse'])
             if 'mae' in which:
-                stats['mae'] = np.nanmean(np.abs(err), axis=axis)
+                stats['mae'] = np.empty(stats_shape, dtype=data.dtype)
+                np.mean(np.abs(err), axis=axis, out=stats['mae'])
             if 'mape' in which:
-                stats['mape'] = np.nanmean(np.abs(err/target)*100, axis=axis)
+                stats['mape'] = np.empty(stats_shape, dtype=data.dtype)
+                np.mean(np.abs(err/target)*100, axis=axis, out=stats['mape'])
             # Free memory
             err = None
 
