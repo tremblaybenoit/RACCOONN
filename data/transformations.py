@@ -44,7 +44,7 @@ class NormalizeProfiles:
         """
 
         # Apply transformation
-        return affine(x, self.profmax, self.profmin, inverse_transform=self.inverse_transform)
+        return affine(x, self.profmax, self.profmin, inverse_transform=~self.inverse_transform)
 
     __call__ = forward  # Make the instance callable for normalization
 
@@ -113,7 +113,7 @@ class NormalizeSurface:
         """
 
         # Apply transformation
-        return affine(x, self.surfmax-self.surfmin, self.surfmin, inverse_transform=self.inverse_transform)
+        return affine(x, self.surfmax-self.surfmin, self.surfmin, inverse_transform=~self.inverse_transform)
 
     __call__ = forward  # Make the instance callable for normalization
 
