@@ -36,6 +36,7 @@ callbacks:
 trainer:
   min_epochs: 1  # To prevent early stopping
   max_epochs: 64  # Number of epochs
+  precision: '32-true'
 
 # Data configuration
 data:

@@ -9,9 +9,9 @@ from utilities.logger import TrainerLogger
 from utilities.instantiators import instantiate, instantiate_list
 from utilities.logic import get_config_path
 # Force full FP32 matmul on CUDA (disable TF32) for more reproducible numerics
+torch.set_float32_matmul_precision('highest') 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
-torch.set_float32_matmul_precision('high')
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -99,7 +99,17 @@ class Operator:
 
         # Trainer
         logger.info("Waking up trainer...")
-        self.trainer = instantiate(self.config.trainer, callbacks=self.callbacks, logger=self.trainer_logger)
+        # Determine precision
+        precision = self.config.trainer.get("precision", None)
+        if precision is None:
+            dtype = self.config.data.get("dtype", "float32")
+            if dtype is None:
+                precision = '32-true'
+            else:
+                precision_map = {'float64': '64-true', 'double': '64-true', 
+                                 'float32': '32-true', 'float': '32-true', 'float16': '16-true'}
+                precision = precision_map.get(dtype, '32-true')
+        self.trainer = instantiate(self.config.trainer, callbacks=self.callbacks, logger=self.trainer_logger, precision=precision)
 
     def train(self) -> None:
         """ Loads data, loggers, callbacks, trainer, and then trains and tests the model.
