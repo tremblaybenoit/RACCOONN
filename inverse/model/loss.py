@@ -447,7 +447,7 @@ class VarLoss(torch.nn.Module):
         # Observation loss: Some observation losses may require additional inputs
         if isinstance(self.loss_obs, DiagonalQuadraticForm):
             loss['obs'] = self.loss_obs(hofx_pred[:, :10], target['hofx'][:, :10],
-                                        hofx_pred[:, 10:]**2)
+                                        hofx_pred[:, 10:])
         else:
             loss['obs'] = self.loss_obs(hofx_pred[:, :10],
                                         target['hofx'][:, :10])
@@ -460,7 +460,7 @@ class VarLoss(torch.nn.Module):
                 if self.pressure_filter is not None:
                     loss['model'] = self.loss_model(pred['prof'][:, pressure_filter],
                                                     target['prof_background'][:, pressure_filter],
-                                                    target['prof_increment']**2)
+                                                    target['prof_increment'])
                 else:
                     loss['model'] = self.loss_model(pred['prof'],
                                                     target['prof_background'],

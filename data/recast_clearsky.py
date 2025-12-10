@@ -7,6 +7,7 @@ import os
 from utilities.logic import get_config_path
 import logging
 from utilities.tensors import to_numpy
+from data.io import load_var_and_normalize
 
 
 logger = logging.getLogger(__name__)
@@ -25,7 +26,7 @@ def main(config: DictConfig) -> None:
     -------
     None.
     """
-
+    """
     out_bases = {
         "float64": "../../GOES_ML-main/Data_cs_float64",
         "float32": "../../GOES_ML-main/Data_cs_float32",
@@ -97,14 +98,29 @@ def main(config: DictConfig) -> None:
                         np.save(out_path, data.astype(save_dtype, copy=False))
                     logger.info("Saved `%s` (stage `%s`, precision `%s`) -> `%s`", var_name, stage_name, precision,
                                 out_path)
-
+    """
     # Compute background from newly computed profiles
-    prof_train = np.load(os.path.join(out_root, 'Train2/prof.npy'))
-    prof_valid = np.load(os.path.join(out_root, 'Val2/prof.npy'))
-    prof_test = np.load(os.path.join(out_root, 'Test2/prof.npy'))
+
+
+    prof_train2 = load_var_and_normalize(config.data.stage.train.vars.prof)
+    prof_valid2 = load_var_and_normalize(config.data.stage.valid.vars.prof)
+    prof_test2 = load_var_and_normalize(config.data.stage.test.vars.prof)
+    prof_stack2 = np.concatenate([prof_train2, prof_valid2, prof_test2], axis=0)
+    # prof_background2 = np.mean(prof_stack2, axis=0, keepdims=True)
+    prof_filter2 = pressure_filter(prof_stack2)
+    # prof_filter1 = np.load('../Data_cs_float32/pressure_filter.npy')
+    prof_train = np.load('../Data_cs_float32/Train2/prof.npy')
+    prof_valid = np.load('../Data_cs_float32/Val2/prof.npy')
+    prof_test = np.load('../Data_cs_float32/Test2/prof.npy')
     prof_stack = np.concatenate([prof_train, prof_valid, prof_test], axis=0)
-    prof_background = np.mean(prof_stack, axis=0, keepdims=True)
-    prof_filter = pressure_filter(prof_stack)
+    prof_mean = np.mean(prof_stack, axis=0, keepdims=True)
+    prof_std = np.std(prof_stack, axis=0, keepdims=True)
+    # prof_background = prof_mean
+    prof_filter = pressure_filter((prof_stack-prof_mean)/prof_std)
+    np.save('../Data_cs_float32/pressure_filter.npy', prof_filter)
+
+    breakpoint()
+
     np.save(os.path.join(out_root, 'Train2/prof_background.npy'), prof_background)
     np.save(os.path.join(out_root, 'Val2/prof_background.npy'), prof_background)
     np.save(os.path.join(out_root, 'Test2/prof_background.npy'), prof_background)

@@ -2,6 +2,7 @@ import numpy as np
 import hydra
 from omegaconf import DictConfig
 from data.io import load_var_and_normalize
+from data.statistics import reduction_shape
 from utilities.instantiators import instantiate
 from utilities.logic import get_config_path
 from utilities.plot import plot_map, save_plot, flexible_gridspec
@@ -45,7 +46,9 @@ def background_climatology(data: np.ndarray, axis: int=0, keepdims: bool=False) 
     """
 
     # Compute mean
-    return np.mean(data, axis=axis, keepdims=keepdims)
+    out = np.empty(reduction_shape(data.shape, axis, keepdims), dtype=data.dtype)
+    np.mean(data, axis=axis, keepdims=keepdims, out=out)
+    return out
 
 
 def background_increment(config_true: DictConfig, config_background: DictConfig) -> np.ndarray:
@@ -72,7 +75,8 @@ def background_increment(config_true: DictConfig, config_background: DictConfig)
         else:
             raise ValueError("The shapes of the true and background data do not match.")
 
-    return x_true-x_background
+    # Return increment
+    return np.subtract(x_true, x_background, out=x_true)
 
 
 def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=True, recenter: bool=True) -> None:
@@ -139,7 +143,7 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
 @hydra.main(version_base=None, config_path=get_config_path(), config_name="default")
 def main(config: DictConfig) -> None:
     """
-    Compute statistics of a given dataset.
+    Compute covariance matrices of given datasets.
 
     Parameters
     ----------
@@ -160,7 +164,7 @@ def main(config: DictConfig) -> None:
 
 
 if __name__ == '__main__':
-    """ Compute statistics of a given dataset.
+    """ Compute covariance matrices of given datasets.
 
         Parameters
         ----------

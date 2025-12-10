@@ -1,0 +1,51 @@
+# Data filters
+filters:
+  # Cloud/clearsky filter
+  cloud:
+    # Function
+    _target_: data.filters.generate_filter
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Increment estimates for the profile variables
+      config: ${data.stage.train.vars.cloud_filter.definition}
+    # What the method produces as output
+    output:
+      # File path to save/load the covariance matrix
+      path: ${data.stage.train.vars.cloud_filter.load.path}
+      # Save function
+      save: ${data.stage.train.vars.cloud_filter.save}
+      # Load function
+      load: ${data.stage.train.vars.cloud_filter.load}
+
+  # Error covariance matrix in observation space
+  R:
+    # Function
+    _target_: data.covariance.covariance_matrix
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Innovation estimates for the observation variables
+      err:
+        load:
+          _target_: data.io.load_stack_and_normalize
+          _recursive_: false
+          stack:
+            - ${data.stage.train.vars.hofx_innovation}
+            - ${data.stage.valid.vars.hofx_innovation}
+            - ${data.stage.test.vars.hofx_innovation}
+    # What the method produces as output
+    output:
+      # File path to save/load the covariance matrix
+      path: data/normalization/covariance_matrix_R_inverse.npy
+      # Save function
+      save:
+        _target_: numpy.save
+        _partial_: true
+        _args_:
+          - ${preparation.covariance.R.output.path}
+      # Load function
+      load:
+        _target_: numpy.load
+        _args_:
+          - ${preparation.covariance.R.output.path}

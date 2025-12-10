@@ -23,7 +23,7 @@ task_name: "inverse_operator"  # Experiment
 paths:
   task_dir: "../inverse_outputs"
   run_id: "cs_000"
-  data_dir: ../../GOES_ML-main/Data_cs_${data.dtype}
+  data_dir: ../Data_cs_${data.dtype}
 
 # Trainer configuration
 trainer:

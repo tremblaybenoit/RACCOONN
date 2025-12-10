@@ -95,7 +95,7 @@ def daytime_filter(meta: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, t
 @hydra.main(version_base=None, config_path=get_config_path(), config_name="default")
 def main(config: DictConfig) -> None:
     """
-    Compute statistics of a given dataset.
+    Compute various data filters.
 
     Parameters
     ----------
@@ -106,17 +106,17 @@ def main(config: DictConfig) -> None:
     None.
     """
 
-    # Compute model and observation covariance matrices
-    if hasattr(config.preparation, "covariance"):
-        for dataset, config_covariance in config.preparation.covariance.items():
-            logger.info(f"Computing error covariance matrix of {dataset} set")
-            instantiate(config_covariance)
+    # Compute filters
+    if hasattr(config.preparation, "filters"):
+        for filter, config_filter in config.preparation.filters.items():
+            logger.info(f"Computing filter for {filter}")
+            instantiate(config_filter)
 
     return
 
 
 if __name__ == '__main__':
-    """ Compute various filters.
+    """ Compute various data filters.
 
         Parameters
         ----------

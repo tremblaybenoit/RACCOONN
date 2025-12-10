@@ -68,7 +68,7 @@ hofx:
   # Loading function
   load:
     _target_: data.io.load_npy
-    path: ${....dir}/predict_hofx.npy
+    path: ${....dir}/hofx.npy
     split: ${....split}
     dtype: ${data.dtype}
 # Cloud filter
