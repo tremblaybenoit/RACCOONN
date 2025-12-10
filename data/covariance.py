@@ -75,7 +75,7 @@ def background_increment(config_true: DictConfig, config_background: DictConfig)
     return x_true-x_background
 
 
-def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=True, recenter: bool=False) -> None:
+def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=True, recenter: bool=True) -> None:
     """ Compute statistics of a given dataset.
 
         Parameters

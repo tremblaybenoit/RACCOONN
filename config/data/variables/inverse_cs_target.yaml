@@ -79,6 +79,42 @@ cloud_filter:
     path: ${....dir}/cloud_filter.npy
     split: ${....split}
     dtype: bool
+# Profile background
+prof_background:
+  # Loading function
+  load:
+    _target_: data.io.load_npy
+    path: ${....dir}/prof_background.npy
+    split: null
+    dtype: ${data.dtype}
+  # Normalization function and parameters
+  normalization:
+    _target_: data.transformations.min_max
+    _partial_: true
+    stats:
+      _target_: data.statistics.read_statistics_var
+      path: ${preparation.statistics.data.output.path}
+      var: 'prof'
+      dtype: ${data.dtype}
+    axis: 1  # null
+# Profile increment
+prof_increment:
+  # Loading function
+  load:
+    _target_: data.io.load_npy
+    path: ${....dir}/prof_increment.npy
+    split: ${....split}
+    dtype: ${data.dtype}
+# Normalization function and parameters
+  normalization:
+    _target_: data.transformations.max
+    _partial_: true
+    stats:
+      _target_: data.statistics.read_statistics_var
+      path: ${preparation.statistics.data.output.path}
+      var: 'prof'
+      dtype: ${data.dtype}
+    axis: 1  # null
 # Brightness temperature innovation
 hofx_innovation:
   # Loading function

@@ -80,12 +80,24 @@ data:
           normalization: ${data.stage.train.vars.prof.normalization}
     # Prediction set
     predict:
+      # Directory
+      dir: ${paths.data_dir}/Train2
       # Variables
       vars:
         # Atmospheric profiles
         prof:
           # Normalization function and parameters
           normalization: ${data.stage.train.vars.prof.normalization}
+
+# Loader configuration
+loader:
+  num_workers: 2
+  persistent_workers: true
+  stage:
+    predict:
+      results:
+        hofx:
+          path: ${paths.run_dir}/train_hofx_v2.npy
 
 # Logger configuration
 logger:
