@@ -4,7 +4,7 @@ defaults:
   - paths: default
   - data: inverse_
   - preparation: inverse_default
-  - loader: inverse_train  # Training only
+  - loader: inverse_default # Training only
   - model: inverse_operator
   - trainer: default
   - callbacks: inverse_default

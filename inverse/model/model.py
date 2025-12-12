@@ -191,10 +191,10 @@ class PINNverseOperator(BaseModel):
         self.activation_out = instantiate(activation_out) if activation_out is not None else nn.Identity()
 
         # Model architecture
-        #self.layers = nn.ModuleList([nn.Linear(n_neurons, n_neurons)
-        #                             for _ in range(n_layers)])
-        #self.batchnorm_layers = nn.ModuleList([nn.LayerNorm(n_neurons)
-        #                                       for _ in range(n_layers)])
+        self.layers = nn.ModuleList([nn.Linear(n_neurons, n_neurons)
+                                     for _ in range(n_layers)])
+        self.batchnorm_layers = nn.ModuleList([nn.LayerNorm(n_neurons)
+                                               for _ in range(n_layers)])
         self.activations = nn.ModuleList([instantiate(activation_in) if activation_in is not None else Sine()
                                           for _ in range(n_layers)])
         self.dropouts = nn.ModuleList([nn.Dropout(dropout_rate)
@@ -202,20 +202,23 @@ class PINNverseOperator(BaseModel):
 
         # SIREN initialization
         self._siren_init(self.d_in, is_first_layer=True, activation_in=self.activation_in)
-        #for layer, activation_func in zip(self.layers, self.activations):
-        #    self._siren_init(layer, is_first_layer=False, activation_in=activation_func)
+        for layer, activation_func in zip(self.layers, self.activations):
+            self._siren_init(layer, is_first_layer=False, activation_in=activation_func)
 
-        residuals_blocks = nn.ModuleList()
-        for activation in self.activations:
-            block = SirenResidualBlock(n_neurons, activation, dropout_rate, self._siren_init)
-            residuals_blocks.append(block)
+        # Layer assembly
+        hidden_layers = nn.ModuleList()
+        for layer, batchnorm, activation, dropout in zip(self.layers, self.batchnorm_layers,
+                                                       self.activations, self.dropouts):
+            hidden_layers.append(layer)
+            hidden_layers.append(batchnorm)
+            hidden_layers.append(activation)
+            hidden_layers.append(dropout)
 
         model = nn.Sequential(
             self.d_in,
             self.activation_in,
             nn.Dropout(dropout_rate),
-            # *[layer for hidden in zip(self.layers, self.batchnorm_layers, self.activations, self.dropouts) for layer in hidden],
-            *residuals_blocks,
+            *hidden_layers,
             self.d_out,
             self.activation_out
         )
@@ -418,6 +421,82 @@ class PINNverseOperator(BaseModel):
             prof = transform(prof)
         return prof
 
+
+class PINNverseOperator2(PINNverseOperator):
+    """Physics-Informed Neural Network (PINN) inverse model with one neural network per profile type."""
+
+    def _build_model(self, positional_encoding: Union[DictConfig, None], activation_in: Union[DictConfig, None],
+                     activation_out: Union[DictConfig, None], parameters: Union[DictConfig, None]) -> nn.Module:
+        """ Build the neural network model.
+
+            Parameters
+            ----------
+            positional_encoding: DictConfig. Function for the positional encoding.
+            activation_in: DictConfig. Activation function (in).
+            activation_out: DictConfig. Activation function (out).
+            parameters: DictConfig. Configuration for the model parameters.
+
+            Returns
+            -------
+            None.
+        """
+
+        # Parameters check
+        dropout_rate = parameters.architecture.dropout if parameters is not None and \
+            hasattr(parameters.architecture, 'dropout') else 0.0
+        n_neurons = parameters.architecture.n_neurons if parameters is not None and \
+            hasattr(parameters.architecture, 'n_neurons') else 128
+        n_layers = parameters.architecture.n_layers if parameters is not None and \
+            hasattr(parameters.architecture, 'n_layers') else 4
+        n_lat = parameters.data.n_lat if parameters is not None and \
+            hasattr(parameters.data, 'n_lat') else 1
+        n_lon = parameters.data.n_lon if parameters is not None and \
+            hasattr(parameters.data, 'n_lon') else 1
+        n_scans = parameters.data.n_scans if parameters is not None and \
+            hasattr(parameters.data, 'n_scans') else 1
+        n_pressure = parameters.data.n_pressure if parameters is not None and \
+            hasattr(parameters.data, 'n_pressure') else 1
+        n_cloud = parameters.data.n_cloud if parameters is not None and \
+            hasattr(parameters.data, 'n_cloud') else 0
+        n_prof = parameters.data.n_prof if parameters is not None and \
+            hasattr(parameters.data, 'n_prof') else 1
+        n_levels = parameters.data.n_levels if parameters is not None and \
+            hasattr(parameters.data, 'n_levels') else 1
+
+        # Positional encoding
+        d_input = n_lat + n_lon + n_scans + n_pressure + n_cloud
+        self.positional_encoding = instantiate(positional_encoding, d_input=d_input) if positional_encoding is not None \
+            else IdentityPositionalEncoding(d_input=d_input)
+        # Input layer
+        self.d_in = nn.Linear(self.positional_encoding.d_output, n_neurons)
+        self.activation_in = instantiate(activation_in) if activation_in is not None else Sine()
+        self.dropout_in = nn.Dropout(dropout_rate)
+        # Output layer
+        self.d_out = nn.Linear(n_neurons, n_prof*n_levels)
+        self.activation_out = instantiate(activation_out) if activation_out is not None else nn.Identity()
+
+        # Model architecture
+        self.activations = nn.ModuleList([instantiate(activation_in) if activation_in is not None else Sine()
+                                          for _ in range(n_layers)])
+
+        # SIREN initialization
+        self._siren_init(self.d_in, is_first_layer=True, activation_in=self.activation_in)
+
+        residuals_blocks = nn.ModuleList()
+        for activation in self.activations:
+            block = SirenResidualBlock(n_neurons, activation, dropout_rate, self._siren_init)
+            residuals_blocks.append(block)
+
+        model = nn.Sequential(
+            self.d_in,
+            self.activation_in,
+            nn.Dropout(dropout_rate),
+            *residuals_blocks,
+            self.d_out,
+            self.activation_out
+        )
+
+        return model
 
 class PINNverseOperators(PINNverseOperator):
     """Physics-Informed Neural Network (PINN) inverse model with one neural network per profile type."""
