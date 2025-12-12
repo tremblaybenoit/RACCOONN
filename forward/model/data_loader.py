@@ -207,7 +207,7 @@ class BaseDataset(Dataset):
         """
 
         # Get the data at the specified index
-        return {k: {kk: vv[idx] if vv.shape[0] == self.__len__() else vv
+        return {k: {kk: vv[idx] if vv.shape[0] == self.__len__() else vv.squeeze()
                     for kk, vv in v.items()} for k, v in self.x.items()}
 
 

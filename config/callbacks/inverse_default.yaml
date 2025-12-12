@@ -1,6 +1,7 @@
 defaults:
   - model_checkpoint
   - figure_logger
+  - early_stopping
   - _self_
 
 figure_logger:

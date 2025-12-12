@@ -37,6 +37,39 @@ class InverseEmulator(LightningModule):
         super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func)
 
 
+class SirenResidualBlock(nn.Module):
+    def __init__(self, n_neurons, activation, dropout_rate, siren_init_func):
+        super().__init__()
+
+        # Internal layers for the residual path (f(x))
+        self.linear1 = nn.Linear(n_neurons, n_neurons)
+        self.layernorm = nn.LayerNorm(n_neurons)  # Using Layer Norm
+        self.activation = activation
+        self.linear2 = nn.Linear(n_neurons, n_neurons)
+        self.dropout = nn.Dropout(dropout_rate)
+
+        # Apply SIREN Initialization to internal layers
+        siren_init_func(self.linear1, is_first_layer=False, activation_in=activation)
+        siren_init_func(self.linear2, is_first_layer=False, activation_in=activation)
+
+    def forward(self, x):
+        # Store input for skip connection
+        residual = x
+
+        # Block 1 (Path where f(x) is computed)
+        out = self.linear1(x)
+        out = self.layernorm(out)
+        out = self.activation(out)
+
+        # Block 2
+        out = self.linear2(out)
+
+        # Skip connection: out = f(x) + x
+        out = out + residual
+        out = self.dropout(out)
+        return out
+
+
 class PINNverseOperator(BaseModel):
     """Class for the Physics-Informed Neural Network (PINN) inverse model."""
     def __init__(self, optimizer: DictConfig = None, loss_func: DictConfig = None, lr_scheduler: DictConfig = None,
@@ -79,6 +112,33 @@ class PINNverseOperator(BaseModel):
             else [f'var_{i}' for i in range(self.n_prof)]
 
         self.model = self._build_model(positional_encoding, activation_in, activation_out, parameters)
+
+    @staticmethod
+    def _siren_init(module, is_first_layer, activation_in):
+        """SIREN initialization for linear layers."""
+
+        # Check if the activation is Sine, otherwise skip custom init
+        if not isinstance(activation_in, Sine):
+            return
+
+        with torch.no_grad():
+            if hasattr(module, 'weight'):
+                dim_in = module.weight.size(1)
+
+                # First layer initialization
+                if is_first_layer:
+                    # Uniform distribution U(-1/dim_in, 1/dim_in)
+                    bound = 1. / dim_in
+                    nn.init.uniform_(module.weight, -bound, bound)
+                # Subsequent layer initialization
+                else:
+                    # Uniform distribution U(-sqrt(6)/sqrt(dim_in), sqrt(6)/sqrt(dim_in))
+                    bound = torch.sqrt(torch.tensor(6. / dim_in))
+                    nn.init.uniform_(module.weight, -bound, bound)
+
+            # Bias initialization (optional, but good practice)
+            if hasattr(module, 'bias') and module.bias is not None:
+                nn.init.zeros_(module.bias)
 
     def _build_model(self, positional_encoding: Union[DictConfig, None], activation_in: Union[DictConfig, None],
                      activation_out: Union[DictConfig, None], parameters: Union[DictConfig, None]) -> nn.Module:
@@ -131,19 +191,31 @@ class PINNverseOperator(BaseModel):
         self.activation_out = instantiate(activation_out) if activation_out is not None else nn.Identity()
 
         # Model architecture
-        self.layers = nn.ModuleList([nn.Linear(n_neurons, n_neurons)
-                                     for _ in range(n_layers)])
-        self.batchnorm_layers = nn.ModuleList([nn.Identity(n_neurons)
-                                               for _ in range(n_layers)])
+        #self.layers = nn.ModuleList([nn.Linear(n_neurons, n_neurons)
+        #                             for _ in range(n_layers)])
+        #self.batchnorm_layers = nn.ModuleList([nn.LayerNorm(n_neurons)
+        #                                       for _ in range(n_layers)])
         self.activations = nn.ModuleList([instantiate(activation_in) if activation_in is not None else Sine()
                                           for _ in range(n_layers)])
         self.dropouts = nn.ModuleList([nn.Dropout(dropout_rate)
                                        for _ in range(n_layers)])
+
+        # SIREN initialization
+        self._siren_init(self.d_in, is_first_layer=True, activation_in=self.activation_in)
+        #for layer, activation_func in zip(self.layers, self.activations):
+        #    self._siren_init(layer, is_first_layer=False, activation_in=activation_func)
+
+        residuals_blocks = nn.ModuleList()
+        for activation in self.activations:
+            block = SirenResidualBlock(n_neurons, activation, dropout_rate, self._siren_init)
+            residuals_blocks.append(block)
+
         model = nn.Sequential(
             self.d_in,
             self.activation_in,
             nn.Dropout(dropout_rate),
-            *[layer for hidden in zip(self.layers, self.batchnorm_layers, self.activations, self.dropouts) for layer in hidden],
+            # *[layer for hidden in zip(self.layers, self.batchnorm_layers, self.activations, self.dropouts) for layer in hidden],
+            *residuals_blocks,
             self.d_out,
             self.activation_out
         )

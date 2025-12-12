@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 import hydra
 from omegaconf import DictConfig
@@ -9,6 +10,65 @@ import logging
 
 # Initialize logger
 logger = logging.getLogger(__name__)
+
+
+def _open_url_wsl_fallback(url: str) -> bool:
+    """Try webbrowser.open() then, if running under WSL, use Windows commands to open the URL.
+    Returns True if a launcher was started."""
+    # 1) Try webbrowser
+    try:
+        if webbrowser.open(url, new=2):
+            return True
+    except Exception:
+        pass
+
+    # 2) Detect WSL
+    is_wsl = False
+    if sys.platform.startswith("linux"):
+        try:
+            with open("/proc/version", "r") as f:
+                text = f.read()
+                is_wsl = "Microsoft" in text or "microsoft" in text
+        except Exception:
+            is_wsl = False
+
+    if is_wsl:
+        # prefer cmd.exe start then powershell as fallback
+        cmds = [
+            ["cmd.exe", "/C", "start", "", url],
+            ["powershell.exe", "-NoProfile", "-Command", "Start-Process", url],
+        ]
+        for cmd in cmds:
+            try:
+                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return True
+            except Exception:
+                continue
+
+    # 3) Generic fallbacks for non-WSL Linux/Win/macOS
+    if sys.platform.startswith("linux"):
+        for cmd in (["xdg-open", url], ["gio", "open", url]):
+            try:
+                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return True
+            except Exception:
+                continue
+    elif sys.platform == "darwin":
+        try:
+            subprocess.Popen(["open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+        except Exception:
+            pass
+    elif os.name == "nt":
+        for cmd in (["cmd", "/C", "start", "", url], ["powershell", "-NoProfile", "-Command", "Start-Process", url]):
+            try:
+                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return True
+            except Exception:
+                continue
+
+    logger.warning("Could not open browser programmatically; please open URL manually: %s", url)
+    return False
 
 
 class TrainerLogger:
@@ -93,7 +153,7 @@ class TrainerLogger:
             # Open UI in the browser
             if show:
                 logger.info("Opening mlflow UI in browser...")
-                webbrowser.open(f"http://127.0.0.1:{port}")
+                _open_url_wsl_fallback(f"http://127.0.0.1:{port}")
 
         # Tensorboard
         if "tensorboard" in self.config:
