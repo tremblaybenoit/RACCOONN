@@ -43,7 +43,7 @@ class SirenResidualBlock(nn.Module):
 
         # Internal layers for the residual path (f(x))
         self.linear1 = nn.Linear(n_neurons, n_neurons)
-        self.layernorm = nn.LayerNorm(n_neurons)  # Using Layer Norm
+        # self.layernorm = nn.LayerNorm(n_neurons)  # Using Layer Norm
         self.activation = activation
         self.linear2 = nn.Linear(n_neurons, n_neurons)
         self.dropout = nn.Dropout(dropout_rate)
@@ -58,7 +58,7 @@ class SirenResidualBlock(nn.Module):
 
         # Block 1 (Path where f(x) is computed)
         out = self.linear1(x)
-        out = self.layernorm(out)
+        # out = self.layernorm(out)
         out = self.activation(out)
 
         # Block 2
@@ -193,7 +193,7 @@ class PINNverseOperator(BaseModel):
         # Model architecture
         self.layers = nn.ModuleList([nn.Linear(n_neurons, n_neurons)
                                      for _ in range(n_layers)])
-        self.batchnorm_layers = nn.ModuleList([nn.LayerNorm(n_neurons)
+        self.batchnorm_layers = nn.ModuleList([nn.Identity(n_neurons)
                                                for _ in range(n_layers)])
         self.activations = nn.ModuleList([instantiate(activation_in) if activation_in is not None else Sine()
                                           for _ in range(n_layers)])
@@ -205,20 +205,11 @@ class PINNverseOperator(BaseModel):
         for layer, activation_func in zip(self.layers, self.activations):
             self._siren_init(layer, is_first_layer=False, activation_in=activation_func)
 
-        # Layer assembly
-        hidden_layers = nn.ModuleList()
-        for layer, batchnorm, activation, dropout in zip(self.layers, self.batchnorm_layers,
-                                                       self.activations, self.dropouts):
-            hidden_layers.append(layer)
-            hidden_layers.append(batchnorm)
-            hidden_layers.append(activation)
-            hidden_layers.append(dropout)
-
         model = nn.Sequential(
             self.d_in,
             self.activation_in,
             nn.Dropout(dropout_rate),
-            *hidden_layers,
+            *[layer for hidden in zip(self.layers, self.batchnorm_layers, self.activations, self.dropouts) for layer in hidden],
             self.d_out,
             self.activation_out
         )
