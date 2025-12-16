@@ -1138,7 +1138,210 @@ def fig_errs_by_channel(target: np.ndarray, pred: np.ndarray, ref: np.ndarray=No
     return fig
 
 
-def scatterplot(fig, ax, x, y, font_size=13, projection=None, title='Scatterplot', title_pad=1.005,
+def scatterplots(ax, x, y, font_size=13, projection=None, title='Scatterplot', title_pad=1.005,
+                x_label='Reference', y_label='Inference', y_labelpad=5, x_labelpad=3, xy_symmetric=True,
+                x_range: tuple = None, y_range: tuple = None, x_nticks=6, y_nticks=6, tickw=1, tickl=2.5, tickdir='out',
+                marker=None, markersize=None, color=None, label=None,
+                grid=True, grid_linew=0.5, x_ascale='linear', y_ascale='linear',
+                ref_label='Reference (1:1)', ref_color='black', ref_linew=0.5, ref_lines='--',
+                fit=False, fit_color='red', fit_linew=0.25, fit_lines='-',
+                lg_loc='upper left', lg_font=10, lg_ncol=1, lg_npoints=1, lg_scale=4.0, lg_spacing=0.05,
+                cb_label='Density', cb_cmap=None, cb_pad=0, cb_tickw=1, cb_tickl=2.5, cb_font=12, cb_dir='out',
+                cb_rot=270, cb_labelpad=15.5, cb_side='right', cb_size=0.025, cb_ticks=5, ):
+    """ Create a scatterplot with optional density projection, supporting multiple series.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes. Axes to plot on.
+    x : list or numpy.ndarray. List of X data arrays (or a single array for one series).
+    y : list or numpy.ndarray. List of Y data arrays (or a single array for one series).
+    font_size : int. Font size for the plot.
+    projection : str. Projection type. Default is None. Use 'scatter_density' for density plots.
+    title : str. Title of the plot.
+    title_pad : float. Padding for the title.
+    x_label : str. Label for the x-axis.
+    y_label : str. Label for the y-axis.
+    y_labelpad : float. Padding for the y-axis label.
+    x_labelpad : float. Padding for the x-axis label.
+    xy_symmetric : bool. If True, the x and y axes are symmetric.
+    x_range : tuple. Range for the x-axis. If None, computed from data.
+    y_range : tuple. Range for the y-axis. If None, computed from data.
+    x_nticks : int. Number of ticks on the x-axis.
+    y_nticks : int. Number of ticks on the y-axis.
+    tickw : float. Width of the ticks.
+    tickl : float. Length of the ticks.
+    tickdir : str. Direction of the ticks. Default is 'out'.
+    marker : str or list. Marker style for the scatterplot(s).
+    markersize : float or list. Size of the markers for the scatterplot(s).
+    color : str or list. Color(s) for the plot line(s). If None, defaults will be used.
+    label : str or list. Label(s) for the plot line(s). Default is None.
+    grid : bool. If True, show grid.
+    grid_linew : float. Line width of the grid.
+    x_ascale : str. Scale for the x-axis. Default is 'linear'.
+    y_ascale : str. Scale for the y-axis. Default is 'linear'.
+    ref_label : str. Label for the reference line.
+    ref_color : str. Color for the reference line.
+    ref_linew : float. Line width for the reference line.
+    ref_lines : str. Line style for the reference line.
+    fit : bool. If True, fit a line to the *first* data series.
+    fit_color : str. Color for the fit line.
+    fit_linew : float. Line width for the fit line.
+    fit_lines : str. Line style for the fit line.
+    lg_loc : str. Location of the legend.
+    lg_font : int. Font size for the legend.
+    lg_ncol : int. Number of columns in the legend.
+    lg_npoints : int. Number of points in the legend.
+    lg_scale : float. Scale for the legend markers.
+    lg_spacing : float. Spacing between legend entries.
+    cb_label : str. Label for the colorbar.
+    cb_size : float. Size of the colorbar.
+    cb_ticks : int. Number of ticks on the colorbar.
+    cb_font : int. Font size for the colorbar.
+    cb_cmap : str. Colormap for the colorbar.
+    cb_pad : float. Padding for the colorbar.
+    cb_tickw : float. Width of the colorbar ticks.
+    cb_tickl : float. Length of the colorbar ticks.
+    cb_dir : str. Direction of the colorbar ticks. Default is 'out'.
+    cb_rot : int. Rotation of the colorbar label.
+    cb_labelpad : float. Padding for the colorbar label.
+    cb_side : str. Side for the colorbar. Default is 'right'.
+
+    Returns
+    -------
+    ax : matplotlib.axes.Axes. Axes with the scatterplot.
+    """
+
+    # --- Pre-processing/Setup ---
+
+    # Ensure x and y are lists of arrays
+    if not isinstance(x, list):
+        x = [x]
+    if not isinstance(y, list):
+        y = [y]
+
+    n_series = len(x)
+    if len(y) != n_series:
+        raise ValueError("The number of x and y data arrays must be the same.")
+
+    # Convert single values to lists for iteration
+    _marker = [marker] * n_series if not isinstance(marker, list) and marker is not None else marker
+    _markersize = [markersize] * n_series if not isinstance(markersize, list) and markersize is not None else markersize
+    _color = [color] * n_series if not isinstance(color, list) and color is not None else color
+    _label = [label] * n_series if not isinstance(label, list) and label is not None else label
+
+    # Handle default colors (assuming 'colors' is a predefined dictionary/list)
+    default_colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown', 'pink', 'gray']
+    if _color is None:
+        _color = [default_colors[i % len(default_colors)] for i in range(n_series)]
+
+    # Handle default markers/sizes
+    if _marker is None:
+        _marker = ['.'] * n_series
+    if _markersize is None:
+        _markersize = [0.9] * n_series
+
+    # Compute min and max values (over ALL data)
+    all_x = np.concatenate([arr.flatten() for arr in x])
+    all_y = np.concatenate([arr.flatten() for arr in y])
+
+    # Compute min and max values (assuming compute_min_max is available)
+    if x_range is None:
+        x_range = compute_min_max(all_x, symmetric=xy_symmetric)
+    if y_range is None:
+        y_range = compute_min_max(all_y, symmetric=xy_symmetric)
+
+    # Adopt a symmetric range
+    if xy_symmetric:
+        full_range = compute_min_max(x_range + y_range, symmetric=xy_symmetric)
+        x_range = full_range
+        y_range = full_range
+        ax.set_aspect(1)
+    else:
+        # Aspect ratio
+        ax.set_aspect('auto')
+
+    # --- Plotting Scatter/Density (Iterate over series) ---
+
+    scat = None
+    if projection == 'scatter_density':
+        # Density scatterplot logic (applies to the first series)
+        fig = ax.figure  # Access figure from axes
+        pos = ax.get_position()
+
+        # Remove and re-add axes with 'scatter_density' projection
+        ax.remove()
+        ax = fig.add_axes(pos, projection='scatter_density')
+
+        # Assuming white_viridis is defined and available
+        density_cmap = cb_cmap if cb_cmap else 'white_viridis'
+        scat = ax.scatter_density(x[0].flatten(), y[0].flatten(), cmap=density_cmap)
+
+        # Note: If density projection is used, subsequent series are not plotted as standard scatterplots
+        # because the axis type is fundamentally changed.
+
+    elif projection is None:
+        for i in range(n_series):
+            # Regular scatterplot
+            scat = ax.scatter(x[i].flatten(), y[i].flatten(), c=_color[i], marker=_marker[i], s=_markersize[i],
+                              label=_label[i])
+    else:
+        raise ValueError("Projection not supported. Use None or 'scatter_density'.")
+
+    # --- Additional Plot Lines ---
+
+    # Plot reference 1:1 line
+    if xy_symmetric:
+        ax.plot(x_range, x_range, label=ref_label, color=ref_color, linewidth=ref_linew, linestyle=ref_lines)
+
+    # Compute and plot linear fit (only for the first series for simplicity)
+    if fit:
+        # Assuming np.polyfit is available
+        slope, y0 = np.polyfit(x[0].flatten(), y[0].flatten(), 1)
+        # Plot linear fit
+        fit_label = f"y = {slope:.3f}x + {y0:.3f}" if y0 >= 0 else f"y = {slope:.3f}x - {abs(y0):.3f}"
+        fit_c = fit_color if fit_color is not None else _color[0]
+        ax.plot(np.array(x_range), slope * np.array(x_range) + y0, label=fit_label,
+                color=fit_c, linewidth=fit_linew, linestyle=fit_lines)
+
+    # --- Final Plot Styling ---
+
+    # Set axis limits
+    ax.set_xlim(x_range)
+    ax.set_ylim(y_range)
+    ax.set_xscale(x_ascale)
+    ax.set_yscale(y_ascale)
+
+    # Add grid
+    ax.grid(grid, linewidth=grid_linew)
+
+    # Set axis ticks
+    ax.get_yaxis().set_tick_params(which='both', direction=tickdir, width=tickw, length=tickl, labelsize=font_size,
+                                   left=True, right=True)
+    ax.get_xaxis().set_tick_params(which='both', direction=tickdir, width=tickw, length=tickl, labelsize=font_size,
+                                   bottom=True, top=True)
+    if x_nticks is not None:
+        ax.xaxis.set_major_locator(plt.MaxNLocator(x_nticks))
+    if y_nticks is not None:
+        ax.yaxis.set_major_locator(plt.MaxNLocator(y_nticks))
+
+    # Set axis labels
+    ax.set_ylabel(y_label, fontsize=font_size, labelpad=y_labelpad)
+    ax.set_xlabel(x_label, fontsize=font_size, labelpad=x_labelpad)
+    # Set title
+    ax.set_title(title, fontsize=font_size, y=title_pad)
+    # Set legend
+    ax.legend(loc=lg_loc, fontsize=lg_font, labelspacing=lg_spacing, numpoints=lg_npoints, ncol=lg_ncol,
+              markerscale=lg_scale, fancybox=False)
+
+    # Set colorbar (apply_colorbar is available)
+    if projection == 'scatter_density' and scat is not None:
+        # Assuming apply_colorbar(ax, mappable, **kwargs) signature
+        apply_colorbar(ax, scat, font_size=cb_font, label=cb_label, label_pad=cb_labelpad, orientation='vertical',
+                       rotation=cb_rot, side=cb_side, size=cb_size, pad=cb_pad,
+                       ticks=cb_ticks, tickw=cb_tickw, tickl=cb_tickl, tickdir=cb_dir)
+
+
+def scatterplot(ax, x, y, font_size=13, projection=None, title='Scatterplot', title_pad=1.005,
                 x_label='Reference', y_label='Inference', y_labelpad=5, x_labelpad=3, xy_symmetric=True,
                 x_range: tuple=None, y_range: tuple=None, x_nticks=6, y_nticks=6, tickw=1, tickl=2.5, tickdir='out',
                 marker='.', markersize=0.9, grid=True, grid_linew=0.5, x_ascale='linear', y_ascale='linear',
@@ -1184,10 +1387,6 @@ def scatterplot(fig, ax, x, y, font_size=13, projection=None, title='Scatterplot
         labels_list = _ensure_list(labels, None, n)
 
     # Colors: if fit_color provided as list, prefer it as plotting colors; otherwise cycle defaults
-    if isinstance(fit_color, (list, tuple, np.ndarray)):
-        fit_colors = list(fit_color)
-    else:
-        fit_colors = None
     default_colors = [colors[c] for c in list(colors.keys())]
     if fit_colors is not None:
         colors_list = _ensure_list(fit_colors, fit_colors[0], n)
@@ -1324,7 +1523,7 @@ def scatterplot(fig, ax, x, y, font_size=13, projection=None, title='Scatterplot
                        orientation='vertical', rotation=cb_rot, side=cb_side, size=cb_size, pad=cb_pad,
                        ticks=cb_ticks, tickw=cb_tickw, tickl=cb_tickl, tickdir=cb_dir)
 
-    return density_ax
+    return
 
 
 def fig_scatterplots(target: Union[list, np.ndarray], pred: Union[list, np.ndarray],

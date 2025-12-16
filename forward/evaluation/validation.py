@@ -32,9 +32,23 @@ def main(config: DictConfig) -> None:
     # Load test set references
     logger.info("Load test set references...")
     hofx = np.array(instantiate(config.data.stage.test.vars.hofx.load))  #.astype(np.float32)
+    surf = instantiate(config.data.stage.test.vars.surf.load)
     cloud_filter = instantiate(config.data.stage.test.vars.cloud_filter.load)
+    clearsky_filter = ~cloud_filter
     meta = instantiate(config.data.stage.test.vars.meta.load)  #.astype(np.float32)
     prof = instantiate(config.data.stage.test.vars.prof.load)
+
+    from data.io import load_npy
+    prof_cs0 = np.take(prof[clearsky_filter, ...], [0, 4, 8], axis=1)
+    hofx_cs0 = pred[clearsky_filter, ...]
+    meta_cs0 = meta[clearsky_filter, ...]
+    surf_cs0 = surf[clearsky_filter, ...]
+    hofx_cs2 = load_npy('../forward_outputs/forward_emulator/runs/v2/test_hofx_v2.npy')[clearsky_filter, ...]
+    hofx_cs3 = load_npy('../../RACCOONN_main/forward_outputs/forward_emulator/runs/v2/test_hofx_v2.npy')[clearsky_filter, ...]
+    prof_cs1 = load_npy('../Data_cs_float32/Test2/prof.npy')
+    hofx_cs1 = load_npy('../Data_cs_float32/Test2/hofx.npy')
+    meta_cs1 = load_npy('../Data_cs_float32/Test2/meta.npy')
+    surf_cs1 = load_npy('../Data_cs_float32/Test2/surf.npy')
     breakpoint()
 
     # Create masks and compute rmse by condition

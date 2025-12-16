@@ -131,6 +131,11 @@ model:
       n_layers: 4
       # Dropout rate
       dropout: 0.1
+      # Normalization
+      normalization:
+        _target_: torch.nn.LayerNorm
+        _args_:
+          - ${model.parameters.architecture.n_neurons}
     # Data
     data:
       n_prof: 3  # Number of profile variables

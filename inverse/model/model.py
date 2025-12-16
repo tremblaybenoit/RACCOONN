@@ -163,6 +163,8 @@ class PINNverseOperator(BaseModel):
             hasattr(parameters.architecture, 'n_neurons') else 128
         n_layers = parameters.architecture.n_layers if parameters is not None and \
             hasattr(parameters.architecture, 'n_layers') else 4
+        normalization = parameters.architecture.normalization if parameters is not None and \
+            hasattr(parameters.architecture, 'normalization') else None
         n_lat = parameters.data.n_lat if parameters is not None and \
             hasattr(parameters.data, 'n_lat') else 1
         n_lon = parameters.data.n_lon if parameters is not None and \
@@ -193,7 +195,7 @@ class PINNverseOperator(BaseModel):
         # Model architecture
         self.layers = nn.ModuleList([nn.Linear(n_neurons, n_neurons)
                                      for _ in range(n_layers)])
-        self.batchnorm_layers = nn.ModuleList([nn.Identity(n_neurons)
+        self.batchnorm_layers = nn.ModuleList([instantiate(normalization) if normalization is not None else nn.Identity()
                                                for _ in range(n_layers)])
         self.activations = nn.ModuleList([instantiate(activation_in) if activation_in is not None else Sine()
                                           for _ in range(n_layers)])
