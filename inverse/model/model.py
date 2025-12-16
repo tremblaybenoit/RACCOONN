@@ -330,6 +330,10 @@ class PINNverseOperator(BaseModel):
             l2_norm = sum((p ** 2).sum() for p in self.parameters() if p.requires_grad)
             self.log(f"{stage}_l2_norm", l2_norm, on_epoch=True, prog_bar=False, logger=logger_flag)
 
+        # Log learning rate
+        if stage == 'train' and self.lr_schedulers() is not None:
+            lr = self.lr_schedulers().get_last_lr()[0]
+            self.log(f"{stage}_lr", lr, on_epoch=True, prog_bar=False, logger=logger_flag)
         # Log total loss
         if 'total' in loss:
             self.log(f"{stage}_loss", loss['total'], on_epoch=True, prog_bar=True, logger=logger_flag)

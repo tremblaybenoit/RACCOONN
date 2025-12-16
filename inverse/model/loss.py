@@ -447,7 +447,7 @@ class VarLoss(torch.nn.Module):
         # Observation loss: Some observation losses may require additional inputs
         if isinstance(self.loss_obs, DiagonalQuadraticForm):
             loss['obs'] = self.loss_obs(hofx_pred[:, :10], target['hofx'][:, :10],
-                                        hofx_pred[:, 10:])
+                                        target['hofx'][:, 10:])
         else:
             loss['obs'] = self.loss_obs(hofx_pred[:, :10],
                                         target['hofx'][:, :10])

@@ -134,9 +134,19 @@ class Operator:
 
         # Train the model ⚡
         resume_ckpt = self.config.get("resume_from_checkpoint", None)
+        init_ckpt = self.config.get("init_from_checkpoint", None)
+        # Check if resuming from checkpoint or initializing from checkpoint
         if resume_ckpt and os.path.exists(resume_ckpt):
             logger.info(f"Resuming training from checkpoint: {resume_ckpt}")
             self.trainer.fit(self.model, self.data_loader, ckpt_path=resume_ckpt)
+        elif init_ckpt and os.path.exists(init_ckpt):
+            logger.info(f"Initializing model from checkpoint: {init_ckpt}")
+            checkpoint = torch.load(init_ckpt, map_location='cpu')
+            state_dict = checkpoint.get('state_dict', checkpoint)
+            self.model.load_state_dict(state_dict, strict=False)
+            logger.info("Training model...")
+            self.trainer.fit(self.model, self.data_loader)
+        # Else, start training from scratch
         else:
             logger.info("Training model...")
             self.trainer.fit(self.model, self.data_loader)
