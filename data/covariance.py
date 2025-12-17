@@ -8,10 +8,56 @@ from utilities.logic import get_config_path
 from utilities.plot import plot_map, save_plot, flexible_gridspec
 import os
 import logging
+import torch
 
 
 # Initialize logger
 logger = logging.getLogger(__name__)
+
+
+def verify_torch_numpy_flattening(n_samples, n_vars, n_levels):
+    """
+    Verifies that NumPy and PyTorch flattening (reshape vs view)
+    produce identical vector indices for the same multi-dimensional coordinate.
+    """
+    # 1. Create a coordinate-coded array
+    # Logic: (Var * 1000) + Level. e.g., Var 2, Level 45 -> 2045.0
+    arr_np = np.zeros((n_samples, n_vars, n_levels), dtype=np.float32)
+    for v in range(n_vars):
+        for l in range(n_levels):
+            arr_np[:, v, l] = (v * 1000) + l
+
+    # 2. NumPy Flattening (as done in your covariance script)
+    flat_np = arr_np.reshape(n_samples, -1)
+
+    # 3. PyTorch Flattening (as done in your VarLoss / QuadraticForm)
+    arr_pt = torch.from_numpy(arr_np)
+    flat_pt = arr_pt.view(n_samples, -1)
+
+    # 4. Comparative Checks
+    # Check 1: Do the libraries agree with each other?
+    mismatch_count = np.sum(flat_np != flat_pt.numpy())
+
+    # Check 2: Verify specific semantic indices
+    # Let's check Var 1, Level 0. In row-major, this should be at index [n_levels]
+    test_v, test_l = 1, 0
+    expected_val = (test_v * 1000) + test_l
+    actual_idx = test_v * n_levels + test_l
+
+    val_at_idx_np = flat_np[0, actual_idx]
+    val_at_idx_pt = flat_pt[0, actual_idx].item()
+
+    print(f"--- Flattening Consistency Check ---")
+    print(f"Total Mismatches (NP vs PT): {mismatch_count}")
+    print(f"Value at index {actual_idx}:")
+    print(f"  Expected: {expected_val}")
+    print(f"  NumPy:    {val_at_idx_np}")
+    print(f"  PyTorch:  {val_at_idx_pt}")
+
+    if mismatch_count == 0 and val_at_idx_np == expected_val:
+        print("SUCCESS: Flattening is consistent and Row-Major (C-style).")
+    else:
+        print("FAILURE: Mismatch in flattening logic!")
 
 
 def innovation_uncertainty(data: np.ndarray) -> np.ndarray:
@@ -79,7 +125,34 @@ def background_increment(config_true: DictConfig, config_background: DictConfig)
     return np.subtract(x_true, x_background, out=x_true)
 
 
-def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=True, recenter: bool=True) -> None:
+def save_cholesky_factor(err_data, inflation=1.0, ridge=1e-6):
+    """
+    Computes and saves the Lower Cholesky factor L.
+    B = L @ L.T
+    """
+    # 1. Compute Standard Covariance
+    flat_err = err_data.reshape(err_data.shape[0], -1)
+    cov = np.cov(flat_err, rowvar=False) * inflation
+
+    # 2. Add Ridge (Tikhonov Regularization)
+    # This ensures the matrix is strictly Positive Definite
+    cov = cov + np.eye(cov.shape[1]) * ridge
+
+    # 3. Compute Lower Cholesky
+    try:
+        L = np.linalg.cholesky(cov)
+        logger.info("Successfully computed Cholesky factor L.")
+    except np.linalg.LinAlgError:
+        # If it fails, the ridge was too small or data is constant
+        eigvals = np.linalg.eigvalsh(cov)
+        logger.error(f"Matrix not PD. Min eigenvalue: {np.min(eigvals)}")
+        raise
+
+    return L.astype(np.float32)
+
+
+def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=True, recenter: bool=True,
+                      inflation: float=1.0, var_threshold: float=1.e-8) -> None:
     """ Compute statistics of a given dataset.
 
         Parameters
@@ -88,6 +161,8 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
         output: DictConfig. Output configuration.
         plot_flag: bool. If True, plot the covariance matrix.
         recenter: bool. If True, recenter the error by removing the mean.
+        inflation: float. Inflation factor to apply to the covariance matrix.
+        var_threshold: float. Variance threshold to filter variables.
 
         Returns
         -------
@@ -110,7 +185,16 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
         err -= np.mean(err, axis=0, keepdims=True)
     # Compute covariance matrix
     logger.info("Computing covariance matrix...")
-    cov = np.cov(err.reshape(err.shape[0], -1), rowvar=False)
+    cov = np.cov(err.reshape(err.shape[0], -1), rowvar=False)*inflation
+    # Apply variance thresholding
+    logger.info("Applying variance thresholding...")
+    var = np.diag(cov)
+    low_var_indices = np.where(var < var_threshold)[0]
+    if low_var_indices.size > 0:
+        logger.info(f"Variables below variance threshold ({var_threshold}): {low_var_indices.size}")
+        # Set low-variance values to threshold
+        for idx in low_var_indices:
+            cov[idx, idx] = var_threshold
 
     # Compute inverse covariance matrix
     logger.info("Computing inverse covariance matrix...")
@@ -133,9 +217,10 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
                                           lefts=[1.00], rights=[1.00], bottoms=[1.00], tops=[1.00])
         ax = get_axes(0, 0)
         # Plot covariance matrix
-        plot_map(ax, cov_inv/10000., title=f"Inverse covariance matrix", img_range=(-1, 1), plt_origin='upper',
+        plot_map(ax, cov_inv, title=f"Inverse covariance matrix", plt_origin='upper',
                  cb_label=r'Values (divided by 10$^4$)')
         save_plot(fig, filename=os.path.splitext(output.path)[0] + '.png')
+    breakpoint()
 
     return
 

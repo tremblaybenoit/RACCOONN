@@ -65,6 +65,38 @@ class MSE(torch.nn.Module):
         return mse(pred, target)
 
 
+class CholeskyForm(torch.nn.Module):
+    """
+    Stable Mahalanobis Loss: 0.5 * || L^-1 (pred - target) ||^2
+    """
+
+    def __init__(self, L_matrix: np.ndarray):
+        super().__init__()
+        # Ensure L is stored as a buffer (device management)
+        self.register_buffer('L', torch.from_numpy(L_matrix).float())
+
+    def to(self, device):
+        super().to(device)
+        self.L = self.L.to(device)
+        return self
+
+    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        # 1. Flatten to [Batch, N, 1]
+        # order: (samples, vars, levels) -> (samples, vars * levels, 1)
+        diff = (pred - target).view(pred.shape[0], -1, 1)
+
+        # 2. Solve L @ w = diff for w
+        # w = L^-1 @ diff. This is the 'whitened' residual.
+        # Since L is lower triangular, this is a very fast/stable back-substitution.
+        whitened_diff = torch.linalg.solve_triangular(
+            self.L, diff, upper=False
+        )
+
+        # 3. Return 0.5 * sum(w^2) per batch
+        # Result is [Batch]
+        return 0.5 * torch.pow(whitened_diff, 2).sum(dim=1).squeeze()
+
+
 def quadratic_form(pred: torch.Tensor, target: torch.Tensor, matrix: torch.Tensor) -> torch.Tensor:
     """ Compute the quadratic form of the difference between predicted and target tensors.
 
@@ -144,7 +176,7 @@ def diagonal_quadratic_form(pred: torch.Tensor, target: torch.Tensor, diag: torc
 
     # Minor adjustment to avoid division by zero
     eps = torch.finfo(target.dtype).eps
-    return mse(pred/(diag + eps), target/(diag + eps))
+    return mse(pred, target)/(diag + eps)**2
 
 
 class DiagonalQuadraticForm(torch.nn.Module):
@@ -464,7 +496,7 @@ class VarLoss(torch.nn.Module):
                 else:
                     loss['model'] = self.loss_model(pred['prof'],
                                                     target['prof_background'],
-                                                    target['prof_increment']**2)
+                                                    target['prof_increment'])
             else:
                 if self.pressure_filter is not None:
                     loss['model'] = self.loss_model(pred['prof'][:, pressure_filter],

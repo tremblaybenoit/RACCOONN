@@ -3,9 +3,6 @@ import torch.nn as nn
 from typing import Union
 from omegaconf import DictConfig, ListConfig
 from pytorch_lightning import LightningModule
-from torch.nn import Sigmoid
-from torch.onnx.symbolic_opset9 import contiguous
-
 from data.statistics import statistics, accumulate_statistics
 from forward.model.model import BaseModel
 from forward.model.activation import Sine
@@ -43,7 +40,7 @@ class SirenResidualBlock(nn.Module):
 
         # Internal layers for the residual path (f(x))
         self.linear1 = nn.Linear(n_neurons, n_neurons)
-        # self.layernorm = nn.LayerNorm(n_neurons)  # Using Layer Norm
+        self.layernorm = nn.LayerNorm(n_neurons)  # Using Layer Norm
         self.activation = activation
         self.linear2 = nn.Linear(n_neurons, n_neurons)
         self.dropout = nn.Dropout(dropout_rate)
@@ -58,7 +55,7 @@ class SirenResidualBlock(nn.Module):
 
         # Block 1 (Path where f(x) is computed)
         out = self.linear1(x)
-        # out = self.layernorm(out)
+        out = self.layernorm(out)
         out = self.activation(out)
 
         # Block 2
@@ -114,7 +111,7 @@ class PINNverseOperator(BaseModel):
         self.model = self._build_model(positional_encoding, activation_in, activation_out, parameters)
 
     @staticmethod
-    def _siren_init(module, is_first_layer, activation_in):
+    def _siren_init(module, is_first_layer, activation_in, w0: float = 30.0):
         """SIREN initialization for linear layers."""
 
         # Check if the activation is Sine, otherwise skip custom init
@@ -130,10 +127,11 @@ class PINNverseOperator(BaseModel):
                     # Uniform distribution U(-1/dim_in, 1/dim_in)
                     bound = 1. / dim_in
                     nn.init.uniform_(module.weight, -bound, bound)
+                    module.weight *= w0
                 # Subsequent layer initialization
                 else:
-                    # Uniform distribution U(-sqrt(6)/sqrt(dim_in), sqrt(6)/sqrt(dim_in))
-                    bound = torch.sqrt(torch.tensor(6. / dim_in))
+                    # Uniform distribution U(-sqrt(6)/sqrt(dim_in), sqrt(6)/sqrt(dim_in)) / w0
+                    bound = (torch.sqrt(torch.tensor(6. / dim_in)) / w0).item()
                     nn.init.uniform_(module.weight, -bound, bound)
 
             # Bias initialization (optional, but good practice)
@@ -538,7 +536,7 @@ class PINNverseOperators(PINNverseOperator):
         parameters.data.n_prof = 1
         return parameters
 
-    def _retrieve_prof(self, x: dict) -> list:
+    def _retrieve_prof(self, x: dict, n_levels: int) -> list:
         """
         Pass forward through all neural networks, one per profile type.
 
@@ -575,5 +573,5 @@ class PINNverseOperators(PINNverseOperator):
         n_levels = x['pressure'].shape[-1]
         x_vector = {k: v.repeat_interleave(n_levels, dim=0) if k != 'pressure' else x['pressure'].reshape(-1, 1)
                     for k, v in x.items()}
-        prof = torch.cat([output.view(-1, 1, n_levels) for output in self._retrieve_prof(x_vector)], dim=1)
+        prof = torch.cat([output.view(-1, 1, n_levels) for output in self._retrieve_prof(x_vector, n_levels)], dim=1)
         return prof

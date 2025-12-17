@@ -352,7 +352,7 @@ def affine(data: Union[np.ndarray, torch.Tensor], factor: Union[np.ndarray, torc
         return translation(data, value, inverse_transform=inverse_transform)
 
 
-def stdev(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform: bool = False) \
+def stdev(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform: bool = False, axis: int=None) \
         -> Union[np.ndarray, torch.Tensor]:
     """ Divide/multiply dataset by stddev.
 
@@ -361,16 +361,22 @@ def stdev(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform:
         data: arr or tensor. Contains data to transform.
         stats: arr or tensor. Statistics of the data.
         inverse_transform: bool. False for standardization, True for unstandardization.
+        axis: int or None. Axis along which to standardize. If None, standardize across all dimensions.
 
         Returns
         -------
         data_transform: arr or tensor. Standardized/unstandardized dataset.
     """
+    if axis is None:
+        return multiplication(data, stats['stdev'], inverse_transform=not inverse_transform)
+    else:
+        acc_mean = stats['mean'].mean(axis=axis, keepdims=True)
+        acc_var = (stats['stdev'] ** 2 + (stats['mean'] - acc_mean) ** 2).mean(axis=axis, keepdims=True)
+        acc_stdev = np.sqrt(acc_var)
+        return multiplication(data, acc_stdev, inverse_transform=not inverse_transform)
 
-    return multiplication(data, stats['stdev'], inverse_transform=not inverse_transform)
 
-
-def mean_stdev(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform: bool = False) \
+def mean_stdev(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform: bool = False, axis: int=None) \
         -> Union[np.ndarray, torch.Tensor]:
     """ Standardize dataset.
 
@@ -379,13 +385,20 @@ def mean_stdev(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_trans
         data: arr or tensor. Contains data to transform.
         stats: arr or tensor. Statistics of the data.
         inverse_transform: bool. False for standardization, True for unstandardization.
+        axis: int or None. Axis along which to standardize. If None, standardize across all dimensions.
 
         Returns
         -------
         data_transform: arr or tensor. Standardized/unstandardized dataset.
     """
-
-    return affine(data, stats['stdev'], stats['mean'], inverse_transform=not inverse_transform)
+    if axis is None:
+        return affine(data, stats['stdev'], stats['mean'], inverse_transform=not inverse_transform)
+    else:
+        # acc_stats = [{'mean': stats['mean'], 'stdev': stats['stdev'], 'n_samples': 1}]
+        acc_mean = stats['mean'].mean(axis=axis, keepdims=True)
+        acc_var = (stats['stdev']**2 + (stats['mean'] - acc_mean)**2).mean(axis=axis, keepdims=True)
+        acc_stdev = np.sqrt(acc_var)
+        return affine(data, acc_stdev, acc_mean, inverse_transform=not inverse_transform)
 
 
 def min_max(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform: bool = False, axis=None) \
