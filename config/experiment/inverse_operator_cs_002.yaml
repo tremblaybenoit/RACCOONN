@@ -9,7 +9,7 @@ defaults:
   - override /preparation: inverse_default
   - override /loader: inverse_cs
   - override /model: inverse_operator
-  - override /trainer: gpu
+  - override /trainer: cpu
   - override /callbacks: inverse_default
   - override /logger: default
 
@@ -23,7 +23,7 @@ task_name: "inverse_operator"  # Experiment
 paths:
   task_dir: "../inverse_outputs"
   run_id: "cs_002"
-  data_dir: ../../GOES_ML-main/Data_cs_${data.dtype}
+  data_dir: ../Data_cs_${data.dtype}
 
 # Trainer configuration
 trainer:
@@ -32,7 +32,7 @@ trainer:
   precision: 32  # 32-bit precision
 
 # Initialization
-init_ckpt: inverse/model/checkpoints/model.ckpt
+init_from_checkpoint: inverse/model/checkpoints/model.ckpt
 
 # Preparation configuration
 preparation:
@@ -134,6 +134,11 @@ model:
       n_layers: 4
       # Dropout rate
       dropout: 0.1
+      # Normalization
+      normalization:
+        _target_: torch.nn.LayerNorm
+        _args_:
+          - ${model.parameters.architecture.n_neurons}
     # Data
     data:
       n_prof: 3  # Number of profile variables

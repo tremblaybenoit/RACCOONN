@@ -48,6 +48,8 @@ parameters:
     n_layers: 4
     # Dropout rate
     dropout: 0.1
+    # Normalization
+    normalization: null
 
 # Loss function and parameters
 loss_func:

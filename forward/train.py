@@ -143,7 +143,7 @@ class Operator:
             logger.info(f"Initializing model from checkpoint: {init_ckpt}")
             checkpoint = torch.load(init_ckpt, map_location='cpu')
             state_dict = checkpoint.get('state_dict', checkpoint)
-            self.model.load_state_dict(state_dict, strict=False)
+            self.model.load_state_dict(state_dict, strict=True)
             logger.info("Training model...")
             self.trainer.fit(self.model, self.data_loader)
         # Else, start training from scratch
