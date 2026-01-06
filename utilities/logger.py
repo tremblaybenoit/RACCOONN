@@ -85,6 +85,21 @@ class TrainerLogger:
         # Load config object and resolve paths
         self.config = config
 
+    def _fix_path(self, path: str) -> str:
+        """Converts a potential Windows path to a WSL path if running in WSL."""
+        # Check if we are in WSL
+        if sys.platform.startswith("linux"):
+            try:
+                with open("/proc/version", "r") as f:
+                    if "microsoft" in f.read().lower():
+                        # Check if it looks like a Windows path (has : or \)
+                        if ":" in path or "\\" in path:
+                            # Use the 'wslpath' utility to convert C:\ to /mnt/c/
+                            return subprocess.check_output(["wslpath", "-u", path]).decode().strip()
+            except Exception:
+                pass
+        return os.path.abspath(path)
+
     def configure(self) -> None:
         """Configure logger for offline mode if specified in the config.
 
@@ -111,9 +126,16 @@ class TrainerLogger:
 
         # MLflow
         if "mlflow" in self.config:
-            # Set tracking URI
-            logger.info("Setting mlflow tracking URI for offline tracking...")
-            os.environ["MLFLOW_TRACKING_URI"] = "file:///" + self.config.mlflow.save_dir
+            # Convert path for WSL compatibility
+            safe_path = self._fix_path(self.config.mlflow.save_dir)
+            logger.info(f"Setting mlflow tracking URI to: file://{safe_path}")
+
+            # Ensure the directory exists before MLflow touches it
+            os.makedirs(safe_path, exist_ok=True)
+
+            # Note: file:// protocol usually takes two slashes + the absolute path
+            # file:///mnt/c/path...
+            os.environ["MLFLOW_TRACKING_URI"] = safe_path
 
     def ui(self, show: bool=False) -> None:
         """ Access logger UI via terminal commands.
@@ -146,7 +168,8 @@ class TrainerLogger:
             # Select port
             port = getattr(self.config.ports, "mlflow", 5000)
             # Command for terminal
-            command = f"mlflow ui --backend-store-uri file:///{os.path.abspath(self.config.mlflow.save_dir)} --port {port}"
+            safe_path = self._fix_path(self.config.mlflow.save_dir)
+            command = f"mlflow ui --backend-store-uri file:///{safe_path} --port {port}"
             # Start the mlflow UI
             logger.info("Starting mlflow UI...")
             subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

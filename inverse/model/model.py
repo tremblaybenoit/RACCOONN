@@ -35,12 +35,12 @@ class InverseEmulator(LightningModule):
 
 
 class SirenResidualBlock(nn.Module):
-    def __init__(self, n_neurons, activation, dropout_rate, siren_init_func):
+    def __init__(self, n_neurons, activation, dropout_rate, siren_init_func, normalization=None):
         super().__init__()
 
         # Internal layers for the residual path (f(x))
         self.linear1 = nn.Linear(n_neurons, n_neurons)
-        self.layernorm = nn.LayerNorm(n_neurons)  # Using Layer Norm
+        self.layernorm = normalization if normalization is not None else nn.LayerNorm(n_neurons)
         self.activation = activation
         self.linear2 = nn.Linear(n_neurons, n_neurons)
         self.dropout = nn.Dropout(dropout_rate)
@@ -236,7 +236,7 @@ class PINNverseOperator(BaseModel):
         # Pass through the model
         profiles = self.model(encoded_inputs).view(-1, n_levels, self.n_prof).transpose(1, 2)
         # Reshape profiles to match the expected output shape
-        return profiles.contiguous()
+        return profiles
 
     def forward(self, x: dict):
         """ Retrieve atmospheric profile over multiple pressure levels.
@@ -250,10 +250,22 @@ class PINNverseOperator(BaseModel):
             prof: tensor. Atmospheric profiles.
         """
 
-        # Forward pass
+        # Get dimensions
         n_levels = x['pressure'].shape[-1]
-        x_vector = {k: v.repeat_interleave(n_levels, dim=0) if k != 'pressure' else x['pressure'].reshape(-1, 1)
-                    for k, v in x.items()}
+        x_vector = {}
+
+        for k, v in x.items():
+            if k == 'pressure':
+                # Pressure is (Batch, n_levels) -> (Batch * n_levels, 1)
+                x_vector[k] = v.reshape(-1, 1)
+            else:
+                # Metadata v is likely (Batch, 1) or (Batch)
+                # Ensure it is (Batch, 1)
+                v_col = v.view(-1, 1)
+
+                # Use .expand(Batch, n_levels, 1) then flatten
+                # The -1 in expand tells PyTorch to infer the batch dimension
+                x_vector[k] = v_col.unsqueeze(1).expand(-1, n_levels, 1).reshape(-1, 1)
 
         return self._retrieve_prof(x_vector, n_levels)
 
@@ -492,6 +504,199 @@ class PINNverseOperator2(PINNverseOperator):
         )
 
         return model
+
+
+class PINNverseOperator3(PINNverseOperator):
+    """Physics-Informed Neural Network (PINN) inverse model with one neural network per profile type."""
+
+    def _build_model(self, positional_encoding: Union[DictConfig, None], activation_in: Union[DictConfig, None],
+                     activation_out: Union[DictConfig, None], parameters: Union[DictConfig, None]) -> nn.Module:
+        """ Build the neural network model.
+
+            Parameters
+            ----------
+            positional_encoding: DictConfig. Function for the positional encoding.
+            activation_in: DictConfig. Activation function (in).
+            activation_out: DictConfig. Activation function (out).
+            parameters: DictConfig. Configuration for the model parameters.
+
+            Returns
+            -------
+            None.
+        """
+
+        # Parameters check
+        dropout_rate = parameters.architecture.dropout if parameters is not None and \
+            hasattr(parameters.architecture, 'dropout') else 0.0
+        n_neurons = parameters.architecture.n_neurons if parameters is not None and \
+            hasattr(parameters.architecture, 'n_neurons') else 128
+        n_layers = parameters.architecture.n_layers if parameters is not None and \
+            hasattr(parameters.architecture, 'n_layers') else 4
+        n_normalization = parameters.architecture.normalization if parameters is not None and \
+            hasattr(parameters.architecture, 'normalization') else None
+        n_lat = parameters.data.n_lat if parameters is not None and \
+            hasattr(parameters.data, 'n_lat') else 1
+        n_lon = parameters.data.n_lon if parameters is not None and \
+            hasattr(parameters.data, 'n_lon') else 1
+        n_scans = parameters.data.n_scans if parameters is not None and \
+            hasattr(parameters.data, 'n_scans') else 1
+        n_pressure = parameters.data.n_pressure if parameters is not None and \
+            hasattr(parameters.data, 'n_pressure') else 1
+        n_cloud = parameters.data.n_cloud if parameters is not None and \
+            hasattr(parameters.data, 'n_cloud') else 0
+        n_prof = parameters.data.n_prof if parameters is not None and \
+            hasattr(parameters.data, 'n_prof') else 1
+        n_levels = parameters.data.n_levels if parameters is not None and \
+            hasattr(parameters.data, 'n_levels') else 1
+
+        # Positional encoding
+        d_input = n_lat + n_lon + n_scans + n_pressure + n_cloud
+        self.positional_encoding = instantiate(positional_encoding, d_input=d_input) if positional_encoding is not None \
+            else IdentityPositionalEncoding(d_input=d_input)
+        # Input layer
+        self.d_in = nn.Linear(self.positional_encoding.d_output, n_neurons)
+        self.activation_in = instantiate(activation_in) if activation_in is not None else Sine()
+        self.dropout_in = nn.Dropout(dropout_rate)
+        # Output layer
+        self.d_out = nn.Linear(n_neurons, n_prof*n_levels)
+        self.activation_out = instantiate(activation_out) if activation_out is not None else nn.Identity()
+
+        # Model architecture
+        self.normalization = nn.ModuleList([instantiate(n_normalization) if n_normalization is not None else nn.Identity()
+                                           for _ in range(n_layers)])
+        self.activations = nn.ModuleList([instantiate(activation_in) if activation_in is not None else Sine()
+                                          for _ in range(n_layers)])
+
+        # SIREN initialization
+        self._siren_init(self.d_in, is_first_layer=True, activation_in=self.activation_in)
+
+        residuals_blocks = nn.ModuleList()
+        for s in range(n_layers):
+            block = SirenResidualBlock(n_neurons, self.activations[s], dropout_rate, self._siren_init,
+                                       self.normalization[s])
+            residuals_blocks.append(block)
+
+        model = nn.Sequential(
+            self.d_in,
+            self.activation_in,
+            nn.Dropout(dropout_rate),
+            *residuals_blocks,
+            self.d_out,
+            self.activation_out
+        )
+
+        return model
+
+
+class PINNverseOperator4(PINNverseOperator):
+    """
+    Hydra-Head SIREN with Coordinate Skip Connections.
+    Shared backbone learns physical correlations; independent heads specialize in variables.
+    """
+
+    @staticmethod
+    def _siren_init(module, is_first_layer, activation_in, is_head=False, w0: float = 30.0):
+        """
+        Enhanced SIREN initialization.
+        - is_first_layer: Uses w0 scaling for high-frequency coordinate mapping.
+        - is_head: Uses small variance to start training with near-zero increments.
+        - hidden: Standard SIREN initialization for residual blocks.
+        """
+        with torch.no_grad():
+            if hasattr(module, 'weight'):
+                dim_in = module.weight.size(1)
+
+                if is_first_layer:
+                    # First layer initialization: U(-1/n, 1/n) * w0
+                    bound = 1. / dim_in
+                    nn.init.uniform_(module.weight, -bound, bound)
+                    module.weight *= w0
+                elif is_head:
+                    # Hydra Head initialization: Small variance to maintain stability
+                    # with CRTM and prevent early training divergence.
+                    bound = torch.sqrt(torch.tensor(1. / dim_in))
+                    nn.init.uniform_(module.weight, -bound, bound)
+                    module.weight *= 0.01
+                else:
+                    # Hidden layer initialization: U(-sqrt(6/n)/w0, sqrt(6/n)/w0)
+                    bound = (torch.sqrt(torch.tensor(6. / dim_in)) / w0).item()
+                    nn.init.uniform_(module.weight, -bound, bound)
+
+            if hasattr(module, 'bias') and module.bias is not None:
+                nn.init.zeros_(module.bias)
+
+    def _build_model(self, positional_encoding, activation_in, activation_out, parameters) -> nn.Module:
+        # 1. Parameter Extraction
+        n_neurons = parameters.architecture.n_neurons if hasattr(parameters.architecture, 'n_neurons') else 128
+        n_layers = parameters.architecture.n_layers if hasattr(parameters.architecture, 'n_layers') else 4
+        dropout_rate = parameters.architecture.dropout if hasattr(parameters.architecture, 'dropout') else 0.0
+        n_normalization = parameters.architecture.normalization if hasattr(parameters.architecture,
+                                                                           'normalization') else None
+
+        d_input = (parameters.data.n_lat + parameters.data.n_lon +
+                   parameters.data.n_scans + parameters.data.n_pressure +
+                   parameters.data.n_cloud)
+
+        # 2. Input/Encoding
+        self.positional_encoding = instantiate(positional_encoding, d_input=d_input) if positional_encoding \
+            else IdentityPositionalEncoding(d_input=d_input)
+
+        self.d_encoded = self.positional_encoding.d_output
+        self.d_in = nn.Linear(self.d_encoded, n_neurons)
+        self.activation_in = instantiate(activation_in) if activation_in else Sine()
+
+        # Init First Layer
+        self._siren_init(self.d_in, is_first_layer=True, activation_in=self.activation_in)
+
+        # 3. Shared Backbone (Residual SIREN)
+        self.backbone = nn.ModuleList()
+        for _ in range(n_layers):
+            norm = instantiate(n_normalization) if n_normalization else nn.Identity()
+            block = SirenResidualBlock(
+                n_neurons,
+                instantiate(activation_in) if activation_in else Sine(),
+                dropout_rate,
+                self._siren_init,
+                normalization=norm
+            )
+            self.backbone.append(block)
+
+        # 4. Independent Hydra Heads with Skip Connections
+        # Input: backbone_output (n_neurons) + coordinate_skip (d_encoded)
+        self.heads = nn.ModuleList([
+            nn.Linear(n_neurons + self.d_encoded, 1) for _ in range(self.n_prof)
+        ])
+
+        # Init Heads
+        for head in self.heads:
+            self._siren_init(head, is_first_layer=False, activation_in=None, is_head=True)
+
+        self.activation_out = instantiate(activation_out) if activation_out else nn.Identity()
+        return nn.ModuleDict({
+            'backbone': self.backbone,
+            'heads': self.heads,
+            'd_in': self.d_in
+        })
+
+    def _retrieve_prof(self, x: dict, n_levels: int) -> torch.Tensor:
+        raw_inputs = torch.cat([v.view(-1, 1) for v in x.values()], dim=-1)
+        encoded_coords = self.positional_encoding(raw_inputs)
+
+        # Accessing via ModuleDict (self.model)
+        x_latent = self.activation_in(self.model['d_in'](encoded_coords))
+
+        for block in self.model['backbone']:
+            x_latent = block(x_latent)
+
+        head_input = torch.cat([x_latent, encoded_coords], dim=-1)
+
+        # Iterate through heads in ModuleDict
+        out = torch.cat([head(head_input) for head in self.model['heads']], dim=-1)
+        out = self.activation_out(out)
+
+        batch_size = out.shape[0] // n_levels
+        return out.view(batch_size, n_levels, self.n_prof).transpose(1, 2)
+
 
 class PINNverseOperators(PINNverseOperator):
     """Physics-Informed Neural Network (PINN) inverse model with one neural network per profile type."""

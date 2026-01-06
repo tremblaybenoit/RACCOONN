@@ -74,7 +74,7 @@ def load_torch(path: str) -> Union[dict, torch.Tensor]:
     return torch.load(path)
 
 
-def load_npy(path: str, split: Union[np.ndarray, int, slice] = None, dtype: str = 'float32', mmap_mode=None) -> np.ndarray:
+def load_npy(path: str, split: Union[np.ndarray, int, slice] = None, dtype: str = None, mmap_mode=None) -> np.ndarray:
     """ Load a numpy array from a .npy file and optionally split it.
 
         Parameters:
@@ -89,12 +89,15 @@ def load_npy(path: str, split: Union[np.ndarray, int, slice] = None, dtype: str 
 
     # Load the numpy array from the specified path
     data = np.load(path, mmap_mode=mmap_mode)
+    # Set desired dtype
+    if dtype is None:
+        dtype = data.dtype
 
     # No split: prefer returning the memmap directly when dtype matches
     if split is None:
         if data.dtype == np.dtype(dtype):
             return data
-        return data.astype(dtype, copy=True)
+        return np.asarray(data, dtype=dtype)
     # Apply split
     else:
         # Single index
@@ -104,7 +107,7 @@ def load_npy(path: str, split: Union[np.ndarray, int, slice] = None, dtype: str 
         elif isinstance(split, slice):
             if data.dtype == np.dtype(dtype):
                 return data[split]
-            return data[split].astype(dtype=dtype, copy=True)
+            return np.asarray(data[split], dtype=dtype)
         # Array of indices
         else:
             # If boolean array
@@ -204,7 +207,7 @@ def load_var(config: DictConfig, split: Union[np.ndarray, int, slice] = None) ->
     """
 
     # Load and normalize variable
-    data = np.array(instantiate(config['load']))
+    data = np.asarray(instantiate(config['load']))
 
     # If no split and data is already a memmap/ndarray and dtype matches, return directly or asarray
     if split is None:

@@ -1,0 +1,16 @@
+# Brightness temperatures
+hofx:
+  # Loading function
+  load:
+    _target_: data.io.load_npy
+    path: ${....dir}/hofx.npy
+    split: ${....split}
+    dtype: ${data.dtype}
+# Cloud filter
+cloud_filter:
+  # Loading function
+  load:
+    _target_: data.io.load_npy
+    path: ${....dir}/cloud_filter.npy
+    split: ${....split}
+    dtype: bool

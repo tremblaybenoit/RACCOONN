@@ -7,6 +7,7 @@ from omegaconf import DictConfig, ListConfig
 from utilities.instantiators import instantiate
 from data.io import load_var
 from utilities.logic import get_config_path
+from tqdm import tqdm
 import logging
 
 
@@ -409,6 +410,41 @@ def accumulate_statistics(stats: list[dict[str, Union[np.ndarray, torch.Tensor]]
     return accumulate_stats
 
 
+def batch_statistics(data: Union[np.ndarray, torch.Tensor], batch_size: int = 32, axis: Union[int, tuple] = 0,
+                     which: list[str] = None) -> dict:
+    """ Compute statistics of a given dataset in batches.
+
+        Parameters
+        ----------
+        data: np.ndarray or torch.Tensor. Dataset to compute statistics on.
+        batch_size: int. Size of the batches to use for computation.
+        axis: int or tuple. Axis to compute statistics along.
+        which: List[str]. List of statistics to compute.
+
+        Returns
+        -------
+        Dictionary containing statistics of the dataset.
+    """
+
+    # Initialize stats
+    stats = None
+    n_samples = data.shape[0]
+    # Loop through batches
+    for start_idx in tqdm(range(0, n_samples, batch_size)):
+        # Determine end index of the batch
+        end_idx = min(start_idx + batch_size, n_samples)
+        # Extract data batch
+        data_batch = data[start_idx:end_idx]
+        # Accumulate statistics for the batch
+        if start_idx == 0:
+            stats = statistics(data_batch, axis=axis, which=which)
+        else:
+            stats = accumulate_statistics([stats, statistics(data_batch, axis=axis, which=which)], which=which)
+        # Free memory
+        data_batch = None
+    return stats
+
+
 def stream_statistics(config: DictConfig, batch_size: int = None) -> dict:
     """ Compute statistics of a given dataset in a streaming fashion.
 
@@ -422,33 +458,19 @@ def stream_statistics(config: DictConfig, batch_size: int = None) -> dict:
         Dictionary containing statistics of the dataset.
     """
 
+    # Load data
+    data = load_var(config)
+
     # If no batching is required
     if batch_size is None:
-        # Load data
-        data = load_var(config)
         # Compute statistics
         stats = statistics(data, axis=0)
-        # Free memory
-        data = None
     # If batching is required
     else:
-        # Initialize stats
-        stats = None
-        # Determine number of samples
-        n_samples = config.get('n_samples', None)  # TODO: Fix this to get n_samples correctly
-        # Loop through batches
-        for start_idx in range(0, n_samples, batch_size):
-            # Determine end index of the batch
-            end_idx = min(start_idx + batch_size, n_samples)
-            # Load data batch
-            data = load_var(config, split=slice(start_idx, end_idx))
-            # Accumulate statistics for the batch
-            if start_idx == 0:
-                stats = statistics(data, axis=0)
-            else:
-                stats = accumulate_statistics([stats, statistics(data, axis=0)])
-            # Free memory
-            data = None
+        # Compute statistics in batches
+        stats = batch_statistics(data, batch_size=batch_size, axis=0)
+    # Free memory
+    data = None
     return stats
 
 

@@ -5,6 +5,7 @@ import hydra
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
 from utilities.logic import get_config_path
+from data.statistics import batch_statistics
 import logging
 
 # Initialize logger
@@ -68,13 +69,7 @@ def pressure_filter(prof: Union[np.ndarray, torch.Tensor], threshold: float = 1.
         np.ndarray or torch.Tensor. Boolean mask indicating profiles above the pressure threshold.
     """
 
-    if isinstance(prof, torch.Tensor):
-        # Compute variance of the profiles
-        prof_var = torch.var(prof, dim=0, keepdim=True).squeeze()
-    else:
-        prof_var = prof.var(axis=0, keepdims=True).squeeze()
-
-    return prof_var > threshold
+    return batch_statistics(prof, which=['mean', 'variance'], axis=0)['variance'] > threshold
 
 
 def daytime_filter(meta: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:

@@ -5,7 +5,7 @@
 defaults:
   - override /paths: default
   - override /hydra: default
-  - override /data: inverse_cs
+  - override /data: inverse_recast
   - override /preparation: inverse_default
   - override /loader: inverse_cs
   - override /model: inverse_operator
@@ -17,19 +17,27 @@ defaults:
 # This allows you to overwrite only specified parameters
 
 # Task name. Note that it determines the output directory path
-task_name: "inverse_operator"  # Experiment
+task_name: "inverse_operator_recast"  # Experiment
 
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "bg_000"
-  data_dir: ../../GOES_ML-main/Data_cs_${data.dtype}
+  run_id: "bg_400"
+  data_dir: ../data_${data.dtype}_cs
 
 # Trainer configuration
 trainer:
   min_epochs: 1  # To prevent early stopping
-  max_epochs: 32  # Number of epochs
+  max_epochs: 64  # Number of epochs
   precision: 32  # 32-bit precision
+
+# Initialization
+init_from_checkpoint: inverse/model/checkpoints/model_bg_300.ckpt
+
+# Callbacks
+callbacks:
+  early_stopping:
+    patience: 10  # Number of epochs with no improvement after which training will be stopped
 
 # Preparation configuration
 preparation:
@@ -94,19 +102,20 @@ data:
 
 # Loader configuration
 loader:
-  # Number of workers for data loading
-  num_workers: 12
-  persistent_workers: true  # Keep workers alive between epochs
+  batch_size: 96
+  num_workers: 16
+  persistent_workers: true
+  pin_memory: true
 # Model parameters
 model:
   # Model
-  _target_: inverse.model.model.PINNverseOperator
+  _target_: inverse.model.model.PINNverseOperator2
   # Optimizer function and parameters
   optimizer:
     # Learning rate
     lr: 0.0005
     # Weight decay (L2 regularization)
-    weight_decay: 1e-5
+    weight_decay: 0
   # Learning rate scheduler
   lr_scheduler:
     # Function
@@ -120,7 +129,8 @@ model:
     # Minimum learning rate
     min_lr: 1.0e-6
     # Threshold for measuring the new optimum, to only focus on significant changes
-    threshold: 0.01
+    threshold: 0.0
+    threshold_mode: abs
   # Model parameters associated with the data (e.g., input/output dimensions) and architecture
   parameters:
     # Model architecture
@@ -128,7 +138,7 @@ model:
       # Number of neurons in the hidden layers
       n_neurons: 128
       # Number of hidden layers
-      n_layers: 4
+      n_layers: 2
       # Dropout rate
       dropout: 0.1
     # Data
@@ -137,7 +147,7 @@ model:
   # Loss function and parameters
   loss_func:
     # Weights for observation (obs), model, and boundary condition (bcs) errors
-    lambda_obs: 0.
+    lambda_obs: 1.e-5
     lambda_model: 1.
     lambda_bcs: 1.
     clear_sky: true
@@ -148,7 +158,6 @@ model:
     # Loss term for model variables
     loss_model:
       _target_: inverse.model.loss.MSE
-      # _target_: inverse.model.loss.MSE
       # _target_: inverse.model.loss.QuadraticForm
       # matrix: ${preparation.covariance.B.output.load}
     # Loss term for boundary conditions
@@ -156,6 +165,8 @@ model:
       _target_: inverse.model.loss.MSE
     # Pressure filter: Consider only pressure levels with non-zero variance (for model and bcs errors)
     pressure_filter: ${data.pressure_filter.load}
+    # Prediction profile: Use full profile for loss computation
+    prof_pred: null
   # Positional encoding
   positional_encoding:
     _target_: inverse.model.encoding.GaussianPositionalEncoding

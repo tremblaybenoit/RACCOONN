@@ -141,7 +141,7 @@ class Operator:
             self.trainer.fit(self.model, self.data_loader, ckpt_path=resume_ckpt)
         elif init_ckpt and os.path.exists(init_ckpt):
             logger.info(f"Initializing model from checkpoint: {init_ckpt}")
-            checkpoint = torch.load(init_ckpt, map_location='cpu')
+            checkpoint = torch.load(init_ckpt, map_location='cpu', weights_only=False)
             state_dict = checkpoint.get('state_dict', checkpoint)
             self.model.load_state_dict(state_dict, strict=True)
             logger.info("Training model...")
@@ -196,9 +196,9 @@ class Operator:
         if hasattr(self.config.loader.stage.test, 'results'):
             # Loop over all results in the config and save them
             for result_name, result_config in self.config.loader.stage.test.results.items():
-                if result_name in self.model.test_results and hasattr(result_config, 'save'):
+                if result_name in self.model.results and hasattr(result_config, 'save'):
                     save_function = instantiate(result_config.save)
-                    save_function(self.model.test_results[result_name])
+                    save_function(self.model.results[result_name])
 
     def predict(self, loader_config: DictConfig) -> np.ndarray:
         """ Predicts the output of the model on a given dataset.

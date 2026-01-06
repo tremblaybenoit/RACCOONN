@@ -257,8 +257,8 @@ def broadcast(var1: Union[np.ndarray, torch.Tensor], var2: Union[np.ndarray, tor
             var2 = var2.to(dtype=dtype)
         # Broadcast dimensions
         if var2.ndim < var1.ndim:
-            for _ in range(var1.ndim - var2.ndim):
-                var2 = var2.unsqueeze(0)
+            view_shape = [1] * (var1.ndim - var2.ndim) + list(var2.shape)
+            var2 = var2.view(view_shape)
         return var2.expand(var1.shape)
     else:
         raise TypeError("Input variables must be numpy arrays or torch tensors.")

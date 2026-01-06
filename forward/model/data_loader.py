@@ -3,13 +3,17 @@ from torch.utils.data import Dataset, DataLoader
 from omegaconf import DictConfig
 from data.io import load_var_and_normalize
 from utilities.instantiators import instantiate
-from typing import Union, Optional
+from typing import Union
 from utilities.tensors import to_torch
 import multiprocessing
 import os
 from tqdm import tqdm
 import numpy as np
 import torch
+from typing import Optional
+import torch.multiprocessing as mp
+# Set this BEFORE any dataloader starts
+mp.set_sharing_strategy('file_system')
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
 
@@ -238,20 +242,26 @@ class CRTMDataset(BaseDataset):
             os.makedirs(self.memmap_dir, exist_ok=True)
 
         # load and store input vars
+        self._len = None
         for var, config in tqdm(input.items()):
             arr = load_var_and_normalize(config)
+            if self._len is None:
+                self._len = arr.shape[0]
             if self.share_memory == 'torch':
                 t = torch.from_numpy(np.ascontiguousarray(arr))
                 t.share_memory_()
                 self._raw_x['input'][var] = t
                 del arr
-            else:  # memmap
+            else:  # memmap: write a proper .npy memmap using numpy's open_memmap
                 shape = arr.shape
                 dtype = arr.dtype
-                fname = os.path.join(self.memmap_dir, f"{var}.dat")
-                mm = np.memmap(fname, dtype=dtype, mode='w+', shape=shape)
+                fname = os.path.join(self.memmap_dir, f"{var}.npy")
+                # create/open a proper .npy memmap and write data
+                mm = np.lib.format.open_memmap(fname, mode='w+', dtype=dtype, shape=shape)
                 mm[:] = arr[:]
                 mm.flush()
+                # delete mm to ensure file is closed; later processes will re-open
+                del mm
                 del arr
                 self._raw_x['input'][var] = {'_memmap_path': fname, 'dtype': str(dtype), 'shape': shape}
 
@@ -268,10 +278,11 @@ class CRTMDataset(BaseDataset):
                 else:
                     shape = arr.shape
                     dtype = arr.dtype
-                    fname = os.path.join(self.memmap_dir, f"target_{var}.dat")
-                    mm = np.memmap(fname, dtype=dtype, mode='w+', shape=shape)
+                    fname = os.path.join(self.memmap_dir, f"target_{var}.npy")
+                    mm = np.lib.format.open_memmap(fname, mode='w+', dtype=dtype, shape=shape)
                     mm[:] = arr[:]
                     mm.flush()
+                    del mm
                     del arr
                     self._raw_x['target'][var] = {'_memmap_path': fname, 'dtype': str(dtype), 'shape': shape}
 
@@ -291,24 +302,46 @@ class CRTMDataset(BaseDataset):
                     path = val['_memmap_path']
                     dtype = np.dtype(val['dtype'])
                     shape = tuple(val['shape'])
-                    mm = np.memmap(path, dtype=dtype, mode='r', shape=shape)
+                    # Prefer opening as writable .npy memmap
+                    try:
+                        mm = np.lib.format.open_memmap(path, mode='r+', dtype=dtype, shape=shape)
+                    except Exception:
+                        # Fallback: try loading via numpy.load with mmap_mode='r'
+                        try:
+                            mm = np.load(path, mmap_mode='r')
+                        except Exception:
+                            raise
                     self._raw_x[grouping][var] = mm
 
         self.x = self._raw_x
         self._memmaps_opened = True
 
-    def __len__(self) -> int:
-        if self.share_memory == 'memmap' and not self._memmaps_opened:
-            self._ensure_memmaps_opened()
-        return super().__len__()
-
     def __getitem__(self, idx: int) -> dict:
         if self.share_memory == 'memmap' and not self._memmaps_opened:
             self._ensure_memmaps_opened()
-        return super().__getitem__(idx)
+
+        out = {}
+        for group_name, group in self.x.items():
+            out[group_name] = {}
+            for k, v in group.items():
+                if getattr(v, 'shape', None) and v.shape[0] == len(self):
+                    val = v[idx]
+                else:
+                    val = v.squeeze() if hasattr(v, 'squeeze') else v
+                # ensure returned numpy arrays are writable/contiguous to avoid PyTorch warnings
+                if isinstance(val, np.ndarray):
+                    # Ensure the array is contiguous before converting
+                    if not val.flags.c_contiguous:
+                        val = np.ascontiguousarray(val)
+                    val = torch.from_numpy(val)
+                out[group_name][k] = val
+        return out
+
+    def __len__(self) -> int:
+        return int(self._len)
 
 
-class TorchDataset(BaseDataset):
+class TorchDataset(Dataset):
     """ Dataset using torch shared memory tensors. """
     def __init__(self, input: DictConfig, target: DictConfig = None, results: DictConfig = None) -> None:
         """ Initialize the dataset.
@@ -324,40 +357,95 @@ class TorchDataset(BaseDataset):
             None.
         """
 
-        def _load(var_dict: DictConfig) -> dict:
+        def _load(var_dict: DictConfig) -> torch.Tensor:
             """ Load and normalize variables from configuration.
 
                 Parameters
                 ----------
-                var_dict : DictConfig. Configuration for variables.
+                var_dict : DictConfig. Configuration for variable.
 
                 Returns
                 -------
-                dict. Dictionary of loaded and normalized variables as torch tensors.
+                torch.Tensor. Loaded and normalized tensor in shared memory.
             """
-            loaded_vars = {}
-            for var, config in tqdm(var_dict.items()):
-                # Load and normalize variable
-                arr = load_var_and_normalize(config)
+
+            arr = load_var_and_normalize(var_dict)
+            if not arr.flags.c_contiguous:
                 arr = np.ascontiguousarray(arr)
-                # Create torch tensor and share memory
-                tnsr = torch.from_numpy(arr)
-                tnsr.share_memory_()
-                loaded_vars[var] = tnsr
-                # Free numpy array memory
-                del arr
-            return loaded_vars
+            t = torch.from_numpy(arr)
+            t.share_memory_()
+            return t
+
+        # Automate Input Block Loading
+        self.input_blocks, self.input_blocks_keys = {}, []
+        self.input_consts, self.input_consts_keys = {}, []
+        # We store the keys in a list once so __getitem__ doesn't have to look them up
+        input_keys = list(input.keys())
+        for key in input_keys:
+            data = _load(input[key])
+            if data.shape[0] == 1:
+                self.input_consts[key] = data.squeeze()
+                self.input_consts_keys.append(key)
+            elif key == 'pressure':
+                # Special case: always treat pressure as constant
+                self.input_consts[key] = data
+                self.input_consts_keys.append(key)
+            else:
+                self.input_blocks[key] = data
+                self.input_blocks_keys.append(key)
+
+        # 2. Automate Target Block Loading
+        self.target_blocks, self.target_blocks_keys = {}, []
+        self.target_consts, self.target_consts_keys = {}, []
+        self.has_targets = target is not None
+        if self.has_targets:
+            target_keys = list(target.keys())
+            for key in target_keys:
+                data = _load(target[key])
+                if data.shape[0] == 1:
+                    self.target_consts[key] = data.squeeze()
+                    self.target_consts_keys.append(key)
+                else:
+                    self.target_blocks[key] = data
+                    self.target_blocks_keys.append(key)
+
+        # Dataset length (assuming 'prof' or the first key exists)
+        self._len = self.input_blocks[self.input_blocks_keys[0]].shape[0]
 
         # Store results config
         self.results = results
-        # Load input variables
-        x = {'input': _load(input)}
-        # Load target variables if provided
-        if target is not None:
-            x['target'] = _load(target)
 
-        # Class inheritance
-        super().__init__(x)
+    def __len__(self):
+        """ Get the length of the dataset."""
+        return int(self._len)
+
+    def __getitem__(self, idx: int) -> dict:
+        """ Get item from dataset.
+
+            Parameters
+            ----------
+            idx : int. Index of the item to retrieve.
+
+            Returns
+            -------
+            Dataset object.
+        """
+
+        # Use dictionary comprehension over pre-cached keys
+        input_dict = {k: self.input_blocks[k][idx] for k in self.input_blocks_keys}
+        for k in self.input_consts_keys:
+            input_dict[k] = self.input_consts[k]
+        out = {'input': input_dict}
+
+        # Add target dictionary only if it exists
+        if self.has_targets:
+            # Automates any number of target keys (hofx, cloud_filter, etc.)
+            target_dict = {k: self.target_blocks[k][idx] for k in self.target_blocks_keys}
+            for k in self.target_consts_keys:
+                target_dict[k] = self.target_consts[k]
+            out['target'] = target_dict
+
+        return out
 
 
 class MemmapDataset(Dataset):

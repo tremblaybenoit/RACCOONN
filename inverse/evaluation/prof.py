@@ -40,6 +40,7 @@ def main(config: DictConfig) -> None:
     prof = np.concatenate([prof_train0, prof_train1, prof_train2], axis=1)
     prof_mean = np.mean(prof, axis=0)
     prof_stdev = np.std(prof, axis=0)
+    breakpoint()
     prof_types = config.data.stage.test.vars.prof.type
     prof_labels = ([f'No norm. - {prof_label}' for prof_label in prof_types] +
                    [f'Height-independent norm. - {prof_label}' for prof_label in prof_types] +

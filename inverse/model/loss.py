@@ -6,7 +6,7 @@ try:
     from inverse.model.forward import CRTMForward
     from utilities.logic import get_config_path
     # Initialize CRTM forward model
-    checkpoint_path = os.path.abspath(os.path.join(os.path.dirname(__name__), 'forward/model/checkpoints/model_v2.ckpt'))
+    checkpoint_path = os.path.abspath(os.path.join(os.path.dirname(__name__), 'forward/model/checkpoints/model_v3.ckpt'))
     config_path = os.path.join(get_config_path(), 'model/forward_emulator.yaml')
     forward = CRTMForward(checkpoint_path=checkpoint_path, config_path=config_path)
 except (ImportError, FileNotFoundError, Exception) as e:
@@ -175,8 +175,9 @@ def diagonal_quadratic_form(pred: torch.Tensor, target: torch.Tensor, diag: torc
     """
 
     # Minor adjustment to avoid division by zero
-    eps = torch.finfo(target.dtype).eps
-    return mse(pred, target)/(diag + eps)**2
+    eps = 1.e-8
+    denom = torch.clamp(diag, min=eps)
+    return mse(pred, target)/denom**2
 
 
 class DiagonalQuadraticForm(torch.nn.Module):
@@ -410,7 +411,7 @@ class VarLoss(torch.nn.Module):
     """ Universal loss module that combines observation and model losses. """
     def __init__(self, forward_model: Callable, loss_obs: Callable, loss_model: Callable = None, loss_bcs: Callable = None,
                  lambda_obs: float=1.0, lambda_model: float=1.0, lambda_bcs: float=1.0,
-                 pressure_filter: np.ndarray=None, clear_sky: bool=False):
+                 pressure_filter: np.ndarray=None, clear_sky: bool=False, prof_pred: np.ndarray=None):
         """ Initialize the variational loss module.
 
         Parameters
@@ -424,6 +425,7 @@ class VarLoss(torch.nn.Module):
         lambda_bcs: float. Weight for the boundary condition loss.
         pressure_filter: Callable. Function to generate a mask for the profile levels to include in the model loss.
         clear_sky: bool. Whether to apply clear-sky filtering.
+        prof_pred: np.ndarray. Base profile for clear-sky filtering.
 
         Returns
         -------
@@ -442,6 +444,11 @@ class VarLoss(torch.nn.Module):
             if pressure_filter is not None and ~pressure_filter.sum() == 0 else None
         # Clear-sky filtering
         self.clear_sky = clear_sky
+        if prof_pred is not None:
+            # Shape is likely (1, 9, n_levels) based on your context
+            self.register_buffer('prof_pred', torch.from_numpy(prof_pred))
+        else:
+            self.prof_pred = None
 
     def __call__(self, pred: dict, target: dict) -> tuple[dict, torch.Tensor]:
         """ Compute the combined loss between predicted profiles and target data.
@@ -464,14 +471,20 @@ class VarLoss(torch.nn.Module):
             pressure_filter = torch.ones_like(pred['prof'], dtype=torch.bool, device=pred['prof'].device)
 
         # Compute the forward model output
-        if not self.clear_sky:
-            hofx_pred = self.forward_model(pred['prof'], target)
-        else:
+        if self.clear_sky and self.prof_pred is not None:
+            pred_prof = self.prof_pred[:pred['prof'].shape[0]].clone()
+            pred_prof[:, 0:1, ...] = pred['prof'][:, 0:1, :]  #  Air temperature
+            pred_prof[:, 4:5, ...] = pred['prof'][:, 1:2, :]  #  Ice particle effective radius
+            pred_prof[:, 8:9, ...] = pred['prof'][:, 2:3, :]  #  Ozone mixing ratio
+            hofx_pred = self.forward_model(pred_prof, target)
+        elif self.clear_sky:
             pred_prof = torch.zeros((pred['prof'].shape[0], 9, pred['prof'].shape[2]), device=pred['prof'].device)
             pred_prof[:, 0:1, ...] = pred['prof'][:, 0:1, :]  #  Air temperature
             pred_prof[:, 4:5, ...] = pred['prof'][:, 1:2, :]  #  Ice particle effective radius
             pred_prof[:, 8:9, ...] = pred['prof'][:, 2:3, :]  #  Ozone mixing ratio
             hofx_pred = self.forward_model(pred_prof, target)
+        else:
+            hofx_pred = self.forward_model(pred['prof'], target)
 
         # Initialize loss dictionary
         loss = {'total': torch.tensor(0.0, device=pred['prof'].device)}
@@ -484,7 +497,7 @@ class VarLoss(torch.nn.Module):
             loss['obs'] = self.loss_obs(hofx_pred[:, :10],
                                         target['hofx'][:, :10])
         # Total
-        loss['total'] += self.lambda_obs * torch.nanmean(loss['obs'])
+        loss['total'] += self.lambda_obs * loss['obs'].mean()
 
         # Model losses: Some model losses may require additional inputs
         if self.loss_model is not None:
@@ -505,13 +518,13 @@ class VarLoss(torch.nn.Module):
                     loss['model'] = self.loss_model(pred['prof'],
                                                     target['prof_background'])
             # Total
-            loss['total'] += self.lambda_model * torch.nanmean(loss['model'])
+            loss['total'] += self.lambda_model * loss['model'].mean()
 
         # Boundary condition losses (where the variance is zero)
         if self.loss_bcs is not None and self.pressure_filter is not None:
             loss['bcs'] = self.loss_bcs(pred['prof'][:, ~pressure_filter], target['prof'][:, ~pressure_filter])
             # Total
-            loss['total'] += self.lambda_bcs * torch.nanmean(loss['bcs'])
+            loss['total'] += self.lambda_bcs * loss['bcs'].mean()
 
         return loss, hofx_pred
 
@@ -537,6 +550,9 @@ class VarLoss(torch.nn.Module):
             if loss_fn is not None and hasattr(loss_fn, 'to'):
                 setattr(self, attr, loss_fn.to(device))
         # Pressure filter
-        if self.pressure_filter is not None and hasattr(self.pressure_filter, 'to'):
+        if self.pressure_filter is not None:
             self.pressure_filter = self.pressure_filter.to(device)
+        # Profile prediction
+        if self.prof_pred is not None and hasattr(self.prof_pred, 'to'):
+            self.prof_pred = self.prof_pred.to(device)
         return self

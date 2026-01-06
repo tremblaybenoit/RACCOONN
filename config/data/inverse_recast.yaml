@@ -1,0 +1,85 @@
+defaults:
+  - variables/inverse_recast_input@stage.train.vars
+  - variables/inverse_recast_input@stage.valid.vars
+  - variables/inverse_recast_input@stage.test.vars
+  - variables/inverse_recast_input@stage.predict.vars
+  - variables/inverse_recast_target@stage.train.vars
+  - variables/inverse_recast_target@stage.valid.vars
+  - variables/inverse_recast_target@stage.test.vars
+
+# Configuration to download the training and testing data
+download:
+  dir: ${paths.data_dir}
+  url: "https://zenodo.org/record/1482223/files/GOES-16_ML_Training_Testing_Data.zip?download=1"
+
+# dtype
+dtype: 'float32'
+
+# Pressure filter
+pressure_filter:
+  load:
+    _target_: data.filters.pressure_filter
+    prof:
+      _target_: data.io.load_stack_and_normalize
+      _recursive_: false
+      stack:
+        - load: ${data.stage.train.vars.prof.load}
+          normalization:
+            _target_: data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'prof'
+              dtype: ${data.dtype}
+            axis: null
+        - load: ${data.stage.valid.vars.prof.load}
+          normalization:
+            _target_: data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'prof'
+              dtype: ${data.dtype}
+            axis: null
+        - load: ${data.stage.test.vars.prof.load}
+          normalization:
+            _target_: data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'prof'
+              dtype: ${data.dtype}
+            axis: null
+
+# Split the data into training, validation, and test sets
+stage:
+  # Training set
+  train:
+    # Path to training data
+    dir: ${paths.data_dir}/Train2
+    # Split
+    split: null
+
+  # Validation set
+  valid:
+    # Path to validation data
+    dir: ${paths.data_dir}/Val2
+    # Split
+    split: null
+
+  # Test set
+  test:
+    # Path to test data
+    dir: ${paths.data_dir}/Test2
+    # Split
+    split: null
+
+  # Prediction set (NOTE: By default, we use the test set as the prediction set for demonstration purposes)
+  predict:
+    # Path to prediction data
+    dir: ${paths.data_dir}/Test2
+    # Split
+    split: ${data.stage.test.split}

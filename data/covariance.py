@@ -2,7 +2,7 @@ import numpy as np
 import hydra
 from omegaconf import DictConfig
 from data.io import load_var_and_normalize
-from data.statistics import reduction_shape
+from data.statistics import reduction_shape, batch_statistics
 from utilities.instantiators import instantiate
 from utilities.logic import get_config_path
 from utilities.plot import plot_map, save_plot, flexible_gridspec
@@ -76,7 +76,7 @@ def innovation_uncertainty(data: np.ndarray) -> np.ndarray:
     return data[:, 10:]
 
 
-def background_climatology(data: np.ndarray, axis: int=0, keepdims: bool=False) \
+def background_climatology(data: np.ndarray, axis: int=0, keepdims: bool=True) \
         -> np.ndarray:
     """ Compute spatiotemporal mean of a given dataset.
 
@@ -92,9 +92,11 @@ def background_climatology(data: np.ndarray, axis: int=0, keepdims: bool=False) 
     """
 
     # Compute mean
-    out = np.empty(reduction_shape(data.shape, axis, keepdims), dtype=data.dtype)
-    np.mean(data, axis=axis, keepdims=keepdims, out=out)
-    return out
+    data_mean = batch_statistics(data, which=['mean'], axis=axis)['mean']
+    # Apply keepdims if necessary
+    if keepdims and data_mean.ndim < data.ndim:
+        data_mean = np.expand_dims(data_mean, axis=axis)
+    return data_mean
 
 
 def background_increment(config_true: DictConfig, config_background: DictConfig) -> np.ndarray:
@@ -115,7 +117,7 @@ def background_increment(config_true: DictConfig, config_background: DictConfig)
     x_background = load_var_and_normalize(config_background)
 
     # Check dimensions and add new axis if necessary
-    if x_true.shape != x_background.shape:
+    if x_true.ndim != x_background.ndim:
         if x_background.ndim == x_true.ndim - 1:
             x_background = x_background[np.newaxis, :]
         else:
@@ -191,14 +193,18 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
     var = np.diag(cov)
     low_var_indices = np.where(var < var_threshold)[0]
     if low_var_indices.size > 0:
+        # breakpoint()
         logger.info(f"Variables below variance threshold ({var_threshold}): {low_var_indices.size}")
         # Set low-variance values to threshold
         for idx in low_var_indices:
-            cov[idx, idx] = var_threshold
+            cov[idx, idx] = cov[idx, idx]  # var_threshold
 
     # Compute inverse covariance matrix
     logger.info("Computing inverse covariance matrix...")
     cov_inv = np.linalg.inv(cov).astype(err.dtype)
+    var_inv = np.diag(cov_inv)
+    vif = var*var_inv
+    breakpoint()
 
     # Check if covariance matrix is positive definite
     if np.any(np.linalg.eigvals(cov_inv) <= 0):

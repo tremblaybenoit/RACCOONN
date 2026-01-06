@@ -32,6 +32,22 @@ class IdentityPositionalEncoding(nn.Module):
         return x
 
 
+class RescaledPositionalEncoding(IdentityPositionalEncoding):
+    """ Identity Positional Encoding. This is a simple positional encoding that does not change the input."""
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """ Forward pass through the Identity Positional Encoding.
+
+        Parameters
+        ----------
+        x : torch.Tensor. Input tensor.
+
+        Returns
+        -------
+        torch.Tensor. Encoded tensor.
+        """
+        return x.sub_(0.5).mul_(2.0)  # Scale input to [-1, 1]
+
+
 class GaussianPositionalEncoding(nn.Module):
     """ Gaussian Positional Encoding. Credit: Robert Jarolim, Momchil Molnar."""
     def __init__(self, num_freqs: int, d_input: int):

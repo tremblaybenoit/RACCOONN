@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 from utilities.plot import save_plot, flexible_gridspec, scatterplots
 import random
+import argparse
 
 
 # --- 1D Neural Field Model ---
@@ -95,19 +96,20 @@ def fig_1d_curve_fitting():
 
 
 # --- Simulation and Plotting ---
-def fig_1d_overfitting_validation():
+def fig_1d_overfitting_validation(SEED, lr=0.01):
     """
     Generates the 1D curve fitting analogy visualization, focusing on
     overfitting and the role of the validation set (cross-validation).
     """
 
     # === REPRODUCIBILITY SEED ===
-    SEED = 42
     random.seed(SEED)
     np.random.seed(SEED)
     torch.manual_seed(SEED)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(SEED)
+    # Force CPU
+    device = torch.device('cpu')
+    #if torch.cuda.is_available():
+    #    torch.cuda.manual_seed_all(SEED)
 
     # 1. Define the True Smooth Function
     x_range = np.linspace(0, 10, 500)
@@ -144,19 +146,19 @@ def fig_1d_overfitting_validation():
     # Ensure both models start identically for a fair comparison
     model_overfit.load_state_dict(model_regularized.state_dict())
 
-    optimizer_reg = optim.Adam(model_regularized.parameters(), lr=0.01)
-    optimizer_over = optim.Adam(model_overfit.parameters(), lr=0.01)
+    optimizer_reg = optim.Adam(model_regularized.parameters(), lr=lr)
+    optimizer_over = optim.Adam(model_overfit.parameters(), lr=lr)
     criterion = nn.MSELoss()
 
     # Initialize for Early Stopping
     # Set patience (how many epochs to wait for improvement)
-    patience = 200
+    patience = 500
     best_val_loss = float('inf')
     epochs_no_improve = 0
     should_stop_reg = False
 
     # We will simulate early stopping decision by tracking validation loss
-    for epoch in range(2500):
+    for epoch in range(5000):
         # =======================================================
         # 1. Regularized Model (Simulate Early Stopping)
         # =======================================================
@@ -179,7 +181,7 @@ def fig_1d_overfitting_validation():
                 best_val_loss = val_loss
                 epochs_no_improve = 0
                 # OPTIONAL: Save the best model state here
-                # best_model_state = model_regularized.state_dict()
+                best_model_state = model_regularized.state_dict()
             else:
                 epochs_no_improve += 1
                 if epochs_no_improve >= patience:
@@ -187,7 +189,7 @@ def fig_1d_overfitting_validation():
                     should_stop_reg = True
                     print(f"Regularized Model stopped training at epoch {epoch} due to no validation loss improvement.")
                     # OPTIONAL: Load the best saved model state here
-                    # model_regularized.load_state_dict(best_model_state)
+                    model_regularized.load_state_dict(best_model_state)
 
         # =======================================================
         # 2. Overfit Model (Train to completion)
@@ -217,8 +219,6 @@ def fig_1d_overfitting_validation():
     rights = [0.75]
     bottoms = [0.75]
     tops = [0.75]
-    fig, get_axes = flexible_gridspec(cell_widths, cell_heights, lefts, rights, bottoms, tops)
-    ax = get_axes(0, 0)
     colors = {'blue': '#1f77b4',
               'orange': '#ff7f0e',
               'green': '#2ca02c',
@@ -231,18 +231,64 @@ def fig_1d_overfitting_validation():
               'cyan': '#17becf'}
 
     # Scatterplot
-    scatterplots(ax, [x_train_np, x_val_np], [y_train_np, y_val_np],
-                 x_range=(0, 10), y_range=(-2, 2), x_label='Coordinate', y_label='Retrieval value',
+    fig1, get_axes = flexible_gridspec(cell_widths, cell_heights, lefts, rights, bottoms, tops)
+    ax1 = get_axes(0, 0)
+    scatterplots(ax1, [x_train_np, x_val_np], [y_train_np, np.ones_like(x_val_np)+100], y_labelpad=2,
+                 x_range=(-1.5, 11.5), y_range=(-2, 2), x_label='Coordinate', y_label='Retrieval value',
                  color=[colors['blue'], colors['orange']], marker=['o', 'x'], markersize=10,
                  label=['Training set', 'Validation set'], xy_symmetric=False)
-    ax.plot(x_range, y_reg, color=colors['green'], label='Model (with validation set)', linewidth=1., linestyle='-', zorder=0)
-    ax.plot(x_range, y_over, color=colors['brown'], label='Model (without validation set)', linewidth=1., linestyle='-',
+    ax1.plot(x_range, -100*np.ones_like(x_range), color=colors['green'], label='Model (overfit)', linewidth=1., linestyle='-',
             zorder=0)
+    ax1.plot(x_range, -100*np.ones_like(x_range), color=colors['brown'], label='Model (cross-validation)', linewidth=1., linestyle='-', zorder=0)
     # Update legend to show model types
-    ax.legend(loc='lower left', fontsize=10, labelspacing=0.05, numpoints=1, ncol=1,
+    ax1.legend(loc='lower left', fontsize=10, labelspacing=0.05, numpoints=1, ncol=1,
               markerscale=1.0, fancybox=False)
 
-    return fig
+    fig2, get_axes = flexible_gridspec(cell_widths, cell_heights, lefts, rights, bottoms, tops)
+    ax2 = get_axes(0, 0)
+    scatterplots(ax2, [x_train_np, x_val_np], [y_train_np, y_val_np], y_labelpad=2,
+                 x_range=(-1.5, 11.5), y_range=(-2, 2), x_label='Coordinate', y_label='Retrieval value',
+                 color=[colors['blue'], colors['orange']], marker=['o', 'x'], markersize=10,
+                 label=['Training set', 'Validation set'], xy_symmetric=False)
+    ax2.plot(x_range, -100 * np.ones_like(x_range), color=colors['green'], label='Model (overfit)',
+            linewidth=1., linestyle='-',
+            zorder=0)
+    ax2.plot(x_range, -100 * np.ones_like(x_range), color=colors['brown'], label='Model (cross-validation)',
+            linewidth=1., linestyle='-', zorder=0)
+    # Update legend to show model types
+    ax2.legend(loc='lower left', fontsize=10, labelspacing=0.05, numpoints=1, ncol=1,
+              markerscale=1.0, fancybox=False)
+
+    fig3, get_axes = flexible_gridspec(cell_widths, cell_heights, lefts, rights, bottoms, tops)
+    ax3 = get_axes(0, 0)
+    scatterplots(ax3, [x_train_np, x_val_np], [y_train_np, y_val_np], y_labelpad=2,
+                 x_range=(-1.5, 11.5), y_range=(-2, 2), x_label='Coordinate', y_label='Retrieval value',
+                 color=[colors['blue'], colors['orange']], marker=['o', 'x'], markersize=10,
+                 label=['Training set', 'Validation set'], xy_symmetric=False)
+    ax3.plot(x_range, y_over, color=colors['green'], label='Model (overfit)', linewidth=1., linestyle='-',
+             zorder=0)
+    ax3.plot(x_range, -100 * np.ones_like(x_range), color=colors['brown'], label='Model (cross-validation)',
+            linewidth=1., linestyle='-', zorder=0)
+    # Update legend to show model types
+    ax3.legend(loc='lower left', fontsize=10, labelspacing=0.05, numpoints=1, ncol=1,
+               markerscale=1.0, fancybox=False)
+
+    fig4, get_axes = flexible_gridspec(cell_widths, cell_heights, lefts, rights, bottoms, tops)
+    ax4 = get_axes(0, 0)
+    scatterplots(ax4, [x_train_np, x_val_np], [y_train_np, y_val_np], y_labelpad=2,
+                 x_range=(-1.5, 11.5), y_range=(-2, 2), x_label='Coordinate', y_label='Retrieval value',
+                 color=[colors['blue'], colors['orange']], marker=['o', 'x'], markersize=10,
+                 label=['Training set', 'Validation set'], xy_symmetric=False)
+    ax4.plot(x_range, y_over, color=colors['green'], label='Model (overfit)', linewidth=1.,
+             linestyle='-',
+             zorder=0)
+    ax4.plot(x_range, y_reg, color=colors['brown'], label='Model (cross-validation)', linewidth=1., linestyle='-',
+             zorder=0)
+    # Update legend to show model types
+    ax4.legend(loc='lower left', fontsize=10, labelspacing=0.05, numpoints=1, ncol=1,
+               markerscale=1.0, fancybox=False)
+
+    return fig1, fig2, fig3, fig4
 
     # Title
     ax.set_title('Neural Field: Overfitting and the Role of the Validation Set', fontsize=13)
@@ -281,6 +327,14 @@ def fig_1d_overfitting_validation():
 
 
 if __name__ == '__main__':
-    fig = fig_1d_overfitting_validation()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-seed', type=int, default=42)
+    parser.add_argument('-lr', type=float, default=0.01)
+    args = parser.parse_args()
+
+    fig1, fig2, fig3, fig4 = fig_1d_overfitting_validation(args.seed, args.lr)
     # Save figure
-    save_plot(fig, '1D_neural_field_curve_fitting.png')
+    save_plot(fig1, f'1D_neural_field_curve_fitting_{args.seed}_1.png')
+    save_plot(fig2, f'1D_neural_field_curve_fitting_{args.seed}_2.png')
+    save_plot(fig3, f'1D_neural_field_curve_fitting_{args.seed}_3.png')
+    save_plot(fig4, f'1D_neural_field_curve_fitting_{args.seed}_4.png')
