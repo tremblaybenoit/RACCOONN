@@ -7,8 +7,8 @@ try:
     from inverse.model.forward import CRTMForward
     from utilities.logic import get_config_path
     # Initialize CRTM forward model
-    checkpoint_path = os.path.abspath(os.path.join(os.path.dirname(__name__), 'forward/model/checkpoints/model_v3.ckpt'))
-    config_path = os.path.join(get_config_path(), 'model/forward_emulator.yaml')
+    checkpoint_path = os.path.abspath(os.path.join(os.path.dirname(__name__), 'forward/model/checkpoints/model_v7.ckpt'))
+    config_path = os.path.join(get_config_path(), 'model/forward_emulator2.yaml')
     forward = CRTMForward(checkpoint_path=checkpoint_path, config_path=config_path)
 except (ImportError, FileNotFoundError, Exception) as e:
     print(f"Error loading CRTM forward model: {e}")
@@ -96,6 +96,49 @@ class CholeskyForm(torch.nn.Module):
         # 3. Return 0.5 * sum(w^2) per batch
         # Result is [Batch]
         return 0.5 * torch.pow(whitened_diff, 2).sum(dim=1).squeeze()
+
+
+class VerticalSmoothnessLoss(nn.Module):
+    """
+    Penalizes non-smooth vertical profiles using finite differences.
+    Works for 1st order (gradients) or 2nd order (curvature/Laplacian).
+    """
+    def __init__(self, lambda_smooth: float = 0.1, order: int = 1, edge_weight: float = 1.0):
+        """
+        Args:
+            lambda_smooth: Scaling factor for the penalty.
+            order: 1 for first-order (prevents jumps), 2 for second-order (prevents kinks).
+            edge_weight: Weight multiplier for the top/bottom of the atmosphere.
+        """
+        super().__init__()
+        self.lambda_smooth = lambda_smooth
+        self.order = order
+        self.edge_weight = edge_weight
+
+    def forward(self, pred: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            pred: Tensor of shape (Batch, Variables, Levels)
+                  e.g., (32, 9, 127)
+        Returns:
+            Scalar loss value.
+        """
+        if self.order == 1:
+            # First-order difference: x_{i+1} - x_i
+            # Result shape: (Batch, Vars, Levels-1)
+            diff = pred[:, :, 1:] - pred[:, :, :-1]
+        elif self.order == 2:
+            # Second-order difference (Laplacian): x_{i+1} - 2x_i + x_{i-1}
+            # Result shape: (Batch, Vars, Levels-2)
+            diff = pred[:, :, 2:] - 2 * pred[:, :, 1:-1] + pred[:, :, :-2]
+        else:
+            raise ValueError("Order must be 1 or 2.")
+
+        # Square the differences and average over the batch and levels
+        # We use .mean() to keep the loss scale independent of the number of levels
+        smoothness_penalty = torch.pow(diff, 2).mean()
+
+        return self.lambda_smooth * smoothness_penalty
 
 
 def quadratic_form(pred: torch.Tensor, target: torch.Tensor, matrix: torch.Tensor) -> torch.Tensor:

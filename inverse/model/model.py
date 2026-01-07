@@ -359,7 +359,7 @@ class PINNverseOperator(BaseModel):
         # Log profile and boundary condition losses
         for key in ['model', 'bcs']:
             if key in loss:
-                self.log(f"{stage}_loss_{key}", loss[key].mean(), on_epoch=True, prog_bar=False, logger=logger_flag)
+                self.log(f"{stage}_loss_{key}", loss[key].mean(), on_epoch=True, prog_bar=True, logger=logger_flag)
                 # Detailed logging per profile and variable
                 if loss[key].ndim == 3:
                     for i, var in enumerate(self.prof_vars):
@@ -376,7 +376,7 @@ class PINNverseOperator(BaseModel):
 
         # Log observation loss
         if 'obs' in loss:
-            self.log(f"{stage}_loss_obs", loss['obs'].mean(), on_epoch=True, prog_bar=False, logger=logger_flag)
+            self.log(f"{stage}_loss_obs", loss['obs'].mean(), on_epoch=True, prog_bar=True, logger=logger_flag)
             if loss['obs'].ndim == 2:
                 for i in range(pred['hofx'].shape[1] // 2):
                     self.log(f"{stage}_loss_obs_{i}", loss['obs'][:, i].mean(), on_epoch=True, prog_bar=False,
@@ -794,6 +794,7 @@ class PINNverseOperatorPCA(PINNverseOperator5):
             self,
             eof_matrix,  # Shape: (127, k_components)
             mean_profile,  # Shape: (127,)
+            std_profile,  # Shape: (127,)
             *args, **kwargs
     ):
         """
@@ -804,7 +805,7 @@ class PINNverseOperatorPCA(PINNverseOperator5):
         self.k_components = eof_matrix.shape[1]
 
         # 2. Force the backbone to output K components instead of 127
-        kwargs['out_features'] = self.k_components
+        kwargs['parameters'].architecture.n_neurons_out = self.k_components # Ensure output matches K
 
         # 3. Initialize the SIREN backbone
         super().__init__(*args, **kwargs)
@@ -813,6 +814,7 @@ class PINNverseOperatorPCA(PINNverseOperator5):
         # We store the basis as (k, 127) for easy matrix multiplication
         self.register_buffer('basis', torch.tensor(eof_matrix).float().t())
         self.register_buffer('mu', torch.tensor(mean_profile).float())
+        self.register_buffer('sigma', torch.tensor(std_profile).float())
 
     def forward(self, x):
         """
@@ -826,7 +828,9 @@ class PINNverseOperatorPCA(PINNverseOperator5):
         # 2. Project from latent space to physical space: x = mu + v @ basis
         # (Batch, k) @ (k, 127) -> (Batch, 127)
         # This operation is fully differentiable.
-        prof_phys = self.mu + torch.matmul(v, self.basis)
+        recon = torch.matmul(v, self.basis)
+        prof_phys = self.mu + (recon * self.sigma)
+        prof_phys.view(-1, self.n_prof, prof_phys.shape[-1])
 
         # 3. Return a dictionary so your loss functions can access
         # both the physical levels and the independent PCA coefficients.

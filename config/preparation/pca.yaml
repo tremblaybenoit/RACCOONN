@@ -1,0 +1,33 @@
+# PCA decomposition
+pca:
+  # Atmospheric profiles
+  prof:
+    # Function
+    _target_: data.statistics.compute_pca
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Profile data to compute PCA on
+      data:
+        load:
+          _target_: data.io.load_stack_and_normalize
+          _recursive_: false
+          stack:
+            - ${data.stage.train.vars.prof}
+            - ${data.stage.valid.vars.prof}
+            - ${data.stage.test.vars.prof}
+    # What the method produces as output (pickle file)
+    output:
+      # File path to save/load the PCA object
+      path: data/normalization/pca.pkl
+      # Save function
+      save:
+        _target_: data.io.save_pickle
+        _partial_: true
+        _args_:
+          - ${preparation.pca.data.output.path}
+      # Load function
+      load:
+        _target_: data.io.load_pickle
+        _args_:
+          - ${preparation.pca.data.output.path}

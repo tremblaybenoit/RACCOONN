@@ -60,6 +60,96 @@ def verify_torch_numpy_flattening(n_samples, n_vars, n_levels):
         print("FAILURE: Mismatch in flattening logic!")
 
 
+def prepare_stable_cholesky(err_data: np.ndarray, ridge_factor: float=1e-6, max_cond: float=1e6) -> np.ndarray:
+    """ Prepare a stable Cholesky factor from error data.
+
+        Parameters
+        ----------
+        err_data: np.ndarray. Error data of shape (n_samples, n_variables...).
+        ridge_factor: float. Factor to scale the ridge added to the diagonal.
+        max_cond: float. Maximum allowed condition number (max eigenvalue / min eigenvalue).
+
+        Returns
+        -------
+        np.ndarray. Lower Cholesky factor L such that B = L @ L.T.
+    """
+
+    # 1. Force everything to float64 immediately for math stability
+    target_dtype = err_data.dtype
+    flat_err = err_data.reshape(err_data.shape[0], -1).astype(np.float64)
+
+    # B will be float64
+    B = np.cov(flat_err, rowvar=False)
+
+    # 2. Add Ridge (Explicitly float64)
+    ridge_val = np.mean(np.diag(B)) * ridge_factor
+    B += np.eye(B.shape[0], dtype=np.float64) * ridge_val
+
+    # 3. Eigen-Value Capping
+    # This is the most sensitive part; float64 is mandatory here
+    vals, vecs = np.linalg.eigh(B)
+    min_val = np.max(vals) / max_cond
+    vals_stable = np.maximum(vals, min_val)
+
+    # Reconstruct B_stable
+    bm_stable = vecs @ np.diag(vals_stable) @ vecs.T
+
+    # 4. Compute Cholesky Factor L
+    lm = np.linalg.cholesky(bm_stable)
+
+    # 5. Return to the original dtype (e.g., float32) for the NN
+    return lm.astype(target_dtype)
+
+
+def verify_cholesky_reconstruction(B_stable: np.ndarray, L: np.ndarray):
+    """
+    Verifies that the Cholesky factor accurately reconstructs the covariance matrix.
+    """
+    # 1. Reconstruct: B_reconstructed = L @ L.T
+    B_rec = L @ L.T
+
+    # 2. Compute Residuals
+    abs_diff = np.abs(B_stable - B_rec)
+    max_err = np.max(abs_diff)
+    mean_err = np.mean(abs_diff)
+
+    # 3. Check Condition Numbers (The 'Health' of the matrix)
+    # Higher condition numbers = more numerical instability
+    cond_B = np.linalg.cond(B_stable)
+    cond_L = np.linalg.cond(L)
+
+    print("--- Cholesky Sanity Check ---")
+    print(f"Max Absolute Reconstruction Error: {max_err:.2e}")
+    print(f"Mean Absolute Reconstruction Error: {mean_err:.2e}")
+    print(f"Condition Number of B: {cond_B:.2e}")
+    print(f"Condition Number of L: {cond_L:.2e} (Should be ~sqrt of B)")
+
+    # Threshold for float32 safety
+    if max_err > 1e-4:
+        print("⚠️ WARNING: Significant reconstruction error. Check your dtypes.")
+    if cond_B > 1e10:
+        print("⚠️ WARNING: B is extremely ill-conditioned. NN training may be unstable.")
+    else:
+        print("✅ SUCCESS: Matrix is stable and reconstruction is accurate.")
+
+    return abs_diff
+
+
+def innovation_error(data: np.ndarray, ref: np.ndarray) -> np.ndarray:
+    """ Return uncertainy estimation of the radiance data.
+
+        Parameters
+        ----------
+        data: np.ndarray. Radiances of shape (n_samples, n_channels).
+
+        Returns
+        -------
+        np.ndarray. Spatiotemporal standard deviation of the dataset.
+    """
+    return data[:, :10]-ref[:, :10]
+
+
+
 def innovation_uncertainty(data: np.ndarray) -> np.ndarray:
     """ Return uncertainy estimation of the radiance data.
 
@@ -154,7 +244,7 @@ def save_cholesky_factor(err_data, inflation=1.0, ridge=1e-6):
 
 
 def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=True, recenter: bool=True,
-                      inflation: float=1.0, var_threshold: float=1.e-8) -> None:
+                      inflation: float=1.0, var_threshold: float=1.e-8, cholesky: bool = False) -> None:
     """ Compute statistics of a given dataset.
 
         Parameters
@@ -165,6 +255,7 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
         recenter: bool. If True, recenter the error by removing the mean.
         inflation: float. Inflation factor to apply to the covariance matrix.
         var_threshold: float. Variance threshold to filter variables.
+        cholesky: bool. If True, compute and verify Cholesky factor for stability.
 
         Returns
         -------
@@ -181,13 +272,42 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
         pressure_filter = instantiate(input.pressure_filter.load)
         err = np.take(err.reshape(err.shape[0], -1), np.flatnonzero(pressure_filter), axis=1)
 
+    # Compute Cholesky factor for stability verification
+    if cholesky:
+        logger.info("Preparing stable Cholesky factor...")
+        L = prepare_stable_cholesky(err, ridge_factor=1e-6, max_cond=1e6)
+        # Verify Cholesky reconstruction
+        logger.info("Verifying Cholesky reconstruction...")
+        verify_cholesky_reconstruction(np.cov(err.reshape(err.shape[0], -1), rowvar=False), L)
+        breakpoint()
+
     # Compute covariance matrix
     if recenter:
         logger.info("Computing covariance matrix with recentered data...")
         err -= np.mean(err, axis=0, keepdims=True)
+
+        # Compute Cholesky factor for stability verification
+        logger.info("Preparing stable Cholesky factor...")
+        if cholesky:
+            L = prepare_stable_cholesky(err, ridge_factor=1e-6, max_cond=1e6)
+            # Verify Cholesky reconstruction
+            logger.info("Verifying Cholesky reconstruction...")
+            verify_cholesky_reconstruction(np.cov(err.reshape(err.shape[0], -1), rowvar=False), L)
+            breakpoint()
+
     # Compute covariance matrix
     logger.info("Computing covariance matrix...")
     cov = np.cov(err.reshape(err.shape[0], -1), rowvar=False)*inflation
+
+    # Add diagonal
+    if hasattr(input, 'sigma'):
+        logger.info("Applying sigma scaling...")
+        sigma_values = instantiate(input.sigma)
+        sigma_values = sigma_values.reshape(sigma_values.shape[0], -1)
+        # Add to diagonal
+        for i in range(cov.shape[0]):
+            cov[i, i] += sigma_values[i]**2
+
     # Apply variance thresholding
     logger.info("Applying variance thresholding...")
     var = np.diag(cov)
@@ -212,8 +332,9 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
 
     # Save statistics to file
     logger.info("Saving inverse covariance matrix to file...")
-    save_func = instantiate(output.save)
-    save_func(cov_inv)
+    if hasattr(output, 'save'):
+        save_func = instantiate(output.save)
+        save_func(cov_inv)
 
     # Plot covariance matrix if required
     if plot_flag:
