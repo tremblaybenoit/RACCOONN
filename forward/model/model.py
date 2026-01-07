@@ -510,6 +510,23 @@ class CRTMModel2(BaseModel):
 
         return torch.cat([out_bt, out_std], dim=1)
 
+    def predict_step(self, batch: dict, batch_nb: int):
+        """ Perform prediction step.
+
+            Parameters
+            ----------
+            batch: dict. Batch from the prediction set.
+            batch_nb: int. Index of the batch out of the prediction set.
+
+            Returns
+            -------
+            Predicted values: tensor.
+        """
+
+        # Forward pass through the model
+        return self(batch['input'])
+
+
 
 class CRTMModel3(BaseModel):
     def __init__(self, parameters, optimizer: DictConfig = None, lr_scheduler: DictConfig = None,
@@ -612,3 +629,20 @@ class CRTMModel3(BaseModel):
         out_std = out_std + self.std_output_activation_offset
 
         return torch.cat([out, out_std], dim=1)
+
+    def predict_step(self, batch: dict, batch_nb: int):
+        """ Perform prediction step.
+
+            Parameters
+            ----------
+            batch: dict. Batch from the prediction set.
+            batch_nb: int. Index of the batch out of the prediction set.
+
+            Returns
+            -------
+            Predicted values: tensor.
+        """
+
+        # Forward pass through the model
+        return self(batch['input'])
+
