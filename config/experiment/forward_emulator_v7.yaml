@@ -5,11 +5,11 @@
 defaults:
   - override /paths: default
   - override /hydra: default
-  - override /data: forward_default
+  - override /data: forward_recast
   - override /preparation: statistics
   - override /loader: forward_default
   - override /model: forward_emulator
-  - override /trainer: cpu
+  - override /trainer: gpu
   - override /callbacks: forward_default
   - override /logger: default
 
@@ -17,34 +17,28 @@ defaults:
 # This allows you to overwrite only specified parameters
 
 # Task name. Note that it determines the output directory path
-task_name: "forward_emulator"  # Experiment
+task_name: "forward_emulator_recast"  # Experiment
 
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../forward_outputs"
-  run_id: "v2"
-  data_dir: ../Data_ClearSky_${data.dtype}
-  checkpoint_dir: "forward/model/checkpoints"
-
-# Callback configuration
-callbacks:
-  # Model checkpoint callback
-  model_checkpoint:
-    filename: "model_v2"
+  run_id: "v7"
+  data_dir: "../data_float32"
 
 # Trainer configuration
 trainer:
   min_epochs: 1  # To prevent early stopping
-  max_epochs: 64  # Number of epochs
+  max_epochs: 96  # Number of epochs
   precision: 32  # 32-bit precision
 
-# Loader
-loader:
-  stage:
-    predict:
-      results:
-        hofx:
-          path: ${data.stage.predict.dir}/predict_hofx.npy
+# Preparation configuration
+preparation:
+  # Statistics computation
+  statistics:
+    # Output path for statistics
+    data:
+      output:
+        path: ../data_float32/normalization/statistics.pkl
 
 # Data configuration
 data:
@@ -88,7 +82,8 @@ data:
           normalization: ${data.stage.train.vars.prof.normalization}
     # Prediction set
     predict:
-      dir: ${paths.data_dir}/Test2
+      # Directory
+      dir: ${paths.data_dir}/Train2
       # Variables
       vars:
         # Atmospheric profiles
@@ -96,8 +91,41 @@ data:
           # Normalization function and parameters
           normalization: ${data.stage.train.vars.prof.normalization}
 
+# Loader configuration
+loader:
+  batch_size: 96
+  num_workers: 16
+  persistent_workers: true
+  pin_memory: true
+  # Split the data into training, validation, and test sets
+  stage:
+    # Training set
+    train:
+      # Dataset class
+      _target_: forward.model.data_loader.TorchDataset
+    # Validation set
+    valid:
+      # Dataset class
+      _target_: forward.model.data_loader.TorchDataset
+    # Test set
+    test:
+      # Dataset class
+      _target_: forward.model.data_loader.TorchDataset
+    # Prediction set
+    predict:
+      # Dataset class
+      _target_: forward.model.data_loader.TorchDataset
+      results:
+        hofx:
+          path: ${data.stage.predict.dir}/predict_hofx_v6.npy
+
+# Model parameters
+model:
+  # Model
+  _target_: forward.model.model.CRTMModel2
+
 # Logger configuration
 logger:
   # MLflow logger
   ports:
-    mlflow: 5001
+    mlflow: 5002

@@ -9,7 +9,7 @@ from forward.model.activation import Sine
 from inverse.model.encoding import IdentityPositionalEncoding
 from utilities.instantiators import instantiate
 from data.transformations import identity
-from copy import deepcopy
+import inspect
 
 
 class InverseEmulator(LightningModule):
@@ -341,6 +341,13 @@ class PINNverseOperator(BaseModel):
             # Compute L2 norm of the model parameters
             l2_norm = sum((p ** 2).sum() for p in self.parameters() if p.requires_grad)
             self.log(f"{stage}_l2_norm", l2_norm, on_epoch=True, prog_bar=False, logger=logger_flag)
+            # If using UncertaintyVarLoss, log the effective weights
+            if hasattr(self.loss_func, 'log_var_obs'):
+                self.log("weight_obs", torch.exp(-self.loss_func.log_var_obs), prog_bar=True, logger=logger_flag)
+            if hasattr(self.loss_func, 'log_var_model'):
+                self.log("weight_model", torch.exp(-self.loss_func.log_var_model), prog_bar=True, logger=logger_flag)
+            if hasattr(self.loss_func, 'alpha'):
+                self.log("weight_alpha", 2.0 - torch.sigmoid(self.loss_func.alpha) * 2.0, prog_bar=True, logger=logger_flag)
 
         # Log learning rate
         if stage == 'train' and self.lr_schedulers() is not None:
@@ -352,7 +359,7 @@ class PINNverseOperator(BaseModel):
         # Log profile and boundary condition losses
         for key in ['model', 'bcs']:
             if key in loss:
-                self.log(f"{stage}_loss_{key}", loss[key].mean(), on_epoch=True, prog_bar=True, logger=logger_flag)
+                self.log(f"{stage}_loss_{key}", loss[key].mean(), on_epoch=True, prog_bar=False, logger=logger_flag)
                 # Detailed logging per profile and variable
                 if loss[key].ndim == 3:
                     for i, var in enumerate(self.prof_vars):
@@ -369,7 +376,7 @@ class PINNverseOperator(BaseModel):
 
         # Log observation loss
         if 'obs' in loss:
-            self.log(f"{stage}_loss_obs", loss['obs'].mean(), on_epoch=True, prog_bar=True, logger=logger_flag)
+            self.log(f"{stage}_loss_obs", loss['obs'].mean(), on_epoch=True, prog_bar=False, logger=logger_flag)
             if loss['obs'].ndim == 2:
                 for i in range(pred['hofx'].shape[1] // 2):
                     self.log(f"{stage}_loss_obs_{i}", loss['obs'][:, i].mean(), on_epoch=True, prog_bar=False,
@@ -399,8 +406,18 @@ class PINNverseOperator(BaseModel):
         # mask = torch.zeros_like(pred['prof'])
         # pred['prof'] = pred['prof'] * mask + batch['target']['prof'] * (1 - mask)
 
+        # Check the signature of the loss function's forward/call method
+        sig = inspect.signature(self.loss_func.__call__)
+
+        if 'current_epoch' in sig.parameters:
+            # If it needs the epoch (Curriculum Loss)
+            loss, pred['hofx'] = self.loss_func(pred, batch['target'], current_epoch=self.current_epoch)
+        else:
+            # If it's a standard loss (Standard VarLoss)
+            loss, pred['hofx'] = self.loss_func(pred, batch['target'])
+
         # Compute loss function
-        loss, pred['hofx'] = self.loss_func(pred, batch['target'])
+        # loss, pred['hofx'] = self.loss_func(pred, batch['target'])
 
         # Logging
         self._logging(stage, loss, batch['input'], batch['target'], pred)
@@ -698,85 +715,123 @@ class PINNverseOperator4(PINNverseOperator):
         return out.view(batch_size, n_levels, self.n_prof).transpose(1, 2)
 
 
-class PINNverseOperators(PINNverseOperator):
-    """Physics-Informed Neural Network (PINN) inverse model with one neural network per profile type."""
+class PINNverseOperator5(PINNverseOperator4):
+    """
+    4D Along-Track Hydra-Head SIREN.
+    Inputs: [Lat, Lon, Scan, Pressure]
+    """
+    def _build_model(self, positional_encoding: Union[DictConfig, None], activation_in: Union[DictConfig, None],
+                     activation_out: Union[DictConfig, None], parameters: Union[DictConfig, None]) -> nn.Module:
+        # 1. Parameter Extraction
+        n_neurons = parameters.architecture.n_neurons
+        n_layers = parameters.architecture.n_layers
+        dropout_rate = parameters.architecture.dropout
+        normalization = parameters.architecture.normalization
 
-    def __init__(self, optimizer: DictConfig = None, loss_func: DictConfig = None, lr_scheduler: DictConfig = None,
-                 positional_encoding: DictConfig = None, activation_in: DictConfig = None, activation_out: DictConfig = None,
-                 transform_out: ListConfig = None, parameters: DictConfig = None):
-        """ Initialize model.
+        # 4 Dimensions: Lat, Lon, Scan, Pressure
+        d_input = (parameters.data.n_lat + parameters.data.n_lon +
+                   parameters.data.n_scans + parameters.data.n_pressure)
 
-        Parameters
-        ----------
-        optimizer: DictConfig. Optimizer for the model.
-        loss_func: DictConfig. Loss function for the model.
-        lr_scheduler: DictConfig. Learning rate scheduler for the model.
-        positional_encoding: DictConfig. Function for the positional encoding.
-        activation_in: DictConfig. Activation function (in).
-        activation_out: DictConfig. Activation function (out).
-        transform_out: ListConfig. List of functions to apply to the model output.
-        parameters: DictConfig. Configuration for the model parameters.
+        # 2. Instantiate Multi-Scale Encoding
+        self.positional_encoding = instantiate(positional_encoding, d_input=d_input)
 
-        Returns
-        -------
-        None.
-        """
+        self.d_encoded = self.positional_encoding.d_output
+        self.d_in = nn.Linear(self.d_encoded, n_neurons)
+        self.activation_in = instantiate(activation_in) if activation_in else Sine()
 
-        # Inherit all attributes and logic from PINNverseOperator
-        super().__init__(optimizer=optimizer, loss_func=loss_func, lr_scheduler=lr_scheduler,
-                         positional_encoding=positional_encoding, activation_in=activation_in,
-                         activation_out=activation_out, transform_out=transform_out, parameters=parameters)
+        # SIREN Init
+        self._siren_init(self.d_in, is_first_layer=True, activation_in=self.activation_in)
 
-        # Replace the single model with a list of models, one per profile type
-        self.model = nn.ModuleList([
-            self._build_model(
-                positional_encoding, activation_in, activation_out, self._patch_profiles(deepcopy(parameters))
-            )
-            for _ in range(self.n_prof)
+        # 3. Shared Backbone
+        self.backbone = nn.ModuleList([
+            SirenResidualBlock(
+                n_neurons, self.activation_in, dropout_rate, self._siren_init,
+                normalization=instantiate(normalization) if normalization else nn.Identity()
+            ) for _ in range(n_layers)
         ])
 
-    @staticmethod
-    def _patch_profiles(parameters: DictConfig) -> DictConfig:
-        """Set n_prof=1 in parameters for sub-model construction."""
-        parameters.data.n_prof = 1
-        return parameters
+        # 4. Specialized Hydra Heads
+        # Each head receives Backbone features + Original coordinates (Skip)
+        self.heads = nn.ModuleList([
+            nn.Linear(n_neurons + self.d_encoded, 1) for _ in range(self.n_prof)
+        ])
+        for head in self.heads:
+            self._siren_init(head, is_first_layer=False, activation_in=None, is_head=True)
 
-    def _retrieve_prof(self, x: dict, n_levels: int) -> list:
+        self.activation_out = instantiate(activation_out) if activation_out else nn.Identity()
+
+        return nn.ModuleDict({
+            'backbone': self.backbone,
+            'heads': self.heads,
+            'd_in': self.d_in
+        })
+
+    def _retrieve_prof(self, x: dict, n_levels: int) -> torch.Tensor:
+        # Explicit order to match encoding expectations: Lat, Lon, Scan, Pressure
+        ordered_keys = ['lat', 'lon', 'scans', 'pressure']
+        inputs = torch.cat([x[k].view(-1, 1) for k in ordered_keys], dim=-1)
+
+        encoded_coords = self.positional_encoding(inputs)
+
+        # Forward through Backbone
+        x_latent = self.activation_in(self.model['d_in'](encoded_coords))
+        for block in self.model['backbone']:
+            x_latent = block(x_latent)
+
+        # Concatenate Skip Connection
+        head_input = torch.cat([x_latent, encoded_coords], dim=-1)
+
+        # Compute each variable through its head
+        out = torch.cat([head(head_input) for head in self.model['heads']], dim=-1)
+        out = self.activation_out(out)
+
+        batch_size = out.shape[0] // n_levels
+        return out.view(batch_size, n_levels, self.n_prof).transpose(1, 2)
+
+
+class PINNverseOperatorPCA(PINNverseOperator5):
+    def __init__(
+            self,
+            eof_matrix,  # Shape: (127, k_components)
+            mean_profile,  # Shape: (127,)
+            *args, **kwargs
+    ):
         """
-        Pass forward through all neural networks, one per profile type.
-
-        Parameters
-        ----------
-        x: dict. Inputs: latitude, longitude, surface, and the metadata.
-
-        Returns
-        -------
-        y: tensor. Outputs: predicted profiles for all types, concatenated.
+        Wraps PINNverseOperator5 to output PCA coefficients and
+        reconstruct physical profiles.
         """
+        # 1. Determine K (dimensionality of the latent space)
+        self.k_components = eof_matrix.shape[1]
 
-        # Concatenate inputs
-        inputs = torch.cat([v.view(-1, 1) for v in x.values()], dim=-1)
-        # Apply positional encoding
-        encoded_inputs = self.positional_encoding(inputs)
-        # Each model predicts its profile type
-        outputs = [model(encoded_inputs) for model in self.model]
-        return outputs
+        # 2. Force the backbone to output K components instead of 127
+        kwargs['out_features'] = self.k_components
 
-    def forward(self, x: dict):
-        """ Retrieve atmospheric profile over multiple pressure levels.
+        # 3. Initialize the SIREN backbone
+        super().__init__(*args, **kwargs)
 
-            Parameters
-            ----------
-            x: tensor. Input variables.
+        # 4. Register PCA basis as buffers (efficient, non-trainable tensors)
+        # We store the basis as (k, 127) for easy matrix multiplication
+        self.register_buffer('basis', torch.tensor(eof_matrix).float().t())
+        self.register_buffer('mu', torch.tensor(mean_profile).float())
 
-            Returns
-            -------
-            prof: tensor. Atmospheric profiles.
+    def forward(self, x):
         """
+        x: Input coordinates/features
+        Returns: Dict containing reconstructed profile and latent coefficients
+        """
+        # 1. Generate latent coefficients (v) via PINNverseOperator5 logic
+        # Output shape: (Batch, k_components)
+        v = super().forward(x)
 
-        # Forward pass
-        n_levels = x['pressure'].shape[-1]
-        x_vector = {k: v.repeat_interleave(n_levels, dim=0) if k != 'pressure' else x['pressure'].reshape(-1, 1)
-                    for k, v in x.items()}
-        prof = torch.cat([output.view(-1, 1, n_levels) for output in self._retrieve_prof(x_vector, n_levels)], dim=1)
-        return prof
+        # 2. Project from latent space to physical space: x = mu + v @ basis
+        # (Batch, k) @ (k, 127) -> (Batch, 127)
+        # This operation is fully differentiable.
+        prof_phys = self.mu + torch.matmul(v, self.basis)
+
+        # 3. Return a dictionary so your loss functions can access
+        # both the physical levels and the independent PCA coefficients.
+        return {
+            'prof': prof_phys,  # Used for Observation Loss (Radiances)
+            'pca_coeffs': v  # Used for Model Loss (Diagonal B-matrix)
+        }
+

@@ -2,6 +2,7 @@ import torch
 import os
 import numpy as np
 from typing import Callable
+import torch.nn as nn
 try:
     from inverse.model.forward import CRTMForward
     from utilities.logic import get_config_path
@@ -487,7 +488,7 @@ class VarLoss(torch.nn.Module):
             hofx_pred = self.forward_model(pred['prof'], target)
 
         # Initialize loss dictionary
-        loss = {'total': torch.tensor(0.0, device=pred['prof'].device)}
+        loss = {}
 
         # Observation loss: Some observation losses may require additional inputs
         if isinstance(self.loss_obs, DiagonalQuadraticForm):
@@ -497,7 +498,7 @@ class VarLoss(torch.nn.Module):
             loss['obs'] = self.loss_obs(hofx_pred[:, :10],
                                         target['hofx'][:, :10])
         # Total
-        loss['total'] += self.lambda_obs * loss['obs'].mean()
+        loss['total'] = self.lambda_obs * loss['obs'].mean()
 
         # Model losses: Some model losses may require additional inputs
         if self.loss_model is not None:
@@ -556,3 +557,235 @@ class VarLoss(torch.nn.Module):
         if self.prof_pred is not None and hasattr(self.prof_pred, 'to'):
             self.prof_pred = self.prof_pred.to(device)
         return self
+
+
+class UncertaintyVarLoss(VarLoss):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Initialize log-variances to 0 (which makes exp(0) = 1.0)
+        self.log_var_obs = nn.Parameter(torch.zeros(1))
+        self.log_var_model = nn.Parameter(torch.zeros(1))
+        self.log_var_bcs = nn.Parameter(torch.zeros(1))
+
+    def forward(self, pred: dict, target: dict) -> tuple[dict, torch.Tensor]:
+        # Reuse your existing loss calculation logic
+        loss_dict, hofx_pred = super().__call__(pred, target)
+
+        # Apply the uncertainty weighting:
+        # Total = (1 / exp(log_var)) * Loss + log_var
+
+        # Observation term
+        precision_obs = torch.exp(-self.log_var_obs)
+        weighted_loss = precision_obs * loss_dict['obs'].mean() + self.log_var_obs
+
+        # Model (Background) term
+        if 'model' in loss_dict:
+            precision_model = torch.exp(-self.log_var_model)
+            weighted_loss += precision_model * loss_dict['model'].mean() + self.log_var_model
+
+        # BCS term
+        if 'bcs' in loss_dict:
+            precision_bcs = torch.exp(-self.log_var_bcs)
+            weighted_loss += precision_bcs * loss_dict['bcs'].mean() + self.log_var_bcs
+
+        loss_dict['total'] = weighted_loss
+        return loss_dict, hofx_pred
+
+
+    class NormalizedUncertaintyVarLoss(VarLoss):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            # Learnable parameters
+            self.log_var_obs = nn.Parameter(torch.ones(1) * 2.0)
+            self.log_var_model = nn.Parameter(torch.zeros(1))
+
+            # Buffers to store the initial loss values (not updated by gradients)
+            self.register_buffer('init_obs', torch.tensor(1.0))
+            self.register_buffer('init_model', torch.tensor(1.0))
+            self.initialized = False
+
+        def forward(self, pred: dict, target: dict) -> tuple[dict, torch.Tensor]:
+            # Reuse your existing loss calculation logic
+            loss_dict, hofx_pred = super().__call__(pred, target)
+
+            # Capture initial scales on the very first step
+            if not self.initialized and self.training:
+                self.init_obs.fill_(loss_dict['obs'].detach().mean())
+                self.init_model.fill_(loss_dict['model'].detach().mean())
+                self.initialized = True
+
+            # Observation term
+            precision_obs = torch.exp(-self.log_var_obs)
+            weighted_loss = precision_obs * loss_dict['obs'].mean()/ self.init_obs + self.log_var_obs
+
+            # Model (Background) term
+            if 'model' in loss_dict:
+                precision_model = torch.exp(-self.log_var_model)
+                weighted_loss += precision_model * loss_dict['model'].mean()/ self.init_model + self.log_var_model
+
+            # BCS term
+            if 'bcs' in loss_dict:
+                precision_bcs = torch.exp(-self.log_var_bcs)
+                weighted_loss += precision_bcs * loss_dict['bcs'].mean()/ self.init_model + self.log_var_bcs
+
+            loss_dict['total'] = weighted_loss
+            return loss_dict, hofx_pred
+
+
+class FadingAnchorUncertaintyLoss(VarLoss):
+    def __init__(self, start_obs_epoch=5, ramp_duration=30, **kwargs):
+        super().__init__(**kwargs)
+        # Learnable uncertainty parameters
+        self.log_var_obs = nn.Parameter(torch.ones(1) * 2.0)
+        self.log_var_model = nn.Parameter(torch.zeros(1))
+
+        # Curriculum settings
+        self.start_obs_epoch = start_obs_epoch
+        self.ramp_duration = ramp_duration
+
+    def forward(self, pred: dict, target: dict, current_epoch: int = 0) -> tuple[dict, torch.Tensor]:
+        # 1. Compute Raw Losses
+        # Note: We need to normalize scale as discussed (Obs is ~10^5, Model is ~10^-2)
+        # We can use a hard-coded scale factor based on your observation
+        loss_dict, hofx_pred = super().__call__(pred, target)
+
+        # 2. Compute Progress Factor (0.0 to 1.0)
+        # Use a sigmoid or linear ramp to shift focus
+        if current_epoch < self.start_obs_epoch:
+            progress = 0.0
+        else:
+            progress = min(1.0, (current_epoch - self.start_obs_epoch) / self.ramp_duration)
+
+        # 3. Apply the "Guiding then Straying" Weights
+        # Early on: weight_model is high, weight_obs is low
+        # Later: weight_model decreases (straying), weight_obs increases (fitting)
+
+        # Observation Weight: Learns to fit, but restricted by 'progress'
+        # We multiply the precision by progress so it starts at 0 weight
+        precision_obs = torch.exp(-self.log_var_obs) * progress
+        loss_obs_term = precision_obs * loss_dict['obs'].mean() + (self.log_var_obs / (progress + 1e-6))
+
+        # Model Weight: Starts as a strong guide, then becomes a weak regularizer
+        # We decay the model precision as we gain confidence in observations
+        model_decay = 1.0 - (0.9 * progress)  # Decays from 100% to 10% influence
+        precision_model = torch.exp(-self.log_var_model) * model_decay
+        loss_model_term = precision_model * loss_dict['model'].mean() + self.log_var_model
+
+        loss_dict['total'] = loss_obs_term + loss_model_term
+        return loss_dict, hofx_pred
+
+
+class FadingAnchorUncertaintyLoss2(VarLoss):
+    def __init__(self, start_obs_epoch=2, ramp_duration=30, **kwargs):
+        super().__init__(**kwargs)
+        self.log_var_obs = nn.Parameter(torch.ones(1) * 2.0)
+        self.log_var_model = nn.Parameter(torch.ones(1) * 2.0)
+
+        self.start_obs_epoch = start_obs_epoch
+        self.ramp_duration = ramp_duration
+
+        # Buffers to store the scale of the losses at the very first step
+        self.register_buffer('scale_obs', torch.tensor(1.0))
+        self.register_buffer('scale_model', torch.tensor(1.0))
+        self.is_initialized = False
+
+    def __call__(self, pred: dict, target: dict, current_epoch: int = 0) -> tuple[dict, torch.Tensor]:
+        # 1. Get RAW losses from Parent VarLoss
+        loss_dict, hofx_pred = super().__call__(pred, target)
+
+        l_obs_raw = loss_dict['obs'].mean()
+        l_model_raw = loss_dict['model'].mean()
+
+        # 2. Initialize scales on the very first training step
+        if not self.is_initialized and self.training:
+            # We detach to ensure we don't backprop through the scale initialization
+            self.scale_obs.fill_(l_obs_raw.detach())
+            self.scale_model.fill_(l_model_raw.detach())
+            self.is_initialized = True
+
+        # 3. Normalize losses (bringing them to ~1.0 magnitude)
+        # This makes the uncertainty parameters 's' operate on the same scale
+        l_obs_norm = l_obs_raw / (self.scale_obs + 1e-8)
+        l_model_norm = l_model_raw / (self.scale_model + 1e-8)
+
+        # 4. Progress Factor for Curriculum
+        if current_epoch < self.start_obs_epoch:
+            progress = 0.0
+        else:
+            progress = min(1.0, (current_epoch - self.start_obs_epoch) / self.ramp_duration)
+
+        # 5. Apply Weighted Terms
+        # Obs: weight grows with progress
+        s_obs = torch.nn.functional.softplus(self.log_var_obs)
+        precision_obs = torch.exp(-s_obs) * progress
+        loss_obs_term = precision_obs * l_obs_norm + (s_obs * progress)
+
+        # Model: weight stays strong then slightly decays to let Obs dominate
+        model_decay = 1.0 - (0.7 * progress)  # Decays to 30% of original 'anchor' strength
+        s_model = torch.nn.functional.softplus(self.log_var_model)
+        precision_model = torch.exp(-s_model) * model_decay
+        loss_model_term = precision_model * l_model_norm + s_model
+
+        loss_dict['total'] = loss_obs_term.mean() + loss_model_term.mean()
+        return loss_dict, hofx_pred
+
+
+class FadingAnchorUncertaintyLoss3(VarLoss):
+    def __init__(self, start_obs_epoch=2, ramp_duration=30, **kwargs):
+        super().__init__(**kwargs)
+        # One parameter to rule them all.
+        # Initializing at 0.0 means 50/50 importance.
+        self.alpha = nn.Parameter(torch.zeros(1))
+
+        self.start_obs_epoch = start_obs_epoch
+        self.ramp_duration = ramp_duration
+
+        self.register_buffer('scale_obs', torch.tensor(1.0))
+        self.register_buffer('scale_model', torch.tensor(1.0))
+        self.is_initialized = False
+
+    def __call__(self, pred: dict, target: dict, current_epoch: int = 0) -> tuple[dict, torch.Tensor]:
+        loss_dict, hofx_pred = super().__call__(pred, target)
+
+        l_obs_raw = loss_dict['obs'].mean()
+        l_model_raw = loss_dict['model'].mean()
+
+        if not self.is_initialized and self.training:
+            self.scale_obs.fill_(l_obs_raw.detach())
+            self.scale_model.fill_(l_model_raw.detach())
+            self.is_initialized = True
+
+        l_obs_norm = l_obs_raw / (self.scale_obs + 1e-8)
+        l_model_norm = l_model_raw / (self.scale_model + 1e-8)
+
+        # Progress Factor
+        progress = 0.0 if current_epoch < self.start_obs_epoch else \
+            min(1.0, (current_epoch - self.start_obs_epoch) / self.ramp_duration)
+
+        # --- Relative Weighting Logic ---
+        # Sigmoid(alpha) gives a value [0, 1].
+        # We multiply by 2 so the total weight sum is 2.0.
+        if progress > 0:
+            prob_obs = torch.sigmoid(self.alpha) * 2.0
+            prob_model = 2.0 - prob_obs
+        else:
+            # By using a constant here, no gradient flows to self.alpha
+            prob_obs = torch.tensor(1.0, device=self.alpha.device)
+            prob_model = torch.tensor(1.0, device=self.alpha.device)
+
+        # Apply curriculum multipliers
+        # Observations start at 0 and grow to their "learned importance"
+        w_obs = prob_obs * progress
+
+        # Model starts at full importance and decays slightly to allow
+        # observations to take the lead if needed.
+        model_decay = 1.0 - (0.7 * progress)
+        w_model = prob_model * model_decay
+
+        loss_dict['total'] = (w_obs * l_obs_norm) + (w_model * l_model_norm)
+
+        # Highly recommended: Log these for W&B / Tensorboard
+        loss_dict['w_obs_effective'] = w_obs.detach()
+        loss_dict['w_model_effective'] = w_model.detach()
+
+        return loss_dict, hofx_pred
