@@ -117,7 +117,7 @@ loader:
       _target_: forward.model.data_loader.TorchDataset
       results:
         hofx:
-          path: ${data.stage.predict.dir}/predict_hofx_v6.npy
+          path: ${data.stage.predict.dir}/predict_hofx_v7.npy
 
 # Model parameters
 model:
