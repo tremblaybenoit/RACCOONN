@@ -65,7 +65,7 @@ preparation:
     # Atmospheric profiles
     prof:
       # Function
-      _target_: data.statistics.compute_pca
+      _target_: data.pca.compute_pca
       _recursive_: false  # Do not instantiate nested objects
       # What the method needs as input
       input:
@@ -84,13 +84,13 @@ preparation:
         path: ${paths.data_dir}/normalization/pca.pkl
         # Save function
         save:
-          _target_: data.io.save_pickle
+          _target_: data.io.save_pkl
           _partial_: true
           _args_:
             - ${preparation.pca.prof.output.path}
         # Load function
         load:
-          _target_: data.io.load_pickle
+          _target_: data.io.load_pkl
           _args_:
             - ${preparation.pca.prof.output.path}
 

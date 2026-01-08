@@ -36,7 +36,7 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=50):
     std = np.std(data, axis=0)  # (V, L)
     standardized_data = (data - mu) / std
 
-    pca = PCA().fit(standardized_data)
+    pca = PCA().fit(standardized_data.reshape(n_samples, -1))
     cumulative_variance = np.cumsum(pca.explained_variance_ratio_)
 
     # Find K for specific thresholds
@@ -53,7 +53,6 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=50):
     plt.xlabel("Number of Components")
     plt.savefig("cumulative_explained_variance.png")
     plt.close()
-    breakpoint()
 
     if mode == 'global':
         # Flatten: (N, V*L)
@@ -126,3 +125,20 @@ def main(config: DictConfig) -> None:
             instantiate(config_pca)
 
     return
+
+
+if __name__ == '__main__':
+    """ Compute covariance matrices of given datasets.
+
+        Parameters
+        ----------
+        --config_path: str. Directory containing configuration file.
+        --config_name: str. Configuration filename.
+        +experiment: str. Experiment configuration filename to override default configuration.
+
+        Returns
+        -------
+        zarr file containing data statistics.
+    """
+
+    main()
