@@ -541,3 +541,30 @@ def clip(data: Union[np.ndarray, torch.Tensor], stats: Dict) \
         return torch.clamp(data, min=min_value, max=max_value)
     else:
         raise TypeError("Input data must be a numpy array or a torch tensor.")
+
+
+def sym_log(data: Union[np.ndarray, torch.Tensor], inverse_transform: bool = False) \
+           -> Union[np.ndarray, torch.Tensor]:
+    """ Apply symmetric logarithm transformation to the data.
+
+        Parameters
+        ----------
+        data: arr or tensor. Contains data to transform.
+        inverse_transform: bool. False for log transform, True for inverse transform.
+
+        Returns
+        -------
+        data_transform: arr or tensor. Transformed dataset.
+    """
+
+    # Apply symmetric logarithm transformation based on the type of data
+    if inverse_transform:
+        if isinstance(data, np.ndarray):
+            return np.sign(data) * (np.expm1(np.abs(data)))
+        else:
+            return torch.sign(data) * (torch.exp(torch.abs(data)) - 1)
+    else:
+        if isinstance(data, np.ndarray):
+            return np.sign(data) * np.log1p(np.abs(data))
+        else:
+            return torch.sign(data) * torch.log1p(torch.abs(data))

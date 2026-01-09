@@ -244,7 +244,10 @@ def load_var_and_normalize(config: DictConfig, split: Union[np.ndarray, int, sli
     """
 
     # Extract normalization function
-    f_norm = instantiate(config['normalization']) if hasattr(config, 'normalization') else identity
+    if hasattr(config, 'normalization') and config['normalization'] is not None:
+        f_norm = instantiate(config['normalization'])
+    else:
+        f_norm = identity
 
     # If no split or split is a slice, load and normalize directly
     if split is None or isinstance(split, slice) or isinstance(split, int):

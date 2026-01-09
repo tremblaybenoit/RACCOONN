@@ -789,53 +789,127 @@ class PINNverseOperator5(PINNverseOperator4):
         return out.view(batch_size, n_levels, self.n_prof).transpose(1, 2)
 
 
-class PINNverseOperatorPCA(PINNverseOperator5):
-    def __init__(
-            self,
-            eof_matrix,  # Shape: (127, k_components)
-            mean_profile,  # Shape: (127,)
-            std_profile,  # Shape: (127,)
-            *args, **kwargs
-    ):
-        """
-        Wraps PINNverseOperator5 to output PCA coefficients and
-        reconstruct physical profiles.
-        """
-        # 1. Determine K (dimensionality of the latent space)
-        self.k_components = eof_matrix.shape[1]
+class PINNverseOperatorPCA(PINNverseOperator4):
+    def __init__(self, pca_buffers: dict, **kwargs):
+        super().__init__(**kwargs)
 
-        # 2. Force the backbone to output K components instead of 127
-        kwargs['parameters'].architecture.n_neurons_out = self.k_components # Ensure output matches K
+        # 1. Register PCA Buffers (from your data.pca output)
+        self.register_buffer('basis', torch.tensor(pca_buffers['basis']).float())  # (270, 1143)
+        self.register_buffer('mu', torch.tensor(pca_buffers['mu']).float())  # (1143,)
+        self.register_buffer('std', torch.tensor(pca_buffers['std']).float())  # (1143,)
+        self.register_buffer('scales', torch.tensor(pca_buffers['scales']).float())  # (270,)
 
-        # 3. Initialize the SIREN backbone
-        super().__init__(*args, **kwargs)
+        # 2. Variable info for reshaping
+        self.n_pca = self.basis.shape[0]  # 270
+        self.n_total_features = self.basis.shape[1]  # 1143 (3 vars * 127 levels)
 
-        # 4. Register PCA basis as buffers (efficient, non-trainable tensors)
-        # We store the basis as (k, 127) for easy matrix multiplication
-        self.register_buffer('basis', torch.tensor(eof_matrix).float().t())
-        self.register_buffer('mu', torch.tensor(mean_profile).float())
-        self.register_buffer('sigma', torch.tensor(std_profile).float())
+    def _build_model(self, positional_encoding, activation_in, activation_out, parameters) -> nn.Module:
+        # Standard Parameter Extraction
+        dropout_rate = parameters.architecture.dropout if hasattr(parameters.architecture, 'dropout') else 0.0
+        n_neurons = parameters.architecture.n_neurons if hasattr(parameters.architecture, 'n_neurons') else 128
+        n_layers = parameters.architecture.n_layers if hasattr(parameters.architecture, 'n_layers') else 4
+        normalization = parameters.architecture.normalization if hasattr(parameters.architecture, 'normalization') else None
+        n_lat = parameters.data.n_lat if parameters is not None and \
+                                         hasattr(parameters.data, 'n_lat') else 1
+        n_lon = parameters.data.n_lon if parameters is not None and \
+                                         hasattr(parameters.data, 'n_lon') else 1
+        n_scans = parameters.data.n_scans if parameters is not None and \
+                                             hasattr(parameters.data, 'n_scans') else 1
 
-    def forward(self, x):
-        """
-        x: Input coordinates/features
-        Returns: Dict containing reconstructed profile and latent coefficients
-        """
-        # 1. Generate latent coefficients (v) via PINNverseOperator5 logic
-        # Output shape: (Batch, k_components)
-        v = super().forward(x)
+        # Positional encoding
+        d_input = n_lat + n_lon + n_scans
+        self.positional_encoding = instantiate(positional_encoding, d_input=d_input) if positional_encoding \
+            else IdentityPositionalEncoding(d_input=d_input)
+        d_encoded = self.positional_encoding.d_output
+        # Input layer
+        self.d_in = nn.Linear(self.positional_encoding.d_output, n_neurons)
+        self.activation_in = instantiate(activation_in) if activation_in is not None else Sine()
+        self.dropout_in = nn.Dropout(dropout_rate)
+        # Output layer
+        self.d_out = nn.Linear(n_neurons + d_encoded, self.n_pca)
+        self.activation_out = instantiate(activation_out) if activation_out else nn.Tanh()
 
-        # 2. Project from latent space to physical space: x = mu + v @ basis
-        # (Batch, k) @ (k, 127) -> (Batch, 127)
-        # This operation is fully differentiable.
-        recon = torch.matmul(v, self.basis)
-        prof_phys = self.mu + (recon * self.sigma)
-        prof_phys.view(-1, self.n_prof, prof_phys.shape[-1])
+        # Model architecture
+        self.normalization = nn.ModuleList([instantiate(normalization) if normalization is not None else nn.Identity()
+                                            for _ in range(n_layers)])
+        self.activations = nn.ModuleList([instantiate(activation_in) if activation_in is not None else Sine()
+                                          for _ in range(n_layers)])
+        self.dropouts = nn.ModuleList([nn.Dropout(dropout_rate)
+                                       for _ in range(n_layers)])
 
-        # 3. Return a dictionary so your loss functions can access
-        # both the physical levels and the independent PCA coefficients.
+        # SIREN initialization
+        self._siren_init(self.d_in, is_first_layer=True, activation_in=self.activation_in)
+        self._siren_init(self.d_out, is_first_layer=False, activation_in=None, is_head=True)
+
+        # Build Sequential Model
+        self.backbone = nn.ModuleList([
+            SirenResidualBlock(
+                n_neurons, self.activations[s], self.dropouts[s], self._siren_init,
+                normalization=self.normalization[s]
+            ) for s in range(n_layers)
+        ])
+
+        return nn.ModuleDict({
+            'd_in': self.d_in,
+            'activation_in': self.activation_in,
+            'dropout_in': self.dropout_in,
+            'backbone': self.backbone,
+            'd_out': self.d_out,
+            'activation_out': self.activation_out
+        })
+
+    def forward(self, x: dict):
+        # 1. Prepare batch metadata
+        keys_coords = ['latitude', 'longitude', 'time']
+        inputs = torch.cat([x[k].view(-1, 1) for k in keys_coords if k in x], dim=-1)
+        encoded_coords = self.positional_encoding(inputs)
+
+        # Forward through Backbone
+        x_latent = self.model['activation_in'](self.model['d_in'](encoded_coords))
+        for block in self.model['backbone']:
+            x_latent = block(x_latent)
+        # Concatenate Skip Connection
+        x_out = torch.cat([x_latent, encoded_coords], dim=-1)
+
+        # PCA Coefficient Prediction
+        w_hat = self.model['activation_out'](self.model['d_out'](x_out))
+        # PCA Reconstruction (The Physics Layer)
+        w_phys = w_hat * self.scales
+        z_recon = torch.matmul(w_phys, self.basis)
+        prof_phys = self.mu + (z_recon * self.std)
+
+        # 4. Final Reshape
+        prof_phys = prof_phys.view(-1, self.n_prof, self.n_levels)
+
         return {
-            'prof': prof_phys,  # Used for Observation Loss (Radiances)
-            'pca_coeffs': v  # Used for Model Loss (Diagonal B-matrix)
+            'prof': prof_phys,
+            'pca_coeffs': w_hat
         }
 
+    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
+        """ Perform training/validation/test step.
+
+            Parameters
+            ----------
+            batch: tensor. Batch from the training set.
+            batch_nb: int. Index of the batch out of the training set.
+            stage: str. Current operation: "train", "valid", or "test".
+
+            Returns
+            -------
+            Loss value: tensor.
+        """
+
+        # Compute profiles
+        pred = self.forward(batch['input'])
+        # Apply output transformations
+        for t, transform in enumerate(self.transform_out):
+            pred['prof'] = transform(pred['prof'])
+
+        # Compute loss function
+        loss, pred['hofx'] = self.loss_func(pred, batch['target'])
+
+        # Logging
+        self._logging(stage, loss, batch['input'], batch['target'], pred)
+
+        return loss['total']

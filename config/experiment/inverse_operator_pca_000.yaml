@@ -78,6 +78,7 @@ preparation:
               - ${data.stage.train.vars.prof}
               - ${data.stage.valid.vars.prof}
               - ${data.stage.test.vars.prof}
+        n_comp: 270
       # What the method produces as output (pickle file)
       output:
         # File path to save/load the PCA object
@@ -93,6 +94,385 @@ preparation:
           _target_: data.io.load_pkl
           _args_:
             - ${preparation.pca.prof.output.path}
+    prof_train:
+      # Function
+      _target_: data.pca.project_pca
+      _recursive_: false  # Do not instantiate nested objects
+      # What the method needs as input
+      input:
+        pca_buffers: ${preparation.pca.prof.output}
+        # Profile data to project
+        data:
+          load:
+            _target_: data.io.load_var_and_normalize
+            _recursive_: false
+            _args_:
+              - ${data.stage.train.vars.prof}
+      output:
+        pca:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Train2/pca_prof.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_train.output.pca.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_train.output.pca.path}
+              - ${data.dtype}
+          normalization: null
+        pca_white:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Train2/white_prof.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_train.output.pca_white.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_train.output.pca_white.path}
+              - ${data.dtype}
+          normalization: null
+        pca_sym:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Train2/sym_prof.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_train.output.pca_sym.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_train.output.pca_sym.path}
+              - ${data.dtype}
+          normalization: null
+    prof_valid:
+      # Function
+      _target_: data.pca.project_pca
+      _recursive_: false  # Do not instantiate nested objects
+      # What the method needs as input
+      input:
+        pca_buffers: ${preparation.pca.prof.output}
+        # Profile data to project
+        data:
+          load:
+            _target_: data.io.load_var_and_normalize
+            _recursive_: false
+            _args_:
+              - ${data.stage.valid.vars.prof}
+      output:
+        pca:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Val2/pca_prof.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_valid.output.pca.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_valid.output.pca.path}
+              - ${data.dtype}
+          normalization: null
+        pca_white:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Val2/white_prof.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_valid.output.pca_white.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_valid.output.pca_white.path}
+              - ${data.dtype}
+          normalization: null
+        pca_sym:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Val2/sym_prof.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_valid.output.pca_sym.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_valid.output.pca_sym.path}
+              - ${data.dtype}
+          normalization: null
+    prof_test:
+      # Function
+      _target_: data.pca.project_pca
+      _recursive_: false  # Do not instantiate nested objects
+      # What the method needs as input
+      input:
+        pca_buffers: ${preparation.pca.prof.output}
+          # Profile data to project
+        data:
+          load:
+            _target_: data.io.load_var_and_normalize
+            _recursive_: false
+            _args_:
+            - ${data.stage.test.vars.prof}
+      output:
+        pca:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Test2/pca_prof.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_test.output.pca.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_test.output.pca.path}
+              - ${data.dtype}
+          normalization: null
+        pca_white:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Test2/white_prof.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_test.output.pca_white.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_test.output.pca_white.path}
+              - ${data.dtype}
+          normalization: null
+        pca_sym:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Test2/sym_prof.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_test.output.pca_sym.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_test.output.pca_sym.path}
+              - ${data.dtype}
+          normalization: null
+    prof_background_train:
+      # Function
+      _target_: data.pca.project_pca
+      _recursive_: false  # Do not instantiate nested objects
+      # What the method needs as input
+      input:
+        pca_buffers: ${preparation.pca.prof.output}
+        # Profile data to project
+        data:
+          load:
+            _target_: data.io.load_var_and_normalize
+            _recursive_: false
+            _args_:
+              - ${data.stage.train.vars.prof_background}
+      output:
+        pca:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Train2/pca_prof_background.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_background_train.output.pca.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_background_train.output.pca.path}
+              - ${data.dtype}
+          normalization: null
+        pca_white:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Train2/white_prof_background.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_background_train.output.pca_white.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_background_train.output.pca_white.path}
+              - ${data.dtype}
+          normalization: null
+        pca_sym:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Train2/sym_prof_background.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_background_train.output.pca_sym.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_background_train.output.pca_sym.path}
+              - ${data.dtype}
+          normalization: null
+    prof_background_valid:
+      # Function
+      _target_: data.pca.project_pca
+      _recursive_: false  # Do not instantiate nested objects
+      # What the method needs as input
+      input:
+        pca_buffers: ${preparation.pca.prof.output}
+        # Profile data to project
+        data:
+          load:
+            _target_: data.io.load_var_and_normalize
+            _recursive_: false
+            _args_:
+              - ${data.stage.valid.vars.prof_background}
+      output:
+        pca:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Val2/pca_prof_background.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_background_valid.output.pca.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_background_valid.output.pca.path}
+              - ${data.dtype}
+          normalization: null
+        pca_white:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Val2/white_prof_background.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_background_valid.output.pca_white.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_background_valid.output.pca_white.path}
+              - ${data.dtype}
+          normalization: null
+        pca_sym:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Val2/sym_prof_background.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_background_valid.output.pca_sym.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_background_valid.output.pca_sym.path}
+              - ${data.dtype}
+          normalization: null
+    prof_background_test:
+      # Function
+      _target_: data.pca.project_pca
+      _recursive_: false  # Do not instantiate nested objects
+      # What the method needs as input
+      input:
+        pca_buffers: ${preparation.pca.prof.output}
+          # Profile data to project
+        data:
+          load:
+            _target_: data.io.load_var_and_normalize
+            _recursive_: false
+            _args_:
+              - ${data.stage.test.vars.prof_background}
+      output:
+        pca:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Test2/pca_prof_background.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_background_test.output.pca.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_background_test.output.pca.path}
+              - ${data.dtype}
+          normalization: null
+        pca_white:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Test2/white_prof_background.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_background_test.output.pca_white.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_background_test.output.pca_white.path}
+              - ${data.dtype}
+          normalization: null
+        pca_sym:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Test2/sym_prof_background.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_background_test.output.pca_sym.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_background_test.output.pca_sym.path}
+              - ${data.dtype}
+          normalization: null
+
 
 # Data configuration
 data:
@@ -116,6 +496,15 @@ data:
               var: 'prof'
               dtype: ${data.dtype}
             axis: 1
+        #
+        pca_coeffs:
+          # Loading function
+          load:
+            _target_: data.pca.load_pca_buffers
+            path: ${preparation.pca.prof.output.path}
+            buffer: 'scales'
+          normalization: null
+
     # Validation set
     valid:
       # Variables
@@ -210,7 +599,7 @@ model:
     num_freqs: 20
     d_input: 4
     # [Lat, Lon, Scans, Pressure]
-    sigma_per_dim: [ 1.0, 1.0, 0.5, 0.5 ]
+    sigma_per_dim: [ 1.0, 1.0, 0.5]
   # Activation functions (input layer/within the network)
   activation_in:
     _target_: forward.model.activation.Sine
