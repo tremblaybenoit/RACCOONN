@@ -8,6 +8,7 @@ from utilities.logic import get_config_path
 import logging
 from sklearn.decomposition import PCA
 from data.transformations import sym_log
+from utilities.plot import plot_map, save_plot, flexible_gridspec
 
 
 # Initialize logger
@@ -36,7 +37,12 @@ def load_pca_buffers(path: str, buffer: str=None) -> dict:
         'std': pca_buffers['std'],
         'eigenvalues': pca_buffers['eigenvalues'],
         'scales': pca_buffers['scales'],
-        'basis': pca_buffers['basis']
+        'scales_z_var': pca_buffers['scales_z_var'],
+        'scales_z_std': pca_buffers['scales_z_std'],
+        'basis': pca_buffers['basis'],
+        'sym_log_scales': pca_buffers['sym_log_scales'],
+        'sym_log_z_var': pca_buffers['sym_log_z_var'],
+        'sym_log_z_std': pca_buffers['sym_log_z_std'],
     }
 
 
@@ -108,9 +114,10 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
     n_samples, n_vars, n_levels = data.shape
 
     # Standardize
-    mu = np.mean(data, axis=0)  # (V, L)
-    std = np.std(data, axis=0)  # (V, L)
-    standardized_data = (data - mu) / std
+    mu = np.mean(data, axis=0, keepdims=True)  # (V, L)
+    std = np.std(data, axis=0, keepdims=True)  # (V, L)
+    increment = data - mu
+    standardized_data = increment / std
 
     """
     pca = PCA().fit(standardized_data.reshape(n_samples, -1))
@@ -149,8 +156,62 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
 
         # Initialize PCA processor
         pca_processor = PCAProcessor(pca_buffs)
-        projected_z = pca_processor.physical_to_whitened(flat_z)
-        pca_buffs['sym_log_z_var'] = sym_log(projected_z, inverse_transform=False).var(axis=0, keepdims=True)
+        # Data
+        whitened_data = pca_processor.physical_to_whitened(data.reshape(n_samples, -1))
+        sym_log_data = sym_log(whitened_data, inverse_transform=False)
+        # Mean
+        whitened_mu0 = whitened_data.mean(axis=0, keepdims=True)
+        whitened_mu1 = pca_processor.physical_to_whitened(mu.reshape(1, -1))
+        sym_log_mu0 = sym_log_data.mean(axis=0, keepdims=True)
+        sym_log_mu1 = sym_log(whitened_mu1, inverse_transform=False)
+        # Increments
+        whitened_increment0 = whitened_data - whitened_mu0
+        whitened_increment1 = whitened_data - whitened_mu1
+        sym_log_increment0 = sym_log_data - sym_log_mu0
+        sym_log_increment1 = sym_log(whitened_increment1, inverse_transform=False)
+        sym_log_increment2 = sym_log_data - sym_log_mu1
+        sym_log_increment3 = sym_log(whitened_increment0, inverse_transform=False)
+        # Variances and stds
+        sym_log_cov0 = np.cov(sym_log_increment0, rowvar=False)
+        sym_log_var0 = np.diag(sym_log_cov0).reshape(1, -1)
+        sym_log_std0 = np.sqrt(sym_log_var0)
+        sym_log_cov_inv0 = np.linalg.inv(sym_log_cov0).astype(data.dtype)
+        sym_log_cov1 = np.cov(sym_log_increment1, rowvar=False)
+        sym_log_var1 = np.diag(sym_log_cov1).reshape(1, -1)
+        sym_log_std1 = np.sqrt(sym_log_var1)
+        sym_log_cov_inv1 = np.linalg.inv(sym_log_cov1).astype(data.dtype)
+        sym_log_cov2 = np.cov(sym_log_increment2, rowvar=False)
+        sym_log_var2 = np.diag(sym_log_cov2).reshape(1, -1)
+        sym_log_std2 = np.sqrt(sym_log_var2)
+        sym_log_cov_inv2 = np.linalg.inv(sym_log_cov2).astype(data.dtype)
+        #
+        pca_buffs['scales_z_var'] = whitened_data.var(axis=0, keepdims=True)
+        pca_buffs['scales_z_std'] = np.sqrt(pca_buffs['scales_z_var'])
+        pca_buffs['sym_log_z_var'] = sym_log(whitened_data, inverse_transform=False).var(axis=0, keepdims=True)
+        pca_buffs['sym_log_z_std'] = np.sqrt(pca_buffs['sym_log_z_var'])
+        # pca_buffs['sym_log_var0'] = sym_log_var0
+        # pca_buffs['sym_log_std0'] = sym_log_std0
+        pca_buffs['sym_log_var'] = sym_log_var1
+        pca_buffs['sym_log_std'] = sym_log_std1
+        # pca_buffs['sym_log_diag_cov'] = 1.0/sym_log_cov_inv0
+        pca_buffs['sym_log_cov'] = sym_log_cov1
+        pca_buffs['sym_log_diag_cov'] = 1.0/np.diag(sym_log_cov_inv1).reshape(1, -1)
+        # pca_buffs['sym_log_diag_cov_inv0'] = sym_log_cov_inv0
+        pca_buffs['sym_log_cov_inv'] = sym_log_cov_inv1
+        pca_buffs['sym_log_diag_cov_inv'] = np.diag(sym_log_cov_inv1).reshape(1, -1)
+        breakpoint()
+
+
+        fig, get_axes = flexible_gridspec(cell_widths=[4.0, 4.0], cell_heights=[4.0, 4.0], lefts=[1.00, 1.00],
+                                          rights=[1.00, 1.00], bottoms=[1.00, 1.00], tops=[1.00, 1.00])
+        ax0 = get_axes(0, 0)
+        plot_map(ax0, sym_log_cov_inv0, title=f"Inverse covariance matrix", plt_origin='upper',
+                 cb_label=r'Values (divided by 10$^4$)')
+        ax1 = get_axes(0, 1)
+        plot_map(ax1, sym_log_cov_inv1, title=f"Inverse covariance matrix (alt method)", plt_origin='upper',
+                 cb_label=r'Values (divided by 10$^4$)')
+        save_plot(fig, "pca_inverse_covariance_matrices.png")
+        plt.close(fig)
 
         return pca_buffs
     else:
@@ -185,9 +246,11 @@ def project_pca(input: DictConfig, output: DictConfig) -> None:
     logger.info("Projecting data onto PCA basis...")
     n_samples = data.shape[0]
     flat_data = data.reshape(n_samples, -1)
-    pca_data = pca_processor.physical_to_standardized(flat_data)
-    projected_data = pca_processor.physical_to_whitened(flat_data)
-    sym_log_data = sym_log(projected_data, inverse_transform=False)
+    standardized_data = pca_processor.physical_to_standardized(flat_data)
+    whitened_data = pca_processor.physical_to_whitened(flat_data)
+    sym_log_data = sym_log(whitened_data, inverse_transform=False)
+
+
     """    # Assuming 'whitened_coeffs' is your (N, 270) array
     abs_coeffs = np.abs(projected_data)
 
@@ -240,10 +303,10 @@ def project_pca(input: DictConfig, output: DictConfig) -> None:
     logger.info("Saving data to file...")
     if hasattr(output.pca, 'save'):
         save_func = instantiate(output.pca.save)
-        save_func(pca_data)
+        save_func(standardized_data)
     if hasattr(output.pca_white, 'save'):
         save_func = instantiate(output.pca_white.save)
-        save_func(projected_data)
+        save_func(whitened_data)
     if hasattr(output.pca_sym, 'save'):
         save_func = instantiate(output.pca_sym.save)
         save_func(sym_log_data)

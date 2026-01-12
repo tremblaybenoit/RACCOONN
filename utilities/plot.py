@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')  # Call this BEFORE importing pyplot
 import matplotlib.pyplot as plt
 from pylab import *
 import numpy as np

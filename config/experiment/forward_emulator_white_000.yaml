@@ -1,0 +1,197 @@
+# @package _global_
+# Experiment-specific Hydra structure
+
+# Overriding default structure
+defaults:
+  - override /paths: default
+  - override /hydra: default
+  - override /data: forward_recast
+  - override /preparation: statistics
+  - override /loader: forward_default
+  - override /model: forward_emulator
+  - override /trainer: gpu
+  - override /callbacks: forward_default
+  - override /logger: default
+
+# All parameters below will be merged with parameters from default configurations set above.
+# This allows you to overwrite only specified parameters
+
+# Task name. Note that it determines the output directory path
+task_name: "forward_emulator_white"  # Experiment
+
+# Run id (unique identifier for the run)
+paths:
+  task_dir: "../forward_outputs"
+  run_id: "v000"
+  data_dir: "../data_float32_cs"
+
+# Callbacks
+callbacks:
+  early_stopping:
+    patience: 20  # Number of epochs with no improvement after which training will be stopped
+
+# Trainer configuration
+trainer:
+  min_epochs: 1  # To prevent early stopping
+  max_epochs: 192  # Number of epochs
+  precision: 32  # 32-bit precision
+
+# Preparation configuration
+preparation:
+  # Statistics computation
+  statistics:
+    # Output path for statistics
+    data:
+      output:
+        path: ../data_float32/normalization/statistics.pkl
+  # PCA decomposition
+  pca:
+    # Atmospheric profiles
+    prof:
+      # Function
+      _target_: data.pca.compute_pca
+      _recursive_: false  # Do not instantiate nested objects
+      # What the method needs as input
+      input:
+        # Profile data to compute PCA on
+        data:
+          load:
+            _target_: data.io.load_stack_and_normalize
+            _recursive_: false
+            stack:
+              - ${data.stage.train.vars.prof}
+              - ${data.stage.valid.vars.prof}
+              - ${data.stage.test.vars.prof}
+        n_comp: 270
+      # What the method produces as output (pickle file)
+      output:
+        # File path to save/load the PCA object
+        path: ${paths.data_dir}/normalization/pca.pkl
+        # Save function
+        save:
+          _target_: data.io.save_pkl
+          _partial_: true
+          _args_:
+            - ${preparation.pca.prof.output.path}
+        # Load function
+        load:
+          _target_: data.io.load_pkl
+          _args_:
+            - ${preparation.pca.prof.output.path}
+
+# Data configuration
+data:
+  # Precision
+  dtype: 'float32'
+  # Split ratios for training, validation, and test sets
+  stage:
+    # Training set
+    train:
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/white_prof.npy
+            split: ${....split}
+            dtype: ${data.dtype}
+          # Normalization function and parameters
+          normalization: null
+    # Validation set
+    valid:
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/white_prof.npy
+            split: ${....split}
+            dtype: ${data.dtype}
+          # Normalization function and parameters
+          normalization: null
+    # Test set
+    test:
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/white_prof.npy
+            split: ${....split}
+            dtype: ${data.dtype}
+          # Normalization function and parameters
+          normalization: null
+    # Prediction set
+    predict:
+      # Directory
+      dir: ${paths.data_dir}/Test2
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/white_prof.npy
+            split: ${....split}
+            dtype: ${data.dtype}
+          # Normalization function and parameters
+          normalization: null
+
+# Loader configuration
+loader:
+  batch_size: 96
+  num_workers: 16
+  persistent_workers: true
+  pin_memory: true
+  # Split the data into training, validation, and test sets
+  stage:
+    # Training set
+    train:
+      # Dataset class
+      _target_: forward.model.data_loader.TorchDataset
+    # Validation set
+    valid:
+      # Dataset class
+      _target_: forward.model.data_loader.TorchDataset
+    # Test set
+    test:
+      # Dataset class
+      _target_: forward.model.data_loader.TorchDataset
+    # Prediction set
+    predict:
+      # Dataset class
+      _target_: forward.model.data_loader.TorchDataset
+      results:
+        hofx:
+          path: ${data.stage.predict.dir}/predict_hofx_white_000.npy
+
+# Model parameters
+model:
+  # Model
+  _target_: forward.model.model.CRTMModelWhite
+  # Scheduler
+  lr_scheduler:
+    # Number of epochs with no improvement after which learning rate will be reduced
+    patience: 6
+    # Threshold for measuring the new optimum, to only focus on significant changes
+    threshold: 0.0
+    threshold_mode: abs
+  # Parameters
+  parameters:
+    data:
+      prof_scaling: 20.0
+      use_prof_vars: [1]
+      nlevels: ${preparation.pca.prof.input.n_comp}
+
+# Logger configuration
+logger:
+  # MLflow logger
+  ports:
+    mlflow: 5004

@@ -8,7 +8,7 @@ from forward.model.model import BaseModel
 from forward.model.activation import Sine
 from inverse.model.encoding import IdentityPositionalEncoding
 from utilities.instantiators import instantiate
-from data.transformations import identity
+from data.transformations import identity, sym_log
 import inspect
 
 
@@ -612,13 +612,16 @@ class PINNverseOperator4(PINNverseOperator):
     """
 
     @staticmethod
-    def _siren_init(module, is_first_layer, activation_in, is_head=False, w0: float = 30.0):
+    def _siren_init(module, is_first_layer, activation_in, is_head=False, w0: float = 1.0):
         """
         Enhanced SIREN initialization.
         - is_first_layer: Uses w0 scaling for high-frequency coordinate mapping.
         - is_head: Uses small variance to start training with near-zero increments.
         - hidden: Standard SIREN initialization for residual blocks.
         """
+
+        w0 = activation_in.w0 if activation_in is not None else w0
+
         with torch.no_grad():
             if hasattr(module, 'weight'):
                 dim_in = module.weight.size(1)
@@ -789,19 +792,149 @@ class PINNverseOperator5(PINNverseOperator4):
         return out.view(batch_size, n_levels, self.n_prof).transpose(1, 2)
 
 
-class PINNverseOperatorPCA(PINNverseOperator4):
+class PINNverseOperatorPCA0(PINNverseOperator4):
     def __init__(self, pca_buffers: dict, **kwargs):
-        super().__init__(**kwargs)
 
         # 1. Register PCA Buffers (from your data.pca output)
-        self.register_buffer('basis', torch.tensor(pca_buffers['basis']).float())  # (270, 1143)
-        self.register_buffer('mu', torch.tensor(pca_buffers['mu']).float())  # (1143,)
-        self.register_buffer('std', torch.tensor(pca_buffers['std']).float())  # (1143,)
-        self.register_buffer('scales', torch.tensor(pca_buffers['scales']).float())  # (270,)
+        pca_buffers = instantiate(pca_buffers)
+        self.n_pca = pca_buffers['basis'].shape[0]
 
-        # 2. Variable info for reshaping
-        self.n_pca = self.basis.shape[0]  # 270
-        self.n_total_features = self.basis.shape[1]  # 1143 (3 vars * 127 levels)
+        super().__init__(**kwargs)
+
+        self.register_buffer('basis', torch.tensor(pca_buffers['basis']))  # (270, 1143)
+        self.register_buffer('mu', torch.tensor(pca_buffers['mu']))  # (1143,)
+        self.register_buffer('std', torch.tensor(pca_buffers['std']))  # (1143,)
+        self.register_buffer('scales', torch.tensor(pca_buffers['scales']))  # (270,)
+
+    def _build_model(self, positional_encoding, activation_in, activation_out, parameters) -> nn.Module:
+        # Standard Parameter Extraction
+        dropout_rate = parameters.architecture.dropout if hasattr(parameters.architecture, 'dropout') else 0.0
+        n_neurons = parameters.architecture.n_neurons if hasattr(parameters.architecture, 'n_neurons') else 128
+        n_layers = parameters.architecture.n_layers if hasattr(parameters.architecture, 'n_layers') else 4
+        normalization = parameters.architecture.normalization if hasattr(parameters.architecture,
+                                                                         'normalization') else None
+        n_lat = parameters.data.n_lat if parameters is not None and \
+                                         hasattr(parameters.data, 'n_lat') else 1
+        n_lon = parameters.data.n_lon if parameters is not None and \
+                                         hasattr(parameters.data, 'n_lon') else 1
+        n_scans = parameters.data.n_scans if parameters is not None and \
+                                             hasattr(parameters.data, 'n_scans') else 1
+
+        # Positional encoding
+        d_input = n_lat + n_lon + n_scans
+        self.positional_encoding = instantiate(positional_encoding, d_input=d_input) if positional_encoding \
+            else IdentityPositionalEncoding(d_input=d_input)
+        d_encoded = self.positional_encoding.d_output
+        # Input layer
+        self.d_in = nn.Linear(self.positional_encoding.d_output, n_neurons)
+        self.activation_in = instantiate(activation_in) if activation_in is not None else Sine()
+        self.dropout_in = nn.Dropout(dropout_rate)
+        # Output layer
+        self.d_out = nn.Linear(n_neurons + d_encoded, self.n_pca)
+        self.activation_out = instantiate(activation_out) if activation_out else nn.Sigmoid()
+
+        # Model architecture
+        self.normalization = nn.ModuleList(
+            [instantiate(normalization) if normalization is not None else nn.Identity()
+             for _ in range(n_layers)])
+        self.activations = nn.ModuleList([instantiate(activation_in) if activation_in is not None else Sine()
+                                          for _ in range(n_layers)])
+
+        self.dropouts = nn.ModuleList([nn.Dropout(dropout_rate)
+                                       for _ in range(n_layers)])
+
+        # SIREN initialization
+        self._siren_init(self.d_in, is_first_layer=True, activation_in=self.activation_in)
+        self._siren_init(self.d_out, is_first_layer=False, activation_in=None, is_head=True)
+
+        # Build Sequential Model
+        self.backbone = nn.ModuleList([
+            SirenResidualBlock(
+                n_neurons, self.activations[s], dropout_rate, self._siren_init,
+                normalization=self.normalization[s]
+            ) for s in range(n_layers)
+        ])
+
+        return nn.ModuleDict({
+            'd_in': self.d_in,
+            'activation_in': self.activation_in,
+            'dropout_in': self.dropout_in,
+            'backbone': self.backbone,
+            'd_out': self.d_out,
+            'activation_out': self.activation_out
+        })
+
+    def forward(self, x: dict):
+        # 1. Prepare batch metadata
+        keys_coords = ['lat', 'lon', 'scans']
+        inputs = torch.cat([x[k].view(-1, 1) for k in keys_coords if k in x], dim=-1)
+        encoded_coords = self.positional_encoding(inputs)
+
+        # Forward through Backbone
+        x_latent = self.model['activation_in'](self.model['d_in'](encoded_coords))
+        for block in self.model['backbone']:
+            x_latent = block(x_latent)
+        # Concatenate Skip Connection
+        x_out = torch.cat([x_latent, encoded_coords], dim=-1)
+
+        # PCA Coefficient Prediction (sym-log of whitened coefficients)
+        w_sym = self.model['d_out'](x_out)
+        # PCA Reconstruction (The Physics Layer)
+        w_white = sym_log(w_sym, inverse_transform=True)
+        w_standardized = w_white * self.scales
+        prof_standardized = torch.matmul(w_standardized, self.basis)
+        prof_phys = self.model['activation_out'](self.mu + (prof_standardized * self.std))
+
+        # 4. Final Reshape
+        prof_phys = prof_phys.view(-1, 127, 3)
+
+        return {
+            'prof': prof_phys,
+            'prof_white': w_sym  # Don't mind the naming convention here
+        }
+
+    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
+        """ Perform training/validation/test step.
+
+            Parameters
+            ----------
+            batch: tensor. Batch from the training set.
+            batch_nb: int. Index of the batch out of the training set.
+            stage: str. Current operation: "train", "valid", or "test".
+
+            Returns
+            -------
+            Loss value: tensor.
+        """
+
+        # Compute profiles
+        pred = self.forward(batch['input'])
+        # Apply output transformations
+        for t, transform in enumerate(self.transform_out):
+            pred['prof'] = transform(pred['prof'])
+
+        # Compute loss function
+        loss, pred['hofx'] = self.loss_func(pred, batch['target'])
+
+        # Logging
+        self._logging(stage, loss, batch['input'], batch['target'], pred)
+
+        return loss['total']
+
+
+class PINNverseOperatorPCA(PINNverseOperator4):
+    def __init__(self, pca_buffers: dict, **kwargs):
+
+        # 1. Register PCA Buffers (from your data.pca output)
+        pca_buffers = instantiate(pca_buffers)
+        self.n_pca = pca_buffers['basis'].shape[0]
+
+        super().__init__(**kwargs)
+
+        self.register_buffer('basis', torch.tensor(pca_buffers['basis']))  # (270, 1143)
+        self.register_buffer('mu', torch.tensor(pca_buffers['mu']))  # (1143,)
+        self.register_buffer('std', torch.tensor(pca_buffers['std']))  # (1143,)
+        self.register_buffer('scales', torch.tensor(pca_buffers['scales']))  # (270,)
 
     def _build_model(self, positional_encoding, activation_in, activation_out, parameters) -> nn.Module:
         # Standard Parameter Extraction
@@ -827,13 +960,14 @@ class PINNverseOperatorPCA(PINNverseOperator4):
         self.dropout_in = nn.Dropout(dropout_rate)
         # Output layer
         self.d_out = nn.Linear(n_neurons + d_encoded, self.n_pca)
-        self.activation_out = instantiate(activation_out) if activation_out else nn.Tanh()
+        self.activation_out = instantiate(activation_out) if activation_out else nn.Identity()
 
         # Model architecture
         self.normalization = nn.ModuleList([instantiate(normalization) if normalization is not None else nn.Identity()
                                             for _ in range(n_layers)])
         self.activations = nn.ModuleList([instantiate(activation_in) if activation_in is not None else Sine()
                                           for _ in range(n_layers)])
+
         self.dropouts = nn.ModuleList([nn.Dropout(dropout_rate)
                                        for _ in range(n_layers)])
 
@@ -844,7 +978,7 @@ class PINNverseOperatorPCA(PINNverseOperator4):
         # Build Sequential Model
         self.backbone = nn.ModuleList([
             SirenResidualBlock(
-                n_neurons, self.activations[s], self.dropouts[s], self._siren_init,
+                n_neurons, self.activations[s], dropout_rate, self._siren_init,
                 normalization=self.normalization[s]
             ) for s in range(n_layers)
         ])
@@ -860,7 +994,7 @@ class PINNverseOperatorPCA(PINNverseOperator4):
 
     def forward(self, x: dict):
         # 1. Prepare batch metadata
-        keys_coords = ['latitude', 'longitude', 'time']
+        keys_coords = ['lat', 'lon', 'scans']
         inputs = torch.cat([x[k].view(-1, 1) for k in keys_coords if k in x], dim=-1)
         encoded_coords = self.positional_encoding(inputs)
 
@@ -871,19 +1005,20 @@ class PINNverseOperatorPCA(PINNverseOperator4):
         # Concatenate Skip Connection
         x_out = torch.cat([x_latent, encoded_coords], dim=-1)
 
-        # PCA Coefficient Prediction
-        w_hat = self.model['activation_out'](self.model['d_out'](x_out))
+        # PCA Coefficient Prediction (sym-log of whitened coefficients)
+        w_sym = self.model['activation_out'](self.model['d_out'](x_out))
         # PCA Reconstruction (The Physics Layer)
-        w_phys = w_hat * self.scales
-        z_recon = torch.matmul(w_phys, self.basis)
-        prof_phys = self.mu + (z_recon * self.std)
+        w_white = sym_log(w_sym, inverse_transform=True)
+        w_standardized = w_white * self.scales
+        prof_standardized = torch.matmul(w_standardized, self.basis)
+        prof_phys = self.mu + (prof_standardized * self.std)
 
         # 4. Final Reshape
-        prof_phys = prof_phys.view(-1, self.n_prof, self.n_levels)
+        prof_phys = prof_phys.view(-1, 3, 127)
 
         return {
             'prof': prof_phys,
-            'pca_coeffs': w_hat
+            'prof_white': w_sym   # Don't mind the naming convention here
         }
 
     def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
@@ -905,6 +1040,140 @@ class PINNverseOperatorPCA(PINNverseOperator4):
         # Apply output transformations
         for t, transform in enumerate(self.transform_out):
             pred['prof'] = transform(pred['prof'])
+
+        # batch['target']['prof_background'] = sym_log(batch['target']['prof_white_background'], inverse_transform=True)* self.scales
+        # batch['target']['prof_background'] = (torch.matmul(batch['target']['prof_background'], self.basis)* self.std + self.mu).view(-1, 3, 127)
+
+        # Compute loss function
+        loss, pred['hofx'] = self.loss_func(pred, batch['target'])
+
+        # Logging
+        self._logging(stage, loss, batch['input'], batch['target'], pred)
+
+        return loss['total']
+
+
+
+class PINNverseOperatorWhite(PINNverseOperator4):
+    def __init__(self, pca_buffers: dict, **kwargs):
+
+        # 1. Register PCA Buffers (from your data.pca output)
+        pca_buffers = instantiate(pca_buffers)
+        self.n_pca = pca_buffers['basis'].shape[0]
+
+        super().__init__(**kwargs)
+
+        self.register_buffer('basis', torch.tensor(pca_buffers['basis']))  # (270, 1143)
+        self.register_buffer('mu', torch.tensor(pca_buffers['mu']))  # (1143,)
+        self.register_buffer('std', torch.tensor(pca_buffers['std']))  # (1143,)
+        self.register_buffer('scales', torch.tensor(pca_buffers['scales']))  # (270,)
+
+    def _build_model(self, positional_encoding, activation_in, activation_out, parameters) -> nn.Module:
+        # Standard Parameter Extraction
+        dropout_rate = parameters.architecture.dropout if hasattr(parameters.architecture, 'dropout') else 0.0
+        n_neurons = parameters.architecture.n_neurons if hasattr(parameters.architecture, 'n_neurons') else 128
+        n_layers = parameters.architecture.n_layers if hasattr(parameters.architecture, 'n_layers') else 4
+        normalization = parameters.architecture.normalization if hasattr(parameters.architecture, 'normalization') else None
+        n_lat = parameters.data.n_lat if parameters is not None and \
+                                         hasattr(parameters.data, 'n_lat') else 1
+        n_lon = parameters.data.n_lon if parameters is not None and \
+                                         hasattr(parameters.data, 'n_lon') else 1
+        n_scans = parameters.data.n_scans if parameters is not None and \
+                                             hasattr(parameters.data, 'n_scans') else 1
+
+        # Positional encoding
+        d_input = n_lat + n_lon + n_scans
+        self.positional_encoding = instantiate(positional_encoding, d_input=d_input) if positional_encoding \
+            else IdentityPositionalEncoding(d_input=d_input)
+        d_encoded = self.positional_encoding.d_output
+        # Input layer
+        self.d_in = nn.Linear(self.positional_encoding.d_output, n_neurons)
+        self.activation_in = instantiate(activation_in) if activation_in is not None else Sine()
+        self.dropout_in = nn.Dropout(dropout_rate)
+        # Output layer
+        self.d_out = nn.Linear(n_neurons + d_encoded, self.n_pca)
+        self.activation_out = instantiate(activation_out) if activation_out else nn.Identity()
+
+        # Model architecture
+        self.normalization = nn.ModuleList([instantiate(normalization) if normalization is not None else nn.Identity()
+                                            for _ in range(n_layers)])
+        self.activations = nn.ModuleList([instantiate(activation_in) if activation_in is not None else Sine()
+                                          for _ in range(n_layers)])
+
+        self.dropouts = nn.ModuleList([nn.Dropout(dropout_rate)
+                                       for _ in range(n_layers)])
+
+        # SIREN initialization
+        self._siren_init(self.d_in, is_first_layer=True, activation_in=self.activation_in)
+        self._siren_init(self.d_out, is_first_layer=False, activation_in=None, is_head=True)
+
+        # Build Sequential Model
+        self.backbone = nn.ModuleList([
+            SirenResidualBlock(
+                n_neurons, self.activations[s], dropout_rate, self._siren_init,
+                normalization=self.normalization[s]
+            ) for s in range(n_layers)
+        ])
+
+        return nn.ModuleDict({
+            'd_in': self.d_in,
+            'activation_in': self.activation_in,
+            'dropout_in': self.dropout_in,
+            'backbone': self.backbone,
+            'd_out': self.d_out,
+            'activation_out': self.activation_out
+        })
+
+    def forward(self, x: dict):
+        # 1. Prepare batch metadata
+        keys_coords = ['lat', 'lon', 'scans']
+        inputs = torch.cat([x[k].view(-1, 1) for k in keys_coords if k in x], dim=-1)
+        encoded_coords = self.positional_encoding(inputs)
+
+        # Forward through Backbone
+        x_latent = self.model['activation_in'](self.model['d_in'](encoded_coords))
+        for block in self.model['backbone']:
+            x_latent = block(x_latent)
+        # Concatenate Skip Connection
+        x_out = torch.cat([x_latent, encoded_coords], dim=-1)
+
+        # PCA Coefficient Prediction (sym-log of whitened coefficients)
+        w_white = self.model['activation_out'](self.model['d_out'](x_out))*20.0
+        # breakpoint()
+        w_standardized = w_white * self.scales
+        prof_standardized = torch.matmul(w_standardized, self.basis)
+        prof_phys = self.mu + (prof_standardized * self.std)
+
+        # 4. Final Reshape
+        prof_phys = prof_phys.view(-1, 3, 127)
+
+        return {
+            'prof': prof_phys,
+            'prof_white': w_white  # Don't mind the naming convention here
+        }
+
+    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
+        """ Perform training/validation/test step.
+
+            Parameters
+            ----------
+            batch: tensor. Batch from the training set.
+            batch_nb: int. Index of the batch out of the training set.
+            stage: str. Current operation: "train", "valid", or "test".
+
+            Returns
+            -------
+            Loss value: tensor.
+        """
+
+        # Compute profiles
+        pred = self.forward(batch['input'])
+        # Apply output transformations
+        for t, transform in enumerate(self.transform_out):
+            pred['prof'] = transform(pred['prof'])
+
+        # batch['target']['prof_background'] = sym_log(batch['target']['prof_white_background'], inverse_transform=True)* self.scales
+        # batch['target']['prof_background'] = (torch.matmul(batch['target']['prof_background'], self.basis)* self.std + self.mu).view(-1, 3, 127)
 
         # Compute loss function
         loss, pred['hofx'] = self.loss_func(pred, batch['target'])
