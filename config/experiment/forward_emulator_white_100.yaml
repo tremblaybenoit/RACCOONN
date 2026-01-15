@@ -57,6 +57,7 @@ data:
       vars:
         # Atmospheric profiles
         prof:
+          type: [ 'Air temperature', 'Ice particle effective radius', 'Ozone mixing ratio' ]
           # Normalization function and parameters
           normalization:
             # Function
@@ -65,7 +66,7 @@ data:
             # Min/max values for normalization
             stats:
               _target_: data.statistics.read_statistics_var
-              path: ${preparation.statistics.data.output.path}
+              path: ../data_float32_cs/normalization/statistics.pkl
               var: 'prof'
               dtype: ${data.dtype}
             axis: 1
@@ -126,6 +127,7 @@ loader:
 
 # Model parameters
 model:
+  _target_: forward.model.model.CRTMModel3
   # Scheduler
   lr_scheduler:
     # Number of epochs with no improvement after which learning rate will be reduced
@@ -133,6 +135,11 @@ model:
     # Threshold for measuring the new optimum, to only focus on significant changes
     threshold: 0.0
     threshold_mode: abs
+  # Parameters
+  parameters:
+    data:
+      use_prof_vars: [1, 2, 3]
+      prof_vars: [ 'Air temperature', 'Ice particle effective radius', 'Ozone mixing ratio' ]
 
 # Logger configuration
 logger:

@@ -9,7 +9,7 @@ defaults:
   - override /preparation: inverse_default
   - override /loader: inverse_cs
   - override /model: inverse_operator
-  - override /trainer: cpu
+  - override /trainer: gpu
   - override /callbacks: inverse_default
   - override /logger: default
 

@@ -283,6 +283,7 @@ def main(in_dir, in_precision, out_dir, out_precision, out_cloud_filter, out_cle
         del prof_filter
         gc.collect()
 
+    breakpoint()
     # Reload all profiles and compute background and increments. Store in each stage directory.
     prof = [load_npy(os.path.join(out_dir, stage_name, "prof.npy"), dtype=out_precision) for stage_name in ["Train2", "Val2", "Test2"]]
     prof_mean = background_climatology(np.concatenate(prof, axis=0), keepdims=True)

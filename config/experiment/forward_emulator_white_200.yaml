@@ -17,18 +17,23 @@ defaults:
 # This allows you to overwrite only specified parameters
 
 # Task name. Note that it determines the output directory path
-task_name: "forward_emulator_recast"  # Experiment
+task_name: "forward_emulator_white"  # Experiment
 
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../forward_outputs"
-  run_id: "v7"
-  data_dir: "../data_float32"
+  run_id: "cs200"
+  data_dir: "../data_float32_cs"
+
+# Callbacks
+callbacks:
+  early_stopping:
+    patience: 20  # Number of epochs with no improvement after which training will be stopped
 
 # Trainer configuration
 trainer:
   min_epochs: 1  # To prevent early stopping
-  max_epochs: 96  # Number of epochs
+  max_epochs: 192  # Number of epochs
   precision: 32  # 32-bit precision
 
 # Preparation configuration
@@ -52,6 +57,7 @@ data:
       vars:
         # Atmospheric profiles
         prof:
+          type: [ 'Air temperature', 'Ice particle effective radius', 'Ozone mixing ratio' ]
           # Normalization function and parameters
           normalization:
             # Function
@@ -60,7 +66,7 @@ data:
             # Min/max values for normalization
             stats:
               _target_: data.statistics.read_statistics_var
-              path: ${preparation.statistics.data.output.path}
+              path: ../data_float32_cs/normalization/statistics.pkl
               var: 'prof'
               dtype: ${data.dtype}
             axis: 1
@@ -83,7 +89,7 @@ data:
     # Prediction set
     predict:
       # Directory
-      dir: ${paths.data_dir}/Test2
+      dir: ${paths.data_dir}/Train2
       # Variables
       vars:
         # Atmospheric profiles
@@ -117,15 +123,26 @@ loader:
       _target_: forward.model.data_loader.TorchDataset
       results:
         hofx:
-          path: ${data.stage.predict.dir}/predict_hofx_v7.npy
+          path: ${data.stage.predict.dir}/predict_hofx_v3.npy
 
 # Model parameters
 model:
-  # Model
-  _target_: forward.model.model.CRTMModel2
+  _target_: forward.model.model.CRTMModel
+  # Scheduler
+  lr_scheduler:
+    # Number of epochs with no improvement after which learning rate will be reduced
+    patience: 6
+    # Threshold for measuring the new optimum, to only focus on significant changes
+    threshold: 0.0
+    threshold_mode: abs
+  # Parameters
+  parameters:
+    data:
+      use_prof_vars: [1, 2, 3]
+      prof_vars: [ 'Air temperature', 'Ice particle effective radius', 'Ozone mixing ratio' ]
 
 # Logger configuration
 logger:
   # MLflow logger
   ports:
-    mlflow: 5002
+    mlflow: 5004

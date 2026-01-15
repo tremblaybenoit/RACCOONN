@@ -29,4 +29,4 @@ class ScaledTanh(nn.Module):
         -------
         torch.Tensor. Output tensor after applying Sine activation.
         """
-        return self.limit * torch.tanh(x / self.limit)
+        return self.limit * torch.tanh(x)

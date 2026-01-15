@@ -71,17 +71,17 @@ class CholeskyForm(torch.nn.Module):
     Stable Mahalanobis Loss: 0.5 * || L^-1 (pred - target) ||^2
     """
 
-    def __init__(self, L_matrix: np.ndarray):
+    def __init__(self, matrix: np.ndarray):
         super().__init__()
         # Ensure L is stored as a buffer (device management)
-        self.register_buffer('L', torch.from_numpy(L_matrix).float())
+        self.register_buffer('matrix', torch.from_numpy(matrix).float())
 
     def to(self, device):
         super().to(device)
-        self.L = self.L.to(device)
+        self.matrix = self.matrix.to(device)
         return self
 
-    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    def __call__(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         # 1. Flatten to [Batch, N, 1]
         # order: (samples, vars, levels) -> (samples, vars * levels, 1)
         diff = (pred - target).view(pred.shape[0], -1, 1)
@@ -90,7 +90,7 @@ class CholeskyForm(torch.nn.Module):
         # w = L^-1 @ diff. This is the 'whitened' residual.
         # Since L is lower triangular, this is a very fast/stable back-substitution.
         whitened_diff = torch.linalg.solve_triangular(
-            self.L, diff, upper=False
+            self.matrix, diff, upper=False
         )
 
         # 3. Return 0.5 * sum(w^2) per batch
@@ -115,7 +115,7 @@ class VerticalSmoothnessLoss(nn.Module):
         self.order = order
         self.edge_weight = edge_weight
 
-    def forward(self, pred: torch.Tensor) -> torch.Tensor:
+    def __call__(self, pred: torch.Tensor) -> torch.Tensor:
         """
         Args:
             pred: Tensor of shape (Batch, Variables, Levels)

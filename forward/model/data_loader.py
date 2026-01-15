@@ -369,8 +369,8 @@ class TorchDataset(Dataset):
                 torch.Tensor. Loaded and normalized tensor in shared memory.
             """
             arr = load_var_and_normalize(var_dict)
-            if not arr.flags.c_contiguous:
-                arr = np.ascontiguousarray(arr)
+            # if not arr.flags.c_contiguous:
+            arr = np.ascontiguousarray(arr)
             t = torch.from_numpy(arr)
             t.share_memory_()
             return t

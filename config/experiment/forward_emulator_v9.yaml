@@ -33,7 +33,7 @@ callbacks:
 # Trainer configuration
 trainer:
   min_epochs: 1  # To prevent early stopping
-  max_epochs: 96  # Number of epochs
+  max_epochs: 196  # Number of epochs
   precision: 32  # 32-bit precision
 
 # Preparation configuration

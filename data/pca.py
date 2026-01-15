@@ -151,6 +151,7 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
             'std': std.flatten(),
             'eigenvalues': pca.explained_variance_,
             'scales': np.sqrt(pca.explained_variance_),
+            'scales_inv': 1.0/np.sqrt(pca.explained_variance_.reshape(1, -1)),
             'sym_log_scales': sym_log(np.sqrt(pca.explained_variance_), inverse_transform=False),
         }
 
@@ -162,6 +163,7 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
         # Mean
         whitened_mu0 = whitened_data.mean(axis=0, keepdims=True)
         whitened_mu1 = pca_processor.physical_to_whitened(mu.reshape(1, -1))
+        breakpoint()
         sym_log_mu0 = sym_log_data.mean(axis=0, keepdims=True)
         sym_log_mu1 = sym_log(whitened_mu1, inverse_transform=False)
         # Increments
@@ -185,6 +187,7 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
         sym_log_std2 = np.sqrt(sym_log_var2)
         sym_log_cov_inv2 = np.linalg.inv(sym_log_cov2).astype(data.dtype)
         #
+        pca_buffs['whitened_mu'] = whitened_mu1
         pca_buffs['scales_z_var'] = whitened_data.var(axis=0, keepdims=True)
         pca_buffs['scales_z_std'] = np.sqrt(pca_buffs['scales_z_var'])
         pca_buffs['sym_log_z_var'] = sym_log(whitened_data, inverse_transform=False).var(axis=0, keepdims=True)
@@ -199,7 +202,6 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
         # pca_buffs['sym_log_diag_cov_inv0'] = sym_log_cov_inv0
         pca_buffs['sym_log_cov_inv'] = sym_log_cov_inv1
         pca_buffs['sym_log_diag_cov_inv'] = np.diag(sym_log_cov_inv1).reshape(1, -1)
-        breakpoint()
 
 
         fig, get_axes = flexible_gridspec(cell_widths=[4.0, 4.0], cell_heights=[4.0, 4.0], lefts=[1.00, 1.00],
@@ -346,6 +348,7 @@ def compute_pca(input: DictConfig, output: DictConfig, mode: str='global', n_com
     if hasattr(output, 'save'):
         save_func = instantiate(output.save)
         save_func(pca_buffs)
+    breakpoint()
 
     return
 

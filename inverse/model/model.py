@@ -40,7 +40,7 @@ class SirenResidualBlock(nn.Module):
 
         # Internal layers for the residual path (f(x))
         self.linear1 = nn.Linear(n_neurons, n_neurons)
-        self.layernorm = normalization if normalization is not None else nn.LayerNorm(n_neurons)
+        self.layernorm = normalization if normalization is not None else nn.Identity()
         self.activation = activation
         self.linear2 = nn.Linear(n_neurons, n_neurons)
         self.dropout = nn.Dropout(dropout_rate)
@@ -65,6 +65,359 @@ class SirenResidualBlock(nn.Module):
         out = out + residual
         out = self.dropout(out)
         return out
+
+
+class PINNverseOperatorW(BaseModel):
+    """Class for the Physics-Informed Neural Network (PINN) inverse model."""
+    def __init__(self, pca_buffers: dict, optimizer: DictConfig = None, loss_func: DictConfig = None, lr_scheduler: DictConfig = None,
+                 positional_encoding: DictConfig = None, activation_in: DictConfig = None, activation_out: DictConfig = None,
+                 transform_out: ListConfig = None, parameters: DictConfig = None):
+        """ Initialize model.
+
+        Parameters
+        ----------
+        optimizer: Callable. Optimizer for the model.
+        loss_func: Callable. Loss function for the model.
+        lr_scheduler: Callable. Learning rate scheduler for the model.
+        positional_encoding: Callable. Function for the positional encoding.
+        activation_in: Callable. Activation function (in).
+        activation_out: Callable. Activation function (out).
+        transform_out: ListConfig. List of functions to apply to the model output.
+        parameters: DictConfig. Configuration for the model parameters.
+
+        Returns
+        -------
+        None.
+        """
+
+        # Class inheritance
+        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func)
+
+        # 1. Register PCA Buffers (from your data.pca output)
+        pca_buffers = instantiate(pca_buffers)
+        self.n_pca = pca_buffers['basis'].shape[0]
+
+        # Results & metrics
+        self.results['prof'] = []
+        self.metrics['prof'], self.metrics['prof_target'], self.metrics['prof_background'] = {}, {}, {}
+
+        # Normalization transformations
+        self.transform_out = [instantiate(t) for t in transform_out] if transform_out is not None else [identity]
+
+        # Model architecture
+        self.n_prof = parameters.data.n_prof if parameters is not None and hasattr(parameters.data, 'n_prof') \
+            else 1
+        self.n_levels = parameters.data.n_levels if parameters is not None and hasattr(parameters.data, 'n_levels') \
+            else 1
+        self.prof_vars = parameters.data.prof_vars if parameters is not None and hasattr(parameters.data, 'prof_vars') \
+            else [f'var_{i}' for i in range(self.n_prof)]
+
+        self.model = self._build_model(positional_encoding, activation_in, activation_out, parameters)
+
+        self.register_buffer('basis', torch.tensor(pca_buffers['basis']))  # (270, 1143)
+        self.register_buffer('mu', torch.tensor(pca_buffers['mu']))  # (1143,)
+        self.register_buffer('std', torch.tensor(pca_buffers['std']))  # (1143,)
+        self.register_buffer('scales', torch.tensor(pca_buffers['scales']))  # (270,)
+
+    @staticmethod
+    def _siren_init(module, is_first_layer, activation_in, is_head=False, w0: float = 30.0):
+        """SIREN initialization for linear layers."""
+
+        # Check if the activation is Sine, otherwise skip custom init
+        if not isinstance(activation_in, Sine):
+            return
+
+        w0 = activation_in.w0 if activation_in is not None else w0
+
+        with torch.no_grad():
+            if hasattr(module, 'weight'):
+                dim_in = module.weight.size(1)
+
+                if is_first_layer:
+                    # First layer initialization: U(-1/n, 1/n) * w0
+                    bound = 1. / dim_in
+                    nn.init.uniform_(module.weight, -bound, bound)
+                    module.weight *= w0
+                elif is_head:
+                    # Hydra Head initialization: Small variance to maintain stability
+                    # with CRTM and prevent early training divergence.
+                    # bound = torch.sqrt(torch.tensor(1. / dim_in))
+                    # nn.init.uniform_(module.weight, -bound, bound)
+                    nn.init.xavier_uniform_(module.weight, gain=1.0)
+                    module.weight *= 1.0
+                else:
+                    # Hidden layer initialization: U(-sqrt(6/n)/w0, sqrt(6/n)/w0)
+                    bound = (torch.sqrt(torch.tensor(6. / dim_in)) / w0).item()
+                    nn.init.uniform_(module.weight, -bound, bound)
+
+            if hasattr(module, 'bias') and module.bias is not None:
+                nn.init.zeros_(module.bias)
+
+    def _build_model(self, positional_encoding, activation_in, activation_out, parameters) -> nn.Module:
+        # Standard Parameter Extraction
+        dropout_rate = parameters.architecture.dropout if hasattr(parameters.architecture, 'dropout') else 0.0
+        n_neurons = parameters.architecture.n_neurons if hasattr(parameters.architecture, 'n_neurons') else 128
+        n_layers = parameters.architecture.n_layers if hasattr(parameters.architecture, 'n_layers') else 4
+        normalization = parameters.architecture.normalization if hasattr(parameters.architecture,
+                                                                         'normalization') else None
+        n_lat = parameters.data.n_lat if parameters is not None and \
+                                         hasattr(parameters.data, 'n_lat') else 1
+        n_lon = parameters.data.n_lon if parameters is not None and \
+                                         hasattr(parameters.data, 'n_lon') else 1
+        n_scans = parameters.data.n_scans if parameters is not None and \
+                                             hasattr(parameters.data, 'n_scans') else 1
+
+        # Positional encoding
+        d_input = n_lat + n_lon + n_scans
+        self.positional_encoding = instantiate(positional_encoding, d_input=d_input) if positional_encoding \
+            else IdentityPositionalEncoding(d_input=d_input)
+        d_encoded = self.positional_encoding.d_output
+
+        self.net = nn.Sequential(
+            nn.Linear(d_encoded, n_neurons),
+            Sine(),
+            nn.Linear(n_neurons, n_neurons),
+            Sine(),
+            nn.Linear(n_neurons, 270)
+        )
+
+        # Standard Initialization
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.zeros_(m.bias)
+
+        # Input layer
+        self.d_in = nn.Linear(self.positional_encoding.d_output, n_neurons)
+        self.activation_in = instantiate(activation_in) if activation_in is not None else Sine()
+        self.dropout_in = nn.Dropout(dropout_rate)
+        # Output layer
+        self.d_out = nn.Linear(n_neurons + d_encoded, self.n_pca)
+        self.activation_out = instantiate(activation_out) if activation_out else nn.Identity()
+
+        # Model architecture
+        self.normalization = nn.ModuleList([instantiate(normalization) if normalization is not None else nn.Identity()
+                                            for _ in range(n_layers)])
+        self.activations = nn.ModuleList([instantiate(activation_in) if activation_in is not None else Sine()
+                                          for _ in range(n_layers)])
+
+        self.dropouts = nn.ModuleList([nn.Dropout(dropout_rate)
+                                       for _ in range(n_layers)])
+
+        # SIREN initialization
+        self._siren_init(self.d_in, is_first_layer=True, activation_in=self.activation_in)
+        self._siren_init(self.d_out, is_first_layer=False, activation_in=None, is_head=True)
+
+        # Build Sequential Model
+        self.backbone = nn.ModuleList([
+            SirenResidualBlock(
+                n_neurons, self.activations[s], dropout_rate, self._siren_init,
+                normalization=self.normalization[s]
+            ) for s in range(n_layers)
+        ])
+
+        return nn.ModuleDict({
+            'd_in': self.d_in,
+            'activation_in': self.activation_in,
+            'dropout_in': self.dropout_in,
+            'backbone': self.backbone,
+            'd_out': self.d_out,
+            'activation_out': self.activation_out
+        })
+
+    def forward(self, x: dict):
+        # 1. Prepare batch metadata
+        keys_coords = ['lat', 'lon', 'scans']
+        inputs = torch.cat([x[k].view(-1, 1) for k in keys_coords if k in x], dim=-1)
+        encoded_coords = self.positional_encoding(inputs)
+
+        # Forward through Backbone
+        x_latent = self.model['activation_in'](self.model['d_in'](encoded_coords))
+        for block in self.model['backbone']:
+            x_latent = block(x_latent)
+        # Concatenate Skip Connection
+        x_out = torch.cat([x_latent, encoded_coords], dim=-1)
+
+        # PCA Coefficient Prediction (sym-log of whitened coefficients)
+        w_white = self.model['activation_out'](self.model['d_out'](x_out))
+
+        # w_white = self.net(encoded_coords)
+
+        # breakpoint()
+        w_standardized = w_white * self.scales
+        prof_standardized = torch.matmul(w_standardized, self.basis)
+        prof_phys = self.mu + (prof_standardized * self.std)
+
+        # 4. Final Reshape
+        prof_phys = prof_phys.view(-1, 3, 127)
+
+        return {
+            'prof': prof_phys,
+            'prof_white': w_white  # Don't mind the naming convention here
+        }
+
+    def _logging_prof(self, pred: torch.Tensor, target: torch.Tensor, background: torch.Tensor=None) -> None:
+        """ Log profile metrics.
+
+            Parameters
+            ----------
+            pred: tensor. Predicted profiles.
+            target: tensor. Target profiles.
+            background: tensor. Background profiles.
+
+            Returns
+            -------
+            None.
+        """
+
+        # Log mean profiles and rmse
+        stats_pred = statistics(pred, axis=0, which=['mean', 'stdev', 'rmse', 'mae'], target=target)
+        stats_target = statistics(target, axis=0, which=['mean', 'stdev'])
+        # Check if statistics dictionaries are empty
+        if self.metrics.get('prof'):
+            self.metrics['prof'] = accumulate_statistics([self.metrics['prof'], stats_pred])
+            self.metrics['prof_target'] = accumulate_statistics([self.metrics['prof_target'], stats_target])
+        else:
+            self.metrics['prof'] = stats_pred
+            self.metrics['prof_target'] = stats_target
+
+        # Log mean background profiles and rmse if available
+        if background is not None:
+            stats_background = statistics(background, axis=0, which=['mean', 'stdev', 'rmse', 'mae'], target=target)
+            # Check if statistics dictionaries are empty
+            if self.metrics.get('prof_background'):
+                self.metrics['prof_background'] = accumulate_statistics([self.metrics['prof_background'], stats_background])
+            else:
+                self.metrics['prof_background'] = stats_background
+
+    def _logging(self, stage: str, loss: dict, input: dict, target: dict, pred: dict) -> None:
+        """ Log training/validation/test metrics.
+
+            Parameters
+            ----------
+            stage: str. Current operation: "train", "valid", or "test".
+            loss: dict. Dictionary containing the loss components.
+            input: dict. Input coordinates.
+            target: dict. Observations.
+            pred: dict. Predictions.
+
+            Returns
+            -------
+            None.
+        """
+
+        # Logger flag
+        logger_flag = stage != 'test'
+
+        # If testing, return predictions in addition to loss
+        if stage == 'test':
+            # Log pressure levels
+            self.results['pressure'] = input['pressure'][0:1].detach().cpu().numpy()
+            # Store test outputs
+            for k, v in {'prof': pred['prof'], 'hofx': pred['hofx']}.items():
+                self.results[k].append(v.detach().cpu().numpy())
+        elif stage == 'valid':
+            # Log pressure levels
+            self.results['pressure'] = input['pressure'][0:1].detach().cpu().numpy()
+            # Log metrics for hofx and profiles
+            self._logging_hofx(pred['hofx'], target['hofx'], target['cloud_filter'].bool(),
+                               target['daytime_filter'].bool())
+            self._logging_prof(pred['prof'], target['prof'], background=target.get('prof_background', None))
+        # Log L2 norm of model parameters during training
+        elif stage == 'train':
+            # Compute L2 norm of the model parameters
+            l2_norm = sum((p ** 2).sum() for p in self.parameters() if p.requires_grad)
+            self.log(f"{stage}_l2_norm", l2_norm, on_epoch=True, prog_bar=False, logger=logger_flag)
+            # If using UncertaintyVarLoss, log the effective weights
+            if hasattr(self.loss_func, 'log_var_obs'):
+                self.log("weight_obs", torch.exp(-self.loss_func.log_var_obs), prog_bar=True, logger=logger_flag)
+            if hasattr(self.loss_func, 'log_var_model'):
+                self.log("weight_model", torch.exp(-self.loss_func.log_var_model), prog_bar=True, logger=logger_flag)
+            if hasattr(self.loss_func, 'alpha'):
+                self.log("weight_alpha", 2.0 - torch.sigmoid(self.loss_func.alpha) * 2.0, prog_bar=True, logger=logger_flag)
+
+        # Log learning rate
+        if stage == 'train' and self.lr_schedulers() is not None:
+            lr = self.lr_schedulers().get_last_lr()[0]
+            self.log(f"{stage}_lr", lr, on_epoch=True, prog_bar=False, logger=logger_flag)
+        # Log total loss
+        if 'total' in loss:
+            self.log(f"{stage}_loss", loss['total'], on_epoch=True, prog_bar=True, logger=logger_flag)
+        # Log profile and boundary condition losses
+        for key in ['model', 'bcs']:
+            if key in loss:
+                self.log(f"{stage}_loss_{key}", loss[key].mean(), on_epoch=True, prog_bar=True, logger=logger_flag)
+                # Detailed logging per profile and variable
+                if loss[key].ndim == 3:
+                    for i, var in enumerate(self.prof_vars):
+                        self.log(f"{stage}_loss_{key}_{i}_{var}", loss[key][:, i, :].mean(), on_epoch=True,
+                                 prog_bar=False, logger=logger_flag)
+                # If pressure-level filtering is involved, log only the relevant levels
+                elif loss[key].ndim == 2 and self.loss_func.pressure_filter is not None:
+                    n_pressure = torch.cumsum(self.loss_func.pressure_filter.sum(axis=1), dim=0)
+                    for i, var in enumerate(self.prof_vars):
+                        # Log loss only for the relevant pressure levels
+                        start_index, end_index = n_pressure[i-1] if i > 0 else 0, n_pressure[i]
+                        self.log(f"{stage}_loss_{key}_{i}_{var}", loss[key][:, start_index:end_index].mean(),
+                                 on_epoch=True, prog_bar=False, logger=logger_flag)
+
+        # Log observation loss
+        if 'obs' in loss:
+            self.log(f"{stage}_loss_obs", loss['obs'].mean(), on_epoch=True, prog_bar=True, logger=logger_flag)
+            if loss['obs'].ndim == 2:
+                for i in range(pred['hofx'].shape[1] // 2):
+                    self.log(f"{stage}_loss_obs_{i}", loss['obs'][:, i].mean(), on_epoch=True, prog_bar=False,
+                             logger=logger_flag)
+
+    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
+        """ Perform training/validation/test step.
+
+            Parameters
+            ----------
+            batch: tensor. Batch from the training set.
+            batch_nb: int. Index of the batch out of the training set.
+            stage: str. Current operation: "train", "valid", or "test".
+
+            Returns
+            -------
+            Loss value: tensor.
+        """
+
+        # Compute profiles
+        pred = self.forward(batch['input'])
+        # Apply output transformations
+        for t, transform in enumerate(self.transform_out):
+            pred['prof'] = transform(pred['prof'])
+
+        # Compute loss function
+        loss, pred['hofx'] = self.loss_func(pred, batch['target'])
+
+        # Logging
+        self._logging(stage, loss, batch['input'], batch['target'], pred)
+
+        return loss['total']
+
+    def predict_step(self, batch: dict, batch_idx: int, dataloader_idx: int = 0) -> torch.Tensor:
+        """ Perform prediction step.
+
+            Parameters
+            ----------
+            batch: tensor. Batch from the prediction set.
+            batch_idx: int. Index of the batch out of the prediction set.
+            dataloader_idx: int. Index of the dataloader.
+
+            Returns
+            -------
+            Predicted profiles: tensor.
+        """
+
+        # Compute profiles
+        prof = self.forward(batch['input'])
+        # Apply output transformations
+        for transform in self.transform_out:
+            prof = transform(prof)
+        return prof
+
 
 
 class PINNverseOperator(BaseModel):
@@ -612,7 +965,7 @@ class PINNverseOperator4(PINNverseOperator):
     """
 
     @staticmethod
-    def _siren_init(module, is_first_layer, activation_in, is_head=False, w0: float = 1.0):
+    def _siren_init(module, is_first_layer, activation_in, is_head=False, w0: float = 30.0):
         """
         Enhanced SIREN initialization.
         - is_first_layer: Uses w0 scaling for high-frequency coordinate mapping.
@@ -634,9 +987,10 @@ class PINNverseOperator4(PINNverseOperator):
                 elif is_head:
                     # Hydra Head initialization: Small variance to maintain stability
                     # with CRTM and prevent early training divergence.
-                    bound = torch.sqrt(torch.tensor(1. / dim_in))
-                    nn.init.uniform_(module.weight, -bound, bound)
-                    module.weight *= 0.01
+                    # bound = torch.sqrt(torch.tensor(1. / dim_in))
+                    # nn.init.uniform_(module.weight, -bound, bound)
+                    nn.init.xavier_uniform_(module.weight)
+                    module.weight *= 1.0
                 else:
                     # Hidden layer initialization: U(-sqrt(6/n)/w0, sqrt(6/n)/w0)
                     bound = (torch.sqrt(torch.tensor(6. / dim_in)) / w0).item()
@@ -792,7 +1146,7 @@ class PINNverseOperator5(PINNverseOperator4):
         return out.view(batch_size, n_levels, self.n_prof).transpose(1, 2)
 
 
-class PINNverseOperatorPCA0(PINNverseOperator4):
+class PINNverseOperatorWhite(PINNverseOperator):
     def __init__(self, pca_buffers: dict, **kwargs):
 
         # 1. Register PCA Buffers (from your data.pca output)
@@ -806,135 +1160,40 @@ class PINNverseOperatorPCA0(PINNverseOperator4):
         self.register_buffer('std', torch.tensor(pca_buffers['std']))  # (1143,)
         self.register_buffer('scales', torch.tensor(pca_buffers['scales']))  # (270,)
 
-    def _build_model(self, positional_encoding, activation_in, activation_out, parameters) -> nn.Module:
-        # Standard Parameter Extraction
-        dropout_rate = parameters.architecture.dropout if hasattr(parameters.architecture, 'dropout') else 0.0
-        n_neurons = parameters.architecture.n_neurons if hasattr(parameters.architecture, 'n_neurons') else 128
-        n_layers = parameters.architecture.n_layers if hasattr(parameters.architecture, 'n_layers') else 4
-        normalization = parameters.architecture.normalization if hasattr(parameters.architecture,
-                                                                         'normalization') else None
-        n_lat = parameters.data.n_lat if parameters is not None and \
-                                         hasattr(parameters.data, 'n_lat') else 1
-        n_lon = parameters.data.n_lon if parameters is not None and \
-                                         hasattr(parameters.data, 'n_lon') else 1
-        n_scans = parameters.data.n_scans if parameters is not None and \
-                                             hasattr(parameters.data, 'n_scans') else 1
-
-        # Positional encoding
-        d_input = n_lat + n_lon + n_scans
-        self.positional_encoding = instantiate(positional_encoding, d_input=d_input) if positional_encoding \
-            else IdentityPositionalEncoding(d_input=d_input)
-        d_encoded = self.positional_encoding.d_output
-        # Input layer
-        self.d_in = nn.Linear(self.positional_encoding.d_output, n_neurons)
-        self.activation_in = instantiate(activation_in) if activation_in is not None else Sine()
-        self.dropout_in = nn.Dropout(dropout_rate)
-        # Output layer
-        self.d_out = nn.Linear(n_neurons + d_encoded, self.n_pca)
-        self.activation_out = instantiate(activation_out) if activation_out else nn.Sigmoid()
-
-        # Model architecture
-        self.normalization = nn.ModuleList(
-            [instantiate(normalization) if normalization is not None else nn.Identity()
-             for _ in range(n_layers)])
-        self.activations = nn.ModuleList([instantiate(activation_in) if activation_in is not None else Sine()
-                                          for _ in range(n_layers)])
-
-        self.dropouts = nn.ModuleList([nn.Dropout(dropout_rate)
-                                       for _ in range(n_layers)])
-
-        # SIREN initialization
-        self._siren_init(self.d_in, is_first_layer=True, activation_in=self.activation_in)
-        self._siren_init(self.d_out, is_first_layer=False, activation_in=None, is_head=True)
-
-        # Build Sequential Model
-        self.backbone = nn.ModuleList([
-            SirenResidualBlock(
-                n_neurons, self.activations[s], dropout_rate, self._siren_init,
-                normalization=self.normalization[s]
-            ) for s in range(n_layers)
-        ])
-
-        return nn.ModuleDict({
-            'd_in': self.d_in,
-            'activation_in': self.activation_in,
-            'dropout_in': self.dropout_in,
-            'backbone': self.backbone,
-            'd_out': self.d_out,
-            'activation_out': self.activation_out
-        })
-
-    def forward(self, x: dict):
-        # 1. Prepare batch metadata
-        keys_coords = ['lat', 'lon', 'scans']
-        inputs = torch.cat([x[k].view(-1, 1) for k in keys_coords if k in x], dim=-1)
-        encoded_coords = self.positional_encoding(inputs)
-
-        # Forward through Backbone
-        x_latent = self.model['activation_in'](self.model['d_in'](encoded_coords))
-        for block in self.model['backbone']:
-            x_latent = block(x_latent)
-        # Concatenate Skip Connection
-        x_out = torch.cat([x_latent, encoded_coords], dim=-1)
-
-        # PCA Coefficient Prediction (sym-log of whitened coefficients)
-        w_sym = self.model['d_out'](x_out)
-        # PCA Reconstruction (The Physics Layer)
-        w_white = sym_log(w_sym, inverse_transform=True)
-        w_standardized = w_white * self.scales
-        prof_standardized = torch.matmul(w_standardized, self.basis)
-        prof_phys = self.model['activation_out'](self.mu + (prof_standardized * self.std))
-
-        # 4. Final Reshape
-        prof_phys = prof_phys.view(-1, 127, 3)
-
-        return {
-            'prof': prof_phys,
-            'prof_white': w_sym  # Don't mind the naming convention here
-        }
-
-    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
-        """ Perform training/validation/test step.
-
-            Parameters
-            ----------
-            batch: tensor. Batch from the training set.
-            batch_nb: int. Index of the batch out of the training set.
-            stage: str. Current operation: "train", "valid", or "test".
-
-            Returns
-            -------
-            Loss value: tensor.
+    @staticmethod
+    def _siren_init(module, is_first_layer, activation_in, is_head=False, w0: float = 30.0):
+        """
+        Enhanced SIREN initialization.
+        - is_first_layer: Uses w0 scaling for high-frequency coordinate mapping.
+        - is_head: Uses small variance to start training with near-zero increments.
+        - hidden: Standard SIREN initialization for residual blocks.
         """
 
-        # Compute profiles
-        pred = self.forward(batch['input'])
-        # Apply output transformations
-        for t, transform in enumerate(self.transform_out):
-            pred['prof'] = transform(pred['prof'])
+        w0 = activation_in.w0 if activation_in is not None else w0
 
-        # Compute loss function
-        loss, pred['hofx'] = self.loss_func(pred, batch['target'])
+        with torch.no_grad():
+            if hasattr(module, 'weight'):
+                dim_in = module.weight.size(1)
 
-        # Logging
-        self._logging(stage, loss, batch['input'], batch['target'], pred)
+                if is_first_layer:
+                    # First layer initialization: U(-1/n, 1/n) * w0
+                    bound = 1. / dim_in
+                    nn.init.uniform_(module.weight, -bound, bound)
+                    module.weight *= w0
+                elif is_head:
+                    # Hydra Head initialization: Small variance to maintain stability
+                    # with CRTM and prevent early training divergence.
+                    # bound = torch.sqrt(torch.tensor(1. / dim_in))
+                    # nn.init.uniform_(module.weight, -bound, bound)
+                    nn.init.xavier_uniform_(module.weight)
+                    module.weight *= 1.0
+                else:
+                    # Hidden layer initialization: U(-sqrt(6/n)/w0, sqrt(6/n)/w0)
+                    bound = (torch.sqrt(torch.tensor(6. / dim_in)) / w0).item()
+                    nn.init.uniform_(module.weight, -bound, bound)
 
-        return loss['total']
-
-
-class PINNverseOperatorPCA(PINNverseOperator4):
-    def __init__(self, pca_buffers: dict, **kwargs):
-
-        # 1. Register PCA Buffers (from your data.pca output)
-        pca_buffers = instantiate(pca_buffers)
-        self.n_pca = pca_buffers['basis'].shape[0]
-
-        super().__init__(**kwargs)
-
-        self.register_buffer('basis', torch.tensor(pca_buffers['basis']))  # (270, 1143)
-        self.register_buffer('mu', torch.tensor(pca_buffers['mu']))  # (1143,)
-        self.register_buffer('std', torch.tensor(pca_buffers['std']))  # (1143,)
-        self.register_buffer('scales', torch.tensor(pca_buffers['scales']))  # (270,)
+            if hasattr(module, 'bias') and module.bias is not None:
+                nn.init.zeros_(module.bias)
 
     def _build_model(self, positional_encoding, activation_in, activation_out, parameters) -> nn.Module:
         # Standard Parameter Extraction
@@ -1006,9 +1265,9 @@ class PINNverseOperatorPCA(PINNverseOperator4):
         x_out = torch.cat([x_latent, encoded_coords], dim=-1)
 
         # PCA Coefficient Prediction (sym-log of whitened coefficients)
-        w_sym = self.model['activation_out'](self.model['d_out'](x_out))
-        # PCA Reconstruction (The Physics Layer)
-        w_white = sym_log(w_sym, inverse_transform=True)
+        w_white = self.model['activation_out'](self.model['d_out'](x_out))
+
+        # breakpoint()
         w_standardized = w_white * self.scales
         prof_standardized = torch.matmul(w_standardized, self.basis)
         prof_phys = self.mu + (prof_standardized * self.std)
@@ -1018,7 +1277,7 @@ class PINNverseOperatorPCA(PINNverseOperator4):
 
         return {
             'prof': prof_phys,
-            'prof_white': w_sym   # Don't mind the naming convention here
+            'prof_white': w_white  # Don't mind the naming convention here
         }
 
     def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
@@ -1041,9 +1300,6 @@ class PINNverseOperatorPCA(PINNverseOperator4):
         for t, transform in enumerate(self.transform_out):
             pred['prof'] = transform(pred['prof'])
 
-        # batch['target']['prof_background'] = sym_log(batch['target']['prof_white_background'], inverse_transform=True)* self.scales
-        # batch['target']['prof_background'] = (torch.matmul(batch['target']['prof_background'], self.basis)* self.std + self.mu).view(-1, 3, 127)
-
         # Compute loss function
         loss, pred['hofx'] = self.loss_func(pred, batch['target'])
 
@@ -1053,8 +1309,7 @@ class PINNverseOperatorPCA(PINNverseOperator4):
         return loss['total']
 
 
-
-class PINNverseOperatorWhite(PINNverseOperator4):
+class PINNverseOperatorWhite0(PINNverseOperator4):
     def __init__(self, pca_buffers: dict, **kwargs):
 
         # 1. Register PCA Buffers (from your data.pca output)
@@ -1085,44 +1340,42 @@ class PINNverseOperatorWhite(PINNverseOperator4):
         d_input = n_lat + n_lon + n_scans
         self.positional_encoding = instantiate(positional_encoding, d_input=d_input) if positional_encoding \
             else IdentityPositionalEncoding(d_input=d_input)
-        d_encoded = self.positional_encoding.d_output
         # Input layer
         self.d_in = nn.Linear(self.positional_encoding.d_output, n_neurons)
         self.activation_in = instantiate(activation_in) if activation_in is not None else Sine()
         self.dropout_in = nn.Dropout(dropout_rate)
         # Output layer
-        self.d_out = nn.Linear(n_neurons + d_encoded, self.n_pca)
-        self.activation_out = instantiate(activation_out) if activation_out else nn.Identity()
+        self.d_out = nn.Linear(n_neurons, 270)
+        self.activation_out = instantiate(activation_out) if activation_out is not None else nn.Identity()
 
         # Model architecture
-        self.normalization = nn.ModuleList([instantiate(normalization) if normalization is not None else nn.Identity()
-                                            for _ in range(n_layers)])
+        self.layers = nn.ModuleList([nn.Linear(n_neurons, n_neurons)
+                                     for _ in range(n_layers)])
+        self.batchnorm_layers = nn.ModuleList(
+            [instantiate(normalization) if normalization is not None else nn.Identity()
+             for _ in range(n_layers)])
         self.activations = nn.ModuleList([instantiate(activation_in) if activation_in is not None else Sine()
                                           for _ in range(n_layers)])
-
         self.dropouts = nn.ModuleList([nn.Dropout(dropout_rate)
                                        for _ in range(n_layers)])
 
         # SIREN initialization
         self._siren_init(self.d_in, is_first_layer=True, activation_in=self.activation_in)
         self._siren_init(self.d_out, is_first_layer=False, activation_in=None, is_head=True)
+        for layer, activation_func in zip(self.layers, self.activations):
+            self._siren_init(layer, is_first_layer=False, activation_in=activation_func)
 
-        # Build Sequential Model
-        self.backbone = nn.ModuleList([
-            SirenResidualBlock(
-                n_neurons, self.activations[s], dropout_rate, self._siren_init,
-                normalization=self.normalization[s]
-            ) for s in range(n_layers)
-        ])
+        model = nn.Sequential(
+            self.d_in,
+            self.activation_in,
+            nn.Dropout(dropout_rate),
+            *[layer for hidden in zip(self.layers, self.batchnorm_layers, self.activations, self.dropouts) for layer in
+              hidden],
+            self.d_out,
+            self.activation_out
+        )
 
-        return nn.ModuleDict({
-            'd_in': self.d_in,
-            'activation_in': self.activation_in,
-            'dropout_in': self.dropout_in,
-            'backbone': self.backbone,
-            'd_out': self.d_out,
-            'activation_out': self.activation_out
-        })
+        return model
 
     def forward(self, x: dict):
         # 1. Prepare batch metadata
@@ -1130,16 +1383,8 @@ class PINNverseOperatorWhite(PINNverseOperator4):
         inputs = torch.cat([x[k].view(-1, 1) for k in keys_coords if k in x], dim=-1)
         encoded_coords = self.positional_encoding(inputs)
 
-        # Forward through Backbone
-        x_latent = self.model['activation_in'](self.model['d_in'](encoded_coords))
-        for block in self.model['backbone']:
-            x_latent = block(x_latent)
-        # Concatenate Skip Connection
-        x_out = torch.cat([x_latent, encoded_coords], dim=-1)
-
         # PCA Coefficient Prediction (sym-log of whitened coefficients)
-        w_white = self.model['activation_out'](self.model['d_out'](x_out))*20.0
-        # breakpoint()
+        w_white = self.model(encoded_coords)
         w_standardized = w_white * self.scales
         prof_standardized = torch.matmul(w_standardized, self.basis)
         prof_phys = self.mu + (prof_standardized * self.std)
