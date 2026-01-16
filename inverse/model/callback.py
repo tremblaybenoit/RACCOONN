@@ -1,12 +1,7 @@
-from pytorch_lightning.callbacks import Callback
 from utilities.instantiators import instantiate
-import matplotlib.pyplot as plt
 from forward.model.callback import FigureLogger as ForwardFigureLogger
-from utilities.plot import fig_vertical_profiles, fig_rmse_bars
+from utilities.plot import fig_vertical_profiles
 from utilities.tensors import to_numpy
-import wandb
-import tempfile
-import os
 
 
 class FigureLogger(ForwardFigureLogger):

@@ -433,104 +433,24 @@ class CRTMModel(BaseModel):
         return self(batch['input'])
 
 
-class CRTMModel2(BaseModel):
-    """
-    Optimized CRTM Emulator for Inverse Problems.
-    Changes:
-    1. Removed Sigmoid output (prevents vanishing gradients).
-    2. Added Linear Skip Connection (provides a direct gradient path).
-    3. Replaced Dropout with optional AlphaDropout (if training for robustness).
-    """
-
-    def __init__(self, parameters, optimizer=None, lr_scheduler=None, loss_func=None):
-        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func)
-
-        # Dimension setup
-        self.n_levels = int(parameters.data.nlevels)
-        self.n_prof_vars = len(parameters.data.use_prof_vars)
-        self.input_dim = (self.n_prof_vars * self.n_levels +
-                          len(parameters.data.use_surf_vars) +
-                          len(parameters.data.use_meta_vars))
-
-        # Neural network parameters
-        nnodes = parameters.architecture.nnodes_bt
-        nhidden = parameters.architecture.nhidden_bt
-
-        # 1. THE GRADIENT HIGHWAY (Skip Connection)
-        # Most BT variations are linear with respect to the profile.
-        # This layer provides the 'baseline' physics for the optimizer.
-        self.skip_connection = nn.Linear(self.input_dim, 10)
-
-        # 2. THE NON-LINEAR RESIDUAL (Deep Network)
-        # This part learns complex corrections (absorption lines, cloud effects)
-        self.flatten = nn.Flatten()
-        self.layers = nn.ModuleList()
-
-        # Input layer
-        self.layers.append(nn.Linear(self.input_dim, nnodes))
-        self.layers.append(Swish())
-
-        # Hidden layers
-        for _ in range(nhidden - 1):
-            self.layers.append(nn.Linear(nnodes, nnodes))
-            self.layers.append(Swish())
-
-        # 3. OUTPUT HEADS
-        # Identity for Mean (No Sigmoid!)
-        self.out_T = nn.Linear(nnodes, 10)
-
-        # Softplus for Uncertainty (Ensures positivity)
-        self.out_std = nn.Linear(nnodes, 10)
-        self.std_offset = parameters.architecture.std_output_activation_offset
-
-    def forward(self, input_dict: dict) -> torch.Tensor:
-        # Reformat variables
-        prof = self.flatten(input_dict['prof'])
-        x = torch.cat([prof, input_dict['surf'], input_dict['meta']], dim=1)
-
-        # Path A: The Linear Baseline (Strong Gradient Signal)
-        linear_bt = self.skip_connection(x)
-
-        # Path B: The Non-Linear Residual
-        res = x
-        for layer in self.layers:
-            res = layer(res)
-
-        residual_bt = self.out_T(res)
-
-        # COMBINE: Final BT is Linear Baseline + Residual Corrections
-        # This 'ResNet' style structure is much easier to invert.
-        out_bt = linear_bt + residual_bt
-
-        # Note: We removed the hard Sigmoid. To keep values in range,
-        # we trust the training data or use a soft-clamp if strictly necessary.
-
-        # Uncertainty Branch
-        out_std = torch.nn.functional.softplus(self.out_std(res)) + self.std_offset
-
-        return torch.cat([out_bt, out_std], dim=1)
-
-    def predict_step(self, batch: dict, batch_nb: int):
-        """ Perform prediction step.
-
-            Parameters
-            ----------
-            batch: dict. Batch from the prediction set.
-            batch_nb: int. Index of the batch out of the prediction set.
-
-            Returns
-            -------
-            Predicted values: tensor.
-        """
-
-        # Forward pass through the model
-        return self(batch['input'])
-
-
-
-class CRTMModel3(BaseModel):
+class CRTMModelSmooth(BaseModel):
     def __init__(self, parameters, optimizer: DictConfig = None, lr_scheduler: DictConfig = None,
                  loss_func: DictConfig = None):
+        """ Initialize LightningCRTMModel.
+
+        Parameters
+        ----------
+        optimizer: DictConfig. Optimizer for the model.
+        loss_func: DictConfig. Loss function for the model.
+        parameters: DictConfig. Configuration object containing model parameters.
+        lr_scheduler: DictConfig. Configuration object for the learning rate scheduler (optional).
+
+        Returns
+        -------
+        None.
+        """
+
+        # Class inheritance
         super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func)
 
         # Input parameters (preserved names)
@@ -765,124 +685,3 @@ class CRTMModelWhite(BaseModel):
 
         # Forward pass through the model
         return self(batch['input'])
-
-
-
-class CRTMModelPCA(BaseModel):
-    def __init__(self, parameters, pca_buffers, optimizer: DictConfig = None, lr_scheduler: DictConfig = None,
-                 loss_func: DictConfig = None):
-        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func)
-
-        # Input parameters (preserved names)
-        self.nprofvars = len(parameters.data.use_prof_vars)
-        self.nsurfvars = len(parameters.data.use_surf_vars)
-        self.nmetavars = len(parameters.data.use_meta_vars)
-        self.nlevels = int(parameters.data.nlevels)
-        self.prof_vars = parameters.data.prof_vars
-
-        # Dimension for the linear skip
-        self.input_dim = self.nprofvars * self.nlevels + self.nsurfvars + self.nmetavars
-
-        # Neural network parameters
-        nnodes_bt = parameters.architecture.nnodes_bt
-        nhidden_bt = parameters.architecture.nhidden_bt
-        dropout_rate = parameters.architecture.dropout_rate
-        self.max_T = parameters.data.bt_norm_max
-        self.min_T = parameters.data.bt_norm_min
-
-        # INVERSION FIX: We store the activation but will bypass it in the skip path
-        # or use a Leaky variant if you want to keep some bounding.
-        # For now, we'll keep the name for compatibility but use Identity in forward.
-        self.bt_output_activation = nn.Identity()
-
-        self.std_output_activation = nn.Softplus()
-        self.std_output_activation_offset = parameters.architecture.std_output_activation_offset
-        self.std_scale_trainable = parameters.architecture.std_scale_trainable
-
-        # --- Components ---
-        self.flatten = nn.Flatten()
-        self.concat = lambda *tensors: torch.cat(tensors, dim=1)
-
-        # 1. NEW: Linear Skip Connection (The Gradient Highway)
-        self.skip_connection = nn.Linear(self.input_dim, 10)
-
-        # 2. Hidden Layers (The Non-Linear Residual)
-        self.hidden_layers = nn.ModuleList()
-        self.swish_layers = nn.ModuleList()
-        self.dropout_layers = nn.ModuleList()
-
-        # First dense layer
-        self.hidden_layers.append(nn.Linear(self.input_dim, nnodes_bt))
-        self.swish_layers.append(Swish())
-        self.dropout_layers.append(nn.Dropout(dropout_rate))
-
-        # Additional hidden layers
-        for _ in range(nhidden_bt - 1):
-            self.hidden_layers.append(nn.Linear(nnodes_bt, nnodes_bt))
-            self.swish_layers.append(Swish())
-            self.dropout_layers.append(nn.Dropout(dropout_rate))
-
-        # Output layers
-        self.out_T = nn.Linear(nnodes_bt, 10)
-        self.out_std = nn.Linear(nnodes_bt, 10)
-
-        if self.std_scale_trainable:
-            self.std_scale = Scale()
-        else:
-            self.std_scale = None
-
-    def forward(self, input: dict) -> torch.Tensor:
-        # Reformat variables
-        prof = input['prof']
-        prof = self.flatten(prof)
-        x = self.concat(prof, input['surf'], input['meta'])
-
-        # Path 1: Linear Baseline (Skip)
-        # This gives the SIREN a direct path to the radiances.
-        linear_bt = self.skip_connection(x)
-
-        # Path 2: Non-linear Hidden Layers (Residual)
-        res = x
-        for dense, swish, drop in zip(self.hidden_layers, self.swish_layers, self.dropout_layers):
-            res = dense(res)
-            res = swish(res)
-            res = drop(res)
-
-        # Mean output calculation
-        # We sum the linear and residual paths before applying the range scaling
-        residual_bt = self.out_T(res)
-
-        # Combine paths
-        # No Sigmoid here! We use the range mapping directly on the sum.
-        out = linear_bt + residual_bt
-
-        # Optional: We still use the norm_max/min to keep values in physical units,
-        # but we don't 'squash' them through a Sigmoid first.
-        # If your weights were trained with Sigmoid, this scaling might need adjustment.
-        out = out * (self.max_T - self.min_T) + self.min_T
-
-        # Std output (positivity via Softplus)
-        out_std = self.out_std(res)
-        out_std = self.std_output_activation(out_std)
-        if self.std_scale is not None:
-            out_std = self.std_scale(out_std)
-        out_std = out_std + self.std_output_activation_offset
-
-        return torch.cat([out, out_std], dim=1)
-
-    def predict_step(self, batch: dict, batch_nb: int):
-        """ Perform prediction step.
-
-            Parameters
-            ----------
-            batch: dict. Batch from the prediction set.
-            batch_nb: int. Index of the batch out of the prediction set.
-
-            Returns
-            -------
-            Predicted values: tensor.
-        """
-
-        # Forward pass through the model
-        return self(batch['input'])
-

@@ -1,11 +1,10 @@
-import numpy as np
 import logging
 import hydra
 from omegaconf import DictConfig
 from utilities.logic import get_config_path
 import os
 from utilities.plot import fig_scatterplots, fig_coordinate_distributions, save_plot
-from data.io import load_var, load_var_and_normalize
+from data.io import load_var
 
 # Initialize logger
 logger = logging.getLogger(__name__)

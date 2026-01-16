@@ -8,7 +8,7 @@ defaults:
   - override /data: forward_recast
   - override /preparation: statistics
   - override /loader: forward_default
-  - override /model: forward_emulator
+  - override /model: forward_emulator2
   - override /trainer: gpu
   - override /callbacks: forward_default
   - override /logger: default

@@ -2,17 +2,16 @@
 _target_: forward.model.data_loader.Dataloader
 _recursive_: false
 batch_size: 32  # Batch size for training
-# TODO: Due to Windows limitations, num_workers must be set to 0. Change this to a higher value for Linux/MacOS for better performance.
-num_workers: 0  # Number of workers for data loading
-# TODO: Set persistent_workers to true if num_workers > 0 for better performance.
-persistent_workers: false  # Keep workers alive between epochs
+num_workers: 16  # Number of workers for data loading
+persistent_workers: true  # Keep workers alive between epochs
+pin_memory: true  # Pin memory for faster data transfer to GPU
 
 # Split the data into training, validation, and test sets
 stage:
   # Training set
   train:
     # Dataset class
-    _target_: forward.model.data_loader.CRTMDataset
+    _target_: forward.model.data_loader.TorchDataset
     _recursive_: false
     # Variables to use as input
     input:
@@ -27,7 +26,7 @@ stage:
   # Validation set
   valid:
     # Dataset class
-    _target_: forward.model.data_loader.CRTMDataset
+    _target_: forward.model.data_loader.TorchDataset
     _recursive_: false
     # Variables to use as input
     input:
@@ -42,7 +41,7 @@ stage:
   # Test set
   test:
     # Dataset class
-    _target_: forward.model.data_loader.CRTMDataset
+    _target_: forward.model.data_loader.TorchDataset
     _recursive_: false
     # Variables to use as input
     input:
@@ -73,7 +72,7 @@ stage:
   # Prediction set
   predict:
     # Dataset class
-    _target_: forward.model.data_loader.CRTMDataset
+    _target_: forward.model.data_loader.TorchDataset
     _recursive_: false
     # Variables to use as input
     input:

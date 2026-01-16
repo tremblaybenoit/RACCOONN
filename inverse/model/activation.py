@@ -5,7 +5,7 @@ import torch.nn as nn
 class ScaledTanh(nn.Module):
     """ScaledTanh activation function. """
     def __init__(self, limit=4.0):
-        """ Initialize Sine activation function.
+        """ Initialize ScaledTanh activation function.
 
         Parameters
         ----------
@@ -19,7 +19,7 @@ class ScaledTanh(nn.Module):
         self.limit = limit
 
     def forward(self, x):
-        """ Forward pass for Sine activation function.
+        """ Forward pass for ScaledTanh activation function.
 
         Parameters
         ----------
@@ -27,6 +27,6 @@ class ScaledTanh(nn.Module):
 
         Returns
         -------
-        torch.Tensor. Output tensor after applying Sine activation.
+        torch.Tensor. Output tensor after applying ScaledTanh activation.
         """
-        return self.limit * torch.tanh(x)
+        return self.limit * torch.tanh(x/self.limit)
