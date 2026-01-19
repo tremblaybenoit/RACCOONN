@@ -750,8 +750,8 @@ class VarLossPCA(torch.nn.Module):
             loss['total'] += self.lambda_model * loss['model'].mean()
 
         # Boundary condition losses (where the variance is zero)
-        if self.loss_bcs is not None:
-            raise NotImplementedError("Boundary condition loss is not implemented for PCA-based profiles.")
+        # if self.loss_bcs is not None:
+        #     raise NotImplementedError("Boundary condition loss is not implemented for PCA-based profiles.")
 
         return loss, hofx_pred
 

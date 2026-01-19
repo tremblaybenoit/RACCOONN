@@ -95,26 +95,10 @@ data:
 loader:
   batch_size: 96
   num_workers: 16
-  persistent_workers: true
-  pin_memory: true
   # Split the data into training, validation, and test sets
   stage:
-    # Training set
-    train:
-      # Dataset class
-      _target_: forward.model.data_loader.TorchDataset
-    # Validation set
-    valid:
-      # Dataset class
-      _target_: forward.model.data_loader.TorchDataset
-    # Test set
-    test:
-      # Dataset class
-      _target_: forward.model.data_loader.TorchDataset
     # Prediction set
     predict:
-      # Dataset class
-      _target_: forward.model.data_loader.TorchDataset
       results:
         hofx:
           path: ${data.stage.predict.dir}/predict_hofx_v3.npy

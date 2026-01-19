@@ -8,7 +8,7 @@ defaults:
   - override /data: forward_recast
   - override /preparation: statistics
   - override /loader: forward_default
-  - override /model: forward_emulator2
+  - override /model: forward_emulator_smooth
   - override /trainer: gpu
   - override /callbacks: forward_default
   - override /logger: default
@@ -22,7 +22,7 @@ task_name: "forward_emulator_recast"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../forward_outputs"
-  run_id: "v7"
+  run_id: "v8"
   data_dir: "../data_float32"
 
 # Trainer configuration
@@ -95,34 +95,13 @@ data:
 loader:
   batch_size: 96
   num_workers: 16
-  persistent_workers: true
-  pin_memory: true
   # Split the data into training, validation, and test sets
   stage:
-    # Training set
-    train:
-      # Dataset class
-      _target_: forward.model.data_loader.TorchDataset
-    # Validation set
-    valid:
-      # Dataset class
-      _target_: forward.model.data_loader.TorchDataset
-    # Test set
-    test:
-      # Dataset class
-      _target_: forward.model.data_loader.TorchDataset
     # Prediction set
     predict:
-      # Dataset class
-      _target_: forward.model.data_loader.TorchDataset
       results:
         hofx:
-          path: ${data.stage.predict.dir}/predict_hofx_v7.npy
-
-# Model parameters
-model:
-  # Model
-  _target_: forward.model.model.CRTMModel2
+          path: ${data.stage.predict.dir}/predict_hofx_v8.npy
 
 # Logger configuration
 logger:

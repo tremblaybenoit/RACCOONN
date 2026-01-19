@@ -22,7 +22,7 @@ task_name: "forward_emulator_white"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../forward_outputs"
-  run_id: "cs000"
+  run_id: "cs200"
   data_dir: "../data_float32_cs"
 
 # Callbacks
@@ -105,29 +105,15 @@ loader:
   pin_memory: true
   # Split the data into training, validation, and test sets
   stage:
-    # Training set
-    train:
-      # Dataset class
-      _target_: forward.model.data_loader.TorchDataset
-    # Validation set
-    valid:
-      # Dataset class
-      _target_: forward.model.data_loader.TorchDataset
-    # Test set
-    test:
-      # Dataset class
-      _target_: forward.model.data_loader.TorchDataset
     # Prediction set
     predict:
-      # Dataset class
-      _target_: forward.model.data_loader.TorchDataset
       results:
         hofx:
           path: ${data.stage.predict.dir}/predict_hofx_v3.npy
 
 # Model parameters
 model:
-  _target_: forward.model.model.CRTMModel3
+  _target_: forward.model.model.CRTMModel
   # Scheduler
   lr_scheduler:
     # Number of epochs with no improvement after which learning rate will be reduced

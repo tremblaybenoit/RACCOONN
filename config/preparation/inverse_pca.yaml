@@ -1,0 +1,6 @@
+# Configuration to load multiple preparation methods
+defaults:
+  - statistics
+  - covariance
+  - pca
+  - _self_

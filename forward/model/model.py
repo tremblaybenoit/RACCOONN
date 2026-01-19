@@ -567,7 +567,7 @@ class CRTMModelSmooth(BaseModel):
         return self(batch['input'])
 
 
-class CRTMModelWhite(CRTMModelSmooth):
+class CRTMModelPCA(CRTMModelSmooth):
     def __init__(self, parameters, optimizer: DictConfig = None, lr_scheduler: DictConfig = None,
                  loss_func: DictConfig = None):
         """ Initialize LightningCRTMModel.

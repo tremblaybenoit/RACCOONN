@@ -1,7 +1,9 @@
 # Atmospheric profiles
 prof:
   # Profile types
-  type: ['Air temperature', 'Humidity mixing ratio', 'Ozone mixing ratio']
+  type: ['Air temperature', 'Cloud ice particle effective radius', 'Cloud water particle effective radius',
+         'Snow particle effective radius', 'Humidity mixing ratio', 'Cloud ice mass', 'Cloud water mass',
+         'Snow mass', 'Ozone mixing ratio']
   # Loading function
   load:
     _target_: data.io.load_npy

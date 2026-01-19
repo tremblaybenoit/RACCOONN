@@ -1,0 +1,4 @@
+defaults:
+  - statistics
+  - pca
+  - _self_

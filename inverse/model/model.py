@@ -9,29 +9,6 @@ from forward.model.activation import Sine
 from inverse.model.encoding import IdentityPositionalEncoding
 from utilities.instantiators import instantiate
 from data.transformations import identity
-import inspect
-
-
-class InverseEmulator(LightningModule):
-    """Class for radiance transfer (PINN) inverse emulator."""
-    def __init__(self, optimizer: DictConfig = None, loss_func: DictConfig = None, lr_scheduler: DictConfig = None):
-        """ Initialize model.
-
-        Parameters
-        ----------
-        optimizer: Callable. Optimizer for the model.
-        loss_func: Callable. Loss function for the model.
-        lr_scheduler: Callable. Learning rate scheduler for the model.
-
-        Returns
-        -------
-        None.
-        """
-
-        # TODO: Complete model
-
-        # Class inheritance
-        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func)
 
 
 class SirenInit:
@@ -99,6 +76,270 @@ class SirenInit:
                 nn.init.zeros_(module.bias)
 
 
+class Residual(nn.Module):
+    """
+    Residual block with skip connection.
+    """
+    def __init__(self, module: nn.Module, projection: nn.Module = None):
+        """
+        Initialize Residual block.
+
+        Parameters
+        ----------
+        module: nn.Module. Internal block to apply.
+        projection: nn.Module. Optional projection for skip connection.
+
+        Returns
+        -------
+        None.
+        """
+
+        # Class inheritance
+        super().__init__()
+
+        # Internal block
+        self.module = module
+        self.projection = projection if projection is not None else nn.Identity()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass through the Residual block.
+
+        Parameters
+        ----------
+        x: tensor. Input tensor.
+
+        Returns
+        -------
+        out: tensor. Output tensor after applying the residual block.
+        """
+
+        # Skip connection: out = f(x) + x
+        return self.module(x) + self.projection(x)
+
+
+class Concatenate(nn.Module):
+    """
+    Concatenate input with the output of a module.
+    """
+    def __init__(self, module: nn.Module):
+        """
+        Initialize Concatenate block.
+
+        Parameters
+        ----------
+        module: nn.Module. Internal block to apply.
+
+        Returns
+        -------
+        None.
+        """
+
+        # Class inheritance
+        super().__init__()
+
+        # Module
+        self.module = module
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass through the Concatenate block.
+
+        Parameters
+        ----------
+        x: tensor. Input tensor.
+
+        Returns
+        -------
+        out: tensor. Output tensor after applying the concatenate block.
+        """
+
+        # Concatenate input with module output
+        return torch.cat([x, self.module(x)], dim=-1)
+
+
+class BaseNN(nn.Module):
+    """
+    Multi-Layer Perceptron (MLP) with configurable layers.
+    """
+    def __init__(self, input_layer: DictConfig, hidden_layer: DictConfig, output_layer: DictConfig,
+                 positional_encoding: DictConfig = None, n_hidden_layers: int=2,
+                 hidden_skip: bool=False, output_skip: bool=False):
+        """
+        Initialize MLP.
+
+        Parameters
+        ----------
+        input_layer: DictConfig. Configuration for the input layer.
+        hidden_layer: DictConfig. Configuration for the hidden layers.
+        output_layer: DictConfig. Configuration for the output layer.
+        n_hidden_layers: int. Number of hidden layers.
+        hidden_skip: bool. Flag to enable skip connections in hidden layers.
+        output_skip: bool. Flag to enable skip connections in output layer.
+
+        Returns
+        -------
+        None.
+        """
+
+        # Class inheritance
+        super().__init__()
+
+        # Positional encoding
+        if positional_encoding is not None:
+            self.positional_encoding = instantiate(positional_encoding)
+            input_layer.in_features = self.positional_encoding.d_output
+        else:
+            self.positional_encoding = IdentityPositionalEncoding(d_input=input_layer.in_features)
+        # Input layer
+        self.input_layer = instantiate(input_layer)
+        # Hidden layers
+        hidden_layers = []
+        # Build hidden layers with optional skip connections
+        for _ in range(n_hidden_layers):
+            hidden_layer_instance = instantiate(hidden_layer)
+            if hidden_skip:
+                hidden_layer_instance = Residual(hidden_layer_instance)
+            hidden_layers.append(hidden_layer_instance)
+        # Output layer
+        if output_skip:
+            self.hidden_layers = Concatenate(nn.Sequential(*hidden_layers))
+            output_layer.in_features = hidden_layer.out_features + input_layer.out_features
+        else:
+            self.hidden_layers = nn.Sequential(*hidden_layers)
+        # Model architecture
+        self.output_layer = instantiate(output_layer)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass through the MLP.
+
+        Parameters
+        ----------
+        x: tensor. Input tensor.
+
+        Returns
+        -------
+        out: tensor. Output tensor after applying the MLP.
+        """
+
+        # Pass
+        x_encoded = self.positional_encoding(x)
+        x_input = self.input_layer(x_encoded)
+        x_hidden = self.hidden_layers(x_input)
+        x_output = self.output_layer(x_hidden)
+        return x_output
+
+
+class MLP(nn.Module):
+    """
+    Multi-Layer Perceptron (MLP) with configurable layers.
+    """
+    def __init__(self, input_layer: DictConfig, input_layernorm: DictConfig, input_activation: DictConfig,
+                 input_dropout: float, input_init: DictConfig, hidden_layer: DictConfig, hidden_layernorm: DictConfig,
+                 hidden_activation: DictConfig, hidden_dropout: float, hidden_init: DictConfig,
+                 output_layer: DictConfig, output_layernorm: DictConfig, output_activation: DictConfig,
+                 output_init: DictConfig, n_hidden_layers: int=2,
+                 hidden_layer_skip: bool=False, output_layer_skip: bool=False):
+        """
+        Initialize MLP.
+
+        Parameters
+        ----------
+        input_layer: DictConfig. Configuration for the input layer.
+        input_layernorm: DictConfig. Configuration for the input layer normalization.
+        input_activation: DictConfig. Configuration for the input layer activation.
+        input_dropout: float. Dropout rate for the input layer.
+        input_init: DictConfig. Configuration for the input layer initialization.
+        hidden_layer: DictConfig. Configuration for the hidden layers.
+        hidden_layernorm: DictConfig. Configuration for the hidden layer normalization.
+        hidden_activation: DictConfig. Configuration for the hidden layer activation.
+        hidden_dropout: float. Dropout rate for the hidden layers.
+        hidden_init: DictConfig. Configuration for the hidden layer initialization.
+        output_layer: DictConfig. Configuration for the output layer.
+        output_layernorm: DictConfig. Configuration for the output layer normalization.
+        output_activation: DictConfig. Configuration for the output layer activation.
+        output_init: DictConfig. Configuration for the output layer initialization.
+        n_hidden_layers: int. Number of hidden layers.
+        hidden_layer_skip: bool. Flag to enable skip connections in hidden layers.
+        output_layer_skip: bool. Flag to enable skip connections in output layer.
+
+        Returns
+        -------
+        None.
+        """
+
+        # Class inheritance
+        super().__init__()
+
+        # Input layer
+        input_layers = LinearBlock(
+            in_features=input_layer.in_features,
+            out_features=input_layer.out_features,
+            activation=instantiate(input_activation),
+            dropout_rate=input_dropout,
+            layernorm=instantiate(input_layernorm),
+            init_func=instantiate(input_init)
+        )
+        # Hidden layers
+        hidden_layers = []
+        for _ in range(n_hidden_layers):
+            hidden_layer_instance = LinearBlock(
+                in_features=hidden_layer.in_features,
+                out_features=hidden_layer.out_features,
+                activation=instantiate(hidden_activation),
+                dropout_rate=hidden_dropout,
+                layernorm=instantiate(hidden_layernorm),
+                init_func=instantiate(hidden_init)
+            )
+            if hidden_layer_skip:
+                hidden_layer_instance = Residual(hidden_layer_instance)
+            hidden_layers.append(hidden_layer_instance)
+        # Output layer
+        if output_layer_skip:
+            output_layers = Concatenate(
+                LinearBlock(
+                    in_features=output_layer.in_features,
+                    out_features=output_layer.out_features,
+                    activation=instantiate(output_activation),
+                    dropout_rate=0.0,
+                    layernorm=instantiate(output_layernorm),
+                    init_func=instantiate(output_init)
+                )
+            )
+        else:
+            output_layers = LinearBlock(
+                in_features=output_layer.in_features,
+                out_features=output_layer.out_features,
+                activation=instantiate(output_activation),
+                dropout_rate=0.0,
+                layernorm=instantiate(output_layernorm),
+                init_func=instantiate(output_init)
+            )
+        # Model architecture
+        self.model = nn.Sequential(
+            input_layers,
+            *hidden_layers,
+            output_layers
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass through the MLP.
+
+        Parameters
+        ----------
+        x: tensor. Input tensor.
+
+        Returns
+        -------
+        out: tensor. Output tensor after applying the MLP.
+        """
+
+        # Pass
+        return self.model(x)
+
+
 def _siren_init(module, is_first_layer: bool, activation, is_head: bool = False, w0: float = 30.0):
     """
         SIREN weights initialization function.
@@ -148,6 +389,52 @@ def _siren_init(module, is_first_layer: bool, activation, is_head: bool = False,
         # Bias initialization
         if hasattr(module, 'bias') and module.bias is not None:
             nn.init.zeros_(module.bias)
+
+
+class SirenResidualMLP(nn.Module):
+    """
+    Multi-Layer Perceptron (MLP) with SIREN Residual Blocks.
+    """
+    def __init__(self, input_layer: DictConfig, hidden_layer: DictConfig, output_layer: DictConfig,
+                 n_hidden_layers: int=2, output_layer_skip: bool=False):
+        """
+        Initialize MLP with SIREN Residual Blocks.
+
+        Parameters
+        ----------
+        input_layer: DictConfig. Configuration for the input layer.
+        hidden_layer: DictConfig. Configuration for the hidden layers (residual blocks).
+        output_layer: DictConfig. Configuration for the output layer.
+        n_hidden_layers: int. Number of hidden layers (residual blocks).
+
+        Returns
+        -------
+        None.
+        """
+
+        # Class inheritance
+        super().__init__()
+
+        # Input layer
+        input_layer = instantiate(input_layer)
+        # Hidden layers with SIREN Residual Blocks
+        hidden_layers = []
+        for _ in range(n_hidden_layers):
+            hidden_layer_instance = instantiate(hidden_layer)
+            hidden_layers.append(hidden_layer_instance)
+        # Output layer
+        if output_layer_skip:
+            output_layer = Concatenate(instantiate(output_layer))
+        else:
+            output_layer = instantiate(output_layer)
+
+        # Model architecture
+        self.model = nn.Sequential(
+            input_layer,
+            *hidden_layers,
+            output_layer
+        )
+
 
 
 class LinearBlock(nn.Module):
@@ -202,8 +489,8 @@ class LinearBlock(nn.Module):
 
 
 class SirenResidualBlock(nn.Module):
-    def __init__(self, n_neurons: int, activation: Callable, dropout_rate: float,
-                 init_func: Callable = _siren_init, normalization: Callable=None):
+    def __init__(self, n_neurons: int, activation: Callable = None, dropout_rate: float = 0,
+                 init_func: Callable = None, normalization: Callable=None):
         """ Initialize a SIREN Residual Block.
 
         Parameters
@@ -225,13 +512,15 @@ class SirenResidualBlock(nn.Module):
         # Internal layers for the residual path (f(x))
         self.linear1 = nn.Linear(n_neurons, n_neurons)
         self.layernorm = normalization if normalization is not None else nn.Identity()
-        self.activation = activation
+        self.activation = activation if activation is not None else Sine()
         self.linear2 = nn.Linear(n_neurons, n_neurons)
         self.dropout = nn.Dropout(dropout_rate)
 
         # Apply SIREN Initialization to internal layers
-        init_func(self.linear1, is_first_layer=False, activation_in=activation)
-        init_func(self.linear2, is_first_layer=False, activation_in=activation)
+        if init_func is not None:
+            init_func = SirenInit(is_first_layer=False, activation=self.activation)
+        init_func(self.linear1)
+        init_func(self.linear2)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """ Forward pass through the SIREN Residual Block.
@@ -260,6 +549,79 @@ class SirenResidualBlock(nn.Module):
         out = out + residual
         out = self.dropout(out)
         return out
+
+
+class SirenResidualNetwork(nn.Module):
+    def __init__(self, input_layer: DictConfig, hidden_layer: DictConfig, output_layer: DictConfig,
+                 n_hidden_layers: int=2, output_layer_skip: bool=False):
+        """ Initialize SIREN Residual Network.
+
+        Parameters
+        ----------
+        input_layer: DictConfig. Configuration for the input layer.
+        hidden_layer: DictConfig. Configuration for the hidden layers (residual blocks).
+        output_layer: DictConfig. Configuration for the output layer.
+        n_hidden_layers: int. Number of hidden layers (residual blocks).
+        output_layer_skip: bool. Flag to enable skip connections in output layer.
+
+        Returns
+        -------
+        None.
+        """
+
+        # Class inheritance
+        super().__init__()
+
+        # Input layer
+        self.input_layer = LinearBlock(
+            in_features=input_layer.in_features,
+            out_features=input_layer.out_features,
+            activation=input_layer.activation,
+            dropout_rate=input_layer.dropout_rate,
+            layernorm=input_layer.layernorm,
+            init_func=SirenInit(is_first_layer=True, activation=input_layer.activation)
+        )
+
+        # Hidden layers with SIREN Residual Blocks
+        hidden_layers = []
+        for _ in range(n_hidden_layers):
+            hidden_layer_instance = SirenResidualBlock(
+                n_neurons=hidden_layer.n_neurons,
+                activation=hidden_layer.activation,
+                dropout_rate=hidden_layer.dropout_rate,
+                init_func=SirenInit(is_first_layer=False, activation=hidden_layer.activation),
+                normalization=hidden_layer.normalization
+            )
+            hidden_layers.append(hidden_layer_instance)
+        # Output layer
+        if output_layer_skip:
+            self.hidden_layers = Concatenate(nn.Sequential(*hidden_layers))
+            output_layer.in_features = hidden_layer.out_features + input_layer.out_features
+        else:
+            self.hidden_layers = nn.Sequential(*hidden_layers)
+        self.output_layer = LinearBlock(
+            in_features=output_layer.in_features,
+            out_features=output_layer.out_features,
+            activation=output_layer.activation,
+            dropout_rate=0.0,
+            layernorm=output_layer.layernorm,
+            init_func=SirenInit(is_first_layer=False, activation=output_layer.activation, is_head=True)
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """ Forward pass through the SIREN Residual Network.
+        Parameters
+        ----------
+        x: tensor. Input tensor.
+        Returns
+        -------
+        out: tensor. Output tensor after applying the network.
+        # Pass
+        """
+        x_input = self.input_layer(x)
+        x_hidden = self.hidden_layers(x_input)
+        x_output = self.output_layer(x_hidden)
+        return x_output
 
 
 class PINNverseOperator0(BaseModel):
@@ -330,7 +692,7 @@ class PINNverseOperator0(BaseModel):
             self.positional_encoding = instantiate(positional_encoding)
             input_layer.in_features = self.positional_encoding.d_output
         else:
-            self.positional_encoding = IdentityPositionalEncoding(d_input=input_layer['in_features'])
+            self.positional_encoding = IdentityPositionalEncoding(d_input=input_layer.in_features)
 
         # Input layer
         self.input_layer = instantiate(input_layer)
@@ -880,7 +1242,7 @@ class PINNverseOperator4(PINNverseOperator):
         return out.view(batch_size, n_levels, self.n_prof).transpose(1, 2)
 
 
-class PINNverseOperatorWhite(PINNverseOperator):
+class PINNverseOperatorPCA(PINNverseOperator):
     def __init__(self, pca_buffers: dict, **kwargs):
 
         # 1. Register PCA Buffers (from your data.pca output)
@@ -893,41 +1255,6 @@ class PINNverseOperatorWhite(PINNverseOperator):
         self.register_buffer('mu', torch.tensor(pca_buffers['mu']))  # (1143,)
         self.register_buffer('std', torch.tensor(pca_buffers['std']))  # (1143,)
         self.register_buffer('scales', torch.tensor(pca_buffers['scales']))  # (270,)
-
-    @staticmethod
-    def _siren_init(module, is_first_layer, activation_in, is_head=False, w0: float = 30.0):
-        """
-        Enhanced SIREN initialization.
-        - is_first_layer: Uses w0 scaling for high-frequency coordinate mapping.
-        - is_head: Uses small variance to start training with near-zero increments.
-        - hidden: Standard SIREN initialization for residual blocks.
-        """
-
-        w0 = activation_in.w0 if activation_in is not None else w0
-
-        with torch.no_grad():
-            if hasattr(module, 'weight'):
-                dim_in = module.weight.size(1)
-
-                if is_first_layer:
-                    # First layer initialization: U(-1/n, 1/n) * w0
-                    bound = 1. / dim_in
-                    nn.init.uniform_(module.weight, -bound, bound)
-                    module.weight *= w0
-                elif is_head:
-                    # Hydra Head initialization: Small variance to maintain stability
-                    # with CRTM and prevent early training divergence.
-                    # bound = torch.sqrt(torch.tensor(1. / dim_in))
-                    # nn.init.uniform_(module.weight, -bound, bound)
-                    nn.init.xavier_uniform_(module.weight)
-                    module.weight *= 1.0
-                else:
-                    # Hidden layer initialization: U(-sqrt(6/n)/w0, sqrt(6/n)/w0)
-                    bound = (torch.sqrt(torch.tensor(6. / dim_in)) / w0).item()
-                    nn.init.uniform_(module.weight, -bound, bound)
-
-            if hasattr(module, 'bias') and module.bias is not None:
-                nn.init.zeros_(module.bias)
 
     def _build_model(self, positional_encoding, activation_in, activation_out, parameters) -> nn.Module:
         """ Build the neural network model.
