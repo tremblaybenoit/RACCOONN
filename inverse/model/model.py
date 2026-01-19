@@ -158,7 +158,7 @@ class Concatenate(nn.Module):
         return torch.cat([x, self.module(x)], dim=-1)
 
 
-class BaseNN(nn.Module):
+class ResidualMLP(nn.Module):
     """
     Multi-Layer Perceptron (MLP) with configurable layers.
     """
@@ -199,7 +199,13 @@ class BaseNN(nn.Module):
         for _ in range(n_hidden_layers):
             hidden_layer_instance = instantiate(hidden_layer)
             if hidden_skip:
-                hidden_layer_instance = Residual(hidden_layer_instance)
+                # Projection for skip connection if dimensions differ
+                if hidden_layer_instance.in_features != hidden_layer_instance.out_features:
+                    projection = nn.Linear(hidden_layer_instance.in_features,
+                                           hidden_layer_instance.out_features)
+                else:
+                    projection = None
+                hidden_layer_instance = Residual(hidden_layer_instance, projection=projection)
             hidden_layers.append(hidden_layer_instance)
         # Output layer
         if output_skip:
