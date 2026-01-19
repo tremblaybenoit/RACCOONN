@@ -134,8 +134,10 @@ class TrainerLogger:
             os.makedirs(safe_path, exist_ok=True)
 
             # Note: file:// protocol usually takes two slashes + the absolute path
-            # file:///mnt/c/path...
-            os.environ["MLFLOW_TRACKING_URI"] = safe_path
+            if sys.platform.startswith("linux"):
+                os.environ["MLFLOW_TRACKING_URI"] = safe_path
+            else:
+                os.environ["MLFLOW_TRACKING_URI"] = f"file:///{safe_path}"
 
     def ui(self, show: bool=False) -> None:
         """ Access logger UI via terminal commands.
