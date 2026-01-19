@@ -127,6 +127,7 @@ class Operator:
         # Model
         logger.info("Initializing model...")
         self.model = instantiate(self.config.model)
+        breakpoint()
         if hasattr(self.config.data, 'dtype'):
             self.model = self.model.to(None, dtype=getattr(torch, self.config.data.dtype))
         else:

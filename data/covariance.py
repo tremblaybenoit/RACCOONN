@@ -101,9 +101,18 @@ def prepare_stable_cholesky(err_data: np.ndarray, ridge_factor: float=1e-6, max_
     return lm.astype(target_dtype)
 
 
-def verify_cholesky_reconstruction(B_stable: np.ndarray, L: np.ndarray):
+def verify_cholesky_reconstruction(B_stable: np.ndarray, L: np.ndarray) -> np.ndarray:
     """
     Verifies that the Cholesky factor accurately reconstructs the covariance matrix.
+
+    Parameters
+    ----------
+    B_stable: np.ndarray. The stable covariance matrix.
+    L: np.ndarray. The lower Cholesky factor such that B = L @ L.T.
+
+    Returns
+    -------
+    np.ndarray. Absolute differences between B_stable and reconstructed B.
     """
     # 1. Reconstruct: B_reconstructed = L @ L.T
     B_rec = L @ L.T
@@ -324,7 +333,6 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
     cov_inv = np.linalg.inv(cov).astype(err.dtype)
     var_inv = np.diag(cov_inv)
     vif = var*var_inv
-    breakpoint()
 
     # Check if covariance matrix is positive definite
     if np.any(np.linalg.eigvals(cov_inv) <= 0):
@@ -347,7 +355,6 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
         plot_map(ax, cov_inv, title=f"Inverse covariance matrix", plt_origin='upper',
                  cb_label=r'Values (divided by 10$^4$)')
         save_plot(fig, filename=os.path.splitext(output.path)[0] + '.png')
-    breakpoint()
 
     return
 

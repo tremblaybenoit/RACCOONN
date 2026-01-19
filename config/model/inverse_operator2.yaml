@@ -1,5 +1,5 @@
 # Model
-_target_: inverse.model.model.PINNverseOperator
+_target_: inverse.model.model.PINNverseOperator0
 _recursive_: false
 
 # Optimizer function and parameters
@@ -49,8 +49,6 @@ parameters:
     n_layers: 4
     # Dropout rate
     dropout: 0.1
-    # Normalization
-    normalization: null
 
 # Loss function and parameters
 loss_func:
@@ -83,6 +81,15 @@ loss_func:
 # Positional encoding
 positional_encoding:
   _target_: inverse.model.encoding.IdentityPositionalEncoding
+  d_input:
+    _target_: numpy.sum
+    _args_:
+      -
+        - ${model.parameters.data.n_lat}
+        - ${model.parameters.data.n_lon}
+        - ${model.parameters.data.n_scans}
+        - ${model.parameters.data.n_pressure}
+        - ${model.parameters.data.n_cloud}
 
 # Input layer
 input_layer:
@@ -90,11 +97,12 @@ input_layer:
   in_features:
     _target_: numpy.sum
     _args_:
-      - [${model.parameters.data.n_lat},
-         ${model.parameters.data.n_lon},
-         ${model.parameters.data.n_scans},
-         ${model.parameters.data.n_pressure},
-         ${model.parameters.data.n_clouds},]
+      -
+        - ${model.parameters.data.n_lat}
+        - ${model.parameters.data.n_lon}
+        - ${model.parameters.data.n_scans}
+        - ${model.parameters.data.n_pressure}
+        - ${model.parameters.data.n_cloud}
   out_features: ${model.parameters.architecture.n_neurons}
   layernorm:
     _target_: torch.nn.Identity
@@ -103,8 +111,8 @@ input_layer:
     w0: 30.0
   dropout_rate: ${model.parameters.architecture.dropout}
   init_func:
-    _target_: inverse.model.model._siren_init
-    is_first: true
+    _target_: inverse.model.model.SirenInit
+    is_first_layer: true
     activation: ${model.input_layer.activation}
 
 # Hidden layer
@@ -116,8 +124,8 @@ hidden_layer:
   activation: ${model.input_layer.activation}
   dropout_rate: ${model.parameters.architecture.dropout}
   init_func:
-    _target_: inverse.model.model._siren_init
-    is_first: false
+    _target_: inverse.model.model.SirenInit
+    is_first_layer: false
     activation: ${model.hidden_layer.activation}
 
 # Output layer
@@ -125,28 +133,19 @@ output_layer:
   _target_: inverse.model.model.LinearBlock
   in_features: ${model.parameters.architecture.n_neurons}
   out_features:
-    _target: numpy.multiply
+    _target_: builtins.int
     _args_:
-      - ${model.parameters.data.n_prof}
-      - ${model.parameters.data.n_levels}
+      -
+        _target_: numpy.multiply
+        _args_:
+          - ${model.parameters.data.n_prof}
+          - ${model.parameters.data.n_levels}
   layernorm: ${model.input_layer.layernorm}
   activation:
     _target_: torch.nn.Sigmoid
   dropout_rate: 0.0
   init_func:
-    _target_: inverse.model.model._siren_init
-    is_first: false
+    _target_: inverse.model.model.SirenInit
+    is_first_layer: false
     is_head: true
     activation: ${model.output_layer.activation}
-
-
-# Activation functions (input layer/within the network)
-activation_in:
-  _target_: forward.model.activation.Sine
-
-# Activation function (output layer)
-activation_out:
-  _target_: torch.nn.Sigmoid
-
-# Transformations (to apply after the output layer)
-transform_out: null
