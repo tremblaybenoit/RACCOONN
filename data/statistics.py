@@ -325,13 +325,13 @@ def accumulate_variance(stats: list[dict[str, Union[np.ndarray, torch.Tensor]]])
     # If the statistics are torch tensors
     if all_torch(means) and all_torch(variances):
         n_samples = torch.sum(torch.stack(n_samples_list, dim=0), dim=0)
-        var = torch.sum(torch.stack([(n * (var + (mean - accumulated_mean)**2)) / n_samples
-                                     for n, mean, var in zip(n_samples_list, means, variances)], dim=0), dim=0)
+        var = torch.sum(torch.stack([(n * (var + (mean - accumulated_mean)**2))
+                                     for n, mean, var in zip(n_samples_list, means, variances)], dim=0), dim=0)/ n_samples
     # If the statistics are numpy arrays
     elif all_numpy(means) and all_numpy(variances):
         n_samples = np.sum(np.stack(n_samples_list, axis=0), axis=0)
-        var = np.sum(np.stack([n * (var + (mean - accumulated_mean)**2) / n_samples
-                               for n, mean, var in zip(n_samples_list, means, variances)], axis=0), axis=0)
+        var = np.sum(np.stack([n * (var + (mean - accumulated_mean)**2)
+                               for n, mean, var in zip(n_samples_list, means, variances)], axis=0), axis=0)/ n_samples
     else:
         raise TypeError("All means and variances must be either numpy arrays or torch tensors.")
 
@@ -367,6 +367,11 @@ def accumulate_statistics(stats: list[dict[str, Union[np.ndarray, torch.Tensor]]
     else:
         raise TypeError("All n_samples must be either numpy arrays or torch tensors.")
 
+    # We force 'mean' calculation if higher-order stats are requested
+    needs_mean = any(k in which for k in ['mean', 'variance', 'stdev', 'rmse'])
+    if needs_mean:
+        accumulate_stats['mean'] = accumulate_mean(stats)
+
     # Loop through requested statistics
     if 'min' in which:
         accumulated_min = [stat["min"] for stat in stats]
@@ -384,17 +389,18 @@ def accumulate_statistics(stats: list[dict[str, Union[np.ndarray, torch.Tensor]]
             accumulate_stats['max'] = np.max(np.stack(accumulated_max, axis=0), axis=0)
         else:
             raise TypeError("All max values must be either numpy arrays or torch tensors.")
-    if 'mean' in which or 'variance' in which or 'stdev' in which:
-        accumulate_stats['mean'] = accumulate_mean(stats)
-    if 'variance' in which:
-        accumulate_stats['variance'] = accumulate_variance(stats)
-    if 'stdev' in which:
-        if 'variance' in which:
+    if 'variance' in which or 'stdev' in which:
+        # Check if we have variance or need to derive it from stdev
+        if 'variance' in stats[0]:
             var = accumulate_variance(stats)
         else:
-            var = accumulate_variance([{'variance': stat['stdev']**2, 'mean': stat['mean'],
-                                        'n_samples': stat['n_samples']} for stat in stats])
-        accumulate_stats['stdev'] = torch.sqrt(var) if torch.is_tensor(var) else np.sqrt(var)
+            # Derive variance from stdev: Var = Std^2
+            temp_stats = [{'variance': s['stdev'] ** 2, 'mean': s['mean'], 'n_samples': s['n_samples']} for s in stats]
+            var = accumulate_variance(temp_stats)
+        if 'variance' in which:
+            accumulate_stats['variance'] = var
+        if 'stdev' in which:
+            accumulate_stats['stdev'] = torch.sqrt(var) if torch.is_tensor(var) else np.sqrt(var)
     if 'mae' in which:
         accumulate_stats['mae'] = accumulate_mean([{'mean': stat['mae'], 'n_samples': stat['n_samples']} 
                                                   for stat in stats])
