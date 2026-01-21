@@ -285,13 +285,14 @@ class SirenFeedForwardBlock(LinearBlock):
 
 
 class SirenResidualBlock(nn.Module):
-    def __init__(self, n_neurons: int, activation: nn.Module = None, dropout_rate: float = 0,
-                 init_func: nn.Module = None, normalization: nn.Module=None):
+    def __init__(self, in_features: int, out_features: int, activation: nn.Module = None,
+                 dropout_rate: float = 0, init_func: nn.Module = None, normalization: nn.Module=None):
         """ Initialize a SIREN Residual Block.
 
         Parameters
         ----------
-        n_neurons: int. Number of neurons in the block.
+        in_features: int. Number of neurons in the block.
+        out_features: int. Number of neurons in the block.
         activation: Callable. Activation function.
         dropout_rate: float. Dropout rate.
         init_func: Callable. SIREN initialization function.
@@ -306,10 +307,10 @@ class SirenResidualBlock(nn.Module):
         super().__init__()
 
         # Internal layers for the residual path (f(x))
-        linear1 = nn.Linear(n_neurons, n_neurons)
+        linear1 = nn.Linear(in_features, in_features)
         layernorm = normalization if normalization is not None else nn.Identity()
         activation = activation if activation is not None else Sine(w0=30.0)
-        linear2 = nn.Linear(n_neurons, n_neurons)
+        linear2 = nn.Linear(in_features, out_features)
 
         # Apply SIREN Initialization to internal layers
         if init_func is None:
@@ -495,11 +496,11 @@ class PINNverseOperator(BaseModel):
         self.metrics['prof'], self.metrics['prof_target'], self.metrics['prof_background'] = {}, {}, {}
 
         # Model parameters
-        self.n_prof = parameters.data.n_prof if parameters is not None and hasattr(parameters.data, 'n_prof') \
+        self.n_prof = parameters.n_prof if parameters is not None and hasattr(parameters.data, 'n_prof') \
             else 1
-        self.n_levels = parameters.data.n_levels if parameters is not None and hasattr(parameters.data, 'n_levels') \
+        self.n_levels = parameters.n_levels if parameters is not None and hasattr(parameters.data, 'n_levels') \
             else 1
-        self.prof_vars = parameters.data.prof_vars if parameters is not None and hasattr(parameters.data, 'prof_vars') \
+        self.prof_vars = parameters.prof_vars if parameters is not None and hasattr(parameters.data, 'prof_vars') \
             else [f'var_{i}' for i in range(self.n_prof)]
 
         # Model architecture

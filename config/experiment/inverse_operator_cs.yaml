@@ -7,7 +7,7 @@ defaults:
   - override /hydra: default
   - override /data: inverse_recast
   - override /preparation: inverse_default
-  - override /loader: inverse_cs
+  - override /loader: inverse_default
   - override /model: inverse_operator
   - override /trainer: gpu
   - override /callbacks: inverse_default
@@ -17,12 +17,12 @@ defaults:
 # This allows you to overwrite only specified parameters
 
 # Task name. Note that it determines the output directory path
-task_name: "inverse_operator_recast"  # Experiment
+task_name: "inverse_operator_cs"  # Experiment
 
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "bg_000"
+  run_id: "0000"
   data_dir: ../data_${data.dtype}_cs
 
 # Trainer configuration
@@ -30,6 +30,11 @@ trainer:
   min_epochs: 1  # To prevent early stopping
   max_epochs: 64  # Number of epochs
   precision: 32  # 32-bit precision
+
+# Callbacks
+callbacks:
+  early_stopping:
+    patience: 10  # Number of epochs with no improvement after which training will be stopped
 
 # Preparation configuration
 preparation:
@@ -40,18 +45,6 @@ preparation:
       # Output path for statistics
       output:
         path: ${paths.data_dir}/normalization/statistics.pkl
-  # Covariance computation
-  covariance:
-    # Error covariance matrix in model space
-    B:
-      # Output path for covariance matrix B
-      output:
-        path: ${paths.data_dir}/normalization/covariance_matrix_B_inverse.npy
-    # Error covariance matrix in observation space
-    R:
-      # Output path for covariance matrix R
-      output:
-        path: ${paths.data_dir}/normalization/covariance_matrix_R_inverse.npy
 
 # Data configuration
 data:
@@ -65,6 +58,8 @@ data:
       vars:
         # Atmospheric profiles
         prof:
+          # Profile types
+          type: ['Air temperature', 'Humidity mixing ratio', 'Ozone mixing ratio']
           # Normalization function and parameters
           normalization:
             _target_: data.transformations.min_max
@@ -81,6 +76,8 @@ data:
       vars:
         # Atmospheric profiles
         prof:
+          # Profile types
+          type: ${data.stage.train.vars.prof.type}
           # Normalization function and parameters
           normalization: ${data.stage.train.vars.prof.normalization}
     # Test set
@@ -89,6 +86,8 @@ data:
       vars:
         # Atmospheric profiles
         prof:
+          # Profile types
+          type: ${data.stage.train.vars.prof.type}
           # Normalization function and parameters
           normalization: ${data.stage.train.vars.prof.normalization}
 
@@ -96,12 +95,9 @@ data:
 loader:
   batch_size: 96
   num_workers: 16
-  persistent_workers: true
-  pin_memory: true
+
 # Model parameters
 model:
-  # Model
-  _target_: inverse.model.model.PINNverseOperator2
   # Optimizer function and parameters
   optimizer:
     # Learning rate
@@ -110,31 +106,10 @@ model:
     weight_decay: 0
   # Learning rate scheduler
   lr_scheduler:
-    # Function
-    _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
-    # Mode for the scheduler
-    mode: min
     # Factor to reduce the learning rate
-    factor: 0.2
+    factor: 0.5
     # Number of epochs with no improvement after which learning rate will be reduced
     patience: 3
-    # Minimum learning rate
-    min_lr: 1.0e-6
-    # Threshold for measuring the new optimum, to only focus on significant changes
-    threshold: 0.01
-  # Model parameters associated with the data (e.g., input/output dimensions) and architecture
-  parameters:
-    # Model architecture
-    architecture:
-      # Number of neurons in the hidden layers
-      n_neurons: 128
-      # Number of hidden layers
-      n_layers: 2
-      # Dropout rate
-      dropout: 0.1
-    # Data
-    data:
-      n_prof: 3  # Number of profile variables
   # Loss function and parameters
   loss_func:
     # Weights for observation (obs), model, and boundary condition (bcs) errors
@@ -144,40 +119,82 @@ model:
     clear_sky: true
     # Loss term for observations
     loss_obs:
-      # _target_: inverse.model.loss.MSE
-      _target_: inverse.model.loss.DiagonalQuadraticForm
+      _target_: inverse.model.loss.MSE
     # Loss term for model variables
     loss_model:
       _target_: inverse.model.loss.MSE
-      # _target_: inverse.model.loss.QuadraticForm
-      # matrix: ${preparation.covariance.B.output.load}
     # Loss term for boundary conditions
     loss_bcs:
       _target_: inverse.model.loss.MSE
     # Pressure filter: Consider only pressure levels with non-zero variance (for model and bcs errors)
     pressure_filter: ${data.pressure_filter.load}
-    # Prediction profile: Use full profile for loss computation
-    prof_pred:
-      # Normalization function and parameters
-      _target_: ${data.stage.train.vars.prof.normalization._target_}
-      data:
-        _target_: numpy.zeros
-        shape: [96, 9, 127]
-        dtype: ${data.dtype}
-      stats:
-        _target_: data.statistics.read_statistics_var
-        path: ../data_${data.dtype}/normalization/statistics.pkl
-        var: 'prof'
-        dtype: ${data.dtype}
-      axis: ${data.stage.train.vars.prof.normalization.axis}
-  # Positional encoding
-  positional_encoding:
-    _target_: inverse.model.encoding.GaussianPositionalEncoding
-    num_freqs: 20
-    d_input: 4
-  # Activation functions (input layer/within the network)
-  activation_in:
-    _target_: forward.model.activation.Sine
-  # Activation function (output layer)
-  activation_out:
-    _target_: torch.nn.Sigmoid
+  # Architecture components
+  architecture:
+    # Positional encoding
+    positional_encoding:
+      _target_: inverse.model.encoding.RescaledPositionalEncoding
+      d_input:
+        _target_: numpy.sum
+        _args_:
+          - - ${model.parameters.data.n_lat}
+            - ${model.parameters.data.n_lon}
+            - ${model.parameters.data.n_scans}
+            - ${model.parameters.data.n_pressure}
+            - ${model.parameters.data.n_cloud}
+    # Input layer
+    input_layer:
+      _target_: inverse.model.model.LinearBlock
+      in_features: ${model.architecture.positional_encoding.d_input}
+      out_features: ${model.architecture.hidden_layer.in_features}
+      layernorm:
+        _target_: torch.nn.Identity
+      activation:
+        _target_: forward.model.activation.Sine
+        w0: 30.0
+      dropout_rate: 0.1
+      init_func:
+        _target_: inverse.model.model.SirenInit
+        is_first_layer: true
+        activation: ${model.input_layer.activation}
+    # Hidden layer
+    n_hidden_layers: 2
+    hidden_skip: false
+    hidden_layer:
+      _target_: inverse.model.model.LinearBlock
+      in_features: 128
+      out_features: ${model.architecture.hidden_layer.in_features}
+      layernorm: ${model.input_layer.layernorm}
+      activation: ${model.input_layer.activation}
+      dropout_rate: ${model.architecture.input_layer.dropout_rate}
+      init_func:
+        _target_: inverse.model.model.SirenInit
+        is_first_layer: false
+        activation: ${model.hidden_layer.activation}
+    # Output layer
+    output_skip: false
+    output_n_heads: 1
+    output_layer:
+      _target_: inverse.model.model.LinearBlock
+      in_features: ${model.architecture.hidden_layer.out_features}
+      out_features:
+        _target_: builtins.int
+        _args_:
+          - _target_: numpy.multiply
+            _args_:
+              - ${model.parameters.data.n_prof}
+              - ${model.parameters.data.n_levels}
+      layernorm: ${model.input_layer.layernorm}
+      activation:
+        _target_: torch.nn.Sigmoid
+      dropout_rate: 0.0
+      init_func:
+        _target_: inverse.model.model.SirenInit
+        is_first_layer: false
+        is_head: true
+        activation: ${model.output_layer.activation}
+
+# Logger configuration
+logger:
+  # MLflow logger
+  ports:
+    mlflow: 5007

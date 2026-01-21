@@ -22,14 +22,24 @@ task_name: "inverse_operator"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "version_000"
-  data_dir: "../../GOES_ML-main/Data"
+  run_id: "0000"
+  data_dir: ../data_${data.dtype}
 
 # Trainer configuration
 trainer:
   min_epochs: 1  # To prevent early stopping
-  max_epochs: 32  # Number of epochs
+  max_epochs: 64  # Number of epochs
   precision: 32  # 32-bit precision
+
+# Preparation configuration
+preparation:
+  # Statistics computation
+  statistics:
+    # Variables for which to compute statistics
+    data:
+      # Output path for statistics
+      output:
+        path: ${paths.data_dir}/normalization/statistics.pkl
 
 # Data configuration
 data:
