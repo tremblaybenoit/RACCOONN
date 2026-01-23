@@ -7,9 +7,9 @@ defaults:
   - override /hydra: default
   - override /data: inverse_recast
   - override /preparation: inverse_default
-  - override /loader: inverse_default
+  - override /loader: inverse_static
   - override /model: inverse_operator
-  - override /trainer: gpu
+  - override /trainer: cpu
   - override /callbacks: inverse_default
   - override /logger: default
 
@@ -17,24 +17,24 @@ defaults:
 # This allows you to overwrite only specified parameters
 
 # Task name. Note that it determines the output directory path
-task_name: "inverse_operator_cs"  # Experiment
+task_name: "inverse_operator_static_cs"  # Experiment
 
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
   run_id: "0000"
-  data_dir: ../data_${data.dtype}_cs
+  data_dir: ../static_${data.dtype}_cs
 
 # Trainer configuration
 trainer:
   min_epochs: 1  # To prevent early stopping
-  max_epochs: 64  # Number of epochs
+  max_epochs: 960  # Number of epochs
   precision: 32  # 32-bit precision
 
 # Callbacks
 callbacks:
   early_stopping:
-    patience: 10  # Number of epochs with no improvement after which training will be stopped
+    patience: 27  # Number of epochs with no improvement after which training will be stopped
 
 # Preparation configuration
 preparation:
@@ -93,8 +93,8 @@ data:
 
 # Loader configuration
 loader:
-  batch_size: 96
-  num_workers: 16
+  batch_size: 16
+  num_workers: 10
 
 # Model parameters
 model:
@@ -109,7 +109,11 @@ model:
     # Factor to reduce the learning rate
     factor: 0.5
     # Number of epochs with no improvement after which learning rate will be reduced
-    patience: 3
+    patience: 9
+  # Model parameters associated with the data (e.g., input/output dimensions) and architecture
+  parameters:
+    # Number of variables
+    n_scans: 0
   # Loss function and parameters
   loss_func:
     # Weights for observation (obs), model, and boundary condition (bcs) errors
@@ -134,13 +138,15 @@ model:
     positional_encoding:
       _target_: inverse.model.encoding.RescaledPositionalEncoding
       d_input:
-        _target_: numpy.sum
+        _target_: builtins.int
         _args_:
-          - - ${model.parameters.n_lat}
-            - ${model.parameters.n_lon}
-            - ${model.parameters.n_scans}
-            - ${model.parameters.n_pressure}
-            - ${model.parameters.n_cloud}
+          - _target_: numpy.sum
+            _args_:
+              - - ${model.parameters.n_lat}
+                - ${model.parameters.n_lon}
+                - ${model.parameters.n_scans}
+                - ${model.parameters.n_pressure}
+                - ${model.parameters.n_cloud}
     # Input layer
     input_layer:
       _target_: inverse.model.model.LinearBlock
@@ -160,7 +166,7 @@ model:
     n_hidden_layers: 2
     hidden_skip: false
     hidden_layer:
-      _target_: inverse.model.model.LinearBlock
+      _target_: inverse.model.model.SirenResidualBlock
       in_features: 128
       out_features: ${model.architecture.hidden_layer.in_features}
       layernorm: ${model.architecture.input_layer.layernorm}
@@ -182,7 +188,7 @@ model:
           - _target_: numpy.multiply
             _args_:
               - ${model.parameters.n_prof}
-              - ${model.parameters.n_levels}
+              - ${model.parameters.n_pressure}
       layernorm: ${model.architecture.input_layer.layernorm}
       activation:
         _target_: torch.nn.Sigmoid

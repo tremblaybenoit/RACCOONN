@@ -368,7 +368,7 @@ def accumulate_statistics(stats: list[dict[str, Union[np.ndarray, torch.Tensor]]
         raise TypeError("All n_samples must be either numpy arrays or torch tensors.")
 
     # We force 'mean' calculation if higher-order stats are requested
-    needs_mean = any(k in which for k in ['mean', 'variance', 'stdev', 'rmse'])
+    needs_mean = any(k in which for k in ['mean', 'variance', 'stdev'])
     if needs_mean:
         accumulate_stats['mean'] = accumulate_mean(stats)
 

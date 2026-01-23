@@ -255,7 +255,7 @@ class LinearBlock(nn.Module):
 
 class SirenFeedForwardBlock(LinearBlock):
     def __init__(self, in_features: int, out_features: int, activation: nn.Module = None,
-                 dropout_rate: float = 0, init_func: nn.Module = None, normalization: nn.Module=None):
+                 dropout_rate: float = 0, init_func: nn.Module = None, layernorm: nn.Module=None):
         """ Initialize a SIREN Feed-Forward Block.
 
         Parameters
@@ -265,7 +265,7 @@ class SirenFeedForwardBlock(LinearBlock):
         activation: Callable. Activation function.
         dropout_rate: float. Dropout rate.
         init_func: Callable. SIREN initialization function.
-        normalization: Callable. Normalization layer.
+        layernorm: Callable. Normalization layer.
 
         Returns
         -------
@@ -281,12 +281,12 @@ class SirenFeedForwardBlock(LinearBlock):
 
         # Class inheritance
         super().__init__(in_features, out_features, activation, dropout_rate,
-                         layernorm=normalization, init_func=init_func)
+                         layernorm=layernorm, init_func=init_func)
 
 
 class SirenResidualBlock(nn.Module):
     def __init__(self, in_features: int, out_features: int, activation: nn.Module = None,
-                 dropout_rate: float = 0, init_func: nn.Module = None, normalization: nn.Module=None):
+                 dropout_rate: float = 0, init_func: nn.Module = None, layernorm: nn.Module=None):
         """ Initialize a SIREN Residual Block.
 
         Parameters
@@ -296,7 +296,7 @@ class SirenResidualBlock(nn.Module):
         activation: Callable. Activation function.
         dropout_rate: float. Dropout rate.
         init_func: Callable. SIREN initialization function.
-        normalization: Callable. Normalization layer.
+        layernorm: Callable. Normalization layer.
 
         Returns
         -------
@@ -308,7 +308,7 @@ class SirenResidualBlock(nn.Module):
 
         # Internal layers for the residual path (f(x))
         linear1 = nn.Linear(in_features, in_features)
-        layernorm = normalization if normalization is not None else nn.Identity()
+        layernorm = layernorm if layernorm is not None else nn.Identity()
         activation = activation if activation is not None else Sine(w0=30.0)
         linear2 = nn.Linear(in_features, out_features)
 
@@ -496,11 +496,11 @@ class PINNverseOperator(BaseModel):
         self.metrics['prof'], self.metrics['prof_target'], self.metrics['prof_background'] = {}, {}, {}
 
         # Model parameters
-        self.n_prof = parameters.n_prof if parameters is not None and hasattr(parameters.data, 'n_prof') \
+        self.n_prof = instantiate(parameters.n_prof) if parameters is not None and hasattr(parameters, 'n_prof') \
             else 1
-        self.n_levels = parameters.n_levels if parameters is not None and hasattr(parameters.data, 'n_levels') \
+        self.n_levels = parameters.n_levels if parameters is not None and hasattr(parameters, 'n_levels') \
             else 1
-        self.prof_vars = parameters.prof_vars if parameters is not None and hasattr(parameters.data, 'prof_vars') \
+        self.prof_vars = parameters.prof_vars if parameters is not None and hasattr(parameters, 'prof_vars') \
             else [f'var_{i}' for i in range(self.n_prof)]
 
         # Model architecture
@@ -563,9 +563,6 @@ class PINNverseOperator(BaseModel):
 
         # Compute profiles
         pred = {'prof': self.forward(batch['input'])}
-        # Apply output transformations
-        for transform in self.transform_out:
-            pred['prof'] = transform(pred['prof'])
 
         # Compute loss function
         loss, pred['hofx'] = self.loss_func(pred, batch['target'])
@@ -591,9 +588,6 @@ class PINNverseOperator(BaseModel):
 
         # Compute profiles
         prof = self.forward(batch['input'])
-        # Apply output transformations
-        for transform in self.transform_out:
-            prof = transform(prof)
         return prof
 
     def _logging_prof(self, pred: torch.Tensor, target: torch.Tensor, background: torch.Tensor=None) -> None:
@@ -786,9 +780,6 @@ class PINNverseOperatorPCA(PINNverseOperator):
 
         # Compute profiles
         pred = self.forward(batch['input'])
-        # Apply output transformations
-        for t, transform in enumerate(self.transform_out):
-            pred['prof'] = transform(pred['prof'])
 
         # Compute loss function
         loss, pred['hofx'] = self.loss_func(pred, batch['target'])

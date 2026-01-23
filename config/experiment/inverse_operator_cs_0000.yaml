@@ -136,11 +136,11 @@ model:
       d_input:
         _target_: numpy.sum
         _args_:
-          - - ${model.parameters.data.n_lat}
-            - ${model.parameters.data.n_lon}
-            - ${model.parameters.data.n_scans}
-            - ${model.parameters.data.n_pressure}
-            - ${model.parameters.data.n_cloud}
+          - - ${model.parameters.n_lat}
+            - ${model.parameters.n_lon}
+            - ${model.parameters.n_scans}
+            - ${model.parameters.n_pressure}
+            - ${model.parameters.n_cloud}
     # Input layer
     input_layer:
       _target_: inverse.model.model.LinearBlock
@@ -155,7 +155,7 @@ model:
       init_func:
         _target_: inverse.model.model.SirenInit
         is_first_layer: true
-        activation: ${model.input_layer.activation}
+        activation: ${model.architecture.input_layer.activation}
     # Hidden layer
     n_hidden_layers: 2
     hidden_skip: false
@@ -163,13 +163,13 @@ model:
       _target_: inverse.model.model.LinearBlock
       in_features: 128
       out_features: ${model.architecture.hidden_layer.in_features}
-      layernorm: ${model.input_layer.layernorm}
-      activation: ${model.input_layer.activation}
+      layernorm: ${model.architecture.input_layer.layernorm}
+      activation: ${model.architecture.input_layer.activation}
       dropout_rate: ${model.architecture.input_layer.dropout_rate}
       init_func:
         _target_: inverse.model.model.SirenInit
         is_first_layer: false
-        activation: ${model.hidden_layer.activation}
+        activation: ${model.architecture.hidden_layer.activation}
     # Output layer
     output_skip: false
     output_n_heads: 1
@@ -181,9 +181,9 @@ model:
         _args_:
           - _target_: numpy.multiply
             _args_:
-              - ${model.parameters.data.n_prof}
-              - ${model.parameters.data.n_levels}
-      layernorm: ${model.input_layer.layernorm}
+              - ${model.parameters.n_prof}
+              - ${model.parameters.n_levels}
+      layernorm: ${model.architecture.input_layer.layernorm}
       activation:
         _target_: torch.nn.Sigmoid
       dropout_rate: 0.0
@@ -191,7 +191,7 @@ model:
         _target_: inverse.model.model.SirenInit
         is_first_layer: false
         is_head: true
-        activation: ${model.output_layer.activation}
+        activation: ${model.architecture.output_layer.activation}
 
 # Logger configuration
 logger:
