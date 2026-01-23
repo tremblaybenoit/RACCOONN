@@ -591,14 +591,11 @@ class VarLoss(torch.nn.Module):
             pressure_filter = torch.ones_like(pred['prof'], dtype=torch.bool, device=pred['prof'].device)
 
         # Compute the forward model output
-        if self.clear_sky and self.prof_pred is not None:
-            pred_prof = self.prof_pred[:pred['prof'].shape[0]].clone()
-            pred_prof[:, 0:1, ...] = pred['prof'][:, 0:1, :]  #  Air temperature
-            pred_prof[:, 4:5, ...] = pred['prof'][:, 1:2, :]  #  Ice particle effective radius
-            pred_prof[:, 8:9, ...] = pred['prof'][:, 2:3, :]  #  Ozone mixing ratio
-            hofx_pred = self.forward_model(pred_prof, target)
-        elif self.clear_sky:
-            pred_prof = torch.zeros((pred['prof'].shape[0], 9, pred['prof'].shape[2]), device=pred['prof'].device)
+        if self.clear_sky:
+            if self.prof_pred is not None:
+                pred_prof = self.prof_pred[:pred['prof'].shape[0]].clone()
+            else:
+                pred_prof = torch.zeros((pred['prof'].shape[0], 9, pred['prof'].shape[2]), device=pred['prof'].device)
             pred_prof[:, 0:1, ...] = pred['prof'][:, 0:1, :]  #  Air temperature
             pred_prof[:, 4:5, ...] = pred['prof'][:, 1:2, :]  #  Ice particle effective radius
             pred_prof[:, 8:9, ...] = pred['prof'][:, 2:3, :]  #  Ozone mixing ratio
