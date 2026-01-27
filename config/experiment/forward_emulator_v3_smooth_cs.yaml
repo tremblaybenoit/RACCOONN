@@ -8,7 +8,7 @@ defaults:
   - override /data: forward_recast
   - override /preparation: statistics
   - override /loader: forward_default
-  - override /model: forward_emulator_smooth
+  - override /model: forward_emulator_smooth_cs
   - override /trainer: gpu
   - override /callbacks: forward_default
   - override /logger: default
@@ -123,7 +123,7 @@ loader:
       _target_: forward.model.data_loader.TorchDataset
       results:
         hofx:
-          path: ${data.stage.predict.dir}/predict_hofx_v3.npy
+          path: ${data.stage.predict.dir}/predict_hofx_v3_smooth_cs.npy
 
 # Model parameters
 model:

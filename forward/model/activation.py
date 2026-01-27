@@ -114,3 +114,44 @@ class Sine(nn.Module):
         torch.Tensor. Output tensor after applying Sine activation.
         """
         return torch.sin(self.w0 * x)
+
+
+class LearnableSine(nn.Module):
+    """Learnable Sine activation function. """
+    def __init__(self, w0=1.):
+        """ Initialize Learnable Sine activation function.
+
+        Parameters
+        ----------
+        w0 : float. Initial frequency of the sine function.
+
+        Returns
+        -------
+        None.
+        """
+        super().__init__()
+        self.w0 = nn.Parameter(torch.tensor(w0))
+
+    def forward(self, x):
+        """ Forward pass for Learnable Sine activation function.
+
+        Parameters
+        ----------
+        x : torch.Tensor. Input tensor.
+
+        Returns
+        -------
+        torch.Tensor. Output tensor after applying Learnable Sine activation.
+        """
+        return torch.sin(self.w0 * x)
+
+
+class SuperLearnableSine(nn.Module):
+    def __init__(self, in_features, w0=30.0):
+        super().__init__()
+        # Each input feature gets its own learnable frequency scaling
+        self.w0 = nn.Parameter(torch.ones(in_features) * w0, requires_grad=True)
+
+    def forward(self, x):
+        # x has shape (Batch, In_Features)
+        return torch.sin(self.w0 * x)

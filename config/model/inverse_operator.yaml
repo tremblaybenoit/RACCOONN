@@ -96,12 +96,9 @@ architecture:
       _target_: torch.nn.Identity
     activation:
       _target_: forward.model.activation.Sine
-      w0: 30.0
     dropout_rate: 0.1
     init_func:
       _target_: inverse.model.model.SirenInit
-      is_first_layer: true
-      activation: ${model.architecture.input_layer.activation}
   # Hidden layer
   n_hidden_layers: 2
   hidden_skip: false
@@ -114,8 +111,6 @@ architecture:
     dropout_rate: ${model.architecture.input_layer.dropout_rate}
     init_func:
       _target_: inverse.model.model.SirenInit
-      is_first_layer: false
-      activation: ${model.architecture.hidden_layer.activation}
   # Output layer
   output_skip: false
   output_n_heads: 1
@@ -136,6 +131,3 @@ architecture:
     dropout_rate: 0.0
     init_func:
       _target_: inverse.model.model.SirenInit
-      is_first_layer: false
-      is_head: true
-      activation: ${model.architecture.output_layer.activation}

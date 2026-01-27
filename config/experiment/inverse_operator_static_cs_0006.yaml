@@ -22,7 +22,7 @@ task_name: "inverse_operator_static_cs"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "0000"
+  run_id: "0006"
   data_dir: ../static_${data.dtype}_cs
 
 # Trainer configuration
@@ -109,18 +109,25 @@ model:
     # Factor to reduce the learning rate
     factor: 0.5
     # Number of epochs with no improvement after which learning rate will be reduced
-    patience: 9
+    patience: 10
   # Model parameters associated with the data (e.g., input/output dimensions) and architecture
   parameters:
     # Number of variables
     n_scans: 0
   # Loss function and parameters
   loss_func:
+    # Forward model to compute the model equivalent of the observations
+    forward_model:
+      # Function
+      _target_: inverse.model.loss.ForwardModel
+      # Configuration of the forward model
+      checkpoint_path: '../forward_outputs/forward_emulator_white/checkpoints/cs000/model.ckpt'
+      config_path: 'model/forward_emulator_smooth_cs.yaml'
     # Weights for observation (obs), model, and boundary condition (bcs) errors
-    lambda_obs: 0.
+    lambda_obs: 1.
     lambda_model: 1.
     lambda_bcs: 1.
-    clear_sky: true
+    clear_sky: false
     # Loss term for observations
     loss_obs:
       _target_: inverse.model.loss.MSE
@@ -136,7 +143,7 @@ model:
   architecture:
     # Positional encoding
     positional_encoding:
-      _target_: inverse.model.encoding.RescaledPositionalEncoding
+      _target_: inverse.model.encoding.MultiScaleGaussianEncoding
       d_input:
         _target_: builtins.int
         _args_:
@@ -147,6 +154,8 @@ model:
                 - ${model.parameters.n_scans}
                 - ${model.parameters.n_pressure}
                 - ${model.parameters.n_cloud}
+      num_freqs: 20
+      sigma_per_dim: [ 1.0, 1.0, 0.5]
     # Input layer
     input_layer:
       _target_: inverse.model.model.LinearBlock
@@ -156,14 +165,14 @@ model:
         _target_: torch.nn.Identity
       activation:
         _target_: forward.model.activation.Sine
-        w0: 5.0
+        w0: 1.0
       dropout_rate: 0.1
       init_func:
         _target_: inverse.model.model.SirenInit
         is_first_layer: true
         activation: ${model.architecture.input_layer.activation}
     # Hidden layer
-    n_hidden_layers: 2
+    n_hidden_layers: 4
     hidden_skip: false
     hidden_layer:
       _target_: inverse.model.model.SirenResidualBlock
@@ -178,17 +187,17 @@ model:
         activation: ${model.architecture.hidden_layer.activation}
     # Output layer
     output_skip: true
-    output_n_heads: 1
+    output_n_heads:
+      _target_: builtins.int
+      _args_:
+        - _target_: numpy.multiply
+          _args_:
+            - ${model.parameters.n_prof}
+            - ${model.parameters.n_pressure}
     output_layer:
       _target_: inverse.model.model.LinearBlock
       in_features: ${model.architecture.hidden_layer.out_features}
-      out_features:
-        _target_: builtins.int
-        _args_:
-          - _target_: numpy.multiply
-            _args_:
-              - ${model.parameters.n_prof}
-              - ${model.parameters.n_pressure}
+      out_features: 1
       layernorm: ${model.architecture.input_layer.layernorm}
       activation:
         _target_: torch.nn.Sigmoid

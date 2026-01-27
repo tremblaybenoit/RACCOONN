@@ -9,6 +9,31 @@ from inverse.model.encoding import IdentityPositionalEncoding
 from utilities.instantiators import instantiate
 
 
+class KaimingInit(nn.Module):
+    def __init__(self, mode: str = 'fan_in', activation_type: str = 'swish'):
+        super().__init__()
+        self.mode = mode
+
+        # Mapping smooth activations to their closest Kaiming proxy
+        if activation_type.lower() in ['swish', 'silu', 'mish', 'gelu']:
+            self.nonlinearity = 'leaky_relu'
+            self.a = 0.01  # Small slope proxy for smooth activations
+        else:
+            self.nonlinearity = 'relu'
+            self.a = 0
+
+    def __call__(self, module: nn.Module):
+        if hasattr(module, 'weight'):
+            nn.init.kaiming_uniform_(
+                module.weight,
+                a=self.a,
+                mode=self.mode,
+                nonlinearity=self.nonlinearity
+            )
+        if hasattr(module, 'bias') and module.bias is not None:
+            nn.init.zeros_(module.bias)
+
+
 class XavierInit(nn.Module):
     """
     Callable Xavier/Glorot initializer.
@@ -57,7 +82,7 @@ class SirenInit(nn.Module):
     """
     Callable SIREN initializer with configuration moved to __init__.
     """
-    def __init__(self, is_first_layer: bool = False, activation=None, is_head: bool = False, w0: float = 30.0):
+    def __init__(self, is_first_layer: bool = False, activation=None, is_head: bool = False, w0: float = None):
         """
         Initialize SIREN initializer.
 
@@ -75,7 +100,7 @@ class SirenInit(nn.Module):
         # Parameters
         self.is_first_layer = is_first_layer
         self.is_head = is_head
-        self.w0 = getattr(activation, 'w0', w0) if activation is not None else w0
+        self.w0 = w0 if w0 is not None else getattr(activation, 'w0', w0)
 
     def __call__(self, module):
         """
@@ -442,11 +467,112 @@ class ResidualMLP(nn.Module):
         else:
             self.hidden_layers = nn.Sequential(*hidden_layers)
         # Model architecture
+        output_n_heads = instantiate(output_n_heads)
         if output_n_heads > 1:
             output_layers = ModuleList([instantiate(output_layer) for _ in range(output_n_heads)])
             self.output_layers = PredictionHeads(output_layers)
         else:
             self.output_layers = instantiate(output_layer)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass through the MLP.
+
+        Parameters
+        ----------
+        x: tensor. Input tensor.
+
+        Returns
+        -------
+        out: tensor. Output tensor after applying the MLP.
+        """
+
+        # Pass
+        x_encoded = self.positional_encoding(x)
+        x_input = self.input_layers(x_encoded)
+        x_hidden = self.hidden_layers(x_input)
+        x_output = self.output_layers(x_hidden)
+        return x_output
+
+
+class HydraResidualMLP(nn.Module):
+    """
+    Multi-Layer Perceptron (MLP) with configurable layers.
+    """
+    def __init__(self, input_layer: DictConfig, hidden_layer: DictConfig, output_layer: DictConfig,
+                 positional_encoding: DictConfig = None, hidden_n_layers: int=2,
+                 hidden_skip: bool=False, output_skip: bool=False, output_n_heads: int=1, output_n_layers: int=1, output_final_layer: DictConfig=None):
+        """
+        Initialize MLP.
+
+        Parameters
+        ----------
+        input_layer: DictConfig. Configuration for the input layer.
+        hidden_layer: DictConfig. Configuration for the hidden layers.
+        output_layer: DictConfig. Configuration for the output layer.
+        hidden_n_layers: int. Number of hidden layers.
+        hidden_skip: bool. Flag to enable skip connections in hidden layers.
+        output_skip: bool. Flag to enable skip connections in output layer.
+
+        Returns
+        -------
+        None.
+        """
+
+        # Class inheritance
+        super().__init__()
+
+        # Positional encoding
+        if positional_encoding is not None:
+            self.positional_encoding = instantiate(positional_encoding)
+            input_layer.in_features = self.positional_encoding.d_output
+        else:
+            self.positional_encoding = IdentityPositionalEncoding(d_input=input_layer.in_features)
+        # Input layer
+        self.input_layers = instantiate(input_layer)
+        # Hidden layers
+        hidden_layers = []
+        # Build hidden layers with optional skip connections
+        for _ in range(hidden_n_layers):
+            hidden_layer_instance = instantiate(hidden_layer)
+            if hidden_skip:
+                # Projection for skip connection if dimensions differ
+                if hidden_layer_instance.in_features != hidden_layer_instance.out_features:
+                    projection = nn.Linear(hidden_layer_instance.in_features,
+                                           hidden_layer_instance.out_features)
+                else:
+                    projection = None
+                hidden_layer_instance = Residual(hidden_layer_instance, projection=projection)
+            hidden_layers.append(hidden_layer_instance)
+        # Output layer
+        if output_skip:
+            self.hidden_layers = Concatenate(nn.Sequential(*hidden_layers))
+            # output_layer.in_features = hidden_layer.out_features + input_layer.out_features
+            output_layer.in_features = hidden_layer.out_features + input_layer.out_features
+            output_layer.out_features = output_layer.in_features
+            output_layer.activation.in_features = output_layer.in_features
+            output_final_layer.in_features = output_layer.out_features
+        else:
+            self.hidden_layers = nn.Sequential(*hidden_layers)
+        # Model architecture
+        output_n_heads = instantiate(output_n_heads)
+        if output_n_heads > 1:
+            output_layers = ModuleList()
+            for _ in range(output_n_heads):
+                head_layers = []
+                for l in range(output_n_layers):
+                    head_layers.append(instantiate(output_layer))
+                if output_final_layer is not None:
+                    head_layers.append(instantiate(output_final_layer))
+                output_layers.append(nn.Sequential(*head_layers))
+            self.output_layers = PredictionHeads(output_layers)
+        else:
+            head_layers = []
+            for _ in range(output_n_layers):
+                head_layers.append(instantiate(output_layer))
+            if output_final_layer is not None:
+                head_layers.append(instantiate(output_final_layer))
+            self.output_layers = nn.Sequential(*head_layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -504,7 +630,7 @@ class PINNverseOperator(BaseModel):
             else [f'var_{i}' for i in range(self.n_prof)]
 
         # Model architecture
-        self.model = ResidualMLP(
+        self.model = HydraResidualMLP(
             input_layer=architecture.input_layer,  # Pass DictConfig directly
             hidden_layer=architecture.hidden_layer,  # Pass DictConfig directly
             output_layer=architecture.output_layer,  # Pass DictConfig directly
@@ -512,7 +638,9 @@ class PINNverseOperator(BaseModel):
             hidden_n_layers=architecture.get('hidden_n_layers', 2),
             hidden_skip=architecture.get('hidden_skip', False),
             output_skip=architecture.get('output_skip', False),
-            output_n_heads=architecture.get('output_n_heads', 1)
+            output_n_heads=architecture.get('output_n_heads', 1),
+            output_final_layer=architecture.get('output_final_layer', None),
+            output_n_layers=architecture.get('output_n_layers', 1),
         )
 
     def forward(self, x: dict) -> torch.Tensor:
