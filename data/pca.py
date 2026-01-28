@@ -309,9 +309,9 @@ def project_pca(input: DictConfig, output: DictConfig) -> None:
     if hasattr(output.pca_white, 'save'):
         save_func = instantiate(output.pca_white.save)
         save_func(whitened_data)
-    if hasattr(output.pca_sym, 'save'):
-        save_func = instantiate(output.pca_sym.save)
-        save_func(sym_log_data)
+    #if hasattr(output.pca_sym, 'save'):
+    #    save_func = instantiate(output.pca_sym.save)
+    #    save_func(sym_log_data)
 
     return
 

@@ -252,8 +252,8 @@ def save_cholesky_factor(err_data, inflation=1.0, ridge=1e-6):
     return L.astype(np.float32)
 
 
-def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=True, recenter: bool=True,
-                      inflation: float=1.0, var_threshold: float=1.e-8, cholesky: bool = False) -> None:
+def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=True, recenter: bool=False,
+                      inflation: float=1.0, var_threshold: float=1.e-7, cholesky: bool = True) -> None:
     """ Compute statistics of a given dataset.
 
         Parameters
@@ -288,7 +288,6 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
         # Verify Cholesky reconstruction
         logger.info("Verifying Cholesky reconstruction...")
         verify_cholesky_reconstruction(np.cov(err.reshape(err.shape[0], -1), rowvar=False), L)
-        breakpoint()
 
     # Compute covariance matrix
     if recenter:
@@ -302,7 +301,6 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
             # Verify Cholesky reconstruction
             logger.info("Verifying Cholesky reconstruction...")
             verify_cholesky_reconstruction(np.cov(err.reshape(err.shape[0], -1), rowvar=False), L)
-            breakpoint()
 
     # Compute covariance matrix
     logger.info("Computing covariance matrix...")
@@ -317,6 +315,7 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
         for i in range(cov.shape[0]):
             cov[i, i] += sigma_values[i]**2
 
+
     # Apply variance thresholding
     logger.info("Applying variance thresholding...")
     var = np.diag(cov)
@@ -325,8 +324,11 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
         # breakpoint()
         logger.info(f"Variables below variance threshold ({var_threshold}): {low_var_indices.size}")
         # Set low-variance values to threshold
-        for idx in low_var_indices:
-            cov[idx, idx] = cov[idx, idx]  # var_threshold
+        # for idx in low_var_indices:
+        #     cov[idx, idx] = cov[idx, idx] + 1.
+        good_var_indices = np.where(var >= var_threshold)[0]
+        cov = np.cov(err.reshape(err.shape[0], -1)[:, good_var_indices], rowvar=False)*inflation
+        var = np.diag(cov)
 
     # Compute inverse covariance matrix
     logger.info("Computing inverse covariance matrix...")
@@ -355,6 +357,7 @@ def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=Tru
         plot_map(ax, cov_inv, title=f"Inverse covariance matrix", plt_origin='upper',
                  cb_label=r'Values (divided by 10$^4$)')
         save_plot(fig, filename=os.path.splitext(output.path)[0] + '.png')
+    breakpoint()
 
     return
 

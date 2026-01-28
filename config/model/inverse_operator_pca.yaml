@@ -34,9 +34,11 @@ parameters:
   n_lon: 1
   n_scans: 1
   n_prof:
-    _target: numpy.size
+    _target_: builtins.int
     _args_:
-      - ${data.stage.train.vars.prof.type}
+      - _target_: builtins.len
+        _args_:
+          - ${data.stage.train.vars.prof.type}
   n_levels: 127
   n_pressure: 127
   n_comp: ${preparation.pca.prof.input.n_comp}

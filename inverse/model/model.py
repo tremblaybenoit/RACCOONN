@@ -545,13 +545,17 @@ class HydraResidualMLP(nn.Module):
                 hidden_layer_instance = Residual(hidden_layer_instance, projection=projection)
             hidden_layers.append(hidden_layer_instance)
         # Output layer
+
         if output_skip:
             self.hidden_layers = Concatenate(nn.Sequential(*hidden_layers))
             # output_layer.in_features = hidden_layer.out_features + input_layer.out_features
             output_layer.in_features = hidden_layer.out_features + input_layer.out_features
-            output_layer.out_features = output_layer.in_features
-            output_layer.activation.in_features = output_layer.in_features
-            output_final_layer.in_features = output_layer.out_features
+            if output_n_layers > 1:
+                output_layer.out_features = output_layer.in_features
+            if hasattr(output_layer.activation, 'in_features'):
+                output_layer.activation.in_features = output_layer.in_features
+            if output_final_layer is not None:
+                output_final_layer.in_features = output_layer.out_features
         else:
             self.hidden_layers = nn.Sequential(*hidden_layers)
         # Model architecture
@@ -833,7 +837,7 @@ class PINNverseOperator(BaseModel):
 
 
 class PINNverseOperatorPCA(PINNverseOperator):
-    def __init__(self, pca_buffers: dict, optimizer: DictConfig = None, loss_func: DictConfig = None,
+    def __init__(self, pca_buffers: DictConfig, optimizer: DictConfig = None, loss_func: DictConfig = None,
                  lr_scheduler: DictConfig = None, architecture: DictConfig = None,
                  parameters: DictConfig = None):
         """ Initialize model.
@@ -857,6 +861,7 @@ class PINNverseOperatorPCA(PINNverseOperator):
                          architecture=architecture, parameters=parameters)
 
         # PCA Buffers
+        pca_buffers = instantiate(pca_buffers)
         self.register_buffer('basis', torch.tensor(pca_buffers['basis']))  # (270, 1143)
         self.register_buffer('mu', torch.tensor(pca_buffers['mu']))  # (1143,)
         self.register_buffer('std', torch.tensor(pca_buffers['std']))  # (1143,)

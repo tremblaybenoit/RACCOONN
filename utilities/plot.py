@@ -553,8 +553,8 @@ def fig_vertical_profiles(prof: list[np.ndarray], label: list[str], stdev: list[
         color = [colors[list(colors.keys())[c]] for c in range(len(prof))]
 
     # From n_profiles, determine optimal layout for flexible_gridspec
-    n_rows = int(np.ceil(np.sqrt(n_profiles)))
-    n_cols = int(np.ceil(n_profiles / n_rows))
+    n_rows = int(np.ceil(np.sqrt(n_profiles))) if n_profiles > 3 else 1
+    n_cols = int(np.ceil(n_profiles / n_rows)) if n_profiles > 3 else n_profiles
     # Create a flexible gridspec
     cell_widths = [4.0] * n_cols
     cell_heights = [4.0] * n_rows

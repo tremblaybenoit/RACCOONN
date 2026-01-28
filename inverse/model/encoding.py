@@ -86,7 +86,7 @@ class GaussianPositionalEncoding(nn.Module):
 
         # Apply Gaussian positional encoding
         encoded_in = x.unsqueeze(1) * self.frequencies.unsqueeze(0) * (2.0 * torch.pi)  # (n_samples, num_freqs, d_input)
-        encoded_in = encoded_in.reshape(x.shape[0], -1)  # (n_samples, num_freqs * d_input)
+        encoded_in = encoded_in.reshape(n_samples, -1)  # (n_samples, num_freqs * d_input)
 
         # Compute sin and cos in-place
         encoded_sin = torch.empty_like(encoded_in)

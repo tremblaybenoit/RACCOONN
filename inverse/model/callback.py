@@ -8,8 +8,25 @@ class FigureLogger(ForwardFigureLogger):
     """
     Callback to log figures at the end of each validation epoch.
     """
-    def __init__(self):
-        super().__init__()
+    def __init__(self, save_every_n_epochs: int = 100, save_on_improvement: bool = True, monitor: str = "val_loss", monitor_mode: str = "min") -> None:
+        """
+        Initializes the FigureLogger callback.
+
+        Parameters
+        ----------
+        save_every_n_epochs: int. Frequency of saving figures in epochs. Default is 1.
+        save_on_improvement: bool. Whether to save figures only when there is an improvement in the monitored metric. Default is False.
+        monitor: str. The metric to monitor for improvements. Default is "val_loss".
+        monitor_mode: str. The mode for monitoring the metric, either "min" or "max". Default is "min".
+
+        Returns
+        -------
+        None.
+        """
+
+        # Class inheritance
+        super().__init__(save_every_n_epochs=save_every_n_epochs, save_on_improvement=save_on_improvement,
+                         monitor=monitor, monitor_mode=monitor_mode)
 
     def _figurebuilder(self, trainer, model, tags, current_epoch):
         """
@@ -85,9 +102,13 @@ class FigureLogger(ForwardFigureLogger):
 
         # Epoch
         current_epoch = trainer.current_epoch
+
+        # Decide whether to save figures
+        if not self._figuresaver(trainer, current_epoch):
+            return
+
         # Tags for each figure
         tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE", "Valid_RadianceRMSE"]
-
         # Call the figure builder and buffer
         self._figurebuilder(trainer, model, tags, current_epoch)
         self._figurebuffer(trainer, tags, current_epoch)

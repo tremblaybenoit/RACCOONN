@@ -775,3 +775,134 @@ class VarLossPCA(torch.nn.Module):
                 setattr(self, attr, loss_fn.to(device))
 
         return self
+
+
+class VarLossHybridPCA(torch.nn.Module):
+    """ Universal loss module that combines observation and model losses. """
+    def __init__(self, forward_model: Callable, loss_obs: Callable, loss_model: Callable = None, loss_bcs: Callable = None,
+                 lambda_obs: float=1.0, lambda_model: float=1.0, lambda_bcs: float=1.0,
+                 pressure_filter: np.ndarray=None, clear_sky: bool=False, prof_pred: np.ndarray=None):
+        """ Initialize the variational loss module.
+
+        Parameters
+        ----------
+        forward_model: Callable. Function to apply the forward model.
+        loss_obs: Callable or ListConfig. Loss function(s) for observations.
+        loss_model: Callable or ListConfig. Loss function(s) for model predictions.
+        loss_bcs: Callable or ListConfig. Loss function(s) for boundary conditions.
+        lambda_obs: float. Weight for the observation loss.
+        lambda_model: float. Weight for the model loss.
+        lambda_bcs: float. Weight for the boundary condition loss.
+        pressure_filter: Callable. Function to generate a mask for the profile levels to include in the model loss.
+        clear_sky: bool. Whether to apply clear-sky filtering.
+        prof_pred: np.ndarray. Base profile for clear-sky filtering.
+
+        Returns
+        -------
+        None.
+        """
+
+        # Class inheritance
+        super().__init__()
+        # Forward model
+        self.forward_model = forward_model
+        # Loss terms
+        self.loss_obs, self.loss_model, self.loss_bcs = loss_obs, loss_model, loss_bcs
+        # Weighting factors for the losses
+        self.lambda_obs, self.lambda_model, self.lambda_bcs = lambda_obs, lambda_model, lambda_bcs
+        # Pressure mask per profile type
+        self.pressure_filter = torch.from_numpy(pressure_filter) \
+            if pressure_filter is not None and ~pressure_filter.sum() == 0 else None
+        # Clear-sky filtering
+        self.clear_sky = clear_sky
+        if prof_pred is not None:
+            # Shape is likely (1, 9, n_levels) based on your context
+            self.register_buffer('prof_pred', torch.from_numpy(prof_pred))
+        else:
+            self.prof_pred = None
+
+    def __call__(self, pred: dict, target: dict) -> tuple[dict, torch.Tensor]:
+        """ Compute the combined loss between predicted profiles and target data.
+
+        Parameters
+        ----------
+        pred: dict. Dictionary containing predicted tensors.
+        target: dict. Dictionary containing target tensors.
+
+        Returns
+        -------
+        loss: dict. Dictionary containing total, observation, and model losses.
+        bt_pred: torch.Tensor. Forward-modeled brightness temperature predictions.
+        """
+
+        # Mask
+        if self.pressure_filter is not None:
+            pressure_filter = self.pressure_filter
+        else:
+            pressure_filter = torch.ones_like(pred['prof'], dtype=torch.bool, device=pred['prof'].device)
+
+        # Compute the forward model output
+        if self.clear_sky:
+            if self.prof_pred is not None:
+                pred_prof = self.prof_pred[:pred['prof'].shape[0]].clone()
+            else:
+                pred_prof = torch.zeros((pred['prof'].shape[0], 9, pred['prof'].shape[2]), device=pred['prof'].device)
+            pred_prof[:, 0:1, ...] = pred['prof'][:, 0:1, :]  # Air temperature
+            pred_prof[:, 4:5, ...] = pred['prof'][:, 1:2, :]  # Ice particle effective radius
+            pred_prof[:, 8:9, ...] = pred['prof'][:, 2:3, :]  # Ozone mixing ratio
+            hofx_pred = self.forward_model(pred_prof, target)
+        else:
+            hofx_pred = self.forward_model(pred['prof'], target)
+
+        # Initialize loss dictionary
+        loss = {}
+
+        # Observation loss: Some observation losses may require additional inputs
+        if isinstance(self.loss_obs, DiagonalQuadraticForm):
+            loss['obs'] = self.loss_obs(hofx_pred[:, :10], target['hofx'][:, :10], target['hofx'][:, 10:])
+        else:
+            loss['obs'] = self.loss_obs(hofx_pred[:, :10], target['hofx'][:, :10])
+        # Total
+        loss['total'] = self.lambda_obs * loss['obs'].mean()
+
+        # Model losses: Some model losses may require additional inputs
+        if self.loss_model is not None:
+            if isinstance(self.loss_model, (DiagonalQuadraticForm, DiagonalQuadraticHuberForm)):
+                loss['model'] = self.loss_model(pred['prof_white'],
+                                                target['prof_white_background'],
+                                                target['prof_white_increment'])
+            else:
+                loss['model'] = self.loss_model(pred['prof_white'],
+                                                target['prof_white_background'])
+            # Total
+            loss['total'] += self.lambda_model * loss['model'].mean()
+
+        # Boundary condition losses (where the variance is zero)
+        # if self.loss_bcs is not None:
+        #     raise NotImplementedError("Boundary condition loss is not implemented for PCA-based profiles.")
+
+        return loss, hofx_pred
+
+    def to(self, device):
+        """
+        Move the module and its components to a specified device.
+
+        Parameters
+        ----------
+        device: torch.device. Device to move the module and its components to.
+
+        Returns
+        -------
+        self: The module itself after moving to the specified device.
+        """
+        super().to(device)
+        # Forward model
+        if hasattr(self.forward_model, 'to'):
+            self.forward_model = self.forward_model.to(device)
+        # Loss functions
+        for attr in ['loss_obs', 'loss_model', 'loss_bcs']:
+            loss_fn = getattr(self, attr, None)
+            if loss_fn is not None and hasattr(loss_fn, 'to'):
+                setattr(self, attr, loss_fn.to(device))
+
+        return self
