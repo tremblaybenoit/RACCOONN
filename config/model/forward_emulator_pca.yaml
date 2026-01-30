@@ -46,9 +46,7 @@ parameters:
     bt_norm_min: 180
     nlevels: 270
     prof_scaling: 20.0
-    prof_vars: ['Air temperature', 'Cloud ice particle effective radius', 'Cloud water particle effective radius',
-                'Snow particle effective radius', 'Humidity mixing ratio', 'Cloud ice mass', 'Cloud water mass',
-                'Snow mass', 'Ozone mixing ratio']
+    prof_vars: ['Air temperature', 'Humidity mixing ratio', 'Ozone mixing ratio']
     surf_vars: ['Ice area fraction', 'Land area fraction', 'Land type index', 'Leaf area index', 'Soil temperature',
                 'Surface snow area fraction', 'Surface snow thickness', 'Surface ice temperature',
                 'Surface soil temperature', 'Surface sea temperature', 'Surface snow temperature',

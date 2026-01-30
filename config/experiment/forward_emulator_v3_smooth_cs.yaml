@@ -89,7 +89,7 @@ data:
     # Prediction set
     predict:
       # Directory
-      dir: ${paths.data_dir}/Train2
+      dir: ../static_float32_cs/Test2
       # Variables
       vars:
         # Atmospheric profiles
