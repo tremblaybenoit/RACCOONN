@@ -11,7 +11,7 @@ class FigureLogger(Callback):
     """
     Callback to log figures at the end of each validation epoch.
     """
-    def __init__(self, save_every_n_epochs: int = 100, save_on_improvement: bool = True, monitor: str = "val_loss", monitor_mode: str = "min") -> None:
+    def __init__(self, save_every_n_epochs: int = 100, save_on_improvement: bool = True, monitor: str = "valid_loss", monitor_mode: str = "min") -> None:
         """
         Initializes the FigureLogger callback.
 
@@ -57,17 +57,7 @@ class FigureLogger(Callback):
         val = None
         if hasattr(trainer, "callback_metrics"):
             val = trainer.callback_metrics.get(self.monitor)
-        # Fallbacks could be added (e.g., model.metrics) if needed
-        if val is None:
-            return None
-        try:
-            # Try to convert tensor/numpy to float
-            return float(to_numpy(val))
-        except Exception:
-            try:
-                return float(val)
-            except Exception:
-                return None
+        return float(val) if val is not None else None
 
     def _figuresaver(self, trainer, current_epoch: int) -> bool:
         """
@@ -178,7 +168,7 @@ class FigureLogger(Callback):
         plt.close('all')
         self.figs.clear()
 
-    def on_validation_epoch_end(self, trainer, model):
+    def on_train_epoch_end(self, trainer, model):
         """
         Logs figures at the end of each validation epoch.
 

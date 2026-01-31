@@ -130,7 +130,7 @@ class LearnableSine(nn.Module):
         None.
         """
         super().__init__()
-        self.w0 = nn.Parameter(torch.tensor(w0))
+        self.w0 = nn.Parameter(torch.tensor(w0), requires_grad=True)
 
     def forward(self, x):
         """ Forward pass for Learnable Sine activation function.
@@ -143,7 +143,7 @@ class LearnableSine(nn.Module):
         -------
         torch.Tensor. Output tensor after applying Learnable Sine activation.
         """
-        return torch.sin(self.w0 * x)
+        return torch.sin(self.w0.abs() * x)
 
 
 class SuperLearnableSine(nn.Module):
@@ -154,4 +154,5 @@ class SuperLearnableSine(nn.Module):
 
     def forward(self, x):
         # x has shape (Batch, In_Features)
-        return torch.sin(self.w0 * x)
+        w0_constrained = torch.clamp(self.w0, min=1.0, max=100.0)
+        return torch.sin(w0_constrained * x)

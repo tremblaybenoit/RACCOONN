@@ -213,7 +213,8 @@ class BaseModel(LightningModule):
         """
 
         # Clear the lists for the next epoch
-        self.on_stage_epoch_end()
+        # self.on_stage_epoch_end()
+        pass
 
     def on_test_epoch_start(self):
         """ Perform test epoch start.

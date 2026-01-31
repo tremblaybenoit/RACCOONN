@@ -835,6 +835,10 @@ class PINNverseOperator(BaseModel):
                     self.log(f"{stage}_loss_obs_{i}", loss['obs'][:, i].mean(), on_epoch=True, prog_bar=False,
                              logger=logger_flag)
 
+        # Log Sobolev loss
+        if 'sobolev' in loss:
+            self.log(f"{stage}_loss_sobolev", loss['sobolev'].mean(), on_epoch=True, prog_bar=False, logger=logger_flag)
+
 
 class PINNverseOperatorPCA(PINNverseOperator):
     def __init__(self, pca_buffers: DictConfig, optimizer: DictConfig = None, loss_func: DictConfig = None,
@@ -910,12 +914,15 @@ class PINNverseOperatorPCA(PINNverseOperator):
             -------
             Loss value: tensor.
         """
+        with torch.set_grad_enabled(True):
+            coords = {'lat': batch['input']['lat'].requires_grad_(True),
+                      'lon': batch['input']['lon'].requires_grad_(True)}
 
-        # Compute profiles
-        pred = self.forward(batch['input'])
+            # Compute profiles
+            pred = self.forward(batch['input'])
 
-        # Compute loss function
-        loss, pred['hofx'] = self.loss_func(pred, batch['target'])
+            # Compute loss function
+            loss, pred['hofx'] = self.loss_func(pred, batch['target'], coords)
 
         # Logging
         self._logging(stage, loss, batch['input'], batch['target'], pred)

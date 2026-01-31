@@ -86,21 +86,11 @@ class GaussianPositionalEncoding(nn.Module):
 
         # Apply Gaussian positional encoding
         encoded_in = x.unsqueeze(1) * self.frequencies.unsqueeze(0) * (2.0 * torch.pi)  # (n_samples, num_freqs, d_input)
-        encoded_in = encoded_in.reshape(n_samples, -1)  # (n_samples, num_freqs * d_input)
-
-        # Compute sin and cos in-place
-        encoded_sin = torch.empty_like(encoded_in)
-        encoded_cos = torch.empty_like(encoded_in)
-        torch.sin(encoded_in, out=encoded_sin)
-        torch.cos(encoded_in, out=encoded_cos)
-
         # Output
-        encoded_out = torch.empty((n_samples, self.d_output), device=encoded_in.device, dtype=encoded_in.dtype)
-        encoded_out[:, :n_variables] = x * 2.0 - 1.0  # Scale input to [-1, 1]
-        encoded_out[:, n_variables:n_variables+encoded_in.shape[1]] = encoded_sin
-        encoded_out[:, n_variables+encoded_in.shape[1]:] = encoded_cos
+        encoded_sin = torch.sin(encoded_in)
+        encoded_cos = torch.cos(encoded_in)
 
-        return encoded_out
+        return torch.cat([x * 2.0 - 1.0, encoded_sin, encoded_cos], dim=-1)
 
 
 class MultiScaleGaussianEncoding(nn.Module):

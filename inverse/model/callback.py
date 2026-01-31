@@ -8,7 +8,7 @@ class FigureLogger(ForwardFigureLogger):
     """
     Callback to log figures at the end of each validation epoch.
     """
-    def __init__(self, save_every_n_epochs: int = 100, save_on_improvement: bool = True, monitor: str = "val_loss", monitor_mode: str = "min") -> None:
+    def __init__(self, save_every_n_epochs: int = 100, save_on_improvement: bool = True, monitor: str = "valid_loss", monitor_mode: str = "min") -> None:
         """
         Initializes the FigureLogger callback.
 
@@ -82,7 +82,7 @@ class FigureLogger(ForwardFigureLogger):
         # Apply parent figure builder
         super()._figurebuilder(trainer, model, tags, current_epoch)
 
-    def on_validation_epoch_end(self, trainer, model):
+    def on_train_epoch_end(self, trainer, model):
         """
         Logs figures at the end of each validation epoch.
 

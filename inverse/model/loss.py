@@ -527,6 +527,68 @@ class ForwardModel(torch.nn.Module):
         return forward_pred
 
 
+class SobolevRegularization(torch.nn.Module):
+    """
+    Sobolev Regularization loss module to penalize the magnitude of spatial gradients.
+    Enforces smoothness by minimizing ||grad(f(x))||^2.
+    """
+    def __init__(self, input_keys: list = None):
+        """
+        Parameters
+        ----------
+        input_keys: list. The keys in the batch dict to differentiate against.
+        """
+        super().__init__()
+        self.input_keys = ['lat', 'lon'] if input_keys is None else input_keys
+
+    def __call__(self, pred: torch.Tensor, coords: dict) -> torch.Tensor:
+        """
+        Compute the Sobolev penalty.
+
+        Parameters
+        ----------
+        pred: torch.Tensor. Predicted output (e.g., prof_white).
+                           Shape: (Batch, 270)
+        coords: dict. Dictionary containing input tensors with requires_grad=True.
+
+        Returns
+        -------
+        torch.Tensor. Mean squared gradient across the batch.
+        """
+        # Ensure we have a flattened representation for differentiation
+        # (Batch, N)
+        y = pred.view(pred.shape[0], -1)
+
+        # We want to find the gradient of the model output with respect to inputs.
+        # Since we want a single scalar loss to minimize, we compute the gradient
+        # of the sum of outputs, which is mathematically equivalent to the
+        # sum of the gradients for each output feature.
+        grad_outputs = torch.ones_like(y)
+
+        # Select input tensors that exist in coords
+        inputs = [coords[k] for k in self.input_keys if k in coords]
+
+        # Calculate Jacobian-vector product
+        # creates_graph=True allows the optimizer to backpropagate through this gradient
+        grads = torch.autograd.grad(
+            outputs=y,
+            inputs=inputs,
+            grad_outputs=grad_outputs,
+            create_graph=True,
+            retain_graph=True,
+            allow_unused=True
+        )
+
+        total_grad_loss = torch.tensor(0.0, device=pred.device)
+        for g in grads:
+            if g is not None:
+                # g will have the same shape as the input (Batch, 1)
+                # We penalize the square of the derivative
+                total_grad_loss += torch.mean(g**2)
+
+        return total_grad_loss
+
+
 class VarLoss(torch.nn.Module):
     """ Universal loss module that combines observation and model losses. """
     def __init__(self, forward_model: Callable, loss_obs: Callable, loss_model: Callable = None, loss_bcs: Callable = None,
@@ -780,7 +842,7 @@ class VarLossPCA(torch.nn.Module):
 class VarLossHybridPCA(torch.nn.Module):
     """ Universal loss module that combines observation and model losses. """
     def __init__(self, forward_model: Callable, loss_obs: Callable, loss_model: Callable = None, loss_bcs: Callable = None,
-                 lambda_obs: float=1.0, lambda_model: float=1.0, lambda_bcs: float=1.0,
+                 lambda_obs: float=1.0, lambda_model: float=1.0, lambda_bcs: float=1.0, lambda_sobolev: float=0.0,
                  pressure_filter: np.ndarray=None, clear_sky: bool=False, prof_pred: np.ndarray=None):
         """ Initialize the variational loss module.
 
@@ -793,6 +855,7 @@ class VarLossHybridPCA(torch.nn.Module):
         lambda_obs: float. Weight for the observation loss.
         lambda_model: float. Weight for the model loss.
         lambda_bcs: float. Weight for the boundary condition loss.
+        lambda_sobolev: float. Weight for the Sobolev regularization loss.
         pressure_filter: Callable. Function to generate a mask for the profile levels to include in the model loss.
         clear_sky: bool. Whether to apply clear-sky filtering.
         prof_pred: np.ndarray. Base profile for clear-sky filtering.
@@ -810,6 +873,8 @@ class VarLossHybridPCA(torch.nn.Module):
         self.loss_obs, self.loss_model, self.loss_bcs = loss_obs, loss_model, loss_bcs
         # Weighting factors for the losses
         self.lambda_obs, self.lambda_model, self.lambda_bcs = lambda_obs, lambda_model, lambda_bcs
+        self.lambda_sobolev = lambda_sobolev
+        self.sobolev_loss_fn = SobolevRegularization(input_keys=['lat', 'lon'])
         # Pressure mask per profile type
         self.pressure_filter = torch.from_numpy(pressure_filter) \
             if pressure_filter is not None and ~pressure_filter.sum() == 0 else None
@@ -821,13 +886,14 @@ class VarLossHybridPCA(torch.nn.Module):
         else:
             self.prof_pred = None
 
-    def __call__(self, pred: dict, target: dict) -> tuple[dict, torch.Tensor]:
+    def __call__(self, pred: dict, target: dict, input: dict) -> tuple[dict, torch.Tensor]:
         """ Compute the combined loss between predicted profiles and target data.
 
         Parameters
         ----------
         pred: dict. Dictionary containing predicted tensors.
         target: dict. Dictionary containing target tensors.
+        input: dict. Dictionary containing input tensors for Sobolev loss.
 
         Returns
         -------
@@ -864,6 +930,11 @@ class VarLossHybridPCA(torch.nn.Module):
             loss['obs'] = self.loss_obs(hofx_pred[:, :10], target['hofx'][:, :10])
         # Total
         loss['total'] = self.lambda_obs * loss['obs'].mean()
+
+        # Sobolev regularization loss
+        if self.lambda_sobolev > 0.0:
+            loss['sobolev'] = self.sobolev_loss_fn(pred['prof_white'], input)  # TODO: Switch to prof (physical space) if needed
+            loss['total'] += self.lambda_sobolev * loss['sobolev'].mean()
 
         # Model losses: Some model losses may require additional inputs
         if self.loss_model is not None:
