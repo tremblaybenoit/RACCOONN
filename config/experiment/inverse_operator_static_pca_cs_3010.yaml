@@ -22,7 +22,7 @@ task_name: "inverse_operator_static_pca_cs"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "3005"
+  run_id: "3010"
   data_dir: ../static_${data.dtype}_cs
 
 # Trainer configuration
@@ -83,6 +83,12 @@ data:
               var: 'prof'
               dtype: ${data.dtype}
             axis: 1
+        # Brightness temperatures
+        hofx:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/predict_hofx_v3_smooth_cs.npy
         # Atmospheric profiles
         prof_background:
           normalization: ${data.stage.train.vars.prof.normalization}
@@ -122,6 +128,12 @@ data:
           type: ${data.stage.train.vars.prof.type}
           # Normalization function and parameters
           normalization: ${data.stage.train.vars.prof.normalization}
+        # Brightness temperatures
+        hofx:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/predict_hofx_v3_smooth_cs.npy
         # Atmospheric profiles
         prof_background:
           normalization: ${data.stage.train.vars.prof.normalization}
@@ -161,6 +173,12 @@ data:
           type: ${data.stage.train.vars.prof.type}
           # Normalization function and parameters
           normalization: ${data.stage.train.vars.prof.normalization}
+        # Brightness temperatures
+        hofx:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/predict_hofx_v3_smooth_cs.npy
         # Atmospheric profiles
         prof_background:
           normalization: ${data.stage.train.vars.prof.normalization}
@@ -243,18 +261,18 @@ model:
       # Function
       _target_: inverse.model.loss.ForwardModel
       # Configuration of the forward model
-      checkpoint_path: 'forward/model/checkpoints/model_v3.ckpt'
-      config_path: 'model/forward_emulator.yaml'
+      checkpoint_path: 'forward/model/checkpoints/model_v3_smooth_cs.ckpt'
+      config_path: 'model/forward_emulator_smooth_cs.yaml'
       # Precision
       dtype: ${data.dtype}
       # Normalization for the profile variables
       prof_norm: null
     # Weights for observation (obs), model, and boundary condition (bcs) errors
     lambda_obs: 1.
-    lambda_model: 1.
+    lambda_model: 10.
     lambda_bcs: 1.
     lambda_sobolev: 1.e-5
-    clear_sky: true
+    clear_sky: false
     # Loss term for observations
     loss_obs:
       _target_: inverse.model.loss.MSE
@@ -288,7 +306,7 @@ model:
       activation:
         _target_: forward.model.activation.SuperLearnableSine
         in_features: ${model.architecture.hidden_layer.in_features}
-        w0: 30.0
+        w0: 5.0
       dropout_rate: 0.1
       init_func:
         _target_: inverse.model.model.SirenInit

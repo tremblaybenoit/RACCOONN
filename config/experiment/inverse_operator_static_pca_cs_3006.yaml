@@ -22,7 +22,7 @@ task_name: "inverse_operator_static_pca_cs"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "3005"
+  run_id: "3006"
   data_dir: ../static_${data.dtype}_cs
 
 # Trainer configuration
@@ -288,7 +288,7 @@ model:
       activation:
         _target_: forward.model.activation.SuperLearnableSine
         in_features: ${model.architecture.hidden_layer.in_features}
-        w0: 30.0
+        w0: 5.0
       dropout_rate: 0.1
       init_func:
         _target_: inverse.model.model.SirenInit

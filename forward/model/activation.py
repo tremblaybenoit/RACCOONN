@@ -154,5 +154,5 @@ class SuperLearnableSine(nn.Module):
 
     def forward(self, x):
         # x has shape (Batch, In_Features)
-        w0_constrained = torch.clamp(self.w0, min=1.0, max=100.0)
+        w0_constrained = torch.clamp(self.w0, min=0.0, max=30.0)
         return torch.sin(w0_constrained * x)

@@ -22,7 +22,7 @@ task_name: "inverse_operator_static_pca_cs"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "3005"
+  run_id: "3016"
   data_dir: ../static_${data.dtype}_cs
 
 # Trainer configuration
@@ -32,7 +32,7 @@ trainer:
   precision: 32  # 32-bit precision
 
 # Initialization
-# init_from_checkpoint: ../inverse_outputs/inverse_operator_static_pca_cs/checkpoints/1021/model.ckpt
+init_from_checkpoint: ../inverse_outputs/inverse_operator_static_pca_cs/checkpoints/3006/model.ckpt
 
 # Callbacks
 callbacks:
@@ -250,7 +250,7 @@ model:
       # Normalization for the profile variables
       prof_norm: null
     # Weights for observation (obs), model, and boundary condition (bcs) errors
-    lambda_obs: 1.
+    lambda_obs: 10.
     lambda_model: 1.
     lambda_bcs: 1.
     lambda_sobolev: 1.e-5
@@ -288,7 +288,7 @@ model:
       activation:
         _target_: forward.model.activation.SuperLearnableSine
         in_features: ${model.architecture.hidden_layer.in_features}
-        w0: 30.0
+        w0: 5.0
       dropout_rate: 0.1
       init_func:
         _target_: inverse.model.model.SirenInit
