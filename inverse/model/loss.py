@@ -555,6 +555,7 @@ class SobolevRegularization(torch.nn.Module):
         -------
         torch.Tensor. Mean squared gradient across the batch.
         """
+
         # Ensure we have a flattened representation for differentiation
         # (Batch, N)
         y = pred.view(pred.shape[0], -1)
@@ -592,7 +593,7 @@ class SobolevRegularization(torch.nn.Module):
 class VarLoss(torch.nn.Module):
     """ Universal loss module that combines observation and model losses. """
     def __init__(self, forward_model: Callable, loss_obs: Callable, loss_model: Callable = None, loss_bcs: Callable = None,
-                 lambda_obs: float=1.0, lambda_model: float=1.0, lambda_bcs: float=1.0,
+                 lambda_obs: float=1.0, lambda_model: float=1.0, lambda_bcs: float=1.0, lambda_sobolev: float=0.0,
                  pressure_filter: np.ndarray=None, clear_sky: bool=False, prof_pred: np.ndarray=None):
         """ Initialize the variational loss module.
 
@@ -605,6 +606,7 @@ class VarLoss(torch.nn.Module):
         lambda_obs: float. Weight for the observation loss.
         lambda_model: float. Weight for the model loss.
         lambda_bcs: float. Weight for the boundary condition loss.
+        lambda_sobolev: float. Weight for the Sobolev regularization loss.
         pressure_filter: Callable. Function to generate a mask for the profile levels to include in the model loss.
         clear_sky: bool. Whether to apply clear-sky filtering.
         prof_pred: np.ndarray. Base profile for clear-sky filtering.
@@ -621,6 +623,8 @@ class VarLoss(torch.nn.Module):
         self.loss_obs, self.loss_model, self.loss_bcs = loss_obs, loss_model, loss_bcs
         # Weighting factors for the losses
         self.lambda_obs, self.lambda_model, self.lambda_bcs = lambda_obs, lambda_model, lambda_bcs
+        self.lambda_sobolev = lambda_sobolev
+        self.sobolev_loss_fn = SobolevRegularization(input_keys=['lat', 'lon', 'scans', 'pressure'])
         # Pressure mask per profile type
         self.pressure_filter = torch.from_numpy(pressure_filter) \
             if pressure_filter is not None and ~pressure_filter.sum() == 0 else None
@@ -632,13 +636,14 @@ class VarLoss(torch.nn.Module):
         else:
             self.prof_pred = None
 
-    def __call__(self, pred: dict, target: dict) -> tuple[dict, torch.Tensor]:
+    def __call__(self, pred: dict, target: dict, input: dict=None) -> tuple[dict, torch.Tensor]:
         """ Compute the combined loss between predicted profiles and target data.
 
         Parameters
         ----------
         pred: dict. Dictionary containing predicted tensors.
         target: dict. Dictionary containing target tensors.
+        input: dict. Dictionary containing input tensors for Sobolev loss.
 
         Returns
         -------
@@ -698,6 +703,11 @@ class VarLoss(torch.nn.Module):
                                                     target['prof_background'])
             # Total
             loss['total'] += self.lambda_model * loss['model'].mean()
+
+        # Sobolev regularization loss
+        if self.lambda_sobolev > 0.0:
+            loss['sobolev'] = self.sobolev_loss_fn(pred['prof'], input)
+            loss['total'] += self.lambda_sobolev * loss['sobolev'].mean()
 
         # Boundary condition losses (where the variance is zero)
         if self.loss_bcs is not None and self.pressure_filter is not None:

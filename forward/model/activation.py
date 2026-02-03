@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+import torch.nn.functional as F
 
 
 class Scale(nn.Module):
@@ -84,6 +85,30 @@ class Swish(nn.Module):
         """
 
         return x * torch.sigmoid(self.b * x)
+
+
+class SuperLearnableSwish(nn.Module):
+    def __init__(self, in_features):
+        super().__init__()
+        # Initializing with 1.0 (SiLU)
+        self.b = nn.Parameter(torch.ones(in_features))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """ Forward pass for SuperLearnableSwish activation function.
+
+        Parameters
+        ----------
+        x : torch.Tensor. Input tensor.
+
+        Returns
+        -------
+        torch.Tensor. Output tensor after applying SuperLearnableSwish activation.
+        """
+
+        # Use softplus to ensure beta > 0 without hard clipping
+        # This keeps the landscape smooth for PINN second derivatives
+        b_safe = F.softplus(self.b)
+        return x * torch.sigmoid(b_safe * x)
 
 
 class Sine(nn.Module):

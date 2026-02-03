@@ -34,6 +34,65 @@ class KaimingInit(nn.Module):
             nn.init.zeros_(module.bias)
 
 
+class SwishInit:
+    """ Swish weights initializer """
+    def __init__(self, is_first_layer: bool = False, is_head: bool = False):
+        """
+        Initialize Swish.
+
+        Parameters
+        ----------
+        is_first_layer: bool. Flag indicating if the module is the first layer.
+        is_head: bool. Flag indicating if the module is a head layer.
+
+        Returns
+        -------
+        None.
+        """
+
+        # Parameters
+        self.is_first_layer = is_first_layer
+        self.is_head = is_head
+
+    def __call__(self, module):
+        """
+        Swish weights initialization function.
+
+        Parameters
+        ----------
+        module: nn.Module. The module to initialize.
+
+        Returns
+        -------
+        None.
+        """
+
+        # Weight initialization
+        if not hasattr(module, 'weight'):
+            return
+
+        # Weight initialization
+        with torch.no_grad():
+            dim_in = module.weight.size(1)
+
+            if self.is_head:
+                # Use Xavier Uniform for the output to keep predictions centered
+                nn.init.xavier_uniform_(module.weight)
+            else:
+                # Kaiming initialization is standard for ReLU/Swish.
+                # Since Swish is "half-linear," we use a gain slightly
+                # different than ReLU (sqrt(2)).
+                # For Swish, 1.0 to 1.4 is usually a sweet spot.
+                gain = 1.0 if self.is_first_layer else 1.2
+                std = gain / torch.sqrt(torch.tensor(float(dim_in)))
+                nn.init.normal_(module.weight, mean=0, std=std)
+
+            if hasattr(module, 'bias') and module.bias is not None:
+                # In PINNs, sometimes initializing bias to small random
+                # values helps "break symmetry" faster than zeros.
+                nn.init.zeros_(module.bias)
+
+
 class XavierInit(nn.Module):
     """
     Callable Xavier/Glorot initializer.
@@ -694,10 +753,14 @@ class PINNverseOperator(BaseModel):
         """
 
         # Compute profiles
-        pred = {'prof': self.forward(batch['input'])}
+        with torch.set_grad_enabled(True):
+            coords = {key: v.requires_grad_(True) for key, v in batch['input'].items()}
 
-        # Compute loss function
-        loss, pred['hofx'] = self.loss_func(pred, batch['target'])
+            # Compute profiles
+            pred = {'prof': self.forward(batch['input']).contiguous()}
+
+            # Compute loss function
+            loss, pred['hofx'] = self.loss_func(pred, batch['target'], coords)
 
         # Logging
         self._logging(stage, loss, batch['input'], batch['target'], pred)
@@ -928,3 +991,53 @@ class PINNverseOperatorPCA(PINNverseOperator):
         self._logging(stage, loss, batch['input'], batch['target'], pred)
 
         return loss['total']
+
+
+class PINNverseOperatorPCALBFGS(PINNverseOperatorPCA):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        # L-BFGS requires manual optimization control in Lightning
+        self.automatic_optimization = False
+
+    def training_step(self, batch: dict, batch_nb: int):
+        """
+        L-BFGS training step using the manual optimization loop.
+        """
+        opt = self.optimizers()
+
+        # The closure is a function that re-evaluates the model and returns the loss.
+        # L-BFGS will call this multiple times per step to estimate the Hessian.
+        def closure():
+            opt.zero_grad()
+
+            # 1. Forward pass and loss calculation
+            # We reuse the logic from PCA/BaseModel
+            with torch.set_grad_enabled(True):
+                coords = {
+                    'lat': batch['input']['lat'].requires_grad_(True),
+                    'lon': batch['input']['lon'].requires_grad_(True)
+                }
+                pred = self.forward(batch['input'])
+                loss_dict, pred['hofx'] = self.loss_func(pred, batch['target'], coords)
+                loss = loss_dict['total']
+
+            # 2. Backward pass
+            # In manual optimization, we must call this ourselves
+            self.manual_backward(loss)
+
+            return loss
+
+        # 3. Optimizer Step
+        # L-BFGS performs line searches inside this call
+        opt.step(closure=closure)
+        params = list(self.parameters())
+        print(f"Update Norm: {torch.norm(params[0].grad)}")
+
+        # Optional: Log the loss after the full L-BFGS step is complete
+        # We re-run the forward pass once without grad for logging to keep it clean
+        with torch.no_grad():
+            pred = self.forward(batch['input'])
+            # Pass dummy coords as we don't need derivatives for final logging
+            loss_dict, _ = self.loss_func(pred, batch['target'], batch['input'])
+            self.log("train_loss", loss_dict['total'], prog_bar=True, on_step=True)
