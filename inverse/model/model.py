@@ -1031,8 +1031,6 @@ class PINNverseOperatorPCALBFGS(PINNverseOperatorPCA):
         # 3. Optimizer Step
         # L-BFGS performs line searches inside this call
         opt.step(closure=closure)
-        params = list(self.parameters())
-        print(f"Update Norm: {torch.norm(params[0].grad)}")
 
         # Optional: Log the loss after the full L-BFGS step is complete
         # We re-run the forward pass once without grad for logging to keep it clean
