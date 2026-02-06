@@ -50,13 +50,14 @@ class RescaledPositionalEncoding(IdentityPositionalEncoding):
 
 class GaussianPositionalEncoding(nn.Module):
     """ Gaussian Positional Encoding. Credit: Robert Jarolim, Momchil Molnar."""
-    def __init__(self, num_freqs: int, d_input: int):
+    def __init__(self, num_freqs: int, d_input: int, sigma: float = 1.0):
         """ Initialize Gaussian Positional Encoding.
 
         Parameters
         ----------
         num_freqs : int. Number of frequencies.
         d_input : int. Input dimension.
+        sigma : float. Standard deviation for frequency sampling.
 
         Returns
         -------
@@ -64,7 +65,7 @@ class GaussianPositionalEncoding(nn.Module):
         """
         super().__init__()
         # Initialize frequencies
-        self.register_buffer("frequencies", torch.randn(num_freqs, d_input))
+        self.register_buffer("frequencies", torch.randn(num_freqs, d_input)*sigma)
         self.num_freqs= num_freqs
         # Output dimension
         self.d_output = d_input * (num_freqs * 2 + 1)

@@ -111,6 +111,28 @@ class SuperLearnableSwish(nn.Module):
         return x * torch.sigmoid(b_safe * x)
 
 
+class NonLearnableSwish(nn.Module):
+
+    def __init__(self, in_features, b: float = 1.0):
+        super().__init__()
+        # Initializing with 1.0 (SiLU)
+        self.b = b
+
+    """Non-learnable Swish activation function. """
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """ Forward pass for Non-learnable Swish activation function.
+
+        Parameters
+        ----------
+        x : torch.Tensor. Input tensor.
+
+        Returns
+        -------
+        torch.Tensor. Output tensor after applying Non-learnable Swish activation.
+        """
+        return x * torch.sigmoid(self.b*x)
+
+
 class Sine(nn.Module):
     """Sine activation function. """
     def __init__(self, w0=1.):
