@@ -993,6 +993,57 @@ class PINNverseOperatorPCA(PINNverseOperator):
         return loss['total']
 
 
+class PINNverseOperatorCycle(PINNverseOperatorPCA):
+
+    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
+        """ Perform training/validation/test step.
+
+            Parameters
+            ----------
+            batch: tensor. Batch from the training set.
+            batch_nb: int. Index of the batch out of the training set.
+            stage: str. Current operation: "train", "valid", or "test".
+
+            Returns
+            -------
+            Loss value: tensor.
+        """
+
+        # Extract current epoch
+        current_epoch = self.current_epoch
+        start_epoch = 25
+        ramp_duration = 200
+        lambda_obs = 1.0
+        lambda_sobolev = 0.00001
+
+        # Adjust loss function weights based on the current epoch
+        if current_epoch < start_epoch:
+            self.loss_func.lambda_obs = 0
+            self.loss_func.lambda_sobolev = 0
+        elif current_epoch < start_epoch + ramp_duration:
+            progress = torch.sigmoid(torch.tensor((current_epoch - start_epoch - (ramp_duration / 2)) / (ramp_duration / 4))).item()
+            self.loss_func.lambda_obs = progress * lambda_obs  # Ramp up observation loss gradually
+            self.loss_func.lambda_sobolev = progress**2 * lambda_sobolev  # Ramp up Sobolev loss faster to stabilize training
+        else:
+            self.loss_func.lambda_obs = lambda_obs
+            self.loss_func.lambda_sobolev = lambda_sobolev
+
+        with torch.set_grad_enabled(True):
+            coords = {'lat': batch['input']['lat'].requires_grad_(True),
+                      'lon': batch['input']['lon'].requires_grad_(True)}
+
+            # Compute profiles
+            pred = self.forward(batch['input'])
+
+            # Compute loss function
+            loss, pred['hofx'] = self.loss_func(pred, batch['target'], coords)
+
+        # Logging
+        self._logging(stage, loss, batch['input'], batch['target'], pred)
+
+        return loss['total']
+
+
 class PINNverseOperatorPCALBFGS(PINNverseOperatorPCA):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
