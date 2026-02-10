@@ -2,6 +2,7 @@ from utilities.instantiators import instantiate
 from forward.model.callback import FigureLogger as ForwardFigureLogger
 from utilities.plot import fig_vertical_profiles
 from utilities.tensors import to_numpy
+import numpy as np
 
 
 class FigureLogger(ForwardFigureLogger):
@@ -79,6 +80,28 @@ class FigureLogger(ForwardFigureLogger):
                                                title=[f"Epoch {current_epoch:02d} - {prof_label}" for prof_label in
                                                       prof_labels]))
 
+        # Whitened profile coefficients (0 to 270)
+        coefficient_levels = np.arange(0, 270, 1)
+        prof_white_mean = [to_numpy(model.metrics['prof_white_target']['mean']).reshape(1, -1),
+                           to_numpy(model.metrics['prof_white']['mean']).reshape(1, -1)]
+        prof_white_rmse = [to_numpy(model.metrics['prof_white']['rmse']).reshape(1, -1), ]
+        prof_white_mean_labels, prof_white_mean_colors = ['Target', 'Prediction'], ['#1f77b4', '#ff7f0e']
+        prof_white_rmse_labels, prof_white_rmse_colors = ['Target-Prediction'], ['#ff7f0e']
+        if 'prof_white_background' in model.metrics and len(model.metrics['prof_white_background']) > 0:
+            prof_white_mean.insert(0, to_numpy(model.metrics['prof_white_background']['mean'].reshape(1, -1)))
+            prof_white_rmse.insert(0, to_numpy(model.metrics['prof_white_background']['rmse'].reshape(1, -1)))
+            prof_white_mean_labels.insert(0, 'Background')
+            prof_white_mean_colors.insert(0, '#2ca02c')
+            prof_white_rmse_labels.insert(0, 'Target-Background')
+            prof_white_rmse_colors.insert(0, '#2ca02c')
+
+        # White profile RMSE
+        self.figs.append(fig_vertical_profiles(prof_white_rmse, prof_white_rmse_labels,
+                                               y=coefficient_levels, y_label='Coefficient Index',
+                                                  x_label='Whitened profile RMSE (no units)', color=prof_white_rmse_colors,
+                                                  title=[f"Epoch {current_epoch:02d} - {prof_label}" for prof_label in
+                                                        prof_labels]))
+
         # Apply parent figure builder
         super()._figurebuilder(trainer, model, tags, current_epoch)
 
@@ -108,7 +131,7 @@ class FigureLogger(ForwardFigureLogger):
             return
 
         # Tags for each figure
-        tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE", "Valid_RadianceRMSE"]
+        tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE", "Valid_WhiteProfilesRMSE", "Valid_RadianceRMSE"]
         # Call the figure builder and buffer
         self._figurebuilder(trainer, model, tags, current_epoch)
         self._figurebuffer(trainer, tags, current_epoch)

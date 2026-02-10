@@ -279,7 +279,7 @@ def diagonal_quadratic_form(pred: torch.Tensor, target: torch.Tensor, diag: torc
 
     # Minor adjustment to avoid division by zero
     eps = 1.e-8
-    denom = torch.clamp(diag, min=eps)
+    denom = torch.clamp(torch.abs(diag), min=eps)
     return mse(pred, target)/denom**2
 
 
@@ -942,9 +942,8 @@ class VarLossHybridPCA(torch.nn.Module):
         loss['total'] = self.lambda_obs * loss['obs'].mean()
 
         # Sobolev regularization loss
-        if self.lambda_sobolev > 0.0:
-            loss['sobolev'] = self.sobolev_loss_fn(pred['prof_white'], input)  # TODO: Switch to prof (physical space) if needed
-            loss['total'] += self.lambda_sobolev * loss['sobolev'].mean()
+        loss['sobolev'] = self.sobolev_loss_fn(pred['prof_white'], input)  # TODO: Switch to prof (physical space) if needed
+        loss['total'] += self.lambda_sobolev * loss['sobolev'].mean()
 
         # Model losses: Some model losses may require additional inputs
         if self.loss_model is not None:

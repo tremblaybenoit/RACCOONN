@@ -683,6 +683,7 @@ class PINNverseOperator(BaseModel):
         # Results & metrics
         self.results['prof'] = []
         self.metrics['prof'], self.metrics['prof_target'], self.metrics['prof_background'] = {}, {}, {}
+        self.metrics['prof_white'], self.metrics['prof_white_target'], self.metrics['prof_white_background'] = {}, {}, {}
 
         # Model parameters
         self.n_prof = instantiate(parameters.n_prof) if parameters is not None and hasattr(parameters, 'n_prof') \
@@ -819,6 +820,40 @@ class PINNverseOperator(BaseModel):
             else:
                 self.metrics['prof_background'] = stats_background
 
+    def _logging_prof_white(self, pred: torch.Tensor, target: torch.Tensor, background: torch.Tensor=None) -> None:
+        """ Log profile metrics in "white" space (i.e., without pressure-level filtering).
+
+            Parameters
+            ----------
+            pred: tensor. Predicted profiles.
+            target: tensor. Target profiles.
+            background: tensor. Background profiles.
+
+            Returns
+            -------
+            None.
+        """
+
+        # Log mean profiles and rmse
+        stats_pred = statistics(pred, axis=0, which=['mean', 'stdev', 'rmse', 'mae'], target=target)
+        stats_target = statistics(target, axis=0, which=['mean', 'stdev'])
+        # Check if statistics dictionaries are empty
+        if self.metrics.get('prof_white'):
+            self.metrics['prof_white'] = accumulate_statistics([self.metrics['prof_white'], stats_pred])
+            self.metrics['prof_white_target'] = accumulate_statistics([self.metrics['prof_white_target'], stats_target])
+        else:
+            self.metrics['prof_white'] = stats_pred
+            self.metrics['prof_white_target'] = stats_target
+
+        # Log mean background profiles and rmse if available
+        if background is not None:
+            stats_background = statistics(background, axis=0, which=['mean', 'stdev', 'rmse', 'mae'], target=target)
+            # Check if statistics dictionaries are empty
+            if self.metrics.get('prof_white_background'):
+                self.metrics['prof_white_background'] = accumulate_statistics([self.metrics['prof_white_background'], stats_background])
+            else:
+                self.metrics['prof_white_background'] = stats_background
+
     def _logging(self, stage: str, loss: dict, input: dict, target: dict, pred: dict) -> None:
         """ Log training/validation/test metrics.
 
@@ -852,6 +887,7 @@ class PINNverseOperator(BaseModel):
             self._logging_hofx(pred['hofx'], target['hofx'], target['cloud_filter'].bool(),
                                target['daytime_filter'].bool())
             self._logging_prof(pred['prof'], target['prof'], background=target.get('prof_background', None))
+            self._logging_prof_white(pred['prof_white'], target['prof_white'], background=target.get('prof_white_background', None))
         # Log L2 norm of model parameters during training
         elif stage == 'train':
             # Compute L2 norm of the model parameters
