@@ -77,6 +77,15 @@ data:
             dtype: ${data.dtype}
           # Normalization function and parameters
           normalization: null
+        prof_background:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/white_prof_background.npy
+            split: ${....split}
+            dtype: ${data.dtype}
+          # Normalization function and parameters
+          normalization: null
     # Validation set
     valid:
       # Variables
@@ -87,6 +96,15 @@ data:
           load:
             _target_: data.io.load_npy
             path: ${....dir}/white_prof.npy
+            split: ${....split}
+            dtype: ${data.dtype}
+          # Normalization function and parameters
+          normalization: null
+        prof_background:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/white_prof_background.npy
             split: ${....split}
             dtype: ${data.dtype}
           # Normalization function and parameters
@@ -105,10 +123,19 @@ data:
             dtype: ${data.dtype}
           # Normalization function and parameters
           normalization: null
+        prof_background:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/white_prof_background.npy
+            split: ${....split}
+            dtype: ${data.dtype}
+          # Normalization function and parameters
+          normalization: null
     # Prediction set
     predict:
       # Directory
-      dir: ../static_float32_cs/Test2
+      dir: ../static_float32_cs/Train2
       # Variables
       vars:
         # Atmospheric profiles
@@ -117,6 +144,15 @@ data:
           load:
             _target_: data.io.load_npy
             path: ${....dir}/white_prof.npy
+            split: ${....split}
+            dtype: ${data.dtype}
+          # Normalization function and parameters
+          normalization: null
+        prof_background:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/white_prof_background.npy
             split: ${....split}
             dtype: ${data.dtype}
           # Normalization function and parameters

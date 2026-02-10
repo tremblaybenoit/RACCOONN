@@ -882,7 +882,7 @@ class PINNverseOperator(BaseModel):
                         self.log(f"{stage}_loss_{key}_{i}_{var}", loss[key][:, i, :].mean(), on_epoch=True,
                                  prog_bar=False, logger=logger_flag)
                 # If pressure-level filtering is involved, log only the relevant levels
-                elif loss[key].ndim == 2 and self.loss_func.pressure_filter is not None:
+                elif loss[key].ndim == 2 and hasattr(self.loss_func, 'pressure_filter'):
                     n_pressure = torch.cumsum(self.loss_func.pressure_filter.sum(axis=1), dim=0)
                     for i, var in enumerate(self.prof_vars):
                         # Log loss only for the relevant pressure levels
@@ -993,7 +993,7 @@ class PINNverseOperatorPCA(PINNverseOperator):
         return loss['total']
 
 
-class PINNverseOperatorCycle(PINNverseOperatorPCA):
+class PINNverseOperatorPCACycle(PINNverseOperatorPCA):
 
     def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
         """ Perform training/validation/test step.
@@ -1011,18 +1011,20 @@ class PINNverseOperatorCycle(PINNverseOperatorPCA):
 
         # Extract current epoch
         current_epoch = self.current_epoch
-        start_epoch = 25
-        ramp_duration = 200
+        start_epoch = 1000
+        ramp_duration = 2000
+        lambda_model = 1.0
         lambda_obs = 1.0
         lambda_sobolev = 0.00001
 
         # Adjust loss function weights based on the current epoch
-        if current_epoch < start_epoch:
-            self.loss_func.lambda_obs = 0
-            self.loss_func.lambda_sobolev = 0
-        elif current_epoch < start_epoch + ramp_duration:
+        if current_epoch < ramp_duration:
             progress = torch.sigmoid(torch.tensor((current_epoch - start_epoch - (ramp_duration / 2)) / (ramp_duration / 4))).item()
+            if batch_nb == 0:
+                print(f"Epoch {current_epoch}: Ramp up progress = {progress:.4f}")
+            # progress = (current_epoch - start_epoch) / ramp_duration
             self.loss_func.lambda_obs = progress * lambda_obs  # Ramp up observation loss gradually
+            self.loss_func.lambda_model = lambda_model * (1.0 - progress)  # Ramp down model loss to encourage early learning of observations
             self.loss_func.lambda_sobolev = progress**2 * lambda_sobolev  # Ramp up Sobolev loss faster to stabilize training
         else:
             self.loss_func.lambda_obs = lambda_obs

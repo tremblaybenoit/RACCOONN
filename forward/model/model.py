@@ -606,5 +606,5 @@ class CRTMModelPCA(CRTMModelSmooth):
         torch.Tensor. Output tensor after passing through the model.
         """
 
-        return super().__forward__({'prof': input['prof']/self.prof_scaling, 'surf': input['surf'],
-                                    'meta': input['meta']})
+        return super().forward({'prof': input['prof']/self.prof_scaling, 'surf': input['surf'],
+                                'meta': input['meta']})

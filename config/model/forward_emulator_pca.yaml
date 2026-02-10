@@ -69,4 +69,4 @@ parameters:
 # Loss function and parameters
 loss_func:
   # Function
-  _target_: forward.model.loss_white.CRPS
+  _target_: forward.model.loss.CRPS

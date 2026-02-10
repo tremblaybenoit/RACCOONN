@@ -22,7 +22,7 @@ task_name: "inverse_operator_static_pca_cs"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "3015"
+  run_id: "7000"
   data_dir: ../static_${data.dtype}_cs
 
 # Trainer configuration
@@ -32,7 +32,7 @@ trainer:
   precision: 32  # 32-bit precision
 
 # Initialization
-# init_from_checkpoint: ../inverse_outputs/inverse_operator_static_pca_cs/checkpoints/1021/model.ckpt
+# init_from_checkpoint: ../inverse_outputs/inverse_operator_static_pca_cs/checkpoints/3014a/model.ckpt
 
 # Callbacks
 callbacks:
@@ -88,7 +88,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_v3_smooth_cs.npy
+            path: ${....dir}/predict_hofx_v3_pca_cs.npy
         # Atmospheric profiles
         prof_background:
           normalization: ${data.stage.train.vars.prof.normalization}
@@ -133,7 +133,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_v3_smooth_cs.npy
+            path: ${....dir}/predict_hofx_v3_pca_cs.npy
         # Atmospheric profiles
         prof_background:
           normalization: ${data.stage.train.vars.prof.normalization}
@@ -178,7 +178,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_v3_smooth_cs.npy
+            path: ${....dir}/predict_hofx_v3_pca_cs.npy
         # Atmospheric profiles
         prof_background:
           normalization: ${data.stage.train.vars.prof.normalization}
@@ -217,17 +217,17 @@ loader:
     train:
       target:
         prof_white: ${data.stage.train.vars.prof_white}
-        prof_white_background: ${data.stage.train.vars.prof_white_background}
+        prof_white_background: ${data.stage.train.vars.prof_white}
         prof_white_increment: ${data.stage.train.vars.prof_white_increment}
     valid:
       target:
         prof_white: ${data.stage.valid.vars.prof_white}
-        prof_white_background: ${data.stage.valid.vars.prof_white_background}
+        prof_white_background: ${data.stage.valid.vars.prof_white}
         prof_white_increment: ${data.stage.valid.vars.prof_white_increment}
     test:
       target:
         prof_white: ${data.stage.test.vars.prof_white}
-        prof_white_background: ${data.stage.test.vars.prof_white_background}
+        prof_white_background: ${data.stage.test.vars.prof_white}
         prof_white_increment: ${data.stage.test.vars.prof_white_increment}
 
 # Model parameters
@@ -239,7 +239,7 @@ model:
   # Optimizer function and parameters
   optimizer:
     # Learning rate
-    lr: 0.001
+    lr: 0.01
     # Weight decay (L2 regularization)
     weight_decay: 0
   # Learning rate scheduler
@@ -255,24 +255,24 @@ model:
   # Loss function and parameters
   loss_func:
     # Function
-    _target_: inverse.model.loss.VarLossHybridPCA # Load loss function
+    _target_: inverse.model.loss.VarLossPCA # Load loss function
     # Forward model to compute the model equivalent of the observations
     forward_model:
       # Function
       _target_: inverse.model.loss.ForwardModel
       # Configuration of the forward model
-      checkpoint_path: 'forward/model/checkpoints/model_v3_smooth_cs.ckpt'
-      config_path: 'model/forward_emulator_smooth_cs.yaml'
+      checkpoint_path: 'forward/model/checkpoints/model_v3_pca_cs.ckpt'
+      config_path: 'model/forward_emulator_pca.yaml'
       # Precision
       dtype: ${data.dtype}
       # Normalization for the profile variables
       prof_norm: null
     # Weights for observation (obs), model, and boundary condition (bcs) errors
-    lambda_obs: 1.
+    lambda_obs: 0.0000
     lambda_model: 1.
     lambda_bcs: 1.
-    lambda_sobolev: 1.e-5
-    clear_sky: false
+    # lambda_sobolev: 0  # 1.e-5
+    # clear_sky: false
     # Loss term for observations
     loss_obs:
       _target_: inverse.model.loss.MSE
@@ -287,7 +287,7 @@ model:
     # Positional encoding
     positional_encoding:
       _target_: inverse.model.encoding.GaussianPositionalEncoding
-      num_freqs: 20
+      num_freqs: 10
       d_input:
         _target_: builtins.int
         _args_:
@@ -304,7 +304,7 @@ model:
       layernorm:
         _target_: torch.nn.Identity
       activation:
-        _target_: forward.model.activation.SuperLearnableSwish
+        _target_: forward.model.activation.NonLearnableSwish
         in_features: ${model.architecture.hidden_layer.in_features}
       dropout_rate: 0.1
       init_func:

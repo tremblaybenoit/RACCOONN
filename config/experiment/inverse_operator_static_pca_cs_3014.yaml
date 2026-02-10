@@ -9,7 +9,7 @@ defaults:
   - override /preparation: inverse_pca
   - override /loader: inverse_static
   - override /model: inverse_operator_pca
-  - override /trainer: cpu
+  - override /trainer: gpu
   - override /callbacks: inverse_default
   - override /logger: default
 
@@ -28,7 +28,7 @@ paths:
 # Trainer configuration
 trainer:
   min_epochs: 1  # To prevent early stopping
-  max_epochs: 960  # Number of epochs
+  max_epochs: 1960  # Number of epochs
   precision: 32  # 32-bit precision
 
 # Initialization

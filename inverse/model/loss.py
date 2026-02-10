@@ -778,7 +778,7 @@ class VarLossPCA(torch.nn.Module):
         # Weighting factors for the losses
         self.lambda_obs, self.lambda_model, self.lambda_bcs = lambda_obs, lambda_model, lambda_bcs
 
-    def __call__(self, pred: dict, target: dict) -> tuple[dict, torch.Tensor]:
+    def __call__(self, pred: dict, target: dict, input: dict=None) -> tuple[dict, torch.Tensor]:
         """ Compute the combined loss between predicted profiles and target data.
 
         Parameters
