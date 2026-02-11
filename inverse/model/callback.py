@@ -81,7 +81,7 @@ class FigureLogger(ForwardFigureLogger):
                                                       prof_labels]))
 
         # Whitened profile coefficients (0 to 270)
-        coefficient_levels = np.arange(0, 191, 1)
+        coefficient_levels = np.arange(0, 78, 1)
         prof_white_rmse = [to_numpy(model.metrics['prof_white']['rmse']).reshape(1, -1), ]
         prof_white_rmse_labels, prof_white_rmse_colors = ['Target-Prediction'], ['#ff7f0e']
         if 'prof_white_background' in model.metrics and len(model.metrics['prof_white_background']) > 0:

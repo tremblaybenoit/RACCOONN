@@ -119,27 +119,26 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
     increment = data - mu
     standardized_data = increment / std
 
-    pca = PCA().fit(standardized_data.reshape(n_samples, -1))
-    cumulative_variance = np.cumsum(pca.explained_variance_ratio_)
-
-    # Find K for specific thresholds
-    k_99 = np.argmax(cumulative_variance >= 0.999) + 1
-    k_9999 = np.argmax(cumulative_variance >= 0.9999) + 1
-
-    print(f"Components for 99.9% variance: {k_99}")
-    print(f"Components for 99.99% variance: {k_9999}")
-
-    plt.figure(figsize=(10, 4))
-    plt.plot(cumulative_variance)
-    plt.axhline(y=0.999, color='r', linestyle='--')
-    plt.title("Cumulative Explained Variance")
-    plt.xlabel("Number of Components")
-    plt.savefig("cumulative_explained_variance.png")
-    plt.close()
-
-
     if mode == 'global':
         # Flatten: (N, V*L)
+        pca = PCA().fit(standardized_data.reshape(n_samples, -1))
+        cumulative_variance = np.cumsum(pca.explained_variance_ratio_)
+
+        # Find K for specific thresholds
+        k_99 = np.argmax(cumulative_variance >= 0.999) + 1
+        k_9999 = np.argmax(cumulative_variance >= 0.9999) + 1
+
+        print(f"Components for 99.9% variance: {k_99}")
+        print(f"Components for 99.99% variance: {k_9999}")
+
+        plt.figure(figsize=(10, 4))
+        plt.plot(cumulative_variance)
+        plt.axhline(y=0.999, color='r', linestyle='--')
+        plt.title("Cumulative Explained Variance")
+        plt.xlabel("Number of Components")
+        plt.savefig("cumulative_explained_variance.png")
+        plt.close()
+
         flat_z = standardized_data.reshape(n_samples, -1)
         pca = PCA(n_components=n_comp)
         pca.fit(flat_z)
@@ -214,17 +213,45 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
         # plt.close(fig)
 
         return pca_buffs
+    elif mode == 'local':
+        # Per variable PCA (with variables in the second dimension)
+        pca_buffs = {}
+        for v in range(n_vars):
+            pca = PCA()
+            pca.fit(standardized_data[:, v, :])
+            cumulative_variance = np.cumsum(pca.explained_variance_ratio_)
+            # Find K for specific thresholds
+            k_99 = np.argmax(cumulative_variance >= 0.999) + 1
+            k_9999 = np.argmax(cumulative_variance >= 0.9999) + 1
+            print(f"Components for 99.9% variance: {k_99}")
+            print(f"Components for 99.99% variance: {k_9999}")
+
+            # Decomposition
+            flat_z = standardized_data[:, v, :].reshape(n_samples, -1)
+            pca = PCA(n_components=n_comp)
+            pca.fit(flat_z)
+            pca_buffs[v] = {
+                'basis': pca.components_,
+                'mu': mu[0:1, v],
+                'std': std[0:1, v],
+                'eigenvalues': pca.explained_variance_,
+                'scales': np.sqrt(pca.explained_variance_),
+                'scales_inv': 1.0/np.sqrt(pca.explained_variance_.reshape(1, -1)),
+            }
+        return pca_buffs
     else:
-        raise NotImplementedError(f"PCA mode '{mode}' is not implemented.")
+        raise ValueError(f"Invalid PCA mode: {mode}. Must be 'global' or 'local'.")
 
 
-def project_pca(input: DictConfig, output: DictConfig) -> None:
+def project_pca(input: DictConfig, output: DictConfig, mode='global', n_comp: int=270) -> None:
     """ Project data onto PCA basis.
 
         Parameters
         ----------
         input: DictConfig. Main hydra configuration file containing all model hyperparameters.
         output: DictConfig. Output configuration.
+        mode: str. PCA mode, either 'global' or 'local'.
+        n_comp: int. Number of principal components to retain.
 
         Returns
         -------
@@ -235,70 +262,42 @@ def project_pca(input: DictConfig, output: DictConfig) -> None:
     logger.info("Loading PCA buffers...")
     pca_buffs = instantiate(input.pca_buffers.load)
 
-    # Initialize PCA processor
-    pca_processor = PCAProcessor(pca_buffs)
+    # Global mode
+    if mode == 'global':
 
-    # Load data
-    logger.info("Loading data...")
-    data = load_var_and_normalize(input.data)
+        # Initialize PCA processor
+        pca_processor = PCAProcessor(pca_buffs)
 
-    # Project data
-    logger.info("Projecting data onto PCA basis...")
-    n_samples = data.shape[0]
-    flat_data = data.reshape(n_samples, -1)
-    standardized_data = pca_processor.physical_to_standardized(flat_data)
-    whitened_data = pca_processor.physical_to_whitened(flat_data)
-    breakpoint()
-    # sym_log_data = sym_log(whitened_data, inverse_transform=False)
+        # Load data
+        logger.info("Loading data...")
+        data = load_var_and_normalize(input.data)
 
+        # Project data
+        logger.info("Projecting data onto PCA basis...")
+        n_samples = data.shape[0]
+        flat_data = data.reshape(n_samples, -1)
+        standardized_data = pca_processor.physical_to_standardized(flat_data)
+        whitened_data = pca_processor.physical_to_whitened(flat_data)
 
-    """    # Assuming 'whitened_coeffs' is your (N, 270) array
-    abs_coeffs = np.abs(projected_data)
+    # Local mode
+    elif mode == 'local':
 
-    print(f"Total coefficients: {abs_coeffs.size}")
-    print(f"Values > 3 sigma:  {np.sum(abs_coeffs > 3)}  ({np.sum(abs_coeffs > 3) / abs_coeffs.size:.4%})")
-    print(f"Values > 10 sigma: {np.sum(abs_coeffs > 10)} ({np.sum(abs_coeffs > 10) / abs_coeffs.size:.4%})")
-    print(f"Values > 30 sigma: {np.sum(abs_coeffs > 30)} ({np.sum(abs_coeffs > 30) / abs_coeffs.size:.4%})")
+        # Load data
+        logger.info("Loading data...")
+        data = load_var_and_normalize(input.data)
 
-    # Check if outliers are concentrated in specific components (the 'tail' of the PCA)
-    outliers_per_component = np.sum(abs_coeffs > 10, axis=0)
+        # Project data
+        logger.info("Projecting data onto PCA basis...")
+        n_samples, n_vars, n_levels = data.shape
+        standardized_data = np.zeros((n_samples, n_vars, n_comp))
+        whitened_data = np.zeros((n_samples, n_vars, n_comp))
+        for v in range(n_vars):
+            pca_processor = PCAProcessor(pca_buffs[v])
+            standardized_data[:, v, :] = pca_processor.physical_to_standardized(data[:, v, :])
+            whitened_data[:, v, :] = pca_processor.physical_to_whitened(data[:, v, :])
 
-    # 1. Identify the 'Extreme' sample
-    idx = np.argmax(np.abs(projected_data).max(axis=1))
-    extreme_w = projected_data[idx]
-    # 2. Reconstruct it normally
-    phys_full = pca_processor.whitened_to_physical(extreme_w)
-
-    # 3. 'Clip' the outliers to a reasonable range (e.g., +/- 3)
-    clipped_w = np.clip(extreme_w, -3, 3)
-    phys_clipped = pca_processor.whitened_to_physical(clipped_w)
-
-    # 1. Grab a sample index that has a >30 sigma value
-    extreme_idx = np.where(np.abs(projected_data) > 30)[0][0]
-
-    # 2. Get the two physical reconstructions (assuming you have these arrays from Pdb)
-    # phys_full and phys_clipped for that extreme_idx
-
-    plt.figure(figsize=(10, 6))
-
-    # Plotting indices as a proxy for height/pressure levels
-    # Note: Usually indices 0-127 are Temp, 128-255 are Q, etc.
-    indices = np.arange(len(phys_full))
-
-    plt.plot(indices, phys_full, label='Full Reconstruction (with Outliers)', alpha=0.8, color='crimson')
-    plt.plot(indices, phys_clipped, label='Clipped Reconstruction (Standardized)', alpha=0.8, color='black',
-             linestyle='--')
-
-    # Highlight the delta
-    plt.fill_between(indices, phys_full, phys_clipped, color='gray', alpha=0.3, label='Information Lost by Clipping')
-
-    plt.title(f"Impact of Whitened Outliers on Physical Profile (Sample {extreme_idx})")
-    plt.xlabel("Feature Index (Vertical Levels/Variables)")
-    plt.ylabel("Physical Value (Normalized)")
-    plt.legend()
-    plt.grid(True, which='both', linestyle='--', alpha=0.5)
-    plt.savefig("project_explained_variance.png")
-    """
+    else:
+        raise ValueError(f"Invalid PCA mode: {mode}. Must be 'global' or 'local'.")
 
     # Save statistics to file
     logger.info("Saving data to file...")
@@ -308,9 +307,6 @@ def project_pca(input: DictConfig, output: DictConfig) -> None:
     if hasattr(output.pca_white, 'save'):
         save_func = instantiate(output.pca_white.save)
         save_func(whitened_data)
-    #if hasattr(output.pca_sym, 'save'):
-    #    save_func = instantiate(output.pca_sym.save)
-    #    save_func(sym_log_data)
 
     return
 

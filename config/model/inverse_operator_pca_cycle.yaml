@@ -13,13 +13,13 @@ optimizer:
 
 # Learning rate scheduler
 lr_scheduler:
-  # Function
-  _target_: torch.optim.lr_scheduler.OneCycleLR
-  max_lr: 0.005
-  pct_start: 0.3
-  anneal_strategy: 'cos'
-  div_factor: 25.0
-  final_div_Factor: 1000.0
+  _target_: torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
+  # T_0: Number of iterations for the first restart
+  T_0: 20
+  # T_mult: Factor by which T_i increases after a restart
+  T_mult: 1
+  # eta_min: Minimum learning rate (the "floor")
+  eta_min: 1.0e-6
 
 # Model parameters associated with the data (e.g., input/output dimensions) and architecture
 parameters:

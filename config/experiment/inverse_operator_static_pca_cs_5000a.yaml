@@ -9,7 +9,7 @@ defaults:
   - override /preparation: inverse_pca
   - override /loader: inverse_static
   - override /model: inverse_operator_pca_cycle
-  - override /trainer: gpu
+  - override /trainer: cpu
   - override /callbacks: inverse_default
   - override /logger: default
 
@@ -37,7 +37,7 @@ trainer:
 # Callbacks
 callbacks:
   early_stopping:
-    patience: 101  # Number of epochs with no improvement after which training will be stopped
+    patience: 501  # Number of epochs with no improvement after which training will be stopped
 
 # Preparation configuration
 preparation:

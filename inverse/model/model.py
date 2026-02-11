@@ -1045,6 +1045,46 @@ class PINNverseOperatorPCA(PINNverseOperator):
         return loss['total']
 
 
+class PINNverseOperatorPCA2(PINNverseOperatorPCA):
+
+    def forward(self, x: dict) -> dict:
+        """ Forward pass through the model.
+
+            Parameters
+            ----------
+            x: dict. Input coordinates.
+
+            Returns
+            -------
+            Predicted profiles: dict.
+        """
+
+        # 1. Prepare batch metadata
+        keys_coords = ['lat', 'lon', 'scans']
+        inputs = torch.cat([x[k].view(-1, 1) for k in keys_coords if k in x], dim=-1)
+
+        # 2. PCA Coefficient Prediction (whitened coefficients)
+        w_white = self.model(inputs).view(-1, self.n_prof, self.basis.shape[0])
+
+        for i in range(self.n_prof):
+            w_standardized = w_white[:, i, :] * self.scales[i]
+            prof_standardized = torch.matmul(w_standardized, self.basis)
+
+
+        # 3. Profile Reconstruction
+        w_standardized = w_white * self.scales
+        prof_standardized = torch.matmul(w_standardized, self.basis)
+        prof_phys = self.mu + (prof_standardized * self.std)
+
+        # 4. Final Reshape
+        prof_phys = prof_phys.view(-1, self.n_prof, self.n_levels)
+        return {
+            'prof': prof_phys,
+            'prof_white': w_white
+        }
+
+
+
 class PINNverseOperatorPCACycle(PINNverseOperatorPCA):
 
     def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:

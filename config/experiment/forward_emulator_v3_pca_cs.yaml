@@ -9,7 +9,7 @@ defaults:
   - override /preparation: forward_pca
   - override /loader: forward_default
   - override /model: forward_emulator_pca
-  - override /trainer: gpu
+  - override /trainer: cpu
   - override /callbacks: forward_default
   - override /logger: default
 
@@ -161,7 +161,7 @@ data:
 # Loader configuration
 loader:
   batch_size: 96
-  num_workers: 16
+  num_workers: 10
   # Split the data into training, validation, and test sets
   stage:
     # Prediction set
