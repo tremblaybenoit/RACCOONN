@@ -40,9 +40,9 @@ def load_pca_buffers(path: str, buffer: str=None) -> dict:
         'scales_z_var': pca_buffers['scales_z_var'],
         'scales_z_std': pca_buffers['scales_z_std'],
         'basis': pca_buffers['basis'],
-        'sym_log_scales': pca_buffers['sym_log_scales'],
-        'sym_log_z_var': pca_buffers['sym_log_z_var'],
-        'sym_log_z_std': pca_buffers['sym_log_z_std'],
+        # 'sym_log_scales': pca_buffers['sym_log_scales'],
+        # 'sym_log_z_var': pca_buffers['sym_log_z_var'],
+        # 'sym_log_z_std': pca_buffers['sym_log_z_std'],
     }
 
 
@@ -119,7 +119,6 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
     increment = data - mu
     standardized_data = increment / std
 
-    """
     pca = PCA().fit(standardized_data.reshape(n_samples, -1))
     cumulative_variance = np.cumsum(pca.explained_variance_ratio_)
 
@@ -137,7 +136,6 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
     plt.xlabel("Number of Components")
     plt.savefig("cumulative_explained_variance.png")
     plt.close()
-    """
 
 
     if mode == 'global':
@@ -152,68 +150,68 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
             'eigenvalues': pca.explained_variance_,
             'scales': np.sqrt(pca.explained_variance_),
             'scales_inv': 1.0/np.sqrt(pca.explained_variance_.reshape(1, -1)),
-            'sym_log_scales': sym_log(np.sqrt(pca.explained_variance_), inverse_transform=False),
+            # 'sym_log_scales': sym_log(np.sqrt(pca.explained_variance_), inverse_transform=False),
         }
 
         # Initialize PCA processor
         pca_processor = PCAProcessor(pca_buffs)
         # Data
         whitened_data = pca_processor.physical_to_whitened(data.reshape(n_samples, -1))
-        sym_log_data = sym_log(whitened_data, inverse_transform=False)
+        # sym_log_data = sym_log(whitened_data, inverse_transform=False)
         # Mean
         whitened_mu0 = whitened_data.mean(axis=0, keepdims=True)
         whitened_mu1 = pca_processor.physical_to_whitened(mu.reshape(1, -1))
-        breakpoint()
-        sym_log_mu0 = sym_log_data.mean(axis=0, keepdims=True)
-        sym_log_mu1 = sym_log(whitened_mu1, inverse_transform=False)
+        # breakpoint()
+        # sym_log_mu0 = sym_log_data.mean(axis=0, keepdims=True)
+        # sym_log_mu1 = sym_log(whitened_mu1, inverse_transform=False)
         # Increments
         whitened_increment0 = whitened_data - whitened_mu0
         whitened_increment1 = whitened_data - whitened_mu1
-        sym_log_increment0 = sym_log_data - sym_log_mu0
-        sym_log_increment1 = sym_log(whitened_increment1, inverse_transform=False)
-        sym_log_increment2 = sym_log_data - sym_log_mu1
-        sym_log_increment3 = sym_log(whitened_increment0, inverse_transform=False)
+        # sym_log_increment0 = sym_log_data - sym_log_mu0
+        # sym_log_increment1 = sym_log(whitened_increment1, inverse_transform=False)
+        # sym_log_increment2 = sym_log_data - sym_log_mu1
+        # sym_log_increment3 = sym_log(whitened_increment0, inverse_transform=False)
         # Variances and stds
-        sym_log_cov0 = np.cov(sym_log_increment0, rowvar=False)
-        sym_log_var0 = np.diag(sym_log_cov0).reshape(1, -1)
-        sym_log_std0 = np.sqrt(sym_log_var0)
-        sym_log_cov_inv0 = np.linalg.inv(sym_log_cov0).astype(data.dtype)
-        sym_log_cov1 = np.cov(sym_log_increment1, rowvar=False)
-        sym_log_var1 = np.diag(sym_log_cov1).reshape(1, -1)
-        sym_log_std1 = np.sqrt(sym_log_var1)
-        sym_log_cov_inv1 = np.linalg.inv(sym_log_cov1).astype(data.dtype)
-        sym_log_cov2 = np.cov(sym_log_increment2, rowvar=False)
-        sym_log_var2 = np.diag(sym_log_cov2).reshape(1, -1)
-        sym_log_std2 = np.sqrt(sym_log_var2)
-        sym_log_cov_inv2 = np.linalg.inv(sym_log_cov2).astype(data.dtype)
+        # sym_log_cov0 = np.cov(sym_log_increment0, rowvar=False)
+        # sym_log_var0 = np.diag(sym_log_cov0).reshape(1, -1)
+        # sym_log_std0 = np.sqrt(sym_log_var0)
+        # sym_log_cov_inv0 = np.linalg.inv(sym_log_cov0).astype(data.dtype)
+        # sym_log_cov1 = np.cov(sym_log_increment1, rowvar=False)
+        # sym_log_var1 = np.diag(sym_log_cov1).reshape(1, -1)
+        # sym_log_std1 = np.sqrt(sym_log_var1)
+        # sym_log_cov_inv1 = np.linalg.inv(sym_log_cov1).astype(data.dtype)
+        # sym_log_cov2 = np.cov(sym_log_increment2, rowvar=False)
+        # sym_log_var2 = np.diag(sym_log_cov2).reshape(1, -1)
+        # sym_log_std2 = np.sqrt(sym_log_var2)
+        # sym_log_cov_inv2 = np.linalg.inv(sym_log_cov2).astype(data.dtype)
         #
         pca_buffs['whitened_mu'] = whitened_mu1
         pca_buffs['scales_z_var'] = whitened_data.var(axis=0, keepdims=True)
         pca_buffs['scales_z_std'] = np.sqrt(pca_buffs['scales_z_var'])
-        pca_buffs['sym_log_z_var'] = sym_log(whitened_data, inverse_transform=False).var(axis=0, keepdims=True)
-        pca_buffs['sym_log_z_std'] = np.sqrt(pca_buffs['sym_log_z_var'])
+        # pca_buffs['sym_log_z_var'] = sym_log(whitened_data, inverse_transform=False).var(axis=0, keepdims=True)
+        # pca_buffs['sym_log_z_std'] = np.sqrt(pca_buffs['sym_log_z_var'])
         # pca_buffs['sym_log_var0'] = sym_log_var0
         # pca_buffs['sym_log_std0'] = sym_log_std0
-        pca_buffs['sym_log_var'] = sym_log_var1
-        pca_buffs['sym_log_std'] = sym_log_std1
+        # pca_buffs['sym_log_var'] = sym_log_var1
+        # pca_buffs['sym_log_std'] = sym_log_std1
         # pca_buffs['sym_log_diag_cov'] = 1.0/sym_log_cov_inv0
-        pca_buffs['sym_log_cov'] = sym_log_cov1
-        pca_buffs['sym_log_diag_cov'] = 1.0/np.diag(sym_log_cov_inv1).reshape(1, -1)
+        # pca_buffs['sym_log_cov'] = sym_log_cov1
+        # pca_buffs['sym_log_diag_cov'] = 1.0/np.diag(sym_log_cov_inv1).reshape(1, -1)
         # pca_buffs['sym_log_diag_cov_inv0'] = sym_log_cov_inv0
-        pca_buffs['sym_log_cov_inv'] = sym_log_cov_inv1
-        pca_buffs['sym_log_diag_cov_inv'] = np.diag(sym_log_cov_inv1).reshape(1, -1)
+        # pca_buffs['sym_log_cov_inv'] = sym_log_cov_inv1
+        # pca_buffs['sym_log_diag_cov_inv'] = np.diag(sym_log_cov_inv1).reshape(1, -1)
 
 
-        fig, get_axes = flexible_gridspec(cell_widths=[4.0, 4.0], cell_heights=[4.0, 4.0], lefts=[1.00, 1.00],
-                                          rights=[1.00, 1.00], bottoms=[1.00, 1.00], tops=[1.00, 1.00])
-        ax0 = get_axes(0, 0)
-        plot_map(ax0, sym_log_cov_inv0, title=f"Inverse covariance matrix", plt_origin='upper',
-                 cb_label=r'Values (divided by 10$^4$)')
-        ax1 = get_axes(0, 1)
-        plot_map(ax1, sym_log_cov_inv1, title=f"Inverse covariance matrix (alt method)", plt_origin='upper',
-                 cb_label=r'Values (divided by 10$^4$)')
-        save_plot(fig, "pca_inverse_covariance_matrices.png")
-        plt.close(fig)
+        # fig, get_axes = flexible_gridspec(cell_widths=[4.0, 4.0], cell_heights=[4.0, 4.0], lefts=[1.00, 1.00],
+        #                                   rights=[1.00, 1.00], bottoms=[1.00, 1.00], tops=[1.00, 1.00])
+        # ax0 = get_axes(0, 0)
+        # plot_map(ax0, sym_log_cov_inv0, title=f"Inverse covariance matrix", plt_origin='upper',
+        #          cb_label=r'Values (divided by 10$^4$)')
+        # ax1 = get_axes(0, 1)
+        # plot_map(ax1, sym_log_cov_inv1, title=f"Inverse covariance matrix (alt method)", plt_origin='upper',
+        #          cb_label=r'Values (divided by 10$^4$)')
+        # save_plot(fig, "pca_inverse_covariance_matrices.png")
+        # plt.close(fig)
 
         return pca_buffs
     else:
@@ -250,7 +248,8 @@ def project_pca(input: DictConfig, output: DictConfig) -> None:
     flat_data = data.reshape(n_samples, -1)
     standardized_data = pca_processor.physical_to_standardized(flat_data)
     whitened_data = pca_processor.physical_to_whitened(flat_data)
-    sym_log_data = sym_log(whitened_data, inverse_transform=False)
+    breakpoint()
+    # sym_log_data = sym_log(whitened_data, inverse_transform=False)
 
 
     """    # Assuming 'whitened_coeffs' is your (N, 270) array
@@ -348,7 +347,6 @@ def compute_pca(input: DictConfig, output: DictConfig, mode: str='global', n_com
     if hasattr(output, 'save'):
         save_func = instantiate(output.save)
         save_func(pca_buffs)
-    breakpoint()
 
     return
 

@@ -909,7 +909,7 @@ class PINNverseOperator(BaseModel):
         if 'total' in loss:
             self.log(f"{stage}_loss", loss['total'], on_epoch=True, prog_bar=True, logger=logger_flag)
         # Log profile and boundary condition losses
-        for key in ['model', 'bcs']:
+        for key in ['model', 'bcs', 'model_phys']:
             if key in loss:
                 self.log(f"{stage}_loss_{key}", loss[key].mean(), on_epoch=True, prog_bar=True, logger=logger_flag)
                 # Detailed logging per profile and variable
@@ -918,7 +918,7 @@ class PINNverseOperator(BaseModel):
                         self.log(f"{stage}_loss_{key}_{i}_{var}", loss[key][:, i, :].mean(), on_epoch=True,
                                  prog_bar=False, logger=logger_flag)
                 # If pressure-level filtering is involved, log only the relevant levels
-                elif loss[key].ndim == 2 and hasattr(self.loss_func, 'pressure_filter'):
+                elif loss[key].ndim == 2 and hasattr(self.loss_func, 'pressure_filter') and self.loss_func.pressure_filter is not None:
                     n_pressure = torch.cumsum(self.loss_func.pressure_filter.sum(axis=1), dim=0)
                     for i, var in enumerate(self.prof_vars):
                         # Log loss only for the relevant pressure levels
@@ -930,7 +930,7 @@ class PINNverseOperator(BaseModel):
         if 'obs' in loss:
             self.log(f"{stage}_loss_obs", loss['obs'].mean(), on_epoch=True, prog_bar=True, logger=logger_flag)
             if loss['obs'].ndim == 2:
-                for i in range(pred['hofx'].shape[1] // 2):
+                for i in range(loss['obs'].shape[1]):
                     self.log(f"{stage}_loss_obs_{i}", loss['obs'][:, i].mean(), on_epoch=True, prog_bar=False,
                              logger=logger_flag)
 
@@ -969,6 +969,22 @@ class PINNverseOperatorPCA(PINNverseOperator):
         self.register_buffer('mu', torch.tensor(pca_buffers['mu']))  # (1143,)
         self.register_buffer('std', torch.tensor(pca_buffers['std']))  # (1143,)
         self.register_buffer('scales', torch.tensor(pca_buffers['scales']))  # (270,)
+
+    def _logging(self, stage: str, loss: dict, input: dict, target: dict, pred: dict) -> None:
+
+        # Logger flag
+        logger_flag = stage != 'test'
+
+        # Class inheritance
+        super()._logging(stage, loss, input, target, pred)
+
+        # Additions for PCA model
+        if 'obs_phys' in loss:
+            self.log(f"{stage}_loss_obs_phys", loss['obs_phys'].mean(), on_epoch=True, prog_bar=False, logger=logger_flag)
+            if loss['obs_phys'].ndim == 2:
+                for i in range(pred['hofx'].shape[1] // 2):
+                    self.log(f"{stage}_loss_obs_phys_{i}", loss['obs_phys'][:, i].mean(), on_epoch=True, prog_bar=False,
+                             logger=logger_flag)
 
     def forward(self, x: dict) -> dict:
         """ Forward pass through the model.
