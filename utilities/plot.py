@@ -5,6 +5,7 @@ from pylab import *
 import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
 import mpl_scatter_density
+import cartopy
 from typing import Union, Callable, Optional
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -1140,23 +1141,142 @@ def fig_errs_by_channel(target: np.ndarray, pred: np.ndarray, ref: np.ndarray=No
     return fig
 
 
-def scatterplots(ax, x, y, font_size=13, projection=None, title='Scatterplot', title_pad=1.005,
-                x_label='Reference', y_label='Inference', y_labelpad=5, x_labelpad=3, xy_symmetric=True,
-                x_range: tuple = None, y_range: tuple = None, x_nticks=6, y_nticks=6, tickw=1, tickl=2.5, tickdir='out',
-                marker=None, markersize=None, color=None, label=None,
-                grid=True, grid_linew=0.5, x_ascale='linear', y_ascale='linear',
-                ref_label='Reference (1:1)', ref_color='black', ref_linew=0.5, ref_lines='--',
-                fit=False, fit_color='red', fit_linew=0.25, fit_lines='-',
-                lg_loc='upper left', lg_font=10, lg_ncol=1, lg_npoints=1, lg_scale=4.0, lg_spacing=0.05,
-                cb_label='Density', cb_cmap=None, cb_pad=0, cb_tickw=1, cb_tickl=2.5, cb_font=12, cb_dir='out',
-                cb_rot=270, cb_labelpad=15.5, cb_side='right', cb_size=0.025, cb_ticks=5, ):
-    """ Create a scatterplot with optional density projection, supporting multiple series.
+def geostationnary_map(fig, ax, lat, lon, c, c_min, c_max, font_size=13, title='Scatterplot', title_pad=1.005,
+                       marker='.', markersize=0.25, lg_loc='upper left', lg_font=10, lg_ncol=1, lg_npoints=1,
+                       lg_scale=4.0, lg_spacing=0.05, cb_label='Value', cb_cmap=None, cb_pad=0, cb_tickw=1,
+                       cb_tickl=2.5, cb_font=12, cb_dir='out', cb_rot=270, cb_labelpad=15.5, cb_side='right', cb_size=0.025, cb_ticks=5,):
+    """ Create a scatterplot with optional density projection.
 
     Parameters
     ----------
+    fig : matplotlib.figure.Figure. Figure to plot on.
     ax : matplotlib.axes.Axes. Axes to plot on.
-    x : list or numpy.ndarray. List of X data arrays (or a single array for one series).
-    y : list or numpy.ndarray. List of Y data arrays (or a single array for one series).
+    lat : numpy.ndarray. Latitude values for the scatterplot.
+    lon : numpy.ndarray. Longitude values for the scatterplot.
+    c : numpy.ndarray. Color values for the scatterplot points.
+    c_min : float. Minimum value for the color scale.
+    c_max : float. Maximum value for the color scale.
+    font_size : int. Font size for the plot.
+    title : str. Title of the plot.
+    title_pad : float. Padding for the title.
+    marker : str. Marker style for the scatterplot.
+    markersize : float. Size of the markers.
+    lg_loc : str. Location of the legend.
+    lg_font : int. Font size for the legend.
+    lg_ncol : int. Number of columns in the legend.
+    lg_npoints : int. Number of points in the legend.
+    lg_scale : float. Scale for the legend markers.
+    lg_spacing : float. Spacing between legend entries.
+    cb_label : str. Label for the colorbar.
+    cb_size : float. Size of the colorbar.
+    cb_ticks : int. Number of ticks on the colorbar.
+    cb_font : int. Font size for the colorbar.
+    cb_cmap : str. Colormap for the colorbar.
+    cb_pad : float. Padding for the colorbar.
+    cb_tickw : float. Width of the colorbar ticks.
+    cb_tickl : float. Length of the colorbar ticks.
+    cb_dir : str. Direction of the colorbar ticks. Default is 'out'.
+    cb_rot : int. Rotation of the colorbar label.
+    cb_labelpad : float. Padding for the colorbar label.
+    cb_side : str. Side for the colorbar. Default is 'right'.
+
+    Returns
+    -------
+    ax : matplotlib.axes.Axes. Axes with the scatterplot.
+    """
+
+    # Aspect ratio
+    ax.set_aspect(1)
+
+    # Scatterplot
+    pos = ax.get_position()
+    fig.delaxes(ax)
+    # Projection for GOES-16/17 (assuming central longitude of -75.2 degrees for the Americas)
+    proj = cartopy.crs.Geostationary(central_longitude=-75.2)
+    ax = fig.add_axes(pos, projection=proj)
+    # Data is in lat/lon, so we need to specify the transform for the scatter points
+    trans = cartopy.crs.PlateCarree()
+    scat = ax.scatter(lat.flatten(), lon.flatten(), c=c, v_min=c_min, v_max=c_max, cmap=cb_cmap,
+                      marker=marker, s=markersize, transform=trans)
+    ax.coastlines()
+
+    # Set title
+    ax.set_title(title, fontsize=font_size, y=title_pad)
+    # Set legend
+    # ax.legend(loc=lg_loc, fontsize=lg_font, labelspacing=lg_spacing, numpoints=lg_npoints, ncol=lg_ncol,
+    #           markerscale=lg_scale, fancybox=False)
+
+    # Set colorbar
+    apply_colorbar(ax, scat, font_size=cb_font, label=cb_label, label_pad=cb_labelpad, orientation='vertical',
+                   rotation=cb_rot, side=cb_side, size=cb_size, pad=cb_pad,
+                   ticks=cb_ticks, tickw=cb_tickw, tickl=cb_tickl, tickdir=cb_dir)
+
+
+def fig_geostationnary(lat: Union[list, np.ndarray], lon: Union[list, np.ndarray], c: Union[list, np.ndarray],
+                       c_min: Union[list[float], float]=None, c_max: Union[list[float], float]=None,
+                       title: Union[list[str], str]='Scatterplot', marker='.', markersize: float=0.25,
+                       cb_label: Union[list[str], str]='Value', cb_cmap: Union[list[str], str]=None):
+    """ Create a geostationary map scatterplot.
+
+    Parameters
+    ----------
+    lat : numpy.ndarray. Latitude values for the scatterplot.
+    lon : numpy.ndarray. Longitude values for the scatterplot.
+    c : numpy.ndarray. Color values for the scatterplot points.
+    c_min : float. Minimum value for the color scale.
+    c_max : float. Maximum value for the color scale.
+    title : str. Title of the plot.
+    marker : str. Marker style for the scatterplot.
+    markersize : float. Size of the markers.
+    cb_label : str. Label for the colorbar.
+    cb_cmap : str. Colormap for the colorbar.
+    """
+
+    # Convert to list if c is a numpy array for consistent handling
+    if isinstance(c, np.ndarray):
+        c = [c]
+    # Number of plots
+    n_c = len(c)
+    # From n_profiles, determine optimal layout for flexible_gridspec
+    n_rows = int(np.ceil(np.sqrt(n_c))) if n_c > 3 else 1
+    n_cols = int(np.ceil(n_c / n_rows)) if n_c > 3 else n_c
+    # Create a flexible gridspec
+    cell_widths = [4.0] * n_cols
+    cell_heights = [4.0] * n_rows
+    lefts = [0.75] * n_cols
+    rights = [0.75] * n_cols
+    bottoms = [0.75] * n_rows
+    tops = [0.75] * n_rows
+    fig, get_axes = flexible_gridspec(cell_widths, cell_heights, lefts, rights, bottoms, tops)
+
+    # Create scatterplots for each set of color values
+    for i in range(n_c):
+        row = i // n_cols
+        col = i % n_cols
+        ax = get_axes(row, col)
+        geostationnary_map(fig, ax, lat, lon, c[i], title=title, marker=marker, markersize=markersize,
+                           cb_label=cb_label, cb_cmap=cb_cmap, c_min=c_min, c_max=c_max)
+    return fig
+
+
+
+def scatterplot(fig, ax, x, y, font_size=13, projection=None, title='Scatterplot', title_pad=1.005,
+                x_label='Reference', y_label='Inference', y_labelpad=5, x_labelpad=3, xy_symmetric=True,
+                x_range: tuple=None, y_range: tuple=None, x_nticks=6, y_nticks=6, tickw=1, tickl=2.5, tickdir='out',
+                marker='.', markersize=0.9, grid=True, grid_linew=0.5, x_ascale='linear', y_ascale='linear',
+                ref_label='Reference (1:1)', ref_color='black', ref_linew=0.5, ref_lines='--',
+                fit=False, fit_color=None, fit_linew=0.25, fit_lines='-',
+                lg_loc='upper left', lg_font=10, lg_ncol=1, lg_npoints=1, lg_scale=4.0, lg_spacing=0.05,
+                cb_label='Density', cb_cmap=None, cb_pad=0, cb_tickw=1, cb_tickl=2.5, cb_font=12, cb_dir='out',
+                cb_rot=270, cb_labelpad=15.5, cb_side='right', cb_size=0.025, cb_ticks=5,):
+    """ Create a scatterplot with optional density projection.
+
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure. Figure to plot on.
+    ax : matplotlib.axes.Axes. Axes to plot on.
+    x : numpy.ndarray. X data.
+    y : numpy.ndarray. Y data.
     font_size : int. Font size for the plot.
     projection : str. Projection type. Default is None. Use 'scatter_density' for density plots.
     title : str. Title of the plot.
@@ -1173,10 +1293,8 @@ def scatterplots(ax, x, y, font_size=13, projection=None, title='Scatterplot', t
     tickw : float. Width of the ticks.
     tickl : float. Length of the ticks.
     tickdir : str. Direction of the ticks. Default is 'out'.
-    marker : str or list. Marker style for the scatterplot(s).
-    markersize : float or list. Size of the markers for the scatterplot(s).
-    color : str or list. Color(s) for the plot line(s). If None, defaults will be used.
-    label : str or list. Label(s) for the plot line(s). Default is None.
+    marker : str. Marker style for the scatterplot.
+    markersize : float. Size of the markers.
     grid : bool. If True, show grid.
     grid_linew : float. Line width of the grid.
     x_ascale : str. Scale for the x-axis. Default is 'linear'.
@@ -1185,7 +1303,7 @@ def scatterplots(ax, x, y, font_size=13, projection=None, title='Scatterplot', t
     ref_color : str. Color for the reference line.
     ref_linew : float. Line width for the reference line.
     ref_lines : str. Line style for the reference line.
-    fit : bool. If True, fit a line to the *first* data series.
+    fit : bool. If True, fit a line to the data.
     fit_color : str. Color for the fit line.
     fit_linew : float. Line width for the fit line.
     fit_lines : str. Line style for the fit line.
@@ -1213,99 +1331,50 @@ def scatterplots(ax, x, y, font_size=13, projection=None, title='Scatterplot', t
     ax : matplotlib.axes.Axes. Axes with the scatterplot.
     """
 
-    # --- Pre-processing/Setup ---
 
-    # Ensure x and y are lists of arrays
-    if not isinstance(x, list):
-        x = [x]
-    if not isinstance(y, list):
-        y = [y]
-
-    n_series = len(x)
-    if len(y) != n_series:
-        raise ValueError("The number of x and y data arrays must be the same.")
-
-    # Convert single values to lists for iteration
-    _marker = [marker] * n_series if not isinstance(marker, list) and marker is not None else marker
-    _markersize = [markersize] * n_series if not isinstance(markersize, list) and markersize is not None else markersize
-    _color = [color] * n_series if not isinstance(color, list) and color is not None else color
-    _label = [label] * n_series if not isinstance(label, list) and label is not None else label
-
-    # Handle default colors (assuming 'colors' is a predefined dictionary/list)
-    default_colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown', 'pink', 'gray']
-    if _color is None:
-        _color = [default_colors[i % len(default_colors)] for i in range(n_series)]
-
-    # Handle default markers/sizes
-    if _marker is None:
-        _marker = ['.'] * n_series
-    if _markersize is None:
-        _markersize = [0.9] * n_series
-
-    # Compute min and max values (over ALL data)
-    all_x = np.concatenate([arr.flatten() for arr in x])
-    all_y = np.concatenate([arr.flatten() for arr in y])
-
-    # Compute min and max values (assuming compute_min_max is available)
+    # Compute min and max values
     if x_range is None:
-        x_range = compute_min_max(all_x, symmetric=xy_symmetric)
+        x_range = compute_min_max(x, symmetric=xy_symmetric)
     if y_range is None:
-        y_range = compute_min_max(all_y, symmetric=xy_symmetric)
-
+        y_range = compute_min_max(y, symmetric=xy_symmetric)
     # Adopt a symmetric range
     if xy_symmetric:
-        full_range = compute_min_max(x_range + y_range, symmetric=xy_symmetric)
-        x_range = full_range
-        y_range = full_range
-        ax.set_aspect(1)
-    else:
-        # Aspect ratio
-        ax.set_aspect('auto')
+        x_range = compute_min_max(x_range + y_range, symmetric=xy_symmetric)
+        y_range = x_range
+    # Aspect ratio
+    ax.set_aspect(1)
 
-    # --- Plotting Scatter/Density (Iterate over series) ---
-
-    scat = None
-    if projection == 'scatter_density':
-        # Density scatterplot logic (applies to the first series)
-        fig = ax.figure  # Access figure from axes
+    # Regular scatterplot
+    if projection is None:
+        scat = ax.scatter(x.flatten(), y.flatten(), c=colors['blue'], marker=marker, s=markersize)
+    # Density scatterplot
+    elif projection == 'scatter_density':
         pos = ax.get_position()
-
-        # Remove and re-add axes with 'scatter_density' projection
-        ax.remove()
+        fig.delaxes(ax)
         ax = fig.add_axes(pos, projection='scatter_density')
+        scat = ax.scatter_density(x.flatten(), y.flatten(), cmap=white_viridis if cb_cmap is None else cb_cmap)
+    elif projection == 'Geostiationary':
+        pos = ax.get_position()
+        fig.delaxes(ax)
+        proj = cartopy.crs.Geostationary(central_longitude=-75.2)
+        trans = cartopy.crs.PlateCarree()
+        ax = fig.add_axes(pos, projection=proj)
+        scat = ax.scatter(x.flatten(), y.flatten(), c=colors['blue'], marker=marker, s=markersize, transform=trans)
+        ax.coastlines()
 
-        # Assuming white_viridis is defined and available
-        density_cmap = cb_cmap if cb_cmap else 'white_viridis'
-        scat = ax.scatter_density(x[0].flatten(), y[0].flatten(), cmap=density_cmap)
-
-        # Note: If density projection is used, subsequent series are not plotted as standard scatterplots
-        # because the axis type is fundamentally changed.
-
-    elif projection is None:
-        for i in range(n_series):
-            # Regular scatterplot
-            scat = ax.scatter(x[i].flatten(), y[i].flatten(), c=_color[i], marker=_marker[i], s=_markersize[i],
-                              label=_label[i])
     else:
         raise ValueError("Projection not supported. Use None or 'scatter_density'.")
 
-    # --- Additional Plot Lines ---
-
     # Plot reference 1:1 line
-    if xy_symmetric:
-        ax.plot(x_range, x_range, label=ref_label, color=ref_color, linewidth=ref_linew, linestyle=ref_lines)
+    ax.plot(x_range, x_range, label=ref_label, color=ref_color, linewidth=ref_linew, linestyle=ref_lines)
 
-    # Compute and plot linear fit (only for the first series for simplicity)
+    # Compute and plot linear fit
     if fit:
-        # Assuming np.polyfit is available
-        slope, y0 = np.polyfit(x[0].flatten(), y[0].flatten(), 1)
+        slope, y0 = np.polyfit(x.flatten(), y.flatten(), 1)
         # Plot linear fit
-        fit_label = f"y = {slope:.3f}x + {y0:.3f}" if y0 >= 0 else f"y = {slope:.3f}x - {abs(y0):.3f}"
-        fit_c = fit_color if fit_color is not None else _color[0]
+        fit_label = f"y = {slope:.3f}x + {y0:.3f}" if y0 > 0 else f"y = {slope:.3f}x - {abs(y0):.3f}"
         ax.plot(np.array(x_range), slope * np.array(x_range) + y0, label=fit_label,
-                color=fit_c, linewidth=fit_linew, linestyle=fit_lines)
-
-    # --- Final Plot Styling ---
+                color=fit_color, linewidth=fit_linew, linestyle=fit_lines)
 
     # Set axis limits
     ax.set_xlim(x_range)
@@ -1335,197 +1404,11 @@ def scatterplots(ax, x, y, font_size=13, projection=None, title='Scatterplot', t
     ax.legend(loc=lg_loc, fontsize=lg_font, labelspacing=lg_spacing, numpoints=lg_npoints, ncol=lg_ncol,
               markerscale=lg_scale, fancybox=False)
 
-    # Set colorbar (apply_colorbar is available)
-    if projection == 'scatter_density' and scat is not None:
-        # Assuming apply_colorbar(ax, mappable, **kwargs) signature
+    # Set colorbar
+    if projection == 'scatter_density' or projection == 'Geostiationary':
         apply_colorbar(ax, scat, font_size=cb_font, label=cb_label, label_pad=cb_labelpad, orientation='vertical',
                        rotation=cb_rot, side=cb_side, size=cb_size, pad=cb_pad,
                        ticks=cb_ticks, tickw=cb_tickw, tickl=cb_tickl, tickdir=cb_dir)
-
-
-def scatterplot(ax, x, y, font_size=13, projection=None, title='Scatterplot', title_pad=1.005,
-                x_label='Reference', y_label='Inference', y_labelpad=5, x_labelpad=3, xy_symmetric=True,
-                x_range: tuple=None, y_range: tuple=None, x_nticks=6, y_nticks=6, tickw=1, tickl=2.5, tickdir='out',
-                marker='.', markersize=0.9, grid=True, grid_linew=0.5, x_ascale='linear', y_ascale='linear',
-                ref_label='Reference (1:1)', ref_color='black', ref_linew=0.5, ref_lines='--',
-                fit=False, fit_color=None, fit_linew=0.25, fit_lines='-',
-                lg_loc='upper left', lg_font=10, lg_ncol=1, lg_npoints=1, lg_scale=4.0, lg_spacing=0.05,
-                cb_label='Density', cb_cmap=None, cb_pad=0, cb_tickw=1, cb_tickl=2.5, cb_font=12, cb_dir='out',
-                cb_rot=270, cb_labelpad=15.5, cb_side='right', cb_size=0.025, cb_ticks=5,
-                labels: Optional[Union[list, str]] = None):
-    """
-    Multi-dataset scatterplot. `x` and `y` may be numpy arrays (single dataset) or lists/tuples of arrays
-    (multiple datasets). Pass `labels` as a list of strings (one per dataset) to create a per-dataset legend.
-    """
-    # Normalize inputs to lists for unified handling
-    multi = isinstance(x, (list, tuple))
-    if multi:
-        xs = list(x)
-        ys = list(y)
-        n = len(xs)
-        if len(ys) != n:
-            raise ValueError("When passing lists, `x` and `y` must have the same length.")
-    else:
-        xs = [np.asarray(x)]
-        ys = [np.asarray(y)]
-        n = 1
-
-    # Helpers to allow scalar or list inputs for style params
-    def _ensure_list(val, default, length):
-        if isinstance(val, (list, tuple, np.ndarray)):
-            if len(val) != length:
-                raise ValueError("List-style style arguments must match number of datasets.")
-            return list(val)
-        else:
-            return [val] * length
-
-    # Collect per-dataset styles
-    markers = _ensure_list(marker, '.', n)
-    markersizes = _ensure_list(markersize, markersize, n)
-
-    # Labels list
-    labels_list = None
-    if labels is not None:
-        labels_list = _ensure_list(labels, None, n)
-
-    # Colors: if fit_color provided as list, prefer it as plotting colors; otherwise cycle defaults
-    default_colors = [colors[c] for c in list(colors.keys())]
-    if fit_colors is not None:
-        colors_list = _ensure_list(fit_colors, fit_colors[0], n)
-    else:
-        colors_list = [default_colors[i % len(default_colors)] for i in range(n)]
-
-    # Allow passing `cb_cmap` single value for density
-    cmap = cb_cmap if cb_cmap is not None else white_viridis
-
-    # Compute global x_range/y_range from all data if not provided
-    all_x = np.concatenate([np.asarray(a).ravel() for a in xs])
-    all_y = np.concatenate([np.asarray(a).ravel() for a in ys])
-    if x_range is None:
-        x_range = compute_min_max(all_x, symmetric=xy_symmetric)
-    if y_range is None:
-        y_range = compute_min_max(all_y, symmetric=xy_symmetric)
-    if xy_symmetric:
-        merged = np.concatenate([np.asarray(x_range).ravel(), np.asarray(y_range).ravel()])
-        sym = compute_min_max(merged, symmetric=True)
-        x_range = sym
-        y_range = sym
-
-    # Ensure aspect and axis limits are set before drawing density (density replacement of ax)
-    ax.set_aspect(1)
-
-    # Plotting loop
-    density_drawn = False
-    density_ax = ax
-    scat_handles = []
-    legend_proxies = []
-    legend_labels = []
-
-    for i in range(n):
-        xi = np.asarray(xs[i]).ravel()
-        yi = np.asarray(ys[i]).ravel()
-        ci = colors_list[i]
-        mi = markers[i]
-        si = markersizes[i]
-
-        if projection == 'scatter_density' and not density_drawn:
-            pos = ax.get_position()
-            fig.delaxes(ax)
-            density_ax = fig.add_axes(pos, projection='scatter_density')
-            # draw density for first dataset
-            scat = density_ax.scatter_density(xi, yi, cmap=cmap)
-            density_drawn = True
-            current_ax = density_ax
-            # create proxy legend entry for the density layer if label provided
-            if labels_list is not None and labels_list[i] is not None:
-                proxy = plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=ci, markersize=6, linestyle='')
-                legend_proxies.append(proxy)
-                legend_labels.append(labels_list[i])
-        else:
-            current_ax = density_ax
-            # regular scatter for this dataset; attach label only if user provided labels
-            if labels_list is not None and labels_list[i] is not None:
-                scat = current_ax.scatter(xi, yi, c=ci, marker=mi, s=si, label=labels_list[i])
-                # create a proxy consistent across backends for legend
-                proxy = plt.Line2D([0], [0], marker=mi, color='w', markerfacecolor=ci, markersize=max(4, si**0.5*2), linestyle='')
-                legend_proxies.append(proxy)
-                legend_labels.append(labels_list[i])
-            else:
-                scat = current_ax.scatter(xi, yi, c=ci, marker=mi, s=si)
-
-        # optional linear fit per dataset
-        fit_this = fit
-        if isinstance(fit, (list, tuple, np.ndarray)):
-            fit_this = bool(fit[i])
-        if fit_this:
-            try:
-                slope, y0 = np.polyfit(xi, yi, 1)
-                fit_label = None
-                if labels_list is not None and labels_list[i] is not None:
-                    fit_label = f"{labels_list[i]} fit"
-                else:
-                    fit_label = f"y = {slope:.3f}x + {y0:.3f}" if y0 > 0 else f"y = {slope:.3f}x - {abs(y0):.3f}"
-                current_ax.plot(np.array(x_range), slope * np.array(x_range) + y0,
-                                color=(fit_colors[i] if fit_colors is not None else ci),
-                                linewidth=fit_linew, linestyle=fit_lines, label=fit_label)
-                # include fit in legend if labels were provided (use same proxy)
-                if labels_list is not None and labels_list[i] is not None:
-                    # use a line proxy for fit
-                    line_proxy = plt.Line2D([0], [0], color=(fit_colors[i] if fit_colors is not None else ci),
-                                            linestyle=fit_lines, linewidth=fit_linew)
-                    legend_proxies.append(line_proxy)
-                    legend_labels.append(fit_label)
-            except Exception:
-                pass
-
-        scat_handles.append(scat)
-
-    # Plot reference 1:1 line once on the active axis
-    density_ax.plot(x_range, x_range, label=ref_label, color=ref_color, linewidth=ref_linew, linestyle=ref_lines)
-    # add reference proxy at front of legend lists
-    ref_proxy = plt.Line2D([0], [0], color=ref_color, linestyle=ref_lines, linewidth=ref_linew)
-    # place reference first
-    legend_proxies.insert(0, ref_proxy)
-    legend_labels.insert(0, ref_label)
-
-    # Set axis limits and scales
-    density_ax.set_xlim(x_range)
-    density_ax.set_ylim(y_range)
-    density_ax.set_xscale(x_ascale)
-    density_ax.set_yscale(y_ascale)
-
-    # Grid and ticks
-    density_ax.grid(grid, linewidth=grid_linew)
-    density_ax.get_yaxis().set_tick_params(which='both', direction=tickdir, width=tickw, length=tickl,
-                                          labelsize=font_size, left=True, right=True)
-    density_ax.get_xaxis().set_tick_params(which='both', direction=tickdir, width=tickw, length=tickl,
-                                          labelsize=font_size, bottom=True, top=True)
-    if x_nticks is not None:
-        density_ax.xaxis.set_major_locator(plt.MaxNLocator(x_nticks))
-    if y_nticks is not None:
-        density_ax.yaxis.set_major_locator(plt.MaxNLocator(y_nticks))
-
-    # Labels, title
-    density_ax.set_ylabel(y_label, fontsize=font_size, labelpad=y_labelpad)
-    density_ax.set_xlabel(x_label, fontsize=font_size, labelpad=x_labelpad)
-    density_ax.set_title(title, fontsize=font_size, y=title_pad)
-
-    # Legend: use user-provided labels if any, otherwise fallback to default legend (reference + any labeled lines)
-    if labels_list is not None:
-        density_ax.legend(legend_proxies, legend_labels, loc=lg_loc, fontsize=lg_font, labelspacing=lg_spacing,
-                          numpoints=lg_npoints, ncol=lg_ncol, markerscale=lg_scale, fancybox=False)
-    else:
-        # default legend (will contain reference and any fit lines with labels)
-        density_ax.legend(loc=lg_loc, fontsize=lg_font, labelspacing=lg_spacing, numpoints=lg_npoints,
-                          ncol=lg_ncol, markerscale=lg_scale, fancybox=False)
-
-    # Colorbar for density projection
-    if projection == 'scatter_density' and density_drawn:
-        apply_colorbar(density_ax, scat_handles[0], font_size=cb_font, label=cb_label, label_pad=cb_labelpad,
-                       orientation='vertical', rotation=cb_rot, side=cb_side, size=cb_size, pad=cb_pad,
-                       ticks=cb_ticks, tickw=cb_tickw, tickl=cb_tickl, tickdir=cb_dir)
-
-    return
 
 
 def fig_scatterplots(target: Union[list, np.ndarray], pred: Union[list, np.ndarray],
@@ -1565,6 +1448,8 @@ def fig_scatterplots(target: Union[list, np.ndarray], pred: Union[list, np.ndarr
                 x_label=x_label, y_label=y_label)
 
     return fig
+
+
 
 
 def compute_normalized_density(lat_data: np.ndarray, lon_data: np.ndarray,
