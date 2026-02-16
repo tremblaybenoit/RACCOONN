@@ -83,7 +83,7 @@ data:
     # Prediction set
     predict:
       # Directory
-      dir: ${paths.data_dir}/Train2
+      dir: ../scene_cloud_float32/Train2
       # Variables
       vars:
         # Atmospheric profiles

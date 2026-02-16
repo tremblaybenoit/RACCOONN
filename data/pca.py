@@ -115,7 +115,7 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
 
     # Standardize
     mu = np.mean(data, axis=0, keepdims=True)  # (V, L)
-    std = np.std(data, axis=0, keepdims=True)  # (V, L)
+    std = np.std(data, axis=0, keepdims=True) + 1e-12  # (V, L)
     increment = data - mu
     standardized_data = increment / std
 

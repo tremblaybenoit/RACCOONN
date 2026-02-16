@@ -8,6 +8,8 @@ import mpl_scatter_density
 import cartopy
 from typing import Union, Callable, Optional
 import os
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import matplotlib.ticker as mticker
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 
@@ -86,7 +88,7 @@ def flexible_gridspec(cell_widths: list[float], cell_heights: list[float], lefts
 
 def apply_colorbar(ax, plot, font_size: float=13, label: str='Density', label_pad: float=15.5,
                    orientation: str="horizontal", rotation: float=0, side: str='bottom', vmin: float=-1, vmax: float=1,
-                   size: float=0.01, pad: float=0.08, ticks=None, tickw: float=1, tickl: float=2.5, tickdir: str='out') \
+                   size: float=0.01, pad: float=0.08, ticks=None, tickw: float=1, tickl: float=2.5, tickdir: str='out', ticklabels=None) \
         -> plt.colorbar:
     """
     Add a floating colorbar to the given axes, using fig.add_axes, without shrinking the plot.
@@ -170,7 +172,7 @@ def apply_colorbar(ax, plot, font_size: float=13, label: str='Density', label_pa
         if ticks is not None:
             tick_values = np.linspace(vmin, vmax, ticks)
             cbar.set_ticks(tick_values)
-            cbar.ax.set_yticklabels([f"{v:.2f}" for v in tick_values])
+            cbar.ax.set_yticklabels([f"{v:.2f}" for v in tick_values]) if ticklabels is None else cbar.ax.set_yticklabels(ticklabels)
         # Customize ticks
         cbar.ax.tick_params(axis='y', direction=tickdir, labelsize=font_size, width=tickw, length=tickl,
                             left=(side=='left'), right=(side=='right'))
@@ -1142,9 +1144,9 @@ def fig_errs_by_channel(target: np.ndarray, pred: np.ndarray, ref: np.ndarray=No
 
 
 def geostationnary_map(fig, ax, lat, lon, c, c_min, c_max, font_size=13, title='Scatterplot', title_pad=1.005,
-                       marker='.', markersize=0.25, lg_loc='upper left', lg_font=10, lg_ncol=1, lg_npoints=1,
-                       lg_scale=4.0, lg_spacing=0.05, cb_label='Value', cb_cmap=None, cb_pad=0, cb_tickw=1,
-                       cb_tickl=2.5, cb_font=12, cb_dir='out', cb_rot=270, cb_labelpad=15.5, cb_side='right', cb_size=0.025, cb_ticks=5,):
+                       marker='.', markersize=0.25, cb_label='Value', cb_cmap=None, cb_pad=0.0125, cb_tickw=1,
+                       cb_tickl=2.5, cb_font=12, cb_dir='out', cb_rot=270, cb_labelpad=15.5, cb_side='right', cb_size=0.025,
+                       cb_ticks=5, cb_ticklabels=None):
     """ Create a scatterplot with optional density projection.
 
     Parameters
@@ -1161,12 +1163,6 @@ def geostationnary_map(fig, ax, lat, lon, c, c_min, c_max, font_size=13, title='
     title_pad : float. Padding for the title.
     marker : str. Marker style for the scatterplot.
     markersize : float. Size of the markers.
-    lg_loc : str. Location of the legend.
-    lg_font : int. Font size for the legend.
-    lg_ncol : int. Number of columns in the legend.
-    lg_npoints : int. Number of points in the legend.
-    lg_scale : float. Scale for the legend markers.
-    lg_spacing : float. Spacing between legend entries.
     cb_label : str. Label for the colorbar.
     cb_size : float. Size of the colorbar.
     cb_ticks : int. Number of ticks on the colorbar.
@@ -1196,26 +1192,35 @@ def geostationnary_map(fig, ax, lat, lon, c, c_min, c_max, font_size=13, title='
     ax = fig.add_axes(pos, projection=proj)
     # Data is in lat/lon, so we need to specify the transform for the scatter points
     trans = cartopy.crs.PlateCarree()
-    scat = ax.scatter(lat.flatten(), lon.flatten(), c=c, v_min=c_min, v_max=c_max, cmap=cb_cmap,
+    scat = ax.scatter(lat.flatten(), lon.flatten(), c=c, vmin=c_min, vmax=c_max, cmap=cb_cmap,
                       marker=marker, s=markersize, transform=trans)
     ax.coastlines()
+
+    # inside geostationnary_map, after ax.coastlines():
+    gl = ax.gridlines(crs=cartopy.crs.PlateCarree(), draw_labels=True,
+                      linewidth=0.5, color='gray', alpha=0.7, linestyle='--')
+    # choose tick spacing appropriate for your region
+    gl.xlocator = mticker.FixedLocator(np.arange(-180, 181, 15))
+    gl.ylocator = mticker.FixedLocator(np.arange(-90, 91, 15))
+    gl.xformatter = LONGITUDE_FORMATTER
+    gl.yformatter = LATITUDE_FORMATTER
+    gl.top_labels = False
+    gl.right_labels = False
+    gl.xlabel_style = {'size': cb_font}
+    gl.ylabel_style = {'size': cb_font}
 
     # Set title
     ax.set_title(title, fontsize=font_size, y=title_pad)
     # Set legend
-    # ax.legend(loc=lg_loc, fontsize=lg_font, labelspacing=lg_spacing, numpoints=lg_npoints, ncol=lg_ncol,
-    #           markerscale=lg_scale, fancybox=False)
-
-    # Set colorbar
     apply_colorbar(ax, scat, font_size=cb_font, label=cb_label, label_pad=cb_labelpad, orientation='vertical',
-                   rotation=cb_rot, side=cb_side, size=cb_size, pad=cb_pad,
-                   ticks=cb_ticks, tickw=cb_tickw, tickl=cb_tickl, tickdir=cb_dir)
+                   rotation=cb_rot, side=cb_side, size=cb_size, pad=cb_pad, vmin=c_min, vmax=c_max,
+                   ticks=cb_ticks, tickw=cb_tickw, tickl=cb_tickl, tickdir=cb_dir, ticklabels=cb_ticklabels)
 
 
 def fig_geostationnary(lat: Union[list, np.ndarray], lon: Union[list, np.ndarray], c: Union[list, np.ndarray],
-                       c_min: Union[list[float], float]=None, c_max: Union[list[float], float]=None,
+                       c_min: Union[list[float], float, int]=None, c_max: Union[list[float], float, int]=None,
                        title: Union[list[str], str]='Scatterplot', marker='.', markersize: float=0.25,
-                       cb_label: Union[list[str], str]='Value', cb_cmap: Union[list[str], str]=None):
+                       cb_label: Union[list[str], str]='Value', cb_cmap=None, cb_ticks=None, cb_ticklabels=None):
     """ Create a geostationary map scatterplot.
 
     Parameters
@@ -1230,6 +1235,8 @@ def fig_geostationnary(lat: Union[list, np.ndarray], lon: Union[list, np.ndarray
     markersize : float. Size of the markers.
     cb_label : str. Label for the colorbar.
     cb_cmap : str. Colormap for the colorbar.
+    cb_ticks : int. Number of ticks on the colorbar.
+    cb_ticklabels : list or None. Custom tick labels for the colorbar. If None, default numeric labels are used.
     """
 
     # Convert to list if c is a numpy array for consistent handling
@@ -1255,7 +1262,8 @@ def fig_geostationnary(lat: Union[list, np.ndarray], lon: Union[list, np.ndarray
         col = i % n_cols
         ax = get_axes(row, col)
         geostationnary_map(fig, ax, lat, lon, c[i], title=title, marker=marker, markersize=markersize,
-                           cb_label=cb_label, cb_cmap=cb_cmap, c_min=c_min, c_max=c_max)
+                           cb_label=cb_label, cb_cmap=cb_cmap, c_min=c_min, c_max=c_max, cb_ticks=cb_ticks,
+                           cb_ticklabels=cb_ticklabels)
     return fig
 
 
