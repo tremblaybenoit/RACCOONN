@@ -22,7 +22,7 @@ task_name: "inverse_operator_scene_cloud"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "phys_0000"
+  run_id: "phys_0001"
   data_dir: ../scene_cloud_${data.dtype}
 
 # Trainer configuration
@@ -125,7 +125,9 @@ data:
 # Loader configuration
 loader:
   batch_size: 16
-  num_workers: 10
+  num_workers: 0
+  pin_memory: false
+  persistent_workers: false
 
 # Model parameters
 model:
@@ -182,20 +184,11 @@ model:
   architecture:
     # Positional encoding
     positional_encoding:
-      _target_: inverse.model.encoding.RescaledPositionalEncoding
-      # num_freqs: 20
-      d_input:
-        _target_: builtins.int
-        _args_:
-          - _target_: numpy.sum
-            _args_:
-              - - ${model.parameters.n_lat}
-                - ${model.parameters.n_lon}
-                - ${model.parameters.n_scans}
-                - ${model.parameters.n_pressure}
-                - ${model.parameters.n_cloud}
-        # [Lat, Lon, Scans, Pressure]
-        # sigma_per_dim: [ 1.0, 1.0, 0.5 ]
+      _target_: inverse.model.encoding.MultiScaleGaussianEncoding
+      num_freqs: 20
+      d_input: 3
+      # [Lat, Lon, Scans, Pressure]
+      sigma_per_dim: [ 2.5, 2.5, 2.5]
     # Input layer
     input_layer:
       _target_: inverse.model.model.LinearBlock
@@ -204,27 +197,30 @@ model:
       layernorm:
         _target_: torch.nn.Identity
       activation:
-        _target_: forward.model.activation.NonLearnableSwish
-        in_features: ${model.architecture.hidden_layer.in_features}
+        _target_: forward.model.activation.Sine
+        # in_features: ${model.architecture.hidden_layer.in_features}
+        w0: 2.5
       dropout_rate: 0.1
       init_func:
-        _target_: inverse.model.model.SwishInit
+        _target_: inverse.model.model.SirenInit
         is_first_layer: true
-        is_head: false
+        activation: ${model.architecture.input_layer.activation}
+        w0: ${model.architecture.input_layer.activation.w0}
     # Hidden layer
-    n_hidden_layers: 1
+    n_hidden_layers: 2
     hidden_skip: false
     hidden_layer:
       _target_: inverse.model.model.SirenResidualBlock
-      in_features: 256
+      in_features: 128
       out_features: ${model.architecture.hidden_layer.in_features}
       layernorm: ${model.architecture.input_layer.layernorm}
       activation: ${model.architecture.input_layer.activation}
       dropout_rate: ${model.architecture.input_layer.dropout_rate}
       init_func:
-        _target_: inverse.model.model.SwishInit
+        _target_: inverse.model.model.SirenInit
         is_first_layer: false
-        is_head: false
+        activation: ${model.architecture.hidden_layer.activation}
+        w0: ${model.architecture.input_layer.activation.w0}
     # Output layer
     output_skip: true
     output_n_heads: ${model.parameters.n_prof}
@@ -237,9 +233,11 @@ model:
         _target_: torch.nn.Sigmoid
       dropout_rate: 0.0
       init_func:
-        _target_: inverse.model.model.SwishInit
+        _target_: inverse.model.model.SirenInit
         is_first_layer: false
         is_head: true
+        activation: ${model.architecture.output_layer.activation}
+        w0: ${model.architecture.input_layer.activation.w0}
 
 # Logger configuration
 logger:

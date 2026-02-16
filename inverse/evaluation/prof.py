@@ -33,6 +33,7 @@ def main(config: DictConfig) -> None:
     config1.normalization.axis = 1
     prof_train1 = load_var_and_normalize(config1)
     config2 = config.data.stage.train.vars.prof
+    config2.normalization._target_ = 'data.transformations.mean_stdev'
     config2.normalization.axis = None
     prof_train2 = load_var_and_normalize(config2)
     # Stack profiles and compute statistics
@@ -42,8 +43,8 @@ def main(config: DictConfig) -> None:
     prof_stdev = np.std(prof, axis=0)
     prof_types = config.data.stage.test.vars.prof.type
     prof_labels = ([f'No norm. - {prof_label}' for prof_label in prof_types] +
-                   [f'Height-independent norm. - {prof_label}' for prof_label in prof_types] +
-                   [f'Profile-dependent norm. - {prof_label}' for prof_label in prof_types])
+                   [f'Min-Max norm. - {prof_label}' for prof_label in prof_types] +
+                   [f'Standardized. - {prof_label}' for prof_label in prof_types])
     pressure_levels = load_var(config.data.stage.train.vars.pressure)/100.0  # Convert to hPa
 
     # Plot profiles
