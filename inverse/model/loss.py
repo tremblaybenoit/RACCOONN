@@ -1098,8 +1098,9 @@ class VarLossHybridPCA2(torch.nn.Module):
         loss['total'] = self.lambda_obs * loss['obs'].mean()
 
         # Sobolev regularization loss
-        loss['sobolev'] = self.sobolev_loss_fn(pred['prof_white'], input)  # TODO: Switch to prof (physical space) if needed
-        loss['total'] += self.lambda_sobolev * loss['sobolev'].mean()
+        if self.lambda_sobolev > 0.0:
+            loss['sobolev'] = self.sobolev_loss_fn(pred['prof_white'], input)  # TODO: Switch to prof (physical space) if needed
+            loss['total'] += self.lambda_sobolev * loss['sobolev'].mean()
 
         # Model losses: Some model losses may require additional inputs
         if self.loss_model is not None:

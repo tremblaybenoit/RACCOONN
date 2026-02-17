@@ -7,6 +7,7 @@ from data.statistics import statistics, accumulate_statistics
 from forward.model.activation import Swish, Scale
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
+import gc
 
 
 class BaseModel(LightningModule):
@@ -199,6 +200,7 @@ class BaseModel(LightningModule):
 
         # Clear the lists for the next epoch
         self.on_stage_epoch_end()
+        gc.collect()
 
     def on_validation_epoch_end(self):
         """ Callback to log validation results at the end of each validation epoch.

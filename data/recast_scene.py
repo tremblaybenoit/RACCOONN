@@ -92,6 +92,7 @@ def main(in_dir, in_precision, out_dir, out_precision, out_cloud_filter, out_cle
         mask &= (lon >= lon_min)
     if lon_max is not None:
         mask &= (lon <= lon_max)
+    extent_mask = mask.copy()
     if out_cloud_filter:
         mask &= (cloud_filter == 1)
     if out_clearsky_filter:
@@ -99,18 +100,21 @@ def main(in_dir, in_precision, out_dir, out_precision, out_cloud_filter, out_cle
     spatial_mask = mask.copy()  # Store spatial mask for later use
     if timestep is not None:
         mask &= (scans == timestep)
+        extent_mask &= (scans == timestep)
     else:
         mask &= (scans == 0)  # Take the first timestep
     lat, lon = lat[mask], lon[mask]
-    del cloud_filter, scans
+    del scans
     gc.collect()
 
     # Number of samples, scans, coordinates
     n_scans = 1
     n_coords = mask.sum()
-    # Establish boundaries of spatial domain using a convex hull
-    # coords = np.stack((lat, lon), axis=-1)
-    # hull_indices = onion_peel_boundary(coords, layers=1)
+    # Establish boundaries of spatial domain. We want to ensure that no validation/test points are alone or on boundaries.
+    # Look for hull points and add to training set.
+
+
+
     # fraction of the total span used as tolerance (adjust as needed)
     frac_lat, frac_lon = 0.050, 0.050
     lat_span = lat_max - lat.min()

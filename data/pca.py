@@ -112,6 +112,7 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
 
     # Get data shape
     n_samples, n_vars, n_levels = data.shape
+    breakpoint()
 
     # Standardize
     mu = np.mean(data, axis=0, keepdims=True)  # (V, L)

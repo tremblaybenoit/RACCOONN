@@ -608,13 +608,13 @@ class HydraResidualMLP(nn.Module):
         if output_skip:
             self.hidden_layers = Concatenate(nn.Sequential(*hidden_layers))
             # output_layer.in_features = hidden_layer.out_features + input_layer.out_features
-            output_layer.in_features = hidden_layer.out_features + input_layer.out_features
-            if output_n_layers > 1:
-                output_layer.out_features = output_layer.in_features
-            if hasattr(output_layer.activation, 'in_features'):
-                output_layer.activation.in_features = output_layer.in_features
-            if output_final_layer is not None:
-                output_final_layer.in_features = output_layer.out_features
+            # output_layer.in_features = hidden_layer.out_features + input_layer.out_features
+            # if output_n_layers > 1:
+            #     output_layer.out_features = output_layer.in_features
+            # if hasattr(output_layer.activation, 'in_features'):
+            #     output_layer.activation.in_features = output_layer.in_features
+            # if output_final_layer is not None:
+            #      output_final_layer.in_features = output_layer.out_features
         else:
             self.hidden_layers = nn.Sequential(*hidden_layers)
         # Model architecture
@@ -624,8 +624,16 @@ class HydraResidualMLP(nn.Module):
             for _ in range(output_n_heads):
                 head_layers = []
                 for l in range(output_n_layers):
+                    if output_skip:
+                        output_layer.in_features = hidden_layer.out_features + input_layer.out_features
+                        output_layer.out_features = output_layer.in_features
+                    else:
+                        output_layer.in_features = output_layer.out_features
+                    if hasattr(output_layer.activation, 'in_features'):
+                        output_layer.activation.in_features = output_layer.in_features
                     head_layers.append(instantiate(output_layer))
                 if output_final_layer is not None:
+                    output_final_layer.in_features = output_layer.out_features
                     head_layers.append(instantiate(output_final_layer))
                 output_layers.append(nn.Sequential(*head_layers))
             self.output_layers = PredictionHeads(output_layers)
@@ -754,17 +762,16 @@ class PINNverseOperator(BaseModel):
         """
 
         # Compute profiles
-        with torch.set_grad_enabled(True):
-            coords = {key: v.clone().requires_grad_(True) for key, v in batch['input'].items()}
 
-            # Compute profiles
-            pred = {'prof': self.forward(batch['input']).contiguous()}
+        # Compute profiles
+        pred = {'prof': self.forward(batch['input']).contiguous()}
 
-            # Compute loss function
-            loss, pred['hofx'] = self.loss_func(pred, batch['target'], coords)
+        # Compute loss function
+        loss, pred['hofx'] = self.loss_func(pred, batch['target'], batch['input'])
+        detached_loss = {k: v.detach().item() if v.ndim == 0 else v.detach() for k, v in loss.items()}
 
         # Logging
-        self._logging(stage, loss, batch['input'], batch['target'], pred)
+        self._logging(stage, detached_loss, batch['input'], batch['target'], {k: v.detach() for k, v in pred.items()})
 
         return loss['total']
 
@@ -898,7 +905,8 @@ class PINNverseOperator(BaseModel):
         # Log L2 norm of model parameters during training
         elif stage == 'train':
             # Compute L2 norm of the model parameters
-            l2_norm = sum((p ** 2).sum() for p in self.parameters() if p.requires_grad)
+            with torch.no_grad():
+                l2_norm = sum(p.pow(2).sum() for p in self.parameters()).sqrt().item()
             self.log(f"{stage}_l2_norm", l2_norm, on_epoch=True, prog_bar=False, logger=logger_flag)
             # If using UncertaintyVarLoss, log the effective weights
             if hasattr(self.loss_func, 'log_var_obs'):
