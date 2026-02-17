@@ -755,7 +755,7 @@ class PINNverseOperator(BaseModel):
 
         # Compute profiles
         with torch.set_grad_enabled(True):
-            coords = {key: v.requires_grad_(True) for key, v in batch['input'].items()}
+            coords = {key: v.clone().requires_grad_(True) for key, v in batch['input'].items()}
 
             # Compute profiles
             pred = {'prof': self.forward(batch['input']).contiguous()}
@@ -764,7 +764,7 @@ class PINNverseOperator(BaseModel):
             loss, pred['hofx'] = self.loss_func(pred, batch['target'], coords)
 
         # Logging
-        self._logging(stage, loss, batch['input'], batch['target'], {k: v.detach() for k, v in pred.items()})
+        self._logging(stage, loss, batch['input'], batch['target'], pred)
 
         return loss['total']
 
@@ -853,6 +853,7 @@ class PINNverseOperator(BaseModel):
         # Log mean background profiles and rmse if available
         if background is not None:
             stats_background = statistics(background, axis=0, which=['mean', 'stdev', 'rmse', 'mae'], target=target)
+            stats_background = {k: v.detach() for k, v in stats_background.items()}
             # Check if statistics dictionaries are empty
             if self.metrics.get('prof_white_background'):
                 self.metrics['prof_white_background'] = accumulate_statistics([self.metrics['prof_white_background'], stats_background])

@@ -9,7 +9,7 @@ defaults:
   - override /preparation: inverse_default
   - override /loader: inverse_static
   - override /model: inverse_operator
-  - override /trainer: cpu
+  - override /trainer: gpu
   - override /callbacks: inverse_default
   - override /logger: default
 
@@ -125,9 +125,7 @@ data:
 # Loader configuration
 loader:
   batch_size: 16
-  num_workers: 0
-  pin_memory: false
-  persistent_workers: false
+  num_workers: 10
 
 # Model parameters
 model:

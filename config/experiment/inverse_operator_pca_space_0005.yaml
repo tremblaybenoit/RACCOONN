@@ -23,7 +23,7 @@ task_name: "inverse_operator_pca_space"  # Experiment
 paths:
   task_dir: "../inverse_outputs"
   run_id: "0005"
-  data_dir: ../static_${data.dtype}_cs
+  data_dir: ../static_${data.dtype}
 
 # Trainer configuration
 trainer:
