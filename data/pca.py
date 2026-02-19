@@ -93,7 +93,7 @@ class PCAProcessor:
         return (z * self.sigma) + self.mu
 
 
-def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
+def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270, pressure_filter: np.ndarray=None) -> dict:
     """
     Generate PCA buffers for a given dataset.
 
@@ -103,6 +103,7 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
           V is the number of variables, and L is the number of levels.
     mode: str. PCA mode, either 'global' or 'local'.
     n_comp: int. Number of principal components to retain.
+    pressure_filter: np.ndarray. Optional boolean array to filter pressure levels (not used in this implementation).
 
     Returns
     -------
@@ -117,10 +118,15 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
     std = np.std(data, axis=0, keepdims=True) + 1e-12  # (V, L)
     increment = data - mu
     standardized_data = increment / std
-    # pressure_filter = np.load('../scene_clouds_float32/pressure_filter.npy')
-    # standardized_data = standardized_data[..., pressure_filter]
 
     if mode == 'global':
+
+        # Pressure filter
+        if pressure_filter is not None:
+            mu = mu[:, :, pressure_filter]
+            std = std[:, :, pressure_filter]
+            standardized_data = standardized_data[:, :, pressure_filter]
+
         # Flatten: (N, V*L)
         pca = PCA().fit(standardized_data.reshape(n_samples, -1))
         cumulative_variance = np.cumsum(pca.explained_variance_ratio_)
@@ -145,7 +151,9 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
         flat_z = standardized_data.reshape(n_samples, -1)
         pca = PCA(n_components=n_comp)
         pca.fit(flat_z)
-        # Compute pseudo-inverse of the PCA transformation matrix for whitening
+        # Compute pseudo-inverse of the covariance matrix
+        # If we assume that the background is the mean, then the standardizedf data is the increment, and the covariance matrix is the covariance of the standardized data, which is the identity matrix.
+        # The pseudo-inverse of the identity matrix is itself, so we can compute the pseudo-inverse of the covariance matrix in the PCA space as follows:
         B_pca_inv = pca.components_.T @ np.diag(1.0/pca.explained_variance_) @ pca.components_
         # Store PCA buffers in a dictionary
         pca_buffs = {
@@ -163,61 +171,12 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
         pca_processor = PCAProcessor(pca_buffs)
         # Data
         whitened_data = pca_processor.physical_to_whitened(data.reshape(n_samples, -1))
-        # sym_log_data = sym_log(whitened_data, inverse_transform=False)
         # Mean
         whitened_mu0 = whitened_data.mean(axis=0, keepdims=True)
         whitened_mu1 = pca_processor.physical_to_whitened(mu.reshape(1, -1))
-        # breakpoint()
-        # sym_log_mu0 = sym_log_data.mean(axis=0, keepdims=True)
-        # sym_log_mu1 = sym_log(whitened_mu1, inverse_transform=False)
-        # Increments
-        whitened_increment0 = whitened_data - whitened_mu0
-        whitened_increment1 = whitened_data - whitened_mu1
-        # sym_log_increment0 = sym_log_data - sym_log_mu0
-        # sym_log_increment1 = sym_log(whitened_increment1, inverse_transform=False)
-        # sym_log_increment2 = sym_log_data - sym_log_mu1
-        # sym_log_increment3 = sym_log(whitened_increment0, inverse_transform=False)
-        # Variances and stds
-        # sym_log_cov0 = np.cov(sym_log_increment0, rowvar=False)
-        # sym_log_var0 = np.diag(sym_log_cov0).reshape(1, -1)
-        # sym_log_std0 = np.sqrt(sym_log_var0)
-        # sym_log_cov_inv0 = np.linalg.inv(sym_log_cov0).astype(data.dtype)
-        # sym_log_cov1 = np.cov(sym_log_increment1, rowvar=False)
-        # sym_log_var1 = np.diag(sym_log_cov1).reshape(1, -1)
-        # sym_log_std1 = np.sqrt(sym_log_var1)
-        # sym_log_cov_inv1 = np.linalg.inv(sym_log_cov1).astype(data.dtype)
-        # sym_log_cov2 = np.cov(sym_log_increment2, rowvar=False)
-        # sym_log_var2 = np.diag(sym_log_cov2).reshape(1, -1)
-        # sym_log_std2 = np.sqrt(sym_log_var2)
-        # sym_log_cov_inv2 = np.linalg.inv(sym_log_cov2).astype(data.dtype)
-        #
         pca_buffs['whitened_mu'] = whitened_mu1
         pca_buffs['scales_z_var'] = whitened_data.var(axis=0, keepdims=True)
         pca_buffs['scales_z_std'] = np.sqrt(pca_buffs['scales_z_var'])
-        # pca_buffs['sym_log_z_var'] = sym_log(whitened_data, inverse_transform=False).var(axis=0, keepdims=True)
-        # pca_buffs['sym_log_z_std'] = np.sqrt(pca_buffs['sym_log_z_var'])
-        # pca_buffs['sym_log_var0'] = sym_log_var0
-        # pca_buffs['sym_log_std0'] = sym_log_std0
-        # pca_buffs['sym_log_var'] = sym_log_var1
-        # pca_buffs['sym_log_std'] = sym_log_std1
-        # pca_buffs['sym_log_diag_cov'] = 1.0/sym_log_cov_inv0
-        # pca_buffs['sym_log_cov'] = sym_log_cov1
-        # pca_buffs['sym_log_diag_cov'] = 1.0/np.diag(sym_log_cov_inv1).reshape(1, -1)
-        # pca_buffs['sym_log_diag_cov_inv0'] = sym_log_cov_inv0
-        # pca_buffs['sym_log_cov_inv'] = sym_log_cov_inv1
-        # pca_buffs['sym_log_diag_cov_inv'] = np.diag(sym_log_cov_inv1).reshape(1, -1)
-
-
-        # fig, get_axes = flexible_gridspec(cell_widths=[4.0, 4.0], cell_heights=[4.0, 4.0], lefts=[1.00, 1.00],
-        #                                   rights=[1.00, 1.00], bottoms=[1.00, 1.00], tops=[1.00, 1.00])
-        # ax0 = get_axes(0, 0)
-        # plot_map(ax0, sym_log_cov_inv0, title=f"Inverse covariance matrix", plt_origin='upper',
-        #          cb_label=r'Values (divided by 10$^4$)')
-        # ax1 = get_axes(0, 1)
-        # plot_map(ax1, sym_log_cov_inv1, title=f"Inverse covariance matrix (alt method)", plt_origin='upper',
-        #          cb_label=r'Values (divided by 10$^4$)')
-        # save_plot(fig, "pca_inverse_covariance_matrices.png")
-        # plt.close(fig)
 
         return pca_buffs
     elif mode == 'local':
@@ -318,7 +277,7 @@ def project_pca(input: DictConfig, output: DictConfig, mode='global', n_comp: in
     return
 
 
-def compute_pca(input: DictConfig, output: DictConfig, mode: str='global', n_comp: int=270) -> None:
+def compute_pca(input: DictConfig, output: DictConfig, mode: str='global', n_comp: int=270, pressure_filter: np.ndarray = None) -> None:
     """ Compute pca decomposition of a given dataset.
 
         Parameters
@@ -327,6 +286,7 @@ def compute_pca(input: DictConfig, output: DictConfig, mode: str='global', n_com
         output: DictConfig. Output configuration.
         mode: str. PCA mode, either 'global' or 'local'.
         n_comp: int. Number of principal components to retain.
+        pressure_filter: np.ndarray. Optional boolean array to filter pressure levels.
 
         Returns
         -------
@@ -342,7 +302,8 @@ def compute_pca(input: DictConfig, output: DictConfig, mode: str='global', n_com
     pca_buffs = generate_pca_buffers(
         data=data,
         mode=input.get('mode', mode),
-        n_comp=input.get('n_comp', n_comp)
+        n_comp=input.get('n_comp', n_comp),
+        pressure_filter=pressure_filter
     )
 
     # Save statistics to file
