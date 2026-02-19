@@ -2,13 +2,14 @@ import numpy as np
 from data.filters import clearsky_filter, pressure_filter, daytime_filter
 import os
 import logging
-from utilities.tensors import to_numpy
-from data.io import load_npy, load_latlon, load_scans, load_stack
-from data.covariance import innovation_uncertainty, background_climatology
+from data.io import load_npy
 from tqdm import tqdm
 import gc
 import argparse
 from scipy.spatial import ConvexHull
+from utilities.plot import plot_map, save_plot, flexible_gridspec
+from sklearn.decomposition import PCA
+
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +66,8 @@ def main(in_dir, in_precision, out_dir, out_precision, out_cloud_filter, out_cle
     # Output directory
     os.makedirs(out_dir, exist_ok=True)
     # Files to recast
-    filenames = ['cloud_filter.npy', 'daytime_filter.npy', 'hofx.npy', 'lat.npy', 'lon.npy',
-                 'meta.npy', 'obs.npy', 'pressure.npy', 'prof.npy', 'scans.npy', 'surf.npy']
+    filenames = ['prof.npy', 'cloud_filter.npy', 'daytime_filter.npy', 'hofx.npy', 'lat.npy', 'lon.npy',
+                 'meta.npy', 'obs.npy', 'pressure.npy', 'scans.npy', 'surf.npy']
 
     # Stages
     stages = ["Train2", "Val2", "Test2"]
@@ -101,14 +102,11 @@ def main(in_dir, in_precision, out_dir, out_precision, out_cloud_filter, out_cle
     if timestep is not None:
         mask &= (scans == timestep)
         extent_mask &= (scans == timestep)
-    else:
-        mask &= (scans == 0)  # Take the first timestep
-    lat, lon = lat[mask], lon[mask]
-    del scans
+    lat, lon, scans = lat[mask], lon[mask], scans[mask]
     gc.collect()
 
     # Number of samples, scans, coordinates
-    n_scans = 1
+    n_scans = np.unique(scans).shape[0]
     n_coords = mask.sum()
     # Establish boundaries of spatial domain. We want to ensure that no validation/test points are alone or on boundaries.
     # Look for hull points and add to training set.
@@ -174,6 +172,7 @@ def main(in_dir, in_precision, out_dir, out_precision, out_cloud_filter, out_cle
                     data = np.take(data, [0, 4, 8], axis=1)
                 # Compute background
                 prof_background = data[spatial_mask].mean(axis=0, keepdims=True)
+
             # Loop over stages and save filtered data
             for stage_name in stages:
                 # Output directory

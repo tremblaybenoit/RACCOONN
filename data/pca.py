@@ -7,7 +7,6 @@ from utilities.instantiators import instantiate
 from utilities.logic import get_config_path
 import logging
 from sklearn.decomposition import PCA
-from data.transformations import sym_log
 from utilities.plot import plot_map, save_plot, flexible_gridspec
 
 
@@ -112,13 +111,14 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
 
     # Get data shape
     n_samples, n_vars, n_levels = data.shape
-    breakpoint()
 
     # Standardize
     mu = np.mean(data, axis=0, keepdims=True)  # (V, L)
     std = np.std(data, axis=0, keepdims=True) + 1e-12  # (V, L)
     increment = data - mu
     standardized_data = increment / std
+    # pressure_filter = np.load('../scene_clouds_float32/pressure_filter.npy')
+    # standardized_data = standardized_data[..., pressure_filter]
 
     if mode == 'global':
         # Flatten: (N, V*L)
@@ -131,6 +131,7 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
 
         print(f"Components for 99.9% variance: {k_99}")
         print(f"Components for 99.99% variance: {k_9999}")
+        breakpoint()
 
         plt.figure(figsize=(10, 4))
         plt.plot(cumulative_variance)
@@ -140,17 +141,22 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270):
         plt.savefig("cumulative_explained_variance.png")
         plt.close()
 
+        # Decomposition
         flat_z = standardized_data.reshape(n_samples, -1)
         pca = PCA(n_components=n_comp)
         pca.fit(flat_z)
+        # Compute pseudo-inverse of the PCA transformation matrix for whitening
+        B_pca_inv = pca.components_.T @ np.diag(1.0/pca.explained_variance_) @ pca.components_
+        # Store PCA buffers in a dictionary
         pca_buffs = {
+            'n_comp': n_comp,
             'basis': pca.components_,
             'mu': mu.flatten(),
             'std': std.flatten(),
             'eigenvalues': pca.explained_variance_,
             'scales': np.sqrt(pca.explained_variance_),
             'scales_inv': 1.0/np.sqrt(pca.explained_variance_.reshape(1, -1)),
-            # 'sym_log_scales': sym_log(np.sqrt(pca.explained_variance_), inverse_transform=False),
+            'B_inv': B_pca_inv,
         }
 
         # Initialize PCA processor

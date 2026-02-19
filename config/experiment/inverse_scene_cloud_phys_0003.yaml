@@ -9,7 +9,7 @@ defaults:
   - override /preparation: inverse_default
   - override /loader: inverse_static
   - override /model: inverse_operator
-  - override /trainer: cpu
+  - override /trainer: gpu
   - override /callbacks: inverse_default
   - override /logger: default
 
@@ -28,7 +28,7 @@ paths:
 # Trainer configuration
 trainer:
   min_epochs: 1  # To prevent early stopping
-  max_epochs: 11  # Number of epochs
+  max_epochs: 1100  # Number of epochs
   precision: 32  # 32-bit precision
 
 # Initialization
@@ -39,7 +39,7 @@ callbacks:
   figure_logger:
     save_every_n_epochs: 10
   early_stopping:
-    patience: 101  # Number of epochs with no improvement after which training will be stopped
+    patience: 501  # Number of epochs with no improvement after which training will be stopped
 
 # Preparation configuration
 preparation:
@@ -125,7 +125,7 @@ data:
 # Loader configuration
 loader:
   batch_size: 16
-  num_workers: 0
+  num_workers: 8
   pin_memory: false
   persistent_workers: false
 
@@ -142,7 +142,7 @@ model:
     # Factor to reduce the learning rate
     factor: 0.75
     # Number of epochs with no improvement after which learning rate will be reduced
-    patience: 50
+    patience: 25
   # Model parameters associated with the data (e.g., input/output dimensions) and architecture
   parameters:
     # Number of variables
@@ -256,4 +256,4 @@ model:
 logger:
   # MLflow logger
   ports:
-    mlflow: 5008
+    mlflow: 5018

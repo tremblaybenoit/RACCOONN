@@ -8,7 +8,7 @@ defaults:
   - override /data: forward_recast
   - override /preparation: statistics
   - override /loader: forward_default
-  - override /model: forward_emulator_smooth
+  - override /model: forward_emulator
   - override /trainer: gpu
   - override /callbacks: forward_default
   - override /logger: default
@@ -22,7 +22,7 @@ task_name: "forward_emulator_recast"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../forward_outputs"
-  run_id: "v8"
+  run_id: "v4_retrain"
   data_dir: "../data_float32"
 
 # Trainer configuration
@@ -63,7 +63,7 @@ data:
               path: ${preparation.statistics.data.output.path}
               var: 'prof'
               dtype: ${data.dtype}
-            axis: 1
+            axis: null
     # Validation set
     valid:
       # Variables
@@ -83,7 +83,7 @@ data:
     # Prediction set
     predict:
       # Directory
-      dir: ../scene_clouds_float32/Train2
+      dir: ../scene_cloud_float32/Train2
       # Variables
       vars:
         # Atmospheric profiles
@@ -101,7 +101,7 @@ loader:
     predict:
       results:
         hofx:
-          path: ${data.stage.predict.dir}/predict_hofx_v8.npy
+          path: ${data.stage.predict.dir}/predict_hofx_v4_retrain.npy
 
 # Logger configuration
 logger:

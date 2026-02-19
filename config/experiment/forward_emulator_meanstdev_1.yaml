@@ -8,7 +8,7 @@ defaults:
   - override /data: forward_recast
   - override /preparation: statistics
   - override /loader: forward_default
-  - override /model: forward_emulator_smooth
+  - override /model: forward_emulator
   - override /trainer: gpu
   - override /callbacks: forward_default
   - override /logger: default
@@ -17,18 +17,18 @@ defaults:
 # This allows you to overwrite only specified parameters
 
 # Task name. Note that it determines the output directory path
-task_name: "forward_emulator_recast"  # Experiment
+task_name: "forward_emulator_norm"  # Experiment
 
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../forward_outputs"
-  run_id: "v8"
+  run_id: "meanstdev_1"
   data_dir: "../data_float32"
 
 # Trainer configuration
 trainer:
   min_epochs: 1  # To prevent early stopping
-  max_epochs: 96  # Number of epochs
+  max_epochs: 196  # Number of epochs
   precision: 32  # 32-bit precision
 
 # Preparation configuration
@@ -55,7 +55,7 @@ data:
           # Normalization function and parameters
           normalization:
             # Function
-            _target_: data.transformations.min_max
+            _target_: data.transformations.mean_stdev
             _partial_: true
             # Min/max values for normalization
             stats:
@@ -83,7 +83,7 @@ data:
     # Prediction set
     predict:
       # Directory
-      dir: ../scene_clouds_float32/Train2
+      dir: ../scene_cloud_float32/Train2
       # Variables
       vars:
         # Atmospheric profiles
@@ -101,10 +101,10 @@ loader:
     predict:
       results:
         hofx:
-          path: ${data.stage.predict.dir}/predict_hofx_v8.npy
+          path: ${data.stage.predict.dir}/predict_hofx_v3_retrain.npy
 
 # Logger configuration
 logger:
   # MLflow logger
   ports:
-    mlflow: 5002
+    mlflow: 4999
