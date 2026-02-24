@@ -22,7 +22,7 @@ task_name: "inverse_operator_scene_cloud"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "phys_0004"
+  run_id: "phys_0006"
   data_dir: ../scene_cloud_${data.dtype}
 
 # Trainer configuration
@@ -37,7 +37,7 @@ trainer:
 # Callbacks
 callbacks:
   early_stopping:
-    patience: 501  # Number of epochs with no improvement after which training will be stopped
+    patience: 101  # Number of epochs with no improvement after which training will be stopped
 
 # Preparation configuration
 preparation:
@@ -130,7 +130,7 @@ model:
   # Optimizer function and parameters
   optimizer:
     # Learning rate
-    lr: 0.001
+    lr: 0.0001
     # Weight decay (L2 regularization)
     weight_decay: 0.005
   # Learning rate scheduler
@@ -161,7 +161,7 @@ model:
     # Weights for observation (obs), model, and boundary condition (bcs) errors
     lambda_obs: 0.
     lambda_model: 1.
-    lambda_bcs: 0.
+    lambda_bcs: 1.
     lambda_sobolev: 0.
     # forward_channels: [0, 4, 5, 6, 7, 8, 9]
     clear_sky: false
@@ -173,13 +173,13 @@ model:
       _target_: inverse.model.loss.QuadraticForm
       matrix:
         _target_: data.pca.load_pca_buffers
-        path: ../scene_clouds_float32/normalization/pca.pkl
+        path: ../scene_clouds_float32/normalization/pca_clouds_pressure2.pkl
         buffer: 'B_inv'
     # Loss term for boundary conditions
     loss_bcs:
       _target_: inverse.model.loss.MSE
     # Pressure filter: Consider only pressure levels with non-zero variance (for model and bcs errors)
-    # pressure_filter: ${data.pressure_filter.load}
+    pressure_filter: ${data.pressure_filter.load}
   # Architecture components
   architecture:
     # Positional encoding

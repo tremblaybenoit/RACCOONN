@@ -116,16 +116,18 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270, 
     # Standardize
     mu = np.mean(data, axis=0, keepdims=True)  # (V, L)
     std = np.std(data, axis=0, keepdims=True) + 1e-12  # (V, L)
-    increment = data - mu
-    standardized_data = increment / std
+    increment = data #- mu
+    standardized_data = increment  # / std
+    breakpoint()
 
     if mode == 'global':
 
         # Pressure filter
         if pressure_filter is not None:
-            mu = mu[:, :, pressure_filter]
-            std = std[:, :, pressure_filter]
-            standardized_data = standardized_data[:, :, pressure_filter]
+            data = data[:, pressure_filter]
+            mu = mu[:, pressure_filter]
+            std = std[:, pressure_filter]
+            standardized_data = standardized_data[:, pressure_filter]
 
         # Flatten: (N, V*L)
         pca = PCA().fit(standardized_data.reshape(n_samples, -1))
@@ -236,6 +238,7 @@ def project_pca(input: DictConfig, output: DictConfig, mode='global', n_comp: in
 
         # Load data
         logger.info("Loading data...")
+        # data = load_var_and_normalize(input.data)
         data = load_var_and_normalize(input.data)
 
         # Project data
@@ -303,7 +306,7 @@ def compute_pca(input: DictConfig, output: DictConfig, mode: str='global', n_com
         data=data,
         mode=input.get('mode', mode),
         n_comp=input.get('n_comp', n_comp),
-        pressure_filter=pressure_filter
+        pressure_filter=instantiate(pressure_filter) if pressure_filter is not None else None,
     )
 
     # Save statistics to file
@@ -311,6 +314,7 @@ def compute_pca(input: DictConfig, output: DictConfig, mode: str='global', n_com
     if hasattr(output, 'save'):
         save_func = instantiate(output.save)
         save_func(pca_buffs)
+    breakpoint()
 
     return
 

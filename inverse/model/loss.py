@@ -628,7 +628,7 @@ class VarLoss(torch.nn.Module):
         self.sobolev_loss_fn = SobolevRegularization(input_keys=['lat', 'lon', 'scans', 'pressure'])
         # Pressure mask per profile type
         self.pressure_filter = torch.from_numpy(pressure_filter) \
-            if pressure_filter is not None and ~pressure_filter.sum() == 0 else None
+            if pressure_filter is not None else None
         # Clear-sky filtering
         self.clear_sky = clear_sky
         if prof_pred is not None:

@@ -22,7 +22,7 @@ task_name: "inverse_operator_scene_cloud"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "phys_0004"
+  run_id: "phys_0008"
   data_dir: ../scene_cloud_${data.dtype}
 
 # Trainer configuration
@@ -37,7 +37,7 @@ trainer:
 # Callbacks
 callbacks:
   early_stopping:
-    patience: 501  # Number of epochs with no improvement after which training will be stopped
+    patience: 101  # Number of epochs with no improvement after which training will be stopped
 
 # Preparation configuration
 preparation:
@@ -47,7 +47,7 @@ preparation:
     data:
       # Output path for statistics
       output:
-        path: ${paths.data_dir}/normalization/statistics.pkl
+        path: ../scene_clouds_float32/normalization/statistics_clouds.pkl
 
 # Data configuration
 data:
@@ -63,22 +63,24 @@ data:
         prof:
           # Normalization function and parameters
           normalization:
-            _target_: data.transformations.min_max
+            _target_: data.transformations.mean_stdev
             _partial_: true
             stats:
               _target_: data.statistics.read_statistics_var
               path: ${preparation.statistics.data.output.path}
               var: 'prof'
               dtype: ${data.dtype}
-            axis: 1
+            axis: null
         # Brightness temperatures
         hofx:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_v8.npy
+            path: ${....dir}/predict_hofx_meanstdev_null.npy
         # Atmospheric profiles
         prof_background:
+          load:
+            path: ${....dir}/prof_background8.npy
           normalization: ${data.stage.train.vars.prof.normalization}
 
     # Validation set
@@ -96,9 +98,11 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_v8.npy
+            path: ${....dir}/predict_hofx_meanstdev_null.npy
         # Atmospheric profiles
         prof_background:
+          load:
+            path: ${....dir}/prof_background8.npy
           normalization: ${data.stage.train.vars.prof.normalization}
     # Test set
     test:
@@ -115,9 +119,11 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_v8.npy
+            path: ${....dir}/predict_hofx_meanstdev_null.npy
         # Atmospheric profiles
         prof_background:
+          load:
+            path: ${....dir}/prof_background8.npy
           normalization: ${data.stage.train.vars.prof.normalization}
 
 # Loader configuration
@@ -152,8 +158,8 @@ model:
       # Function
       _target_: inverse.model.loss.ForwardModel
       # Configuration of the forward model
-      checkpoint_path: 'forward/model/checkpoints/model_v8.ckpt'
-      config_path: 'model/forward_emulator_smooth.yaml'
+      checkpoint_path: '../forward_outputs/forward_emulator_norm/checkpoints/meanstdev_null/model.ckpt'
+      config_path: 'model/forward_emulator.yaml'
       # Precision
       dtype: ${data.dtype}
       # Normalization for the profile variables
@@ -161,7 +167,7 @@ model:
     # Weights for observation (obs), model, and boundary condition (bcs) errors
     lambda_obs: 0.
     lambda_model: 1.
-    lambda_bcs: 0.
+    lambda_bcs: 1.
     lambda_sobolev: 0.
     # forward_channels: [0, 4, 5, 6, 7, 8, 9]
     clear_sky: false
@@ -173,13 +179,13 @@ model:
       _target_: inverse.model.loss.QuadraticForm
       matrix:
         _target_: data.pca.load_pca_buffers
-        path: ../scene_clouds_float32/normalization/pca.pkl
+        path: ../scene_clouds_float32/normalization/pca_clouds_pressure8.pkl
         buffer: 'B_inv'
     # Loss term for boundary conditions
     loss_bcs:
       _target_: inverse.model.loss.MSE
     # Pressure filter: Consider only pressure levels with non-zero variance (for model and bcs errors)
-    # pressure_filter: ${data.pressure_filter.load}
+    pressure_filter: ${data.pressure_filter.load}
   # Architecture components
   architecture:
     # Positional encoding
@@ -245,7 +251,7 @@ model:
       out_features: 1
       layernorm: ${model.architecture.input_layer.layernorm}
       activation:
-        _target_: torch.nn.Sigmoid
+        _target_: torch.nn.Identity
       dropout_rate: 0.0
       init_func:
         _target_: inverse.model.model.SwishInit

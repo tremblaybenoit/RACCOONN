@@ -634,11 +634,14 @@ def compute_statistics(input: DictConfig, output: DictConfig = None, batch_size:
         # If the variable contains multiple datasets
         elif isinstance(input[variable], ListConfig):
             # Loop through each dataset
+            data = []  # Free memory after processing the variable
             for d, dataset in enumerate(input[variable]):
                 logger.info(f"  Dataset {d + 1}/{len(input[variable])}...")
-                stats_d = stream_statistics(dataset, batch_size=batch_size)
+                # stats_d = stream_statistics(dataset, batch_size=batch_size)
                 # Accumulate statistics
-                stats[variable] = stats_d if d == 0 else accumulate_statistics([stats[variable], stats_d])
+                # stats[variable] = stats_d if d == 0 else accumulate_statistics([stats[variable], stats_d])
+                data.append(load_var(dataset))
+            stats[variable] = statistics(np.concatenate(data, axis=0), axis=0)
         else:
             raise TypeError("Input variable configuration must be either a DictConfig or a ListConfig.")
 
