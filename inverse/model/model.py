@@ -954,6 +954,37 @@ class PINNverseOperator(BaseModel):
             self.log(f"{stage}_loss_sobolev", loss['sobolev'].mean(), on_epoch=True, prog_bar=False, logger=logger_flag)
 
 
+class PINNverseOperatorP(PINNverseOperator):
+
+    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
+        """ Perform training/validation/test step.
+
+            Parameters
+            ----------
+            batch: tensor. Batch from the training set.
+            batch_nb: int. Index of the batch out of the training set.
+            stage: str. Current operation: "train", "valid", or "test".
+
+            Returns
+            -------
+            Loss value: tensor.
+        """
+
+        # Compute profiles
+
+        # Compute profiles
+        pred = {'prof': self.forward(batch['input']).contiguous()}
+
+        # Compute loss function
+        loss, pred['hofx'] = self.loss_func(pred, batch['target'], batch['input'])
+        detached_loss = {k: v.detach().item() if v.ndim == 0 else v.detach() for k, v in loss.items()}
+
+        # Logging
+        self._logging(stage, detached_loss, batch['input'], batch['target'], {k: v.detach() for k, v in pred.items()})
+
+        return loss['total']
+
+
 class PINNverseOperatorPCA(PINNverseOperator):
     def __init__(self, pca_buffers: DictConfig, optimizer: DictConfig = None, loss_func: DictConfig = None,
                  lr_scheduler: DictConfig = None, architecture: DictConfig = None,

@@ -521,7 +521,7 @@ class ForwardModel(torch.nn.Module):
         """
 
         # Apply the forward model to the prediction
-        input = {'prof': pred if self.prof_norm is None else self.prof_norm(pred),
+        input = {'prof': pred if self.prof_norm is None else self.prof_norm(pred.clone()),
                  'surf': target['surf'], 'meta': target['meta']}
         forward_pred = self.forward_model(input)
 
@@ -629,6 +629,7 @@ class VarLoss(torch.nn.Module):
         # Pressure mask per profile type
         self.pressure_filter = torch.from_numpy(pressure_filter) \
             if pressure_filter is not None else None
+        self.pressure_mask = torch.from_numpy(pressure_filter.astype('float32')) if pressure_filter is not None else None
         # Clear-sky filtering
         self.clear_sky = clear_sky
         if prof_pred is not None:
@@ -655,6 +656,7 @@ class VarLoss(torch.nn.Module):
         # Mask
         if self.pressure_filter is not None:
             pressure_filter = self.pressure_filter
+            # pred['prof'][:, ~pressure_filter] = target['prof_background'][:, ~pressure_filter]
         else:
             pressure_filter = torch.ones_like(pred['prof'], dtype=torch.bool, device=pred['prof'].device)
 

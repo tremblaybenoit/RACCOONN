@@ -116,8 +116,8 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270, 
     # Standardize
     mu = np.mean(data, axis=0, keepdims=True)  # (V, L)
     std = np.std(data, axis=0, keepdims=True) + 1e-12  # (V, L)
-    increment = data #- mu
-    standardized_data = increment  # / std
+    increment = data - mu
+    standardized_data = increment  / std
     breakpoint()
 
     if mode == 'global':
@@ -157,6 +157,15 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270, 
         # If we assume that the background is the mean, then the standardizedf data is the increment, and the covariance matrix is the covariance of the standardized data, which is the identity matrix.
         # The pseudo-inverse of the identity matrix is itself, so we can compute the pseudo-inverse of the covariance matrix in the PCA space as follows:
         B_pca_inv = pca.components_.T @ np.diag(1.0/pca.explained_variance_) @ pca.components_
+        # Create a flexible gridspec
+        fig, get_axes = flexible_gridspec(cell_widths=[4.0], cell_heights=[4.0],
+                                          lefts=[1.00], rights=[1.00], bottoms=[1.00], tops=[1.00])
+        ax = get_axes(0, 0)
+        # Plot covariance matrix
+        plot_map(ax, B_pca_inv, title=f"Inverse covariance matrix", plt_origin='upper',
+                 cb_label=r'Values (divided by 10$^4$)')
+        save_plot(fig, filename='B_inv.png')
+
         # Store PCA buffers in a dictionary
         pca_buffs = {
             'n_comp': n_comp,
