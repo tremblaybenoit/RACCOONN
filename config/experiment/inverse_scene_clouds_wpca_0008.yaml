@@ -68,11 +68,11 @@ preparation:
               - ${data.stage.train.vars.prof}
               - ${data.stage.valid.vars.prof}
               - ${data.stage.test.vars.prof}
-        n_comp: 502  # Number of PCA components to keep
+        mode: multivariate
       # What the method produces as output (pickle file)
       output:
         # File path to save/load the PCA object
-        path: ${paths.data_dir}/normalization/pca_clouds_pressure8.pkl
+        path: ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
         # Save function
         save:
           _target_: data.io.save_pkl
@@ -92,18 +92,18 @@ preparation:
       input:
         pca_buffers:
           # File path to save/load the PCA object
-          path: ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+          path: ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
         # Profile data to project
         data:
           load:
@@ -114,7 +114,7 @@ preparation:
       output:
         pca:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Train2/pca_prof_clouds_pressure.npy
+          path: ${paths.data_dir}/Train2/pca_prof_clouds_p_${preparation.pca.prof.input.mode}.npy
           # Save function
           save:
             _target_: numpy.save
@@ -130,7 +130,7 @@ preparation:
           normalization: null
         pca_white:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Train2/white_prof_clouds_pressure.npy
+          path: ${paths.data_dir}/Train2/white_prof_clouds_p_${preparation.pca.prof.input.mode}.npy
           # Save function
           save:
             _target_: numpy.save
@@ -152,18 +152,18 @@ preparation:
       input:
         pca_buffers:
           # File path to save/load the PCA object
-          path: ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+          path: ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
         # Profile data to project
         data:
           load:
@@ -174,7 +174,7 @@ preparation:
       output:
         pca:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Val2/pca_prof_clouds_pressure.npy
+          path: ${paths.data_dir}/Val2/pca_prof_clouds_p_${preparation.pca.prof.input.mode}.npy
           # Save function
           save:
             _target_: numpy.save
@@ -190,7 +190,7 @@ preparation:
           normalization: null
         pca_white:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Val2/white_prof_clouds_pressure.npy
+          path: ${paths.data_dir}/Val2/white_prof_clouds_p_${preparation.pca.prof.input.mode}.npy
           # Save function
           save:
             _target_: numpy.save
@@ -212,18 +212,18 @@ preparation:
       input:
         pca_buffers:
           # File path to save/load the PCA object
-          path: ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+          path: ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
           # Profile data to project
         data:
           load:
@@ -234,7 +234,7 @@ preparation:
       output:
         pca:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Test2/pca_prof_clouds_pressure.npy
+          path: ${paths.data_dir}/Test2/pca_prof_clouds_p_${preparation.pca.prof.input.mode}.npy
           # Save function
           save:
             _target_: numpy.save
@@ -250,7 +250,7 @@ preparation:
           normalization: null
         pca_white:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Test2/white_prof_clouds_pressure.npy
+          path: ${paths.data_dir}/Test2/white_prof_clouds_p_${preparation.pca.prof.input.mode}.npy
           # Save function
           save:
             _target_: numpy.save
@@ -272,18 +272,18 @@ preparation:
       input:
         pca_buffers:
           # File path to save/load the PCA object
-          path: ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+          path: ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
         # Profile data to project
         data:
           load:
@@ -294,7 +294,7 @@ preparation:
       output:
         pca:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Train2/pca_prof_background_clouds_pressure.npy
+          path: ${paths.data_dir}/Train2/pca_prof_background_clouds_p_${preparation.pca.prof.input.mode}.npy
           # Save function
           save:
             _target_: numpy.save
@@ -310,7 +310,7 @@ preparation:
           normalization: null
         pca_white:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Train2/white_prof_background_clouds_pressure.npy
+          path: ${paths.data_dir}/Train2/white_prof_background_clouds_p_${preparation.pca.prof.input.mode}.npy
           # Save function
           save:
             _target_: numpy.save
@@ -332,18 +332,18 @@ preparation:
       input:
         pca_buffers:
           # File path to save/load the PCA object
-          path: ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+          path: ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
         # Profile data to project
         data:
           load:
@@ -354,7 +354,7 @@ preparation:
       output:
         pca:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Val2/pca_prof_background_clouds_pressure.npy
+          path: ${paths.data_dir}/Val2/pca_prof_background_clouds_p_${preparation.pca.prof.input.mode}.npy
           # Save function
           save:
             _target_: numpy.save
@@ -370,7 +370,7 @@ preparation:
           normalization: null
         pca_white:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Val2/white_prof_background_clouds_pressure.npy
+          path: ${paths.data_dir}/Val2/white_prof_background_clouds_p_${preparation.pca.prof.input.mode}.npy
           # Save function
           save:
             _target_: numpy.save
@@ -392,18 +392,18 @@ preparation:
       input:
         pca_buffers:
           # File path to save/load the PCA object
-          path: ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+          path: ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
           # Profile data to project
         data:
           load:
@@ -414,7 +414,7 @@ preparation:
       output:
         pca:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Test2/pca_prof_background_clouds_pressure.npy
+          path: ${paths.data_dir}/Test2/pca_prof_background_clouds_p_${preparation.pca.prof.input.mode}.npy
           # Save function
           save:
             _target_: numpy.save
@@ -430,7 +430,7 @@ preparation:
           normalization: null
         pca_white:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Test2/white_prof_background_clouds_pressure.npy
+          path: ${paths.data_dir}/Test2/white_prof_background_clouds_p_${preparation.pca.prof.input.mode}.npy
           # Save function
           save:
             _target_: numpy.save
@@ -485,7 +485,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/white_prof_clouds_pressure.npy
+            path: ${....dir}/white_prof_clouds_p_${preparation.pca.prof.input.mode}.npy
             split: ${....split}
             dtype: ${data.dtype}
           normalization: null
@@ -494,7 +494,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/white_prof_background_clouds_pressure.npy
+            path: ${....dir}/white_prof_background_clouds_p_${preparation.pca.prof.input.mode}.npy
             split: ${....split}
             dtype: ${data.dtype}
           normalization: null
@@ -503,7 +503,7 @@ data:
           # Loading function
           load:
             _target_: data.pca.load_pca_buffers
-            path: ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+            path: ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
             buffer: 'scales_inv'
           normalization: null
     # Validation set
@@ -532,7 +532,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/white_prof_clouds_pressure.npy
+            path: ${....dir}/white_prof_clouds_p_${preparation.pca.prof.input.mode}.npy
             split: ${....split}
             dtype: ${data.dtype}
           normalization: null
@@ -541,7 +541,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/white_prof_background_clouds_pressure.npy
+            path: ${....dir}/white_prof_background_clouds_p_${preparation.pca.prof.input.mode}.npy
             split: ${....split}
             dtype: ${data.dtype}
           normalization: null
@@ -550,7 +550,7 @@ data:
           # Loading function
           load:
             _target_: data.pca.load_pca_buffers
-            path: ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+            path: ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
             buffer: 'scales_inv'
           normalization: null
     # Test set
@@ -579,7 +579,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/white_prof_clouds_pressure.npy
+            path: ${....dir}/white_prof_clouds_p_${preparation.pca.prof.input.mode}.npy
             split: ${....split}
             dtype: ${data.dtype}
           normalization: null
@@ -588,7 +588,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/white_prof_background_clouds_pressure.npy
+            path: ${....dir}/white_prof_background_clouds_p_${preparation.pca.prof.input.mode}.npy
             split: ${....split}
             dtype: ${data.dtype}
           normalization: null
@@ -597,7 +597,7 @@ data:
           # Loading function
           load:
             _target_: data.pca.load_pca_buffers
-            path: ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+            path: ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
             buffer: 'scales_inv'
           normalization: null
 
@@ -627,7 +627,7 @@ model:
   pca_buffers:
     # Load PCA buffers
     _target_: data.pca.load_pca_buffers
-    path: ${paths.data_dir}/normalization/pca_clouds_pressure.pkl
+    path: ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
   # Optimizer function and parameters
   optimizer:
     # Learning rate
@@ -725,7 +725,12 @@ model:
     output_layer:
       _target_: inverse.model.model.LinearBlock
       in_features: ${model.architecture.hidden_layer.out_features}
-      out_features: ${preparation.pca.prof.input.n_comp}
+      out_features:
+        _target_: builtins.int
+        _args_:
+          - _target_: data.pca.load_pca_buffers
+            path: ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+            buffer: 'n_comp'
       layernorm: ${model.architecture.input_layer.layernorm}
       activation:
         _target_: torch.nn.Identity

@@ -72,7 +72,7 @@ preparation:
       # What the method produces as output (pickle file)
       output:
         # File path to save/load the PCA object
-        path: ${paths.data_dir}/normalization/pca_clouds_pressure8.pkl
+        path: ${paths.data_dir}/normalization/pca_clouds_pressure9.pkl
         # Save function
         save:
           _target_: data.io.save_pkl
@@ -461,14 +461,14 @@ data:
           #   path: ../scene_cloud_float32/Train2/prof.npy
           # Normalization function and parameters
           normalization: #null
-            _target_: data.transformations.mean_stdev
+            _target_: data.transformations.min_max
             _partial_: true
             stats:
               _target_: data.statistics.read_statistics_var
               path: ${preparation.statistics.data.output.path}
               var: 'prof'
               dtype: ${data.dtype}
-            axis: null
+            axis: 1
         # Brightness temperatures
         hofx:
           # Loading function

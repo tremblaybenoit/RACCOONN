@@ -41,7 +41,12 @@ parameters:
           - ${data.stage.train.vars.prof.type}
   n_levels: 127
   n_pressure: 127
-  n_comp: ${preparation.pca.prof.input.n_comp}
+  n_comp:
+    _target_: builtins.int
+    _args_:
+      - _target_: data.pca.load_pca_buffers
+        path: ${preparation.pca.prof.output.path}
+        buffer: 'n_comp'
   n_cloud: 0
   # Profile variables (input/output)
   prof_vars: ${data.stage.train.vars.prof.type}

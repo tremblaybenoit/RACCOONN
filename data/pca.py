@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import numpy as np
 import hydra
 from omegaconf import DictConfig
@@ -7,8 +6,9 @@ from utilities.instantiators import instantiate
 from utilities.logic import get_config_path
 import logging
 from sklearn.decomposition import PCA
+from scipy.linalg import block_diag
+import matplotlib.pyplot as plt
 from utilities.plot import plot_map, save_plot, flexible_gridspec
-
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -36,12 +36,7 @@ def load_pca_buffers(path: str, buffer: str=None) -> dict:
         'std': pca_buffers['std'],
         'eigenvalues': pca_buffers['eigenvalues'],
         'scales': pca_buffers['scales'],
-        'scales_z_var': pca_buffers['scales_z_var'],
-        'scales_z_std': pca_buffers['scales_z_std'],
         'basis': pca_buffers['basis'],
-        # 'sym_log_scales': pca_buffers['sym_log_scales'],
-        # 'sym_log_z_var': pca_buffers['sym_log_z_var'],
-        # 'sym_log_z_std': pca_buffers['sym_log_z_std'],
     }
 
 
@@ -93,7 +88,7 @@ class PCAProcessor:
         return (z * self.sigma) + self.mu
 
 
-def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270, pressure_filter: np.ndarray=None) -> dict:
+def generate_pca_buffers(data: np.ndarray, mode: str='global', pressure_filter: np.ndarray=None, alpha: float=1e-5) -> dict:
     """
     Generate PCA buffers for a given dataset.
 
@@ -102,8 +97,8 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270, 
     data: np.ndarray. Input data of shape (N, V, L) where N is the number of samples,
           V is the number of variables, and L is the number of levels.
     mode: str. PCA mode, either 'global' or 'local'.
-    n_comp: int. Number of principal components to retain.
     pressure_filter: np.ndarray. Optional boolean array to filter pressure levels (not used in this implementation).
+    alpha: float. Damping factor for eigenvalues to ensure numerical stability.
 
     Returns
     -------
@@ -117,96 +112,67 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270, 
     mu = np.mean(data, axis=0, keepdims=True)  # (V, L)
     std = np.std(data, axis=0, keepdims=True) + 1e-12  # (V, L)
     increment = data - mu
-    standardized_data = increment  / std
-    breakpoint()
+    standardized_data = increment / std  # (N, V, L)
 
-    if mode == 'global':
+    # Multivariate PCA
+    if mode == 'multivariate':
 
         # Pressure filter
         if pressure_filter is not None:
-            data = data[:, pressure_filter]
             mu = mu[:, pressure_filter]
             std = std[:, pressure_filter]
             standardized_data = standardized_data[:, pressure_filter]
 
-        # Flatten: (N, V*L)
-        pca = PCA().fit(standardized_data.reshape(n_samples, -1))
-        cumulative_variance = np.cumsum(pca.explained_variance_ratio_)
-
-        # Find K for specific thresholds
-        k_99 = np.argmax(cumulative_variance >= 0.999) + 1
-        k_9999 = np.argmax(cumulative_variance >= 0.9999) + 1
-
-        print(f"Components for 99.9% variance: {k_99}")
-        print(f"Components for 99.99% variance: {k_9999}")
-        breakpoint()
-
-        plt.figure(figsize=(10, 4))
-        plt.plot(cumulative_variance)
-        plt.axhline(y=0.999, color='r', linestyle='--')
-        plt.title("Cumulative Explained Variance")
-        plt.xlabel("Number of Components")
-        plt.savefig("cumulative_explained_variance.png")
-        plt.close()
-
         # Decomposition
         flat_z = standardized_data.reshape(n_samples, -1)
-        pca = PCA(n_components=n_comp)
+        pca = PCA(n_components=0.9999)
         pca.fit(flat_z)
         # Compute pseudo-inverse of the covariance matrix
         # If we assume that the background is the mean, then the standardizedf data is the increment, and the covariance matrix is the covariance of the standardized data, which is the identity matrix.
         # The pseudo-inverse of the identity matrix is itself, so we can compute the pseudo-inverse of the covariance matrix in the PCA space as follows:
-        B_pca_inv = pca.components_.T @ np.diag(1.0/pca.explained_variance_) @ pca.components_
-        # Create a flexible gridspec
-        fig, get_axes = flexible_gridspec(cell_widths=[4.0], cell_heights=[4.0],
-                                          lefts=[1.00], rights=[1.00], bottoms=[1.00], tops=[1.00])
-        ax = get_axes(0, 0)
-        # Plot covariance matrix
-        plot_map(ax, B_pca_inv, title=f"Inverse covariance matrix", plt_origin='upper',
-                 cb_label=r'Values (divided by 10$^4$)')
-        save_plot(fig, filename='B_inv.png')
+        max_ev = np.max(pca.explained_variance_)
+        damped_ev = pca.explained_variance_ + alpha * max_ev
+        B_inv = pca.components_.T @ np.diag(1.0/damped_ev) @ pca.components_
+        B_inv += (1.0 / (alpha * max_ev)) * (np.eye(B_inv.shape[0]) - pca.components_.T @ pca.components_)
 
         # Store PCA buffers in a dictionary
         pca_buffs = {
-            'n_comp': n_comp,
+            'n_comp': pca.n_components_,
             'basis': pca.components_,
             'mu': mu.flatten(),
             'std': std.flatten(),
             'eigenvalues': pca.explained_variance_,
             'scales': np.sqrt(pca.explained_variance_),
             'scales_inv': 1.0/np.sqrt(pca.explained_variance_.reshape(1, -1)),
-            'B_inv': B_pca_inv,
+            'B_inv': B_inv,
         }
 
-        # Initialize PCA processor
-        pca_processor = PCAProcessor(pca_buffs)
-        # Data
-        whitened_data = pca_processor.physical_to_whitened(data.reshape(n_samples, -1))
-        # Mean
-        whitened_mu0 = whitened_data.mean(axis=0, keepdims=True)
-        whitened_mu1 = pca_processor.physical_to_whitened(mu.reshape(1, -1))
-        pca_buffs['whitened_mu'] = whitened_mu1
-        pca_buffs['scales_z_var'] = whitened_data.var(axis=0, keepdims=True)
-        pca_buffs['scales_z_std'] = np.sqrt(pca_buffs['scales_z_var'])
-
-        return pca_buffs
-    elif mode == 'local':
+    elif mode == 'univariate':
         # Per variable PCA (with variables in the second dimension)
         pca_buffs = {}
+        B_inv = []
         for v in range(n_vars):
-            pca = PCA()
-            pca.fit(standardized_data[:, v, :])
-            cumulative_variance = np.cumsum(pca.explained_variance_ratio_)
-            # Find K for specific thresholds
-            k_99 = np.argmax(cumulative_variance >= 0.999) + 1
-            k_9999 = np.argmax(cumulative_variance >= 0.9999) + 1
-            print(f"Components for 99.9% variance: {k_99}")
-            print(f"Components for 99.99% variance: {k_9999}")
+
+            # Pressure filter
+            if pressure_filter is not None:
+                mu[:, v] = mu[:, v][pressure_filter[v]]
+                std[:, v] = std[:, v][pressure_filter[v]]
+                standardized_data[:, v] = standardized_data[:, v][:, pressure_filter[v]]
 
             # Decomposition
-            flat_z = standardized_data[:, v, :].reshape(n_samples, -1)
-            pca = PCA(n_components=n_comp)
+            flat_z = standardized_data[:, v].reshape(n_samples, -1)
+            pca = PCA(n_components=0.9999)
             pca.fit(flat_z)
+
+            # Compute pseudo-inverse of the covariance matrix
+            max_ev = np.max(pca.explained_variance_)
+            damped_inv_ev = pca.explained_variance_ + alpha * max_ev
+            B_inv_v = pca.components_.T @ np.diag(1.0/damped_inv_ev) @ pca.components_
+            # Null-space penalty for this variable
+            B_inv_v += (1.0 / (alpha * max_ev)) * (np.eye(n_levels) - pca.components_.T @ pca.components_)
+            B_inv.append(B_inv_v)
+
+            # Store PCA buffers in a dictionary
             pca_buffs[v] = {
                 'basis': pca.components_,
                 'mu': mu[0:1, v],
@@ -214,21 +180,39 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', n_comp: int=270, 
                 'eigenvalues': pca.explained_variance_,
                 'scales': np.sqrt(pca.explained_variance_),
                 'scales_inv': 1.0/np.sqrt(pca.explained_variance_.reshape(1, -1)),
+                'B_inv': B_inv_v,
             }
-        return pca_buffs
+        # Assemble a pseudo-inverse of the covariance matrix for the full state vector by block-diagonalizing the per-variable pseudo-inverses
+        # Assemble Block-Diagonal B_inv
+        pca_buffs['B_inv'] = block_diag(*B_inv)
+
+        # Flattened Mu/Std for easy use in loss function
+        pca_buffs['mu'] = mu.flatten()
+        pca_buffs['std'] = std.flatten()
+
     else:
         raise ValueError(f"Invalid PCA mode: {mode}. Must be 'global' or 'local'.")
 
+    # Create a flexible gridspec
+    fig, get_axes = flexible_gridspec(cell_widths=[4.0], cell_heights=[4.0],
+                                      lefts=[1.00], rights=[1.00], bottoms=[1.00], tops=[1.00])
+    ax = get_axes(0, 0)
+    # Plot covariance matrix
+    plot_map(ax, B_inv, title=f"Inverse covariance matrix", plt_origin='upper',
+             cb_label=r'Values')
+    save_plot(fig, filename='B_inv.png')
 
-def project_pca(input: DictConfig, output: DictConfig, mode='global', n_comp: int=270) -> None:
+    return pca_buffs
+
+
+def project_pca(input: DictConfig, output: DictConfig, mode='multivariate') -> None:
     """ Project data onto PCA basis.
 
         Parameters
         ----------
         input: DictConfig. Main hydra configuration file containing all model hyperparameters.
         output: DictConfig. Output configuration.
-        mode: str. PCA mode, either 'global' or 'local'.
-        n_comp: int. Number of principal components to retain.
+        mode: str. PCA mode, either 'multivariate' or 'univariate'.
 
         Returns
         -------
@@ -240,25 +224,24 @@ def project_pca(input: DictConfig, output: DictConfig, mode='global', n_comp: in
     pca_buffs = instantiate(input.pca_buffers.load)
 
     # Global mode
-    if mode == 'global':
+    if mode == 'multivariate':
 
         # Initialize PCA processor
         pca_processor = PCAProcessor(pca_buffs)
 
         # Load data
         logger.info("Loading data...")
-        # data = load_var_and_normalize(input.data)
         data = load_var_and_normalize(input.data)
 
         # Project data
         logger.info("Projecting data onto PCA basis...")
         n_samples = data.shape[0]
         flat_data = data.reshape(n_samples, -1)
-        standardized_data = pca_processor.physical_to_standardized(flat_data)
-        whitened_data = pca_processor.physical_to_whitened(flat_data)
+        standardized_pca = pca_processor.physical_to_standardized(flat_data)
+        whitened_pca = pca_processor.physical_to_whitened(flat_data)
 
     # Local mode
-    elif mode == 'local':
+    elif mode == 'univariate':
 
         # Load data
         logger.info("Loading data...")
@@ -267,12 +250,14 @@ def project_pca(input: DictConfig, output: DictConfig, mode='global', n_comp: in
         # Project data
         logger.info("Projecting data onto PCA basis...")
         n_samples, n_vars, n_levels = data.shape
-        standardized_data = np.zeros((n_samples, n_vars, n_comp))
-        whitened_data = np.zeros((n_samples, n_vars, n_comp))
+        standardized_pca = []
+        whitened_pca = []
         for v in range(n_vars):
             pca_processor = PCAProcessor(pca_buffs[v])
-            standardized_data[:, v, :] = pca_processor.physical_to_standardized(data[:, v, :])
-            whitened_data[:, v, :] = pca_processor.physical_to_whitened(data[:, v, :])
+            standardized_pca.append(pca_processor.physical_to_standardized(data[:, v, :]))
+            whitened_pca.append(pca_processor.physical_to_whitened(data[:, v, :]))
+        standardized_pca = np.concatenate(standardized_pca, axis=1)
+        whitened_pca = np.concatenate(whitened_pca, axis=1)
 
     else:
         raise ValueError(f"Invalid PCA mode: {mode}. Must be 'global' or 'local'.")
@@ -281,15 +266,15 @@ def project_pca(input: DictConfig, output: DictConfig, mode='global', n_comp: in
     logger.info("Saving data to file...")
     if hasattr(output.pca, 'save'):
         save_func = instantiate(output.pca.save)
-        save_func(standardized_data)
+        save_func(standardized_pca)
     if hasattr(output.pca_white, 'save'):
         save_func = instantiate(output.pca_white.save)
-        save_func(whitened_data)
+        save_func(whitened_pca)
 
     return
 
 
-def compute_pca(input: DictConfig, output: DictConfig, mode: str='global', n_comp: int=270, pressure_filter: np.ndarray = None) -> None:
+def compute_pca(input: DictConfig, output: DictConfig, mode: str='multivariate', pressure_filter: np.ndarray = None) -> None:
     """ Compute pca decomposition of a given dataset.
 
         Parameters
@@ -297,7 +282,6 @@ def compute_pca(input: DictConfig, output: DictConfig, mode: str='global', n_com
         input: DictConfig. Main hydra configuration file containing all model hyperparameters.
         output: DictConfig. Output configuration.
         mode: str. PCA mode, either 'global' or 'local'.
-        n_comp: int. Number of principal components to retain.
         pressure_filter: np.ndarray. Optional boolean array to filter pressure levels.
 
         Returns
@@ -314,8 +298,8 @@ def compute_pca(input: DictConfig, output: DictConfig, mode: str='global', n_com
     pca_buffs = generate_pca_buffers(
         data=data,
         mode=input.get('mode', mode),
-        n_comp=input.get('n_comp', n_comp),
         pressure_filter=instantiate(pressure_filter) if pressure_filter is not None else None,
+        alpha=input.get('alpha', 1e-5)
     )
 
     # Save statistics to file
@@ -324,7 +308,6 @@ def compute_pca(input: DictConfig, output: DictConfig, mode: str='global', n_com
         save_func = instantiate(output.save)
         save_func(pca_buffs)
     breakpoint()
-
     return
 
 
