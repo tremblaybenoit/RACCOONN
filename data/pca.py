@@ -88,7 +88,7 @@ class PCAProcessor:
         return (z * self.sigma) + self.mu
 
 
-def generate_pca_buffers(data: np.ndarray, mode: str='global', pressure_filter: np.ndarray=None, alpha: float=1e-5) -> dict:
+def generate_pca_buffers(data: np.ndarray, mode: str='multivariate', pressure_filter: np.ndarray=None, alpha: float=1e-5) -> dict:
     """
     Generate PCA buffers for a given dataset.
 
@@ -134,6 +134,8 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', pressure_filter: 
         damped_ev = pca.explained_variance_ + alpha * max_ev
         B_inv = pca.components_.T @ np.diag(1.0/damped_ev) @ pca.components_
         B_inv += (1.0 / (alpha * max_ev)) * (np.eye(B_inv.shape[0]) - pca.components_.T @ pca.components_)
+        # Make diagonal-only version in case we want to use it for whitening
+        B_inv_d = np.diag(np.diag(B_inv))
 
         # Store PCA buffers in a dictionary
         pca_buffs = {
@@ -145,6 +147,7 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', pressure_filter: 
             'scales': np.sqrt(pca.explained_variance_),
             'scales_inv': 1.0/np.sqrt(pca.explained_variance_.reshape(1, -1)),
             'B_inv': B_inv,
+            'B_inv_d': B_inv_d,
         }
 
     elif mode == 'univariate':
@@ -155,12 +158,17 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', pressure_filter: 
 
             # Pressure filter
             if pressure_filter is not None:
-                mu[:, v] = mu[:, v][pressure_filter[v]]
-                std[:, v] = std[:, v][pressure_filter[v]]
-                standardized_data[:, v] = standardized_data[:, v][:, pressure_filter[v]]
+                mu_v = mu[:, v][:, pressure_filter[v]]
+                std_v = std[:, v][:, pressure_filter[v]]
+                standardized_data_v = standardized_data[:, v][:, pressure_filter[v]]
+                n_levels = pressure_filter[v].sum()
+            else:
+                mu_v = mu[:, v]
+                std_v = std[:, v]
+                standardized_data_v = standardized_data[:, v]
 
             # Decomposition
-            flat_z = standardized_data[:, v].reshape(n_samples, -1)
+            flat_z = standardized_data_v.reshape(n_samples, -1)
             pca = PCA(n_components=0.9999)
             pca.fit(flat_z)
 
@@ -171,21 +179,24 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', pressure_filter: 
             # Null-space penalty for this variable
             B_inv_v += (1.0 / (alpha * max_ev)) * (np.eye(n_levels) - pca.components_.T @ pca.components_)
             B_inv.append(B_inv_v)
+            # Make diagonal-only version in case we want to use it for whitening
+            B_inv_d = np.diag(np.diag(B_inv_v))
 
             # Store PCA buffers in a dictionary
             pca_buffs[v] = {
                 'basis': pca.components_,
-                'mu': mu[0:1, v],
-                'std': std[0:1, v],
+                'mu': mu_v,
+                'std': std_v,
                 'eigenvalues': pca.explained_variance_,
                 'scales': np.sqrt(pca.explained_variance_),
                 'scales_inv': 1.0/np.sqrt(pca.explained_variance_.reshape(1, -1)),
                 'B_inv': B_inv_v,
+                'B_inv_d': B_inv_d,
             }
         # Assemble a pseudo-inverse of the covariance matrix for the full state vector by block-diagonalizing the per-variable pseudo-inverses
         # Assemble Block-Diagonal B_inv
-        pca_buffs['B_inv'] = block_diag(*B_inv)
-
+        B_inv = block_diag(*B_inv)
+        pca_buffs['B_inv'] = B_inv
         # Flattened Mu/Std for easy use in loss function
         pca_buffs['mu'] = mu.flatten()
         pca_buffs['std'] = std.flatten()
@@ -198,7 +209,7 @@ def generate_pca_buffers(data: np.ndarray, mode: str='global', pressure_filter: 
                                       lefts=[1.00], rights=[1.00], bottoms=[1.00], tops=[1.00])
     ax = get_axes(0, 0)
     # Plot covariance matrix
-    plot_map(ax, B_inv, title=f"Inverse covariance matrix", plt_origin='upper',
+    plot_map(ax, np.abs(B_inv), title=f"Inverse covariance matrix", plt_origin='upper',
              cb_label=r'Values')
     save_plot(fig, filename='B_inv.png')
 
