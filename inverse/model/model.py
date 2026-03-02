@@ -7,6 +7,7 @@ from forward.model.model import BaseModel
 from forward.model.activation import Sine
 from inverse.model.encoding import IdentityPositionalEncoding
 from utilities.instantiators import instantiate
+from data.transformations import mean_stdev, min_max
 
 
 class KaimingInit(nn.Module):
@@ -669,7 +670,7 @@ class HydraResidualMLP(nn.Module):
 class PINNverseOperator(BaseModel):
     """Class for the Physics-Informed Neural Network (PINN) inverse model."""
     def __init__(self, optimizer: DictConfig = None, loss_func: DictConfig = None, lr_scheduler: DictConfig = None,
-                 architecture: DictConfig = None, parameters: DictConfig = None):
+                 architecture: DictConfig = None, parameters: DictConfig = None, transform: DictConfig = None):
         """ Initialize model.
 
         Parameters
@@ -679,6 +680,7 @@ class PINNverseOperator(BaseModel):
         lr_scheduler: Callable. Learning rate scheduler for the model.
         architecture: DictConfig. Configuration for the model architecture.
         parameters: DictConfig. Configuration for the model parameters.
+        transform: DictConfig. Optional transform to apply to the predicted profiles before computing the loss.
 
         Returns
         -------
@@ -714,6 +716,9 @@ class PINNverseOperator(BaseModel):
             output_final_layer=architecture.get('output_final_layer', None),
             output_n_layers=architecture.get('output_n_layers', 1),
         )
+
+        # Optional transform for predicted profiles before computing the loss
+        self.transform = instantiate(transform) if transform is not None else None
 
     def forward(self, x: dict) -> torch.Tensor:
         """ Forward pass through the model.
@@ -956,6 +961,15 @@ class PINNverseOperator(BaseModel):
 
 class PINNverseOperatorP(PINNverseOperator):
 
+    def __init__(self, optimizer: DictConfig = None, loss_func: DictConfig = None, lr_scheduler: DictConfig = None,
+                 architecture: DictConfig = None, parameters: DictConfig = None, transform: DictConfig = None, stats: DictConfig = None):
+
+        # Class inheritance
+        super().__init__(optimizer=optimizer, loss_func=loss_func, lr_scheduler=lr_scheduler,
+                         architecture=architecture, parameters=parameters, transform=transform)
+
+        self.stats = instantiate(stats) if stats is not None else None
+
     def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
         """ Perform training/validation/test step.
 
@@ -971,9 +985,35 @@ class PINNverseOperatorP(PINNverseOperator):
         """
 
         # Compute profiles
-
-        # Compute profiles
         pred = {'prof': self.forward(batch['input']).contiguous()}
+
+        # Apply transform
+        if self.transform is not None:
+            pred['prof_phys'] = self.transform(pred['prof'].clone())
+            pred['prof_target_phys'] = self.transform(batch['target']['prof'].clone())
+            pred['prof_background_phys'] = self.transform(batch['target']['prof_background'].clone())
+        else:
+            pred['prof_phys'] = pred['prof'].clone()
+
+        # Compute normalized and standardized profiles for loss computation if required by the loss function
+        pred['prof_min_max'] = min_max(pred['prof_phys'].clone(), self.stats, axis=None)
+        pred['prof_mean_stdev'] = mean_stdev(pred['prof_phys'].clone(), self.stats, axis=None)
+        pred['prof_background_min_max'] = min_max(pred['prof_background_phys'].clone(), self.stats, axis=None) if 'prof_background_phys' in pred else None
+        pred['prof_background_mean_stdev'] = mean_stdev(pred['prof_background_phys'].clone(), self.stats, axis=None) if 'prof_background_phys' in pred else None
+        pred['prof_target_min_max'] = min_max(pred['prof_target_phys'].clone(), self.stats, axis=None) if 'prof_target_phys' in pred else None
+        pred['prof_target_mean_stdev'] = mean_stdev(pred['prof_target_phys'].clone(), self.stats, axis=None) if 'prof_target_phys' in pred else None
+        pred['prof'] = pred['prof_mean_stdev'].clone()
+        batch['target']['prof_background'] = pred['prof_background_mean_stdev'].clone()
+        batch['target']['prof'] = pred['prof_target_mean_stdev'].clone()
+        # breakpoint()
+        # Print min/max values of the predicted profiles for debugging
+        #for i in range(pred['prof_phys'].shape[1]):
+        #    print(f"{stage}_prof_min_max var_{i} min", pred['prof_min_max'][:, i, :].min(), f"{stage}_prof_min_max var_{i} max", pred['prof_min_max'][:, i, :].max())
+        #    print(f"{stage}_prof_mean_stdev var_{i} min", pred['prof_mean_stdev'][:, i, :].min(), f"{stage}_prof_mean_stdev var_{i} max", pred['prof_mean_stdev'][:, i, :].max())
+        # print(f"{stage}_prof_min_max min", pred['prof_min_max'].min(), f"{stage}_prof_min_max max", pred['prof_min_max'].max())
+        # print(f"{stage}_prof_background_min_max min", pred['prof_background_min_max'].min(), f"{stage}_prof_background_min_max max",
+        #       pred['prof_background_min_max'].max())
+        # breakpoint()
 
         # Compute loss function
         loss, pred['hofx'] = self.loss_func(pred, batch['target'], batch['input'])

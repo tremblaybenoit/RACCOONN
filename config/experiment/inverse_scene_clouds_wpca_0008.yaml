@@ -56,7 +56,7 @@ preparation:
       # Function
       _target_: data.pca.compute_pca
       _recursive_: false  # Do not instantiate nested objects
-      pressure_filter: ${data.pressure_filter.load}
+      # pressure_filter: ${data.pressure_filter.load}
       # What the method needs as input
       input:
         # Profile data to compute PCA on
@@ -68,11 +68,11 @@ preparation:
               - ${data.stage.train.vars.prof}
               - ${data.stage.valid.vars.prof}
               - ${data.stage.test.vars.prof}
-        mode: multivariate
+        mode: univariate
       # What the method produces as output (pickle file)
       output:
         # File path to save/load the PCA object
-        path: ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+        path: ${paths.data_dir}/normalization/pca_clouds_${preparation.pca.prof.input.mode}.pkl
         # Save function
         save:
           _target_: data.io.save_pkl
@@ -460,15 +460,15 @@ data:
           # load:
           #   path: ../scene_cloud_float32/Train2/prof.npy
           # Normalization function and parameters
-          normalization: #null
-            _target_: data.transformations.mean_stdev
-            _partial_: true
-            stats:
-              _target_: data.statistics.read_statistics_var
-              path: ${preparation.statistics.data.output.path}
-              var: 'prof'
-              dtype: ${data.dtype}
-            axis: null
+          normalization: null
+          #  _target_: data.transformations.mean_stdev
+          #  _partial_: true
+          #  stats:
+          #    _target_: data.statistics.read_statistics_var
+          #    path: ${preparation.statistics.data.output.path}
+          #    var: 'prof'
+          #    dtype: ${data.dtype}
+          #  axis: null
         # Brightness temperatures
         hofx:
           # Loading function

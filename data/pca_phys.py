@@ -110,7 +110,7 @@ def generate_pca_buffers(data: np.ndarray, mode: str='multivariate', pressure_fi
 
     # Standardize
     mu = np.mean(data, axis=0, keepdims=True)  # (V, L)
-    std = np.std(data, axis=0, keepdims=True) + 1e-12  # (V, L)
+    std = np.ones_like(mu)  # np.std(data, axis=0, keepdims=True) + 1e-12  # (V, L)
     increment = data - mu
     standardized_data = increment / std  # (N, V, L)
 
@@ -125,15 +125,29 @@ def generate_pca_buffers(data: np.ndarray, mode: str='multivariate', pressure_fi
 
         # Decomposition
         flat_z = standardized_data.reshape(n_samples, -1)
-        pca = PCA(n_components=0.9999)
+        pca = PCA(n_components=flat_z.shape[1])
         pca.fit(flat_z)
+        Q = pca.components_.T  # (n_features, n_features), eigenvectors
+        lambdas = pca.explained_variance_ # eigenvalues
+        cumvar = np.cumsum(pca.explained_variance_ratio_)
+        k_var = np.argmax(cumvar >= 0.999) + 1
+        lambda_max = lambdas[0]
+        eigen_floor = 1e-5
+        k_floor = np.sum(lambdas >= eigen_floor * lambda_max)
+        k = max(k_var, k_floor)
+        Qk = Q[:, :k]  # (n_features, k), leading eigenvectors
+        Lk = np.maximum(lambdas[:k], eigen_floor* lambda_max)  # (k,), leading eigenvalues
+
+        pca = PCA(n_components=k)
+        pca.fit(flat_z)
+
         # Compute pseudo-inverse of the covariance matrix
         # If we assume that the background is the mean, then the standardizedf data is the increment, and the covariance matrix is the covariance of the standardized data, which is the identity matrix.
         # The pseudo-inverse of the identity matrix is itself, so we can compute the pseudo-inverse of the covariance matrix in the PCA space as follows:
         max_ev = np.max(pca.explained_variance_)
         damped_ev = pca.explained_variance_ + alpha * max_ev
-        B_inv = pca.components_.T @ np.diag(1.0/damped_ev) @ pca.components_
-        B_inv += (1.0 / (alpha * max_ev)) * (np.eye(B_inv.shape[0]) - pca.components_.T @ pca.components_)
+        B_inv = (Qk * Lk) @ Qk.T
+        # B_inv += (1.0 / (alpha * max_ev)) * (np.eye(B_inv.shape[0]) - pca.components_.T @ pca.components_)
         # Make diagonal-only version in case we want to use it for whitening
         B_inv_d = np.diag(np.diag(B_inv))
         B_inv_phys = B_inv * np.outer(1.0/std.flatten(), 1.0/std.flatten())
@@ -174,15 +188,28 @@ def generate_pca_buffers(data: np.ndarray, mode: str='multivariate', pressure_fi
 
             # Decomposition
             flat_z = standardized_data_v.reshape(n_samples, -1)
-            pca = PCA(n_components=0.9999)
+            pca = PCA(n_components=flat_z.shape[1])
+            pca.fit(flat_z)
+            Q = pca.components_.T  # (n_features, n_features), eigenvectors
+            lambdas = pca.explained_variance_  # eigenvalues
+            cumvar = np.cumsum(pca.explained_variance_ratio_)
+            k_var = np.argmax(cumvar >= 0.999) + 1
+            lambda_max = lambdas[0]
+            eigen_floor = 1e-5
+            k_floor = np.sum(lambdas >= eigen_floor * lambda_max)
+            k = max(k_var, k_floor)
+            Qk = Q[:, :k]  # (n_features, k), leading eigenvectors
+            Lk = np.maximum(lambdas[:k], eigen_floor* lambda_max)  # (k,), leading eigenvalues
+            pca = PCA(n_components=k)
             pca.fit(flat_z)
 
             # Compute pseudo-inverse of the covariance matrix
             max_ev = np.max(pca.explained_variance_)
             damped_inv_ev = pca.explained_variance_ + alpha * max_ev
-            B_inv_v = pca.components_.T @ np.diag(1.0/damped_inv_ev) @ pca.components_
+            # B_inv_v = pca.components_.T @ np.diag(1.0/damped_inv_ev) @ pca.components_
             # Null-space penalty for this variable
-            B_inv_v += (1.0 / (alpha * max_ev)) * (np.eye(n_levels) - pca.components_.T @ pca.components_)
+            # B_inv_v += (1.0 / (alpha * max_ev)) * (np.eye(n_levels) - pca.components_.T @ pca.components_)
+            B_inv_v = (Qk * Lk) @ Qk.T
             B_inv.append(B_inv_v)
             # Make diagonal-only version in case we want to use it for whitening
             B_inv_d = np.diag(np.diag(B_inv_v))

@@ -22,7 +22,7 @@ task_name: "inverse_operator_scene_cloud"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "phys_0025"
+  run_id: "phys_0025b"
   data_dir: ../scene_cloud_${data.dtype}
 
 # Trainer configuration
@@ -32,7 +32,7 @@ trainer:
   precision: 32  # 32-bit precision
 
 # Initialization
-# init_from_checkpoint: ../inverse_outputs/inverse_operator_scene_cloud/checkpoints/phys_0010/model.ckpt
+init_from_checkpoint: ../inverse_outputs/inverse_operator_scene_cloud/checkpoints/phys_0025/model.ckpt
 
 # Callbacks
 callbacks:
@@ -146,6 +146,7 @@ loader:
 # Model parameters
 model:
   _target_: inverse.model.model.PINNverseOperatorP
+  stats: ${data.stage.train.vars.prof.normalization.stats}
   # Transform
   transform:
     _target_: ${data.stage.train.vars.prof.normalization._target_}
@@ -199,8 +200,8 @@ model:
         axis1: null
         axis2: 1
     # Weights for observation (obs), model, and boundary condition (bcs) errors
-    lambda_obs: 0.
-    lambda_model: 1.
+    lambda_obs: 1.
+    lambda_model: 0.
     lambda_bcs: 1.
     lambda_sobolev: 0.
     # forward_channels: [0, 4, 5, 6, 7, 8, 9]

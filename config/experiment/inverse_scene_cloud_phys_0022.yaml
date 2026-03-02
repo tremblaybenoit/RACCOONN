@@ -17,7 +17,7 @@ defaults:
 # This allows you to overwrite only specified parameters
 
 # Task name. Note that it determines the output directory path
-task_name: "inverse_operator_scene_cloud"  # Experiment
+task_name: "inverse_operator_scene_cloud2"  # Experiment
 
 # Run id (unique identifier for the run)
 paths:
@@ -70,7 +70,7 @@ data:
               path: ${preparation.statistics.data.output.path}
               var: 'prof'
               dtype: ${data.dtype}
-            axis: 1
+            axis: null
         # Brightness temperatures
         hofx:
           # Loading function
@@ -133,6 +133,15 @@ loader:
 
 # Model parameters
 model:
+  _target_: inverse.model.model.PINNverseOperatorP
+  stats: ${data.stage.train.vars.prof.normalization.stats}
+  # Transform
+  transform:
+    _target_: ${data.stage.train.vars.prof.normalization._target_}
+    _partial_: true
+    stats: ${data.stage.train.vars.prof.normalization.stats}
+    axis: ${data.stage.train.vars.prof.normalization.axis}
+    inverse_transform: true
   # Optimizer function and parameters
   optimizer:
     # Learning rate
@@ -152,7 +161,7 @@ model:
   # Loss function and parameters
   loss_func:
     # Function
-    _target_: inverse.model.loss.VarLoss # Load loss function
+    _target_: inverse.model.loss.VarLossP # Load loss function
     # Forward model to compute the model equivalent of the observations
     forward_model:
       # Function
@@ -164,20 +173,14 @@ model:
       dtype: ${data.dtype}
       # Normalization for the profile variables
       prof_norm:
-        _target_: data.transformations.min_max_to_min_max
+        _target_: data.transformations.min_max
         _partial_: true
-        stats1:
-          _target_: data.statistics.read_statistics_var
-          path: ${preparation.statistics.data.output.path}
-          var: 'prof'
-          dtype: ${data.dtype}
-        stats2:
+        stats:
           _target_: data.statistics.read_statistics_var
           path: ../data_float32/normalization/statistics.pkl
           var: 'prof'
           dtype: ${data.dtype}
-        axis1: 1
-        axis2: 1
+        axis: 1
     # Weights for observation (obs), model, and boundary condition (bcs) errors
     lambda_obs: 0.
     lambda_model: 1.
@@ -193,7 +196,7 @@ model:
       _target_: inverse.model.loss.MSE
     #  matrix:
     #    _target_: data.pca.load_pca_buffers
-    #    path: ../scene_clouds_float32/normalization/pca_clouds_pressure8.pkl
+    #    path: ../scene_clouds_float32/normalization/pca_clouds_p_multivariate.pkl
     #    buffer: 'B_inv'
     # Loss term for boundary conditions
     loss_bcs:
@@ -217,7 +220,7 @@ model:
                 - ${model.parameters.n_pressure}
                 - ${model.parameters.n_cloud}
       # [Lat, Lon, Scans, Pressure]
-      sigma_per_dim: [ 1.0, 1.0, 30.0]
+      sigma_per_dim: [ 1.0, 1.0, 1.0]
     # Input layer
     input_layer:
       _target_: inverse.model.model.LinearBlock
@@ -276,4 +279,4 @@ model:
 logger:
   # MLflow logger
   ports:
-    mlflow: 5018
+    mlflow: 5019
