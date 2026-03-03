@@ -81,7 +81,7 @@ preparation:
       output:
         pca:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Train2/pca_prof_clouds_univariate.npy
+          path: ${paths.data_dir}/Train2/pca_prof_clouds_univariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -97,7 +97,7 @@ preparation:
           normalization: null
         pca_white:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Train2/white_prof_clouds_univariate.npy
+          path: ${paths.data_dir}/Train2/white_prof_clouds_univariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -141,7 +141,7 @@ preparation:
       output:
         pca:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Val2/pca_prof_clouds_univariate.npy
+          path: ${paths.data_dir}/Val2/pca_prof_clouds_univariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -157,7 +157,7 @@ preparation:
           normalization: null
         pca_white:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Val2/white_prof_clouds_univariate.npy
+          path: ${paths.data_dir}/Val2/white_prof_clouds_univariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -201,7 +201,7 @@ preparation:
       output:
         pca:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Test2/pca_prof_clouds_univariate.npy
+          path: ${paths.data_dir}/Test2/pca_prof_clouds_univariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -217,7 +217,7 @@ preparation:
           normalization: null
         pca_white:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Test2/white_prof_clouds_univariate.npy
+          path: ${paths.data_dir}/Test2/white_prof_clouds_univariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -261,7 +261,7 @@ preparation:
       output:
         pca:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Train2/pca_prof_background_clouds_univariate.npy
+          path: ${paths.data_dir}/Train2/pca_prof_background_clouds_univariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -277,7 +277,7 @@ preparation:
           normalization: null
         pca_white:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Train2/white_prof_background_clouds_univariate.npy
+          path: ${paths.data_dir}/Train2/white_prof_background_clouds_univariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -321,7 +321,7 @@ preparation:
       output:
         pca:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Val2/pca_prof_background_clouds_univariate.npy
+          path: ${paths.data_dir}/Val2/pca_prof_background_clouds_univariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -337,7 +337,7 @@ preparation:
           normalization: null
         pca_white:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Val2/white_prof_background_clouds_univariate.npy
+          path: ${paths.data_dir}/Val2/white_prof_background_clouds_univariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -381,7 +381,7 @@ preparation:
       output:
         pca:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Test2/pca_prof_background_clouds_univariate.npy
+          path: ${paths.data_dir}/Test2/pca_prof_background_clouds_univariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -397,7 +397,7 @@ preparation:
           normalization: null
         pca_white:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Test2/white_prof_background_clouds_univariate.npy
+          path: ${paths.data_dir}/Test2/white_prof_background_clouds_univariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -452,7 +452,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/white_prof_clouds_univariate.npy
+            path: ${....dir}/white_prof_clouds_univariate_10.npy
             split: ${....split}
             dtype: ${data.dtype}
           normalization: null
@@ -461,7 +461,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/white_prof_background_clouds_univariate.npy
+            path: ${....dir}/white_prof_background_clouds_univariate_10.npy
             split: ${....split}
             dtype: ${data.dtype}
           normalization: null
@@ -499,7 +499,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/white_prof_clouds_univariate.npy
+            path: ${....dir}/white_prof_clouds_univariate_10.npy
             split: ${....split}
             dtype: ${data.dtype}
           normalization: null
@@ -508,7 +508,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/white_prof_background_clouds_univariate.npy
+            path: ${....dir}/white_prof_background_clouds_univariate_10.npy
             split: ${....split}
             dtype: ${data.dtype}
           normalization: null
@@ -546,7 +546,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/white_prof_clouds_univariate.npy
+            path: ${....dir}/white_prof_clouds_univariate_10.npy
             split: ${....split}
             dtype: ${data.dtype}
           normalization: null
@@ -555,7 +555,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/white_prof_background_clouds_univariate.npy
+            path: ${....dir}/white_prof_background_clouds_univariate_10.npy
             split: ${....split}
             dtype: ${data.dtype}
           normalization: null

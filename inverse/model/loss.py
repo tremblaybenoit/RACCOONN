@@ -772,6 +772,7 @@ class VarLossP(VarLoss):
             pressure_filter = self.pressure_filter
             pred['prof'][:, ~pressure_filter] = target['prof_background'][:, ~pressure_filter]
             pred['prof_phys'][:, ~pressure_filter] = pred['prof_background_phys'][:, ~pressure_filter]
+            pred['prof_min_max'][:, ~pressure_filter] = pred['prof_background_min_max'][:, ~pressure_filter]
             pred['prof_mean_stdev'][:, ~pressure_filter] = pred['prof_background_mean_stdev'][:, ~pressure_filter]
         else:
             pressure_filter = torch.ones_like(pred['prof_phys'], dtype=torch.bool, device=pred['prof_phys'].device)
@@ -787,7 +788,7 @@ class VarLossP(VarLoss):
             pred_prof[:, 8:9, ...] = pred['prof'][:, 2:3, :]  #  Ozone mixing ratio
             hofx_pred = self.forward_model(pred_prof, target)
         else:
-            hofx_pred = self.forward_model(pred['prof_phys'], target)
+            hofx_pred = self.forward_model(pred['prof_min_max'], target)
 
         # Initialize loss dictionary
         loss = {}

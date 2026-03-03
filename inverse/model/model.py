@@ -962,13 +962,17 @@ class PINNverseOperator(BaseModel):
 class PINNverseOperatorP(PINNverseOperator):
 
     def __init__(self, optimizer: DictConfig = None, loss_func: DictConfig = None, lr_scheduler: DictConfig = None,
-                 architecture: DictConfig = None, parameters: DictConfig = None, transform: DictConfig = None, stats: DictConfig = None):
+                 architecture: DictConfig = None, parameters: DictConfig = None, transform: DictConfig = None, stats: DictConfig = None,
+                 sigmoid: bool = False, min_max: bool = True):
 
         # Class inheritance
         super().__init__(optimizer=optimizer, loss_func=loss_func, lr_scheduler=lr_scheduler,
                          architecture=architecture, parameters=parameters, transform=transform)
 
+        self.min_max = min_max
         self.stats = instantiate(stats) if stats is not None else None
+        self.sigmoid = sigmoid
+        self.sigmoid_stats = {'min': (self.stats['min'] - self.stats['mean']) / self.stats['stdev'], 'max': (self.stats['max'] - self.stats['mean'])/ self.stats['stdev']}
 
     def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
         """ Perform training/validation/test step.
@@ -984,27 +988,61 @@ class PINNverseOperatorP(PINNverseOperator):
             Loss value: tensor.
         """
 
-        # Compute profiles
-        pred = {'prof': self.forward(batch['input']).contiguous()}
+        # Norm
+        if self.min_max:
 
-        # Apply transform
-        if self.transform is not None:
-            pred['prof_phys'] = self.transform(pred['prof'].clone())
-            pred['prof_target_phys'] = self.transform(batch['target']['prof'].clone())
-            pred['prof_background_phys'] = self.transform(batch['target']['prof_background'].clone())
+            # Compute profiles
+            pred = {'prof': self.forward(batch['input']).contiguous()}
+
+            # Apply transform
+            if self.transform is not None:
+                pred['prof_phys'] = self.transform(pred['prof'].clone())
+                pred['prof_target_phys'] = self.transform(batch['target']['prof'].clone())
+                pred['prof_background_phys'] = self.transform(batch['target']['prof_background'].clone())
+            else:
+                pred['prof_phys'] = pred['prof'].clone()
+
+            pred['prof_min_max'] = pred['prof'].clone()
+            pred['prof_mean_stdev'] = mean_stdev(pred['prof_phys'].clone(), self.stats, axis=None)
+            pred['prof_background_min_max'] = batch['target']['prof_background'].clone()
+            pred['prof_background_mean_stdev'] = mean_stdev(pred['prof_background_phys'].clone(), self.stats, axis=None)
+            pred['prof_target_min_max'] = batch['target']['prof'].clone()
+            pred['prof_target_mean_stdev'] = mean_stdev(pred['prof_target_phys'].clone(), self.stats, axis=None)
+
+            pred['prof'] = pred['prof_mean_stdev'].clone()
+            batch['target']['prof_background'] = pred['prof_background_mean_stdev'].clone()
+            batch['target']['prof'] = pred['prof_target_mean_stdev'].clone()
         else:
-            pred['prof_phys'] = pred['prof'].clone()
 
-        # Compute normalized and standardized profiles for loss computation if required by the loss function
-        pred['prof_min_max'] = min_max(pred['prof_phys'].clone(), self.stats, axis=None)
-        pred['prof_mean_stdev'] = mean_stdev(pred['prof_phys'].clone(), self.stats, axis=None)
-        pred['prof_background_min_max'] = min_max(pred['prof_background_phys'].clone(), self.stats, axis=None) if 'prof_background_phys' in pred else None
-        pred['prof_background_mean_stdev'] = mean_stdev(pred['prof_background_phys'].clone(), self.stats, axis=None) if 'prof_background_phys' in pred else None
-        pred['prof_target_min_max'] = min_max(pred['prof_target_phys'].clone(), self.stats, axis=None) if 'prof_target_phys' in pred else None
-        pred['prof_target_mean_stdev'] = mean_stdev(pred['prof_target_phys'].clone(), self.stats, axis=None) if 'prof_target_phys' in pred else None
-        pred['prof'] = pred['prof_mean_stdev'].clone()
-        batch['target']['prof_background'] = pred['prof_background_mean_stdev'].clone()
-        batch['target']['prof'] = pred['prof_target_mean_stdev'].clone()
+            # Compute profiles
+            if self.sigmoid:
+                raw_out = self.forward(batch['input']).contiguous()
+                sig_out = torch.sigmoid(raw_out)
+                prof_minmax = min_max(sig_out.clone(), self.sigmoid_stats, axis=None)
+                pred = {'prof': prof_minmax}
+                # pred = {'prof': min_max(torch.sigmoid(self.forward(batch['input']).contiguous().clone()), self.sigmoid_stats, axis=None)}
+            else:
+                pred = {'prof': self.forward(batch['input']).contiguous()}
+
+            # Apply transform
+            if self.transform is not None:
+                pred['prof_phys'] = self.transform(pred['prof'].clone())
+                pred['prof_target_phys'] = self.transform(batch['target']['prof'].clone())
+                pred['prof_background_phys'] = self.transform(batch['target']['prof_background'].clone())
+            else:
+                pred['prof_phys'] = pred['prof'].clone()
+
+            # Compute normalized and standardized profiles for loss computation if required by the loss function
+            pred['prof_min_max'] = min_max(pred['prof_phys'].clone(), self.stats, axis=1)
+            pred['prof_mean_stdev'] = pred['prof'].clone()
+            pred['prof_background_min_max'] = min_max(pred['prof_background_phys'].clone(), self.stats, axis=1)
+            pred['prof_background_mean_stdev'] = batch['target']['prof_background'].clone()
+            pred['prof_target_min_max'] = min_max(pred['prof_target_phys'].clone(), self.stats, axis=1)
+            pred['prof_target_mean_stdev'] = batch['target']['prof'].clone()
+
+            pred['prof'] = pred['prof_min_max'].clone()
+            batch['target']['prof_background'] = pred['prof_background_min_max'].clone()
+            batch['target']['prof'] = pred['prof_target_min_max'].clone()
         # breakpoint()
         # Print min/max values of the predicted profiles for debugging
         #for i in range(pred['prof_phys'].shape[1]):

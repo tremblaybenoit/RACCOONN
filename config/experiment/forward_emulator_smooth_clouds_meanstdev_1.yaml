@@ -88,7 +88,7 @@ data:
     # Prediction set
     predict:
       # Directory
-      dir: ../scene_cloud_float32/Test2
+      dir: ../scene_cloud_float32/Train2
       # Variables
       vars:
         # Atmospheric profiles
@@ -106,7 +106,7 @@ loader:
     predict:
       results:
         hofx:
-          path: ${data.stage.predict.dir}/predict_hofx_meanstdev_null.npy
+          path: ${data.stage.predict.dir}/predict_hofx_clouds_meanstdev_1.npy
 
 # Model parameters
 model:
