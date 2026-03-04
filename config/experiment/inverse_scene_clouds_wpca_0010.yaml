@@ -59,18 +59,18 @@ preparation:
       input:
         pca_buffers:
           # File path to save/load the PCA object
-          path: ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+          path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
         # Profile data to project
         data:
           load:
@@ -119,18 +119,18 @@ preparation:
       input:
         pca_buffers:
           # File path to save/load the PCA object
-          path: ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+          path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
         # Profile data to project
         data:
           load:
@@ -179,18 +179,18 @@ preparation:
       input:
         pca_buffers:
           # File path to save/load the PCA object
-          path: ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+          path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
           # Profile data to project
         data:
           load:
@@ -239,18 +239,18 @@ preparation:
       input:
         pca_buffers:
           # File path to save/load the PCA object
-          path: ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+          path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
         # Profile data to project
         data:
           load:
@@ -299,18 +299,18 @@ preparation:
       input:
         pca_buffers:
           # File path to save/load the PCA object
-          path: ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+          path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
         # Profile data to project
         data:
           load:
@@ -359,18 +359,18 @@ preparation:
       input:
         pca_buffers:
           # File path to save/load the PCA object
-          path: ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+          path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
           # Profile data to project
         data:
           load:
@@ -470,7 +470,7 @@ data:
           # Loading function
           load:
             _target_: data.pca.load_pca_buffers
-            path: ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+            path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
             buffer: 'scales_inv'
           normalization: null
     # Validation set
@@ -517,7 +517,7 @@ data:
           # Loading function
           load:
             _target_: data.pca.load_pca_buffers
-            path: ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+            path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
             buffer: 'scales_inv'
           normalization: null
     # Test set
@@ -564,7 +564,7 @@ data:
           # Loading function
           load:
             _target_: data.pca.load_pca_buffers
-            path: ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+            path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
             buffer: 'scales_inv'
           normalization: null
 
@@ -594,7 +594,7 @@ model:
   pca_buffers:
     # Load PCA buffers
     _target_: data.pca.load_pca_buffers
-    path: ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+    path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
   # Optimizer function and parameters
   optimizer:
     # Learning rate
@@ -696,7 +696,7 @@ model:
         _target_: builtins.int
         _args_:
           - _target_: data.pca.load_pca_buffers
-            path: ../scene_clouds_float32/normalization/pca_clouds_univariate.pkl
+            path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
             buffer: 'n_comp'
       layernorm: ${model.architecture.input_layer.layernorm}
       activation:

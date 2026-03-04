@@ -22,7 +22,7 @@ task_name: "inverse_operator_scenes_cloud"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "wpca_0008"
+  run_id: "wpca_0018"
   data_dir: ../scene_clouds_${data.dtype}
 
 # Trainer configuration
@@ -54,7 +54,7 @@ preparation:
     # Atmospheric profiles
     prof:
       # Function
-      _target_: data.pca.compute_pca
+      _target_: data.pca_phys.compute_pca
       _recursive_: false  # Do not instantiate nested objects
       # pressure_filter: ${data.pressure_filter.load}
       # What the method needs as input
@@ -72,7 +72,7 @@ preparation:
       # What the method produces as output (pickle file)
       output:
         # File path to save/load the PCA object
-        path: ${paths.data_dir}/normalization/pca_clouds_${preparation.pca.prof.input.mode}_10.pkl
+        path: ${paths.data_dir}/normalization/pca_clouds_${preparation.pca.prof.input.mode}_18.pkl
         # Save function
         save:
           _target_: data.io.save_pkl

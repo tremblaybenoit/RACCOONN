@@ -246,6 +246,7 @@ class QuadraticForm(torch.nn.Module):
         """
         super().to(device)
         self.matrix = self.matrix.to(device)
+
         return self
 
     def __call__(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:

@@ -36,6 +36,8 @@ trainer:
 
 # Callbacks
 callbacks:
+  figure_logger:
+    save_every_n_epochs: 10
   early_stopping:
     patience: 101  # Number of epochs with no improvement after which training will be stopped
 
@@ -185,11 +187,11 @@ model:
       _target_: inverse.model.loss.MSE
     # Loss term for model variables
     loss_model:
-      _target_: inverse.model.loss.QuadraticForm
-      matrix:
-        _target_: data.pca.load_pca_buffers
-        path: ../scene_clouds_float32/normalization/pca_clouds_p_univariate_10.pkl
-        buffer: 'B_inv'
+      _target_: inverse.model.loss.MSE
+    #   matrix:
+    #     _target_: data.pca.load_pca_buffers
+    #     path: ../scene_clouds_float32/normalization/pca_clouds_p_univariate_10.pkl
+    #     buffer: 'B_inv'
     # Loss term for boundary conditions
     loss_bcs:
       _target_: inverse.model.loss.MSE
@@ -212,7 +214,7 @@ model:
                 - ${model.parameters.n_pressure}
                 - ${model.parameters.n_cloud}
       # [Lat, Lon, Scans, Pressure]
-      sigma_per_dim: [ 1.0, 1.0, 1.0]
+      sigma_per_dim: [ 1.0, 1.0, 30.0]
     # Input layer
     input_layer:
       _target_: inverse.model.model.LinearBlock
@@ -221,7 +223,7 @@ model:
       layernorm:
         _target_: torch.nn.Identity
       activation:
-        _target_: forward.model.activation.NonLearnableSwish
+        _target_: forward.model.activation.SuperLearnableSwish
         in_features: ${model.architecture.hidden_layer.in_features}
       dropout_rate: 0.1
       init_func:

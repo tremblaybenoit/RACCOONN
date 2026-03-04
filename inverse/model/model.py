@@ -8,6 +8,7 @@ from forward.model.activation import Sine
 from inverse.model.encoding import IdentityPositionalEncoding
 from utilities.instantiators import instantiate
 from data.transformations import mean_stdev, min_max
+import numpy as np
 
 
 class KaimingInit(nn.Module):
@@ -36,62 +37,65 @@ class KaimingInit(nn.Module):
 
 
 class SwishInit:
-    """ Swish weights initializer """
+    """
+    Improved Swish weights initializer for Coordinate-based PINNs.
+    Optimized to prevent the 'Flat Start' common in Swish/SiLU networks.
+    """
+
     def __init__(self, is_first_layer: bool = False, is_head: bool = False):
         """
-        Initialize Swish.
+        Initialize SwishInit.
 
         Parameters
         ----------
         is_first_layer: bool. Flag indicating if the module is the first layer.
         is_head: bool. Flag indicating if the module is a head layer.
-
-        Returns
-        -------
-        None.
         """
-
-        # Parameters
         self.is_first_layer = is_first_layer
         self.is_head = is_head
 
     def __call__(self, module):
         """
         Swish weights initialization function.
-
-        Parameters
-        ----------
-        module: nn.Module. The module to initialize.
-
-        Returns
-        -------
-        None.
         """
-
-        # Weight initialization
-        if not hasattr(module, 'weight'):
+        if not hasattr(module, 'weight') or module.weight is None:
             return
 
-        # Weight initialization
         with torch.no_grad():
             dim_in = module.weight.size(1)
 
             if self.is_head:
-                # Use Xavier Uniform for the output to keep predictions centered
+                # Use Xavier Uniform for the output.
+                # This keeps the whitened PCA coefficients centered at zero
+                # while allowing enough range to hit +/- 2.0 std dev.
                 nn.init.xavier_uniform_(module.weight)
+
+            elif self.is_first_layer:
+                # The "SIREN-lite" trick: Initialize the first layer with
+                # a larger uniform range. This ensures the Gaussian Positional
+                # Encoding is 'stretched' across the Swish non-linearity
+                # from Step 0.
+                scale = 1.0 / dim_in
+                nn.init.uniform_(module.weight, -scale, scale)
+
             else:
-                # Kaiming initialization is standard for ReLU/Swish.
-                # Since Swish is "half-linear," we use a gain slightly
-                # different than ReLU (sqrt(2)).
-                # For Swish, 1.0 to 1.4 is usually a sweet spot.
-                gain = 1.0 if self.is_first_layer else 1.2
-                std = gain / torch.sqrt(torch.tensor(float(dim_in)))
+                # For hidden layers, we use a gain of sqrt(2) ~ 1.414.
+                # This treats Swish as a smooth ReLU and maintains activation
+                # variance throughout the Hydra trunk.
+                gain = np.sqrt(2.0)
+                std = gain / np.sqrt(float(dim_in))
                 nn.init.normal_(module.weight, mean=0, std=std)
 
+            # --- Symmetry Breaking for Biases ---
             if hasattr(module, 'bias') and module.bias is not None:
-                # In PINNs, sometimes initializing bias to small random
-                # values helps "break symmetry" faster than zeros.
-                nn.init.zeros_(module.bias)
+                if self.is_head:
+                    # Keep output biases at zero to avoid shifting PCA mean
+                    nn.init.zeros_(module.bias)
+                else:
+                    # Small uniform noise in biases helps the network 'locate'
+                    # features spatially. Without this, all neurons in a layer
+                    # start by doing the exact same thing.
+                    nn.init.uniform_(module.bias, -0.05, 0.05)
 
 
 class XavierInit(nn.Module):
