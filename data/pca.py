@@ -111,8 +111,22 @@ def generate_pca_buffers(data: np.ndarray, mode: str='multivariate', pressure_fi
     # Standardize
     mu = np.mean(data, axis=0, keepdims=True)  # (V, L)
     std = np.std(data, axis=0, keepdims=True) + 1e-12  # (V, L)
+    vmin = np.min(data, axis=0, keepdims=True)
+    vmax = np.max(data, axis=0, keepdims=True)
     increment = data - mu
     standardized_data = increment / std  # (N, V, L)
+
+    # TODO: Filter out [:, 1, 39] > 0. There are bad pixels.
+    # 0: OK
+    # 1:
+    filter1 = data[:, 1, 39] == 0
+    data2 = data[filter1]
+    mu2 = np.mean(data2, axis=0, keepdims=True)  # (V, L)
+    std2 = np.std(data2, axis=0, keepdims=True) + 1e-12  # (V, L)
+    vmin2 = np.min(data2, axis=0, keepdims=True)
+    vmax2 = np.max(data2, axis=0, keepdims=True)
+
+    breakpoint()
 
     # Multivariate PCA
     if mode == 'multivariate':

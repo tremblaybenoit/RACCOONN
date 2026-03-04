@@ -68,7 +68,7 @@ preparation:
               - ${data.stage.train.vars.prof}
               - ${data.stage.valid.vars.prof}
               - ${data.stage.test.vars.prof}
-        mode: univariate
+        mode: multivariate
       # What the method produces as output (pickle file)
       output:
         # File path to save/load the PCA object

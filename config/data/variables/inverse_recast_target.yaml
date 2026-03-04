@@ -104,19 +104,12 @@ prof_background:
 prof_increment:
   # Loading function
   load:
-    _target_: data.covariance.background_increment
-    config_true: ${...prof}  # We use the normalized true profiles
-    config_background: ${...prof_background}  # We use the normalized background profiles
+    _target_: data.io.load_npy
+    path: ${....dir}/prof_increment_thresh0.npy
+    split: null
+    dtype: ${data.dtype}
   # Normalization function and parameters
-  normalization:
-    _target_: data.transformations.max
-    _partial_: true
-    stats:
-      _target_: data.statistics.read_statistics_var
-      path: ${preparation.statistics.data.output.path}
-      var: 'prof'
-      dtype: ${data.dtype}
-    axis: 1  # null
+  normalization: null
 # Brightness temperature innovation
 hofx_innovation:
   # Loading function

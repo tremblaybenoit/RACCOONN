@@ -909,6 +909,10 @@ class PINNverseOperator(BaseModel):
             self._logging_hofx(pred['hofx'], target['hofx'], target['cloud_filter'].bool(),
                                target['daytime_filter'].bool())
             self._logging_prof(pred['prof'], target['prof'], background=target.get('prof_background', None))
+            if 'prof_mean_stdev' in pred and 'prof_target_mean_stdev' in pred:
+                self._logging_prof(pred['prof_mean_stdev'], pred['prof_mean_stdev'], background=pred.get('prof_background_mean_stdev', None))
+            if 'prof_min_max' in pred and 'prof_target_min_ax' in pred:
+                self._logging_prof(pred['prof_min_max'], pred['prof_min_max'], background=pred.get('prof_background_min_max', None))
             if 'prof_white' in pred and 'prof_white' in target:
                 self._logging_prof_white(pred['prof_white'], target['prof_white'], background=target.get('prof_white_background', None))
         # Log L2 norm of model parameters during training
@@ -973,6 +977,8 @@ class PINNverseOperatorP(PINNverseOperator):
         super().__init__(optimizer=optimizer, loss_func=loss_func, lr_scheduler=lr_scheduler,
                          architecture=architecture, parameters=parameters, transform=transform)
 
+        self.metrics['prof_min_max'], self.metrics['prof_target_min_max'], self.metrics['prof_background_min_max'] = {}, {}, {}
+        self.metrics['prof_mean_stdev'], self.metrics['prof_target_mean_stdev'], self.metrics['prof_background_mean_stdev'] = {}, {}, {}
         self.min_max = min_max
         self.stats = instantiate(stats) if stats is not None else None
         self.sigmoid = sigmoid
@@ -1012,10 +1018,8 @@ class PINNverseOperatorP(PINNverseOperator):
             pred['prof_background_mean_stdev'] = mean_stdev(pred['prof_background_phys'].clone(), self.stats, axis=None)
             pred['prof_target_min_max'] = batch['target']['prof'].clone()
             pred['prof_target_mean_stdev'] = mean_stdev(pred['prof_target_phys'].clone(), self.stats, axis=None)
+            breakpoint()
 
-            pred['prof'] = pred['prof_mean_stdev'].clone()
-            batch['target']['prof_background'] = pred['prof_background_mean_stdev'].clone()
-            batch['target']['prof'] = pred['prof_target_mean_stdev'].clone()
         else:
 
             # Compute profiles
@@ -1043,19 +1047,6 @@ class PINNverseOperatorP(PINNverseOperator):
             pred['prof_background_mean_stdev'] = batch['target']['prof_background'].clone()
             pred['prof_target_min_max'] = min_max(pred['prof_target_phys'].clone(), self.stats, axis=1)
             pred['prof_target_mean_stdev'] = batch['target']['prof'].clone()
-
-            pred['prof'] = pred['prof_min_max'].clone()
-            batch['target']['prof_background'] = pred['prof_background_min_max'].clone()
-            batch['target']['prof'] = pred['prof_target_min_max'].clone()
-        # breakpoint()
-        # Print min/max values of the predicted profiles for debugging
-        #for i in range(pred['prof_phys'].shape[1]):
-        #    print(f"{stage}_prof_min_max var_{i} min", pred['prof_min_max'][:, i, :].min(), f"{stage}_prof_min_max var_{i} max", pred['prof_min_max'][:, i, :].max())
-        #    print(f"{stage}_prof_mean_stdev var_{i} min", pred['prof_mean_stdev'][:, i, :].min(), f"{stage}_prof_mean_stdev var_{i} max", pred['prof_mean_stdev'][:, i, :].max())
-        # print(f"{stage}_prof_min_max min", pred['prof_min_max'].min(), f"{stage}_prof_min_max max", pred['prof_min_max'].max())
-        # print(f"{stage}_prof_background_min_max min", pred['prof_background_min_max'].min(), f"{stage}_prof_background_min_max max",
-        #       pred['prof_background_min_max'].max())
-        # breakpoint()
 
         # Compute loss function
         loss, pred['hofx'] = self.loss_func(pred, batch['target'], batch['input'])
@@ -1173,8 +1164,53 @@ class PINNverseOperatorPCA(PINNverseOperator):
         return loss['total']
 
 
-class PINNverseOperatorPCA2(PINNverseOperatorPCA):
+class PINNverseOperatorPCA1(PINNverseOperatorPCA):
 
+    def __init__(self, pca_buffers: DictConfig, optimizer: DictConfig = None, loss_func: DictConfig = None, lr_scheduler: DictConfig = None,
+                 architecture: DictConfig = None, parameters: DictConfig = None, stats: DictConfig = None):
+
+        # Class inheritance
+        super().__init__(pca_buffers=pca_buffers, optimizer=optimizer, loss_func=loss_func, lr_scheduler=lr_scheduler,
+                         architecture=architecture, parameters=parameters)
+
+        self.stats = instantiate(stats) if stats is not None else None
+
+    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
+        """ Perform training/validation/test step.
+
+            Parameters
+            ----------
+            batch: tensor. Batch from the training set.
+            batch_nb: int. Index of the batch out of the training set.
+            stage: str. Current operation: "train", "valid", or "test".
+
+            Returns
+            -------
+            Loss value: tensor.
+        """
+        with torch.set_grad_enabled(True):
+            coords = {'lat': batch['input']['lat'].requires_grad_(True),
+                      'lon': batch['input']['lon'].requires_grad_(True)}
+
+            # Compute profiles
+            pred = self.forward(batch['input'])
+            pred['prof_min_max'] = min_max(pred['prof'].clone(), self.stats, axis=1)
+            pred['prof_background_min_max'] = min_max(batch['target']['prof_background'].clone(), self.stats, axis=1)
+            # batch['target']['prof_background'] = pred['prof_background_min_max'].clone()
+            # pred['prof_target_min_max'] = min_max(batch['target']['prof'].clone(), self.stats, axis=1)
+            # batch['target']['prof'] = pred['prof_target_min_max'].clone()
+            # pred['prof'] = pred['prof_min_max'].clone()
+
+            # Compute loss function
+            loss, pred['hofx'] = self.loss_func(pred, batch['target'], coords)
+
+        # Logging
+        self._logging(stage, loss, batch['input'], batch['target'], pred)
+
+        return loss['total']
+
+class PINNverseOperatorPCA2(PINNverseOperatorPCA):
+    # TODO: Version that's univariate
     def forward(self, x: dict) -> dict:
         """ Forward pass through the model.
 

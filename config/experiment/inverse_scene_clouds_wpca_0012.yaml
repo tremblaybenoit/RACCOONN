@@ -22,7 +22,7 @@ task_name: "inverse_operator_scenes_cloud2"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "wpca_0011"
+  run_id: "wpca_0012"
   data_dir: ../scene_cloud_${data.dtype}
 
 # Trainer configuration
@@ -59,18 +59,18 @@ preparation:
       input:
         pca_buffers:
           # File path to save/load the PCA object
-          path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+          path: ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
         # Profile data to project
         data:
           load:
@@ -81,7 +81,7 @@ preparation:
       output:
         pca:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Train2/pca_prof_clouds_univariate_10.npy
+          path: ${paths.data_dir}/Train2/pca_prof_clouds_multivariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -97,7 +97,7 @@ preparation:
           normalization: null
         pca_white:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Train2/white_prof_clouds_univariate_10.npy
+          path: ${paths.data_dir}/Train2/white_prof_clouds_multivariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -119,18 +119,18 @@ preparation:
       input:
         pca_buffers:
           # File path to save/load the PCA object
-          path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+          path: ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
         # Profile data to project
         data:
           load:
@@ -141,7 +141,7 @@ preparation:
       output:
         pca:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Val2/pca_prof_clouds_univariate_10.npy
+          path: ${paths.data_dir}/Val2/pca_prof_clouds_multivariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -157,7 +157,7 @@ preparation:
           normalization: null
         pca_white:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Val2/white_prof_clouds_univariate_10.npy
+          path: ${paths.data_dir}/Val2/white_prof_clouds_multivariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -179,18 +179,18 @@ preparation:
       input:
         pca_buffers:
           # File path to save/load the PCA object
-          path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+          path: ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
           # Profile data to project
         data:
           load:
@@ -201,7 +201,7 @@ preparation:
       output:
         pca:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Test2/pca_prof_clouds_univariate_10.npy
+          path: ${paths.data_dir}/Test2/pca_prof_clouds_multivariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -217,7 +217,7 @@ preparation:
           normalization: null
         pca_white:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Test2/white_prof_clouds_univariate_10.npy
+          path: ${paths.data_dir}/Test2/white_prof_clouds_multivariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -239,18 +239,18 @@ preparation:
       input:
         pca_buffers:
           # File path to save/load the PCA object
-          path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+          path: ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
         # Profile data to project
         data:
           load:
@@ -261,7 +261,7 @@ preparation:
       output:
         pca:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Train2/pca_prof_background_clouds_univariate_10.npy
+          path: ${paths.data_dir}/Train2/pca_prof_background_clouds_multivariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -277,7 +277,7 @@ preparation:
           normalization: null
         pca_white:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Train2/white_prof_background_clouds_univariate_10.npy
+          path: ${paths.data_dir}/Train2/white_prof_background_clouds_multivariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -299,18 +299,18 @@ preparation:
       input:
         pca_buffers:
           # File path to save/load the PCA object
-          path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+          path: ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
         # Profile data to project
         data:
           load:
@@ -321,7 +321,7 @@ preparation:
       output:
         pca:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Val2/pca_prof_background_clouds_univariate_10.npy
+          path: ${paths.data_dir}/Val2/pca_prof_background_clouds_multivariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -337,7 +337,7 @@ preparation:
           normalization: null
         pca_white:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Val2/white_prof_background_clouds_univariate_10.npy
+          path: ${paths.data_dir}/Val2/white_prof_background_clouds_multivariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -359,18 +359,18 @@ preparation:
       input:
         pca_buffers:
           # File path to save/load the PCA object
-          path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+          path: ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+              - ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
           # Profile data to project
         data:
           load:
@@ -381,7 +381,7 @@ preparation:
       output:
         pca:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Test2/pca_prof_background_clouds_univariate_10.npy
+          path: ${paths.data_dir}/Test2/pca_prof_background_clouds_multivariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -397,7 +397,7 @@ preparation:
           normalization: null
         pca_white:
           # Output path for PCA projection
-          path: ${paths.data_dir}/Test2/white_prof_background_clouds_univariate_10.npy
+          path: ${paths.data_dir}/Test2/white_prof_background_clouds_multivariate_10.npy
           # Save function
           save:
             _target_: numpy.save
@@ -452,7 +452,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/white_prof_clouds_univariate_10.npy
+            path: ${....dir}/white_prof_clouds_multivariate_10.npy
             split: ${....split}
             dtype: ${data.dtype}
           normalization: null
@@ -461,7 +461,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/white_prof_background_clouds_univariate_10.npy
+            path: ${....dir}/white_prof_background_clouds_multivariate_10.npy
             split: ${....split}
             dtype: ${data.dtype}
           normalization: null
@@ -470,7 +470,7 @@ data:
           # Loading function
           load:
             _target_: data.pca.load_pca_buffers
-            path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+            path: ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
             buffer: 'scales_inv'
           normalization: null
     # Validation set
@@ -499,7 +499,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/white_prof_clouds_univariate_10.npy
+            path: ${....dir}/white_prof_clouds_multivariate_10.npy
             split: ${....split}
             dtype: ${data.dtype}
           normalization: null
@@ -508,7 +508,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/white_prof_background_clouds_univariate_10.npy
+            path: ${....dir}/white_prof_background_clouds_multivariate_10.npy
             split: ${....split}
             dtype: ${data.dtype}
           normalization: null
@@ -517,7 +517,7 @@ data:
           # Loading function
           load:
             _target_: data.pca.load_pca_buffers
-            path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+            path: ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
             buffer: 'scales_inv'
           normalization: null
     # Test set
@@ -546,7 +546,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/white_prof_clouds_univariate_10.npy
+            path: ${....dir}/white_prof_clouds_multivariate_10.npy
             split: ${....split}
             dtype: ${data.dtype}
           normalization: null
@@ -555,7 +555,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/white_prof_background_clouds_univariate_10.npy
+            path: ${....dir}/white_prof_background_clouds_multivariate_10.npy
             split: ${....split}
             dtype: ${data.dtype}
           normalization: null
@@ -564,7 +564,7 @@ data:
           # Loading function
           load:
             _target_: data.pca.load_pca_buffers
-            path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+            path: ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
             buffer: 'scales_inv'
           normalization: null
 
@@ -600,13 +600,13 @@ model:
   pca_buffers:
     # Load PCA buffers
     _target_: data.pca.load_pca_buffers
-    path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+    path: ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
   # Optimizer function and parameters
   optimizer:
     # Learning rate
     lr: 0.001
     # Weight decay (L2 regularization)
-    weight_decay: 0.005
+    weight_decay: 0.0
   # Learning rate scheduler
   lr_scheduler:
     # Factor to reduce the learning rate
@@ -671,7 +671,7 @@ model:
       layernorm:
         _target_: torch.nn.Identity
       activation:
-        _target_: forward.model.activation.NonLearnableSwish
+        _target_: forward.model.activation.SuperLearnableSwish
         in_features: ${model.architecture.hidden_layer.in_features}
       dropout_rate: 0.1
       init_func:
@@ -679,11 +679,11 @@ model:
         is_first_layer: true
         is_head: false
     # Hidden layer
-    n_hidden_layers: 8
+    n_hidden_layers: 4
     hidden_skip: false
     hidden_layer:
       _target_: inverse.model.model.SirenResidualBlock
-      in_features: 64
+      in_features: 128
       out_features: ${model.architecture.hidden_layer.in_features}
       layernorm: ${model.architecture.input_layer.layernorm}
       activation: ${model.architecture.input_layer.activation}
@@ -702,7 +702,7 @@ model:
         _target_: builtins.int
         _args_:
           - _target_: data.pca.load_pca_buffers
-            path: ../scene_clouds_float32/normalization/pca_clouds_univariate_10.pkl
+            path: ../scene_clouds_float32/normalization/pca_clouds_multivariate_10.pkl
             buffer: 'n_comp'
       layernorm: ${model.architecture.input_layer.layernorm}
       activation:
