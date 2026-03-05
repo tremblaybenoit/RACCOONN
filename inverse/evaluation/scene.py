@@ -44,6 +44,7 @@ def main(config: DictConfig) -> None:
     lon = np.concatenate([lon_train, lon_valid, lon_test], axis=0)
     scans = np.concatenate([scans_train, scans_valid, scans_test], axis=0)
     mask = np.concatenate([mask_train, mask_valid, mask_test], axis=0).astype(int)
+    breakpoint()
 
     # Number of samples, scans, coordinates
     n_samples = scans.shape[0]

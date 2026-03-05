@@ -9,7 +9,7 @@ import argparse
 from scipy.spatial import ConvexHull
 from utilities.plot import plot_map, save_plot, flexible_gridspec
 from sklearn.decomposition import PCA
-
+from scipy.spatial import cKDTree
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ def main(in_dir, in_precision, out_dir, out_precision, out_cloud_filter, out_cle
 
     # Stages
     stages = ["Train2", "Val2", "Test2"]
-    stages_split = {"Train2": 0.6, "Val2": 0.2, "Test2": 0.2}
+    stages_split = {"Train2": 0.5, "Val2": 0.25, "Test2": 0.25}
 
     # Load scans (timesteps) as one stack
     scans = np.concatenate([load_npy(os.path.join(in_dir, stage_name, "scans.npy"), dtype=in_precision)
@@ -102,6 +102,43 @@ def main(in_dir, in_precision, out_dir, out_precision, out_cloud_filter, out_cle
     if timestep is not None:
         mask &= (scans == timestep)
         extent_mask &= (scans == timestep)
+
+    lat_extent, lon_extent, cloud_extent = lat[extent_mask], lon[extent_mask], cloud_filter[extent_mask]
+    coords = np.column_stack((lat_extent, lon_extent))
+    tree = cKDTree(coords)
+    dist, neigh = tree.query(coords, k=5)  # 5 neighbors + itself
+    cloud_extent = cloud_extent.astype(bool)
+    clear_extent = ~cloud_extent
+    neigh = neigh[:, 1:]  # Remove self-neighbor
+    has_cloud_neighbor = cloud_extent[neigh].any(axis=1)
+
+    # fraction of the total span used as tolerance (adjust as needed)
+    frac_lat, frac_lon = 0.050, 0.050
+    lat_span = lat_max - lat_extent.min()
+    lon_span = lon_max - lon_extent.min()
+    tol_lat = 0.75 # frac_lat * lat_span if lat_span > 0 else frac_lat * (abs(lat_extent.max()) + 1e-6)
+    tol_lon = 0.75 # frac_lon * lon_span if lon_span > 0 else frac_lon * (abs(lon_extent.max()) + 1e-6)
+    has_edge = (
+            (lat_extent >= lat_max - tol_lat) |
+            (lat_extent <= lat_min + tol_lat) |
+             (lon_extent >= lon_max - tol_lon) |
+             (lon_extent <= lon_min + tol_lon)
+    )
+
+    hull_indices = np.flatnonzero(extent_mask)[clear_extent & (has_cloud_neighbor | has_edge)]
+    remaining_indices = np.flatnonzero(extent_mask)[clear_extent & ~(has_cloud_neighbor | has_edge)]
+    breakpoint()
+
+    # Extract indices of hull points and remaining points. We want to ensure that no validation/test points are alone or on boundaries.
+    # coords = np.column_stack((lat, lon))
+    # tree = cKDTree(coords)
+    # dist, neigh = tree.query(coords, k=5)  # 4 neighbors + itself
+    # neigh = neigh[:, 1:]  # Remove self-neighbor
+    # has_neighbor = (~mask)[neigh].any(axis=1)
+    # hull_indices = np.flatnonzero(mask & has_neighbor)
+    # remaining_indices = np.flatnonzero(mask & ~has_neighbor)
+    # breakpoint()
+
     lat, lon, scans = lat[mask], lon[mask], scans[mask]
     gc.collect()
 
@@ -115,20 +152,20 @@ def main(in_dir, in_precision, out_dir, out_precision, out_cloud_filter, out_cle
 
     # fraction of the total span used as tolerance (adjust as needed)
     frac_lat, frac_lon = 0.050, 0.050
-    lat_span = lat_max - lat.min()
-    lon_span = lon_max - lon.min()
-    tol_lat = frac_lat * lat_span if lat_span > 0 else frac_lat * (abs(lat.max()) + 1e-6)
-    tol_lon = frac_lon * lon_span if lon_span > 0 else frac_lon * (abs(lon.max()) + 1e-6)
-    hull_indices = np.flatnonzero(
-            (lat >= lat_max - tol_lat) |
-            (lat <= lat_min + tol_lat) |
-            (lon >= lon_max - tol_lon) |
-            (lon <= lon_min + tol_lon)
+    lat_span = lat_max - lat_extent.min()
+    lon_span = lon_max - lon_extent.min()
+    tol_lat = frac_lat * lat_span if lat_span > 0 else frac_lat * (abs(lat_extent.max()) + 1e-6)
+    tol_lon = frac_lon * lon_span if lon_span > 0 else frac_lon * (abs(lon_extent.max()) + 1e-6)
+    edge_indices = np.flatnonzero(
+            (lat_extent >= lat_max - tol_lat) |
+            (lat_extent <= lat_min + tol_lat) |
+             (lon_extent >= lon_max - tol_lon) |
+             (lon_extent <= lon_min + tol_lon)
     )
-    remaining_indices = np.setdiff1d(np.arange(n_coords), hull_indices)
+    # remaining_indices = np.setdiff1d(np.arange(n_coords), hull_indices)
     # Update indices
-    hull_indices = np.flatnonzero(mask)[hull_indices]
-    remaining_indices = np.flatnonzero(mask)[remaining_indices]
+    # hull_indices = np.flatnonzero(mask)[hull_indices]
+    # remaining_indices = np.flatnonzero(mask)[remaining_indices]
 
     # Static scenario: We only extract one timestep (scan). We shuffle lat/lon pairs across the training,
     # validation and test sets. However, the hull_indices must be part of the training set indices.

@@ -45,7 +45,7 @@ def main(config: DictConfig) -> None:
     colors = ['#56B4E9','#E69F00', '#009E73']
     cmap = ListedColormap(colors)
     fig = fig_geostationnary(lon, lat, mask, mask.min(), mask.max(), title='Spatial distribution of data sets',
-                             cb_cmap=cmap, cb_ticks=3, cb_ticklabels=['Train', 'Valid', 'Test'], markersize=1.)
+                             cb_cmap=cmap, cb_ticks=3, cb_ticklabels=['Train', 'Valid', 'Test'], markersize=5.)
     save_plot(fig, os.path.join(config.paths.data_dir, f'split.png'))
 
 if __name__ == '__main__':
