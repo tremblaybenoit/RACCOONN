@@ -909,10 +909,10 @@ class PINNverseOperator(BaseModel):
             self._logging_hofx(pred['hofx'], target['hofx'], target['cloud_filter'].bool(),
                                target['daytime_filter'].bool())
             self._logging_prof(pred['prof'], target['prof'], background=target.get('prof_background', None))
-            if 'prof_mean_stdev' in pred and 'prof_target_mean_stdev' in pred:
-                self._logging_prof(pred['prof_mean_stdev'], pred['prof_mean_stdev'], background=pred.get('prof_background_mean_stdev', None))
-            if 'prof_min_max' in pred and 'prof_target_min_ax' in pred:
-                self._logging_prof(pred['prof_min_max'], pred['prof_min_max'], background=pred.get('prof_background_min_max', None))
+            # if 'prof_mean_stdev' in pred and 'prof_target_mean_stdev' in pred:
+            #     self._logging_prof(pred['prof_mean_stdev'], pred['prof_mean_stdev'], background=pred.get('prof_background_mean_stdev', None))
+            # if 'prof_min_max' in pred and 'prof_target_min_ax' in pred:
+            #     self._logging_prof(pred['prof_min_max'], pred['prof_min_max'], background=pred.get('prof_background_min_max', None))
             if 'prof_white' in pred and 'prof_white' in target:
                 self._logging_prof_white(pred['prof_white'], target['prof_white'], background=target.get('prof_white_background', None))
         # Log L2 norm of model parameters during training
@@ -1018,8 +1018,6 @@ class PINNverseOperatorP(PINNverseOperator):
             pred['prof_background_mean_stdev'] = mean_stdev(pred['prof_background_phys'].clone(), self.stats, axis=None)
             pred['prof_target_min_max'] = batch['target']['prof'].clone()
             pred['prof_target_mean_stdev'] = mean_stdev(pred['prof_target_phys'].clone(), self.stats, axis=None)
-            breakpoint()
-
         else:
 
             # Compute profiles
@@ -1047,6 +1045,11 @@ class PINNverseOperatorP(PINNverseOperator):
             pred['prof_background_mean_stdev'] = batch['target']['prof_background'].clone()
             pred['prof_target_min_max'] = min_max(pred['prof_target_phys'].clone(), self.stats, axis=1)
             pred['prof_target_mean_stdev'] = batch['target']['prof'].clone()
+
+        # Register standardized for plotting
+        pred['prof'] = pred['prof_phys'].clone()
+        batch['target']['prof'] = pred['prof_target_phys'].clone()
+        batch['target']['prof_background'] = pred['prof_background_phys'].clone()
 
         # Compute loss function
         loss, pred['hofx'] = self.loss_func(pred, batch['target'], batch['input'])

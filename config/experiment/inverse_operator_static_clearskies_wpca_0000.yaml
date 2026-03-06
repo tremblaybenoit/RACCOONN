@@ -1,0 +1,618 @@
+# @package _global_
+# Experiment-specific Hydra structure
+
+# Overriding default structure
+defaults:
+  - override /paths: default
+  - override /hydra: default
+  - override /data: inverse_recast
+  - override /preparation: inverse_default
+  - override /loader: inverse_static
+  - override /model: inverse_operator
+  - override /trainer: gpu
+  - override /callbacks: inverse_default
+  - override /logger: default
+
+# All parameters below will be merged with parameters from default configurations set above.
+# This allows you to overwrite only specified parameters
+
+# Task name. Note that it determines the output directory path
+task_name: "inverse_operator_static_clearskies"  # Experiment
+
+# Run id (unique identifier for the run)
+paths:
+  task_dir: "../inverse_outputs"
+  run_id: "wpca_0000"
+  data_dir: ../static_clearskies_${data.dtype}
+
+# Trainer configuration
+trainer:
+  min_epochs: 1  # To prevent early stopping
+  max_epochs: 960  # Number of epochs
+  precision: 32  # 32-bit precision
+
+# Callbacks
+callbacks:
+  early_stopping:
+    patience: 101  # Number of epochs with no improvement after which training will be stopped
+
+# Preparation configuration
+preparation:
+  # Statistics computation
+  statistics:
+    # Variables for which to compute statistics
+    data:
+      # Output path for statistics
+      output:
+        path: ${paths.data_dir}/normalization/statistics.pkl
+  # PCA decomposition
+  pca:
+    # Atmospheric profiles
+    prof:
+      # Function
+      _target_: data.pca.compute_pca
+      _recursive_: false  # Do not instantiate nested objects
+      # pressure_filter: ${data.pressure_filter.load}
+      # What the method needs as input
+      input:
+        # Profile data to compute PCA on
+        data:
+          load:
+            _target_: data.io.load_stack_and_normalize
+            _recursive_: false
+            stack:
+              - ${data.stage.train.vars.prof}
+              - ${data.stage.valid.vars.prof}
+              - ${data.stage.test.vars.prof}
+        mode: multivariate
+      # What the method produces as output (pickle file)
+      output:
+        # File path to save/load the PCA object
+        path: ${paths.data_dir}/normalization/pca_clouds_${preparation.pca.prof.input.mode}_10.pkl
+        # Save function
+        save:
+          _target_: data.io.save_pkl
+          _partial_: true
+          _args_:
+            - ${preparation.pca.prof.output.path}
+        # Load function
+        load:
+          _target_: data.io.load_pkl
+          _args_:
+            - ${preparation.pca.prof.output.path}
+    prof_train:
+      # Function
+      _target_: data.pca.project_pca
+      _recursive_: false  # Do not instantiate nested objects
+      # What the method needs as input
+      input:
+        pca_buffers:
+          # File path to save/load the PCA object
+          path: ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+          # Save function
+          save:
+            _target_: data.io.save_pkl
+            _partial_: true
+            _args_:
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+          # Load function
+          load:
+            _target_: data.io.load_pkl
+            _args_:
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+        # Profile data to project
+        data:
+          load:
+            _target_: data.io.load_var_and_normalize
+            _recursive_: false
+            _args_:
+              - ${data.stage.train.vars.prof}
+      output:
+        pca:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Train2/pca_prof_clouds_p_${preparation.pca.prof.input.mode}.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_train.output.pca.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_train.output.pca.path}
+              - ${data.dtype}
+          normalization: null
+        pca_white:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Train2/white_prof_clouds_p_${preparation.pca.prof.input.mode}.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_train.output.pca_white.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_train.output.pca_white.path}
+              - ${data.dtype}
+          normalization: null
+    prof_valid:
+      # Function
+      _target_: data.pca.project_pca
+      _recursive_: false  # Do not instantiate nested objects
+      # What the method needs as input
+      input:
+        pca_buffers:
+          # File path to save/load the PCA object
+          path: ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+          # Save function
+          save:
+            _target_: data.io.save_pkl
+            _partial_: true
+            _args_:
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+          # Load function
+          load:
+            _target_: data.io.load_pkl
+            _args_:
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+        # Profile data to project
+        data:
+          load:
+            _target_: data.io.load_var_and_normalize
+            _recursive_: false
+            _args_:
+              - ${data.stage.valid.vars.prof}
+      output:
+        pca:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Val2/pca_prof_clouds_p_${preparation.pca.prof.input.mode}.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_valid.output.pca.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_valid.output.pca.path}
+              - ${data.dtype}
+          normalization: null
+        pca_white:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Val2/white_prof_clouds_p_${preparation.pca.prof.input.mode}.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_valid.output.pca_white.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_valid.output.pca_white.path}
+              - ${data.dtype}
+          normalization: null
+    prof_test:
+      # Function
+      _target_: data.pca.project_pca
+      _recursive_: false  # Do not instantiate nested objects
+      # What the method needs as input
+      input:
+        pca_buffers:
+          # File path to save/load the PCA object
+          path: ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+          # Save function
+          save:
+            _target_: data.io.save_pkl
+            _partial_: true
+            _args_:
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+          # Load function
+          load:
+            _target_: data.io.load_pkl
+            _args_:
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+          # Profile data to project
+        data:
+          load:
+            _target_: data.io.load_var_and_normalize
+            _recursive_: false
+            _args_:
+              - ${data.stage.test.vars.prof}
+      output:
+        pca:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Test2/pca_prof_clouds_p_${preparation.pca.prof.input.mode}.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_test.output.pca.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_test.output.pca.path}
+              - ${data.dtype}
+          normalization: null
+        pca_white:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Test2/white_prof_clouds_p_${preparation.pca.prof.input.mode}.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_test.output.pca_white.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_test.output.pca_white.path}
+              - ${data.dtype}
+          normalization: null
+    prof_background_train:
+      # Function
+      _target_: data.pca.project_pca
+      _recursive_: false  # Do not instantiate nested objects
+      # What the method needs as input
+      input:
+        pca_buffers:
+          # File path to save/load the PCA object
+          path: ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+          # Save function
+          save:
+            _target_: data.io.save_pkl
+            _partial_: true
+            _args_:
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+          # Load function
+          load:
+            _target_: data.io.load_pkl
+            _args_:
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+        # Profile data to project
+        data:
+          load:
+            _target_: data.io.load_var_and_normalize
+            _recursive_: false
+            _args_:
+              - ${data.stage.train.vars.prof_background}
+      output:
+        pca:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Train2/pca_prof_background_clouds_p_${preparation.pca.prof.input.mode}.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_background_train.output.pca.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_background_train.output.pca.path}
+              - ${data.dtype}
+          normalization: null
+        pca_white:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Train2/white_prof_background_clouds_p_${preparation.pca.prof.input.mode}.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_background_train.output.pca_white.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_background_train.output.pca_white.path}
+              - ${data.dtype}
+          normalization: null
+    prof_background_valid:
+      # Function
+      _target_: data.pca.project_pca
+      _recursive_: false  # Do not instantiate nested objects
+      # What the method needs as input
+      input:
+        pca_buffers:
+          # File path to save/load the PCA object
+          path: ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+          # Save function
+          save:
+            _target_: data.io.save_pkl
+            _partial_: true
+            _args_:
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+          # Load function
+          load:
+            _target_: data.io.load_pkl
+            _args_:
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+        # Profile data to project
+        data:
+          load:
+            _target_: data.io.load_var_and_normalize
+            _recursive_: false
+            _args_:
+              - ${data.stage.valid.vars.prof_background}
+      output:
+        pca:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Val2/pca_prof_background_clouds_p_${preparation.pca.prof.input.mode}.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_background_valid.output.pca.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_background_valid.output.pca.path}
+              - ${data.dtype}
+          normalization: null
+        pca_white:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Val2/white_prof_background_clouds_p_${preparation.pca.prof.input.mode}.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_background_valid.output.pca_white.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_background_valid.output.pca_white.path}
+              - ${data.dtype}
+          normalization: null
+    prof_background_test:
+      # Function
+      _target_: data.pca.project_pca
+      _recursive_: false  # Do not instantiate nested objects
+      # What the method needs as input
+      input:
+        pca_buffers:
+          # File path to save/load the PCA object
+          path: ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+          # Save function
+          save:
+            _target_: data.io.save_pkl
+            _partial_: true
+            _args_:
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+          # Load function
+          load:
+            _target_: data.io.load_pkl
+            _args_:
+              - ${paths.data_dir}/normalization/pca_clouds_p_${preparation.pca.prof.input.mode}.pkl
+          # Profile data to project
+        data:
+          load:
+            _target_: data.io.load_var_and_normalize
+            _recursive_: false
+            _args_:
+              - ${data.stage.test.vars.prof_background}
+      output:
+        pca:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Test2/pca_prof_background_clouds_p_${preparation.pca.prof.input.mode}.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_background_test.output.pca.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_background_test.output.pca.path}
+              - ${data.dtype}
+          normalization: null
+        pca_white:
+          # Output path for PCA projection
+          path: ${paths.data_dir}/Test2/white_prof_background_clouds_p_${preparation.pca.prof.input.mode}.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.pca.prof_background_test.output.pca_white.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.pca.prof_background_test.output.pca_white.path}
+              - ${data.dtype}
+          normalization: null
+
+
+# Data configuration
+data:
+  # Precision
+  dtype: 'float32'
+  # Split ratios for training, validation, and test sets
+  stage:
+    # Training set
+    train:
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Profile types
+          type: ['Air temperature', 'Humidity mixing ratio', 'Ozone mixing ratio']
+          # Normalization function and parameters
+          normalization: null
+        # Brightness temperatures
+        hofx:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/predict_hofx_v3_smooth_cs.npy
+    # Validation set
+    valid:
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Profile types
+          type: ${data.stage.train.vars.prof.type}
+          # Normalization function and parameters
+          normalization: ${data.stage.train.vars.prof.normalization}
+        # Brightness temperatures
+        hofx:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/predict_hofx_v3_smooth_cs.npy
+    # Test set
+    test:
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Profile types
+          type: ${data.stage.train.vars.prof.type}
+          # Normalization function and parameters
+          normalization: ${data.stage.train.vars.prof.normalization}
+        # Brightness temperatures
+        hofx:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/predict_hofx_v3_smooth_cs.npy
+
+# Loader configuration
+loader:
+  batch_size: 24
+  num_workers: 10
+
+# Model parameters
+model:
+  # Optimizer function and parameters
+  optimizer:
+    # Learning rate
+    lr: 0.0005
+    # Weight decay (L2 regularization)
+    weight_decay: 0
+  # Learning rate scheduler
+  lr_scheduler:
+    # Factor to reduce the learning rate
+    factor: 0.75
+    # Number of epochs with no improvement after which learning rate will be reduced
+    patience: 25
+  # Model parameters associated with the data (e.g., input/output dimensions) and architecture
+  parameters:
+    # Number of variables
+    n_scans: 0
+  # Loss function and parameters
+  loss_func:
+    # Forward model to compute the model equivalent of the observations
+    forward_model:
+      # Function
+      _target_: inverse.model.loss.ForwardModel
+      # Configuration of the forward model
+      checkpoint_path: 'forward/model/checkpoints/model_v3_smooth_cs.ckpt'
+      config_path: 'model/forward_emulator_smooth_cs.yaml'
+      # Precision
+      dtype: ${data.dtype}
+      # Normalization for the profile variables
+      prof_norm: null
+    # Weights for observation (obs), model, and boundary condition (bcs) errors
+    lambda_obs: 1.
+    lambda_model: 100.
+    lambda_bcs: 1.
+    lambda_sobolev: 1.e-5
+    clear_sky: false
+    # Loss term for observations
+    loss_obs:
+      _target_: inverse.model.loss.MSE
+    # Loss term for model variables
+    loss_model:
+      _target_: inverse.model.loss.MSE
+    # Loss term for boundary conditions
+    loss_bcs:
+      _target_: inverse.model.loss.MSE
+    # Pressure filter: Consider only pressure levels with non-zero variance (for model and bcs errors)
+    pressure_filter: ${data.pressure_filter.load}
+  # Architecture components
+  architecture:
+    # Positional encoding
+    positional_encoding:
+      _target_: inverse.model.encoding.RescaledPositionalEncoding
+      d_input:
+        _target_: builtins.int
+        _args_:
+          - _target_: numpy.sum
+            _args_:
+              - - ${model.parameters.n_lat}
+                - ${model.parameters.n_lon}
+                - ${model.parameters.n_scans}
+                - ${model.parameters.n_pressure}
+                - ${model.parameters.n_cloud}
+    # Input layer
+    input_layer:
+      _target_: inverse.model.model.LinearBlock
+      in_features: ${model.architecture.positional_encoding.d_input}
+      out_features: ${model.architecture.hidden_layer.in_features}
+      layernorm:
+        _target_: torch.nn.Identity
+      activation:
+        _target_: forward.model.activation.SuperLearnableSwish
+        in_features: ${model.architecture.hidden_layer.in_features}
+      dropout_rate: 0.1
+      init_func:
+        _target_: inverse.model.model.SwishInit
+        is_first_layer: true
+        is_head: false
+
+    # Hidden layer
+    n_hidden_layers: 4
+    hidden_skip: false
+    hidden_layer:
+      _target_: inverse.model.model.LinearBlock
+      in_features: 128
+      out_features: ${model.architecture.hidden_layer.in_features}
+      layernorm: ${model.architecture.input_layer.layernorm}
+      activation: ${model.architecture.input_layer.activation}
+      dropout_rate: ${model.architecture.input_layer.dropout_rate}
+      init_func:
+        _target_: inverse.model.model.SwishInit
+        is_first_layer: false
+        is_head: false
+    # Output layer
+    output_skip: true
+    output_n_heads: 3
+    output_layer:
+      _target_: inverse.model.model.LinearBlock
+      in_features: ${model.architecture.hidden_layer.out_features}
+      out_features: 1
+      layernorm: ${model.architecture.input_layer.layernorm}
+      activation:
+        _target_: torch.nn.Sigmoid
+      dropout_rate: 0.0
+      init_func:
+        _target_: inverse.model.model.SwishInit
+        is_first_layer: false
+        is_head: true
+
+# Logger configuration
+logger:
+  # MLflow logger
+  ports:
+    mlflow: 5021

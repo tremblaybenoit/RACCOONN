@@ -9,7 +9,7 @@ defaults:
   - override /preparation: statistics
   - override /loader: forward_default
   - override /model: forward_emulator_smooth_cs
-  - override /trainer: cpu
+  - override /trainer: gpu
   - override /callbacks: forward_default
   - override /logger: default
 
@@ -89,7 +89,7 @@ data:
     # Prediction set
     predict:
       # Directory
-      dir: ../static_float32_cs/Train2
+      dir: ../static_clearskies_float32/Train2
       # Variables
       vars:
         # Atmospheric profiles

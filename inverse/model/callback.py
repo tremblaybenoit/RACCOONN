@@ -142,11 +142,11 @@ class FigureLogger(ForwardFigureLogger):
 
         # Tags for each figure
         tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE", "Valid_RadianceRMSE"]
-        if 'prof_mean_stdev' in model.metrics and len(model.metrics['prof_mean_stdev']) > 0:
-            tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE", "Valid_ProfilesMeanStdev", "Valid_RadianceRMSE"]
-            if 'prof_white_background' in model.metrics and len(model.metrics['prof_white_background']) > 0:
-                tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE", "Valid_ProfilesMeanStdev", "Valid_WhiteProfilesRMSE", "Valid_RadianceRMSE"]
-        elif 'prof_white_background' in model.metrics and len(model.metrics['prof_white_background']) > 0:
+        # if 'prof_mean_stdev' in model.metrics and len(model.metrics['prof_mean_stdev']) > 0:
+        #     tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE", "Valid_ProfilesMeanStdev", "Valid_RadianceRMSE"]
+        #     if 'prof_white_background' in model.metrics and len(model.metrics['prof_white_background']) > 0:
+        #         tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE", "Valid_ProfilesMeanStdev", "Valid_WhiteProfilesRMSE", "Valid_RadianceRMSE"]
+        if 'prof_white_background' in model.metrics and len(model.metrics['prof_white_background']) > 0:
             tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE", "Valid_WhiteProfilesRMSE", "Valid_RadianceRMSE"]
 
         # Call the figure builder and buffer

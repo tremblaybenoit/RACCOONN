@@ -596,7 +596,8 @@ class VarLoss(torch.nn.Module):
     """ Universal loss module that combines observation and model losses. """
     def __init__(self, forward_model: Callable, loss_obs: Callable, loss_model: Callable = None, loss_bcs: Callable = None,
                  lambda_obs: float=1.0, lambda_model: float=1.0, lambda_bcs: float=1.0, lambda_sobolev: float=0.0,
-                 pressure_filter: np.ndarray=None, clear_sky: bool=False, prof_pred: np.ndarray=None):
+                 pressure_filter: np.ndarray=None, clear_sky: bool=False, prof_pred: np.ndarray=None,
+                 key_obs: str='_phys', key_model: str='_mean_stdev'):
         """ Initialize the variational loss module.
 
         Parameters
@@ -638,6 +639,8 @@ class VarLoss(torch.nn.Module):
             self.register_buffer('prof_pred', torch.from_numpy(prof_pred))
         else:
             self.prof_pred = None
+        self.key_obs = key_obs
+        self.key_model = key_model
 
     def __call__(self, pred: dict, target: dict, input: dict=None) -> tuple[dict, torch.Tensor]:
         """ Compute the combined loss between predicted profiles and target data.
@@ -789,7 +792,7 @@ class VarLossP(VarLoss):
             pred_prof[:, 8:9, ...] = pred['prof'][:, 2:3, :]  #  Ozone mixing ratio
             hofx_pred = self.forward_model(pred_prof, target)
         else:
-            hofx_pred = self.forward_model(pred['prof_min_max'], target)
+            hofx_pred = self.forward_model(pred['prof'+self.key_obs], target)
 
         # Initialize loss dictionary
         loss = {}
@@ -820,8 +823,8 @@ class VarLossP(VarLoss):
                     loss['model'] = self.loss_model(pred['prof_mean_stdev'][:, pressure_filter],
                                                     pred['prof_background_mean_stdev'][:, pressure_filter])
                 else:
-                    loss['model'] = self.loss_model(pred['prof_mean_stdev'],
-                                                    pred['prof_background_mean_stdev'])
+                    loss['model'] = self.loss_model(pred['prof'+self.key_model],
+                                                    pred['prof_background'+self.key_model])
             # Total
             loss['total'] += self.lambda_model * loss['model'].mean()
 

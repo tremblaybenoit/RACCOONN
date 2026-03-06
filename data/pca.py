@@ -115,17 +115,6 @@ def generate_pca_buffers(data: np.ndarray, mode: str='multivariate', pressure_fi
     vmax = np.max(data, axis=0, keepdims=True)
     increment = data - mu
     standardized_data = increment / std  # (N, V, L)
-
-    # TODO: Filter out [:, 1, 39] > 0. There are bad pixels.
-    # 0: OK
-    # 1:
-    filter1 = data[:, 1, 39] == 0
-    data2 = data[filter1]
-    mu2 = np.mean(data2, axis=0, keepdims=True)  # (V, L)
-    std2 = np.std(data2, axis=0, keepdims=True) + 1e-12  # (V, L)
-    vmin2 = np.min(data2, axis=0, keepdims=True)
-    vmax2 = np.max(data2, axis=0, keepdims=True)
-
     breakpoint()
 
     # Multivariate PCA
@@ -135,6 +124,8 @@ def generate_pca_buffers(data: np.ndarray, mode: str='multivariate', pressure_fi
         if pressure_filter is not None:
             mu = mu[:, pressure_filter]
             std = std[:, pressure_filter]
+            vmin = vmin[:, pressure_filter]
+            vmax = vmax[:, pressure_filter]
             standardized_data = standardized_data[:, pressure_filter]
 
         # Decomposition
@@ -150,40 +141,46 @@ def generate_pca_buffers(data: np.ndarray, mode: str='multivariate', pressure_fi
         B_inv += (1.0 / (alpha * max_ev)) * (np.eye(B_inv.shape[0]) - pca.components_.T @ pca.components_)
         # Make diagonal-only version in case we want to use it for whitening
         B_inv_d = np.diag(np.diag(B_inv))
-        # B_inv_phys = B_inv * np.outer(1.0/std.flatten(), 1.0/std.flatten())
-        # B_inv_d_phys = B_inv_d * np.outer(1.0/std.flatten(), 1.0/std.flatten())
+        B_inv_phys = B_inv * np.outer(1.0/std.flatten(), 1.0/std.flatten())
+        B_inv_d_phys = B_inv_d * np.outer(1.0/std.flatten(), 1.0/std.flatten())
 
         # Store PCA buffers in a dictionary
         pca_buffs = {
             'n_comp': pca.n_components_,
             'basis': pca.components_,
-            'mu': mu.flatten(),
-            'std': std.flatten(),
+            'mu': mu,
+            'std': std,
+            'vmin': vmin,
+            'vmax': vmax,
             'eigenvalues': pca.explained_variance_,
             'scales': np.sqrt(pca.explained_variance_),
             'scales_inv': 1.0/np.sqrt(pca.explained_variance_.reshape(1, -1)),
             'B_inv': B_inv,
             'B_inv_d': B_inv_d,
-            # 'B_inv_phys': B_inv_phys,
-            # 'B_inv_d_phys': B_inv_d_phys,
+            'B_inv_phys': B_inv_phys,
+            'B_inv_d_phys': B_inv_d_phys,
         }
 
     elif mode == 'univariate':
         # Per variable PCA (with variables in the second dimension)
         pca_buffs = {'n_comp': 0}
         B_inv = []
-        # B_inv_phys = []
+        B_inv_phys = []
         for v in range(n_vars):
 
             # Pressure filter
             if pressure_filter is not None:
                 mu_v = mu[:, v][:, pressure_filter[v]]
                 std_v = std[:, v][:, pressure_filter[v]]
+                vmin_v = vmin[:, v][:, pressure_filter[v]]
+                vmax_v = vmax[:, v][:, pressure_filter[v]]
                 standardized_data_v = standardized_data[:, v][:, pressure_filter[v]]
                 n_levels = pressure_filter[v].sum()
             else:
                 mu_v = mu[:, v]
                 std_v = std[:, v]
+                vmin_v = vmin[:, v]
+                vmax_v = vmax[:, v]
                 standardized_data_v = standardized_data[:, v]
 
             # Decomposition
@@ -200,9 +197,10 @@ def generate_pca_buffers(data: np.ndarray, mode: str='multivariate', pressure_fi
             B_inv.append(B_inv_v)
             # Make diagonal-only version in case we want to use it for whitening
             B_inv_d = np.diag(np.diag(B_inv_v))
-            # B_inv_phys_v = B_inv_v * np.outer(1.0/std_v.flatten(), 1.0/std_v.flatten())
-            # B_inv_d_phys = B_inv_d * np.outer(1.0/std_v.flatten(), 1.0/std_v.flatten())
-            # B_inv_phys.append(B_inv_phys_v)
+
+            B_inv_phys_v = B_inv_v * np.outer(1.0/std_v.flatten(), 1.0/std_v.flatten())
+            B_inv_d_phys = B_inv_d * np.outer(1.0/std_v.flatten(), 1.0/std_v.flatten())
+            B_inv_phys.append(B_inv_phys_v)
 
             # Store PCA buffers in a dictionary
             pca_buffs[v] = {
@@ -210,21 +208,25 @@ def generate_pca_buffers(data: np.ndarray, mode: str='multivariate', pressure_fi
                 'basis': pca.components_,
                 'mu': mu_v,
                 'std': std_v,
+                'vmin': vmin_v,
+                'vmax': vmax_v,
                 'eigenvalues': pca.explained_variance_,
                 'scales': np.sqrt(pca.explained_variance_),
                 'scales_inv': 1.0/np.sqrt(pca.explained_variance_.reshape(1, -1)),
                 'B_inv': B_inv_v,
                 'B_inv_d': B_inv_d,
-                # 'B_inv_phys': B_inv_phys,
-                # 'B_inv_d_phys': B_inv_d_phys,
+                'B_inv_phys': B_inv_phys,
+                'B_inv_d_phys': B_inv_d_phys,
             }
 
         # Combine the number of components, basis, mu, std, and eigenvalues across variables for easy use in the loss function
         pca_buffs['n_comp'] = sum(pca_buffs[v]['n_comp'] for v in range(n_vars))
         pca_buffs['basis'] = block_diag(*[pca_buffs[v]['basis'] for v in range(n_vars)])
         pca_buffs['eigenvalues'] = np.concatenate([pca_buffs[v]['eigenvalues'] for v in range(n_vars)])
-        pca_buffs['mu'] = mu.flatten()
-        pca_buffs['std'] = std.flatten()
+        pca_buffs['mu'] = mu  # np.stack([pca_buffs[v]['mu'] for v in range(n_vars)])
+        pca_buffs['std'] = std  # np.stack([pca_buffs[v]['std'] for v in range(n_vars)])
+        pca_buffs['vmin'] = vmin  # np.concatenate([pca_buffs[v]['vmin'] for v in range(n_vars)])
+        pca_buffs['vmax'] = vmax  # np.concatenate([pca_buffs[v]['vmax'] for v in range(n_vars)])
         pca_buffs['scales'] = np.sqrt(pca_buffs['eigenvalues'])
         pca_buffs['scales_inv'] = 1.0/np.sqrt(pca_buffs['eigenvalues'].reshape(1, -1))
         # Assemble a pseudo-inverse of the covariance matrix for the full state vector by block-diagonalizing the per-variable pseudo-inverses
@@ -232,6 +234,9 @@ def generate_pca_buffers(data: np.ndarray, mode: str='multivariate', pressure_fi
         B_inv = block_diag(*B_inv)
         pca_buffs['B_inv'] = B_inv
         pca_buffs['B_inv_d'] = block_diag(*[pca_buffs[v]['B_inv_d'] for v in range(n_vars)])
+        B_inv_phys = block_diag(*B_inv_phys)
+        pca_buffs['B_inv_phys'] = B_inv_phys
+        pca_buffs['B_inv_d_phys'] = block_diag(*[pca_buffs[v]['B_inv_d_phys'] for v in range(n_vars)])
 
     else:
         raise ValueError(f"Invalid PCA mode: {mode}. Must be 'global' or 'local'.")
@@ -245,13 +250,13 @@ def generate_pca_buffers(data: np.ndarray, mode: str='multivariate', pressure_fi
              cb_label=r'Values')
     save_plot(fig, filename='B_inv.png')
 
-    # fig, get_axes = flexible_gridspec(cell_widths=[4.0], cell_heights=[4.0],
-    #                                   lefts=[1.00], rights=[1.00], bottoms=[1.00], tops=[1.00])
-    # ax = get_axes(0, 0)
+    fig, get_axes = flexible_gridspec(cell_widths=[4.0], cell_heights=[4.0],
+                                      lefts=[1.00], rights=[1.00], bottoms=[1.00], tops=[1.00])
+    ax = get_axes(0, 0)
     # Plot covariance matrix
-    # plot_map(ax, np.abs(B_inv_phys), title=f"Inverse covariance matrix", plt_origin='upper',
-    #          cb_label=r'Values')
-    # save_plot(fig, filename='B_inv_phys.png')
+    plot_map(ax, np.abs(B_inv_phys), title=f"Inverse covariance matrix", plt_origin='upper',
+             cb_label=r'Values')
+    save_plot(fig, filename='B_inv_phys.png')
 
     return pca_buffs
 
@@ -350,7 +355,7 @@ def compute_pca(input: DictConfig, output: DictConfig, mode: str='multivariate',
         data=data,
         mode=input.get('mode', mode),
         pressure_filter=instantiate(pressure_filter) if pressure_filter is not None else None,
-        alpha=input.get('alpha', 1e-5)
+        alpha=input.get('alpha', 1e-4)
     )
 
     # Save statistics to file
