@@ -629,14 +629,18 @@ class HydraResidualMLP(nn.Module):
             for _ in range(output_n_heads):
                 head_layers = []
                 for l in range(output_n_layers):
-                    if output_skip:
-                        output_layer.in_features = hidden_layer.out_features + input_layer.out_features
-                        output_layer.out_features = output_layer.in_features
+                    output_layer_l = output_layer.copy()
+                    if output_skip and l == 0:
+                        output_layer_l.in_features = hidden_layer.out_features + input_layer.out_features
+                        if output_layer_l._target_ == 'inverse.model.model.SirenResidualBlock':
+                            output_layer.out_features = output_layer_l.in_features
+                            output_layer_l.out_features = output_layer_l.in_features
                     else:
-                        output_layer.in_features = output_layer.out_features
-                    if hasattr(output_layer.activation, 'in_features'):
-                        output_layer.activation.in_features = output_layer.in_features
-                    head_layers.append(instantiate(output_layer))
+                        output_layer_l.in_features = output_layer.out_features
+                    if hasattr(output_layer_l.activation, 'in_features'):
+                        output_layer_l.activation.in_features = output_layer_l.out_features
+                    # breakpoint()
+                    head_layers.append(instantiate(output_layer_l))
                 if output_final_layer is not None:
                     output_final_layer.in_features = output_layer.out_features
                     head_layers.append(instantiate(output_final_layer))
@@ -649,6 +653,7 @@ class HydraResidualMLP(nn.Module):
             if output_final_layer is not None:
                 head_layers.append(instantiate(output_final_layer))
             self.output_layers = nn.Sequential(*head_layers)
+        # breakpoint()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
