@@ -53,8 +53,8 @@ def main(config: DictConfig) -> None:
     logger.info("Plot comparison...")
     fig2 = fig_rmse_bars([stats['hofx'][key]['rmse'] for key in stats['hofx'].keys()],
                          [stats['hofx_norm'][key]['rmse'] for key in stats['hofx_norm'].keys()],
-                         x_range=[[0, 1.5], [0, 2.0]], labels=list(stats['hofx'].keys()),
-                         title=["(a) Forward model - Daytime forward model errors",
+                         x_range=[[0, 0.8], [0, 2.0]], labels=list(stats['hofx'].keys()),
+                         title=["Forward model errors",
                                 "(b) Forward model - Nighttime forward model errors"])
     save_plot(fig2, config.paths.run_dir + '/Figure2_rmse_bars2_test.png')
     fig3 = fig_errs_by_channel(hofx, pred, title=[f'Channel {i+7}' for i in range(hofx.shape[1])],

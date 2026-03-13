@@ -83,7 +83,7 @@ data:
     # Prediction set
     predict:
       # Directory
-      dir: ../scene_cloud_float32/Test2
+      dir: ../static_clearsky_float32/Test2
       # Variables
       vars:
         # Atmospheric profiles

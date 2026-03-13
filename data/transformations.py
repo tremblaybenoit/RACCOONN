@@ -376,7 +376,8 @@ def stdev(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform:
         return multiplication(data, acc_stdev, inverse_transform=not inverse_transform)
 
 
-def mean_stdev(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform: bool = False, axis: int=None) \
+def mean_stdev(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform: bool = False, axis: int=None,
+               stdev_thresh: Union[np.ndarray, torch.Tensor] = None) \
         -> Union[np.ndarray, torch.Tensor]:
     """ Standardize dataset.
 
@@ -386,17 +387,29 @@ def mean_stdev(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_trans
         stats: arr or tensor. Statistics of the data.
         inverse_transform: bool. False for standardization, True for unstandardization.
         axis: int or None. Axis along which to standardize. If None, standardize across all dimensions.
+        stdev_thresh: arr or tensor. Threshold for standard deviation to avoid division by zero.
 
         Returns
         -------
         data_transform: arr or tensor. Standardized/unstandardized dataset.
     """
+
+    # If stdev_thresh is provided, ensure it's broadcastable to the shape of stats['stdev']
+    std = stats['stdev']
+    if stdev_thresh is not None:
+        stdev_thresh = broadcast(std, stdev_thresh)
+        # Replace any stdev values below the threshold with the threshold value
+        if isinstance(std, np.ndarray):
+            std = np.where(std < stdev_thresh, stdev_thresh, std)
+        else:
+            std = torch.where(std < stdev_thresh, stdev_thresh, std)
+
     if axis is None:
-        return affine(data, stats['stdev'], stats['mean'], inverse_transform=not inverse_transform)
+        return affine(data, std, stats['mean'], inverse_transform=not inverse_transform)
     else:
         # acc_stats = [{'mean': stats['mean'], 'stdev': stats['stdev'], 'n_samples': 1}]
         acc_mean = stats['mean'].mean(axis=axis, keepdims=True)
-        acc_var = (stats['stdev']**2 + (stats['mean'] - acc_mean)**2).mean(axis=axis, keepdims=True)
+        acc_var = (std**2 + (stats['mean'] - acc_mean)**2).mean(axis=axis, keepdims=True)
         acc_stdev = np.sqrt(acc_var)
         return affine(data, acc_stdev, acc_mean, inverse_transform=not inverse_transform)
 

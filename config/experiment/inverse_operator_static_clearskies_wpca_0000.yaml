@@ -64,11 +64,12 @@ preparation:
               - ${data.stage.train.vars.prof}
               - ${data.stage.valid.vars.prof}
               - ${data.stage.test.vars.prof}
-        mode: multivariate
+        alpha: 0.
+        mode: univariate
       # What the method produces as output (pickle file)
       output:
         # File path to save/load the PCA object
-        path: ${paths.data_dir}/normalization/pca_clouds_${preparation.pca.prof.input.mode}_10.pkl
+        path: ${paths.data_dir}/normalization/pca_clouds_${preparation.pca.prof.input.mode}_X00.pkl
         # Save function
         save:
           _target_: data.io.save_pkl

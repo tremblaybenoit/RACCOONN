@@ -657,7 +657,7 @@ def plot_rmse_bars(ax, values, positions, height=0.3, colors=None, labels=None, 
 
 
 
-def fig_rmse_bars(rmse_raw: list, rmse_norm: list, figname=None, channels=None, height=0.25, colors=None,
+def fig_rmse_bars(rmse_raw: list, rmse_norm: list=None, figname=None, channels=None, height=0.25, colors=None,
                   labels=None, x_range=None, y_label=None, x_label=None, title=None):
     """
     Plot raw and normalized RMSE bars side by side using a flexible gridspec.
@@ -696,24 +696,36 @@ def fig_rmse_bars(rmse_raw: list, rmse_norm: list, figname=None, channels=None, 
     if height is None:
         height = 0.35 if len(labels) <= 2 else 0.175
 
-    # Create flexible grid (2 columns)
-    cell_widths = [4.0, 4.0]
-    cell_heights = [4.0]
-    lefts = [0.75, 0.75]
-    rights = [0.75, 0.75]
-    bottoms = [0.75]
-    tops = [0.75]
-    fig, get_axes = flexible_gridspec(cell_widths, cell_heights, lefts, rights, bottoms, tops)
-    ax0 = get_axes(0, 0)
-    ax1 = get_axes(0, 1)
-
-    # Plot raw RMSE
-    plot_rmse_bars(ax0, rmse_raw, channels, height=height, colors=colors, labels=labels, x_range=x_range[0],
-                   title=title[0], x_label=x_label[0], y_label=y_label[0])
-
     # Plot normalized RMSE
-    plot_rmse_bars(ax1, rmse_norm, channels, height=height, colors=colors, labels=labels, x_range=x_range[1],
-                   title=title[1], x_label=x_label[1], y_label=y_label[1])
+    if rmse_norm is not None:
+        # Create flexible grid (2 columns)
+        cell_widths = [4.0, 4.0]
+        cell_heights = [4.0]
+        lefts = [0.75, 0.75]
+        rights = [0.75, 0.75]
+        bottoms = [0.75]
+        tops = [0.75]
+        fig, get_axes = flexible_gridspec(cell_widths, cell_heights, lefts, rights, bottoms, tops)
+        ax0 = get_axes(0, 0)
+        ax1 = get_axes(0, 1)
+        # Plot raw RMSE
+        plot_rmse_bars(ax0, rmse_raw, channels, height=height, colors=colors, labels=labels, x_range=x_range[0],
+                       title=title[0], x_label=x_label[0], y_label=y_label[0])
+        plot_rmse_bars(ax1, rmse_norm, channels, height=height, colors=colors, labels=labels, x_range=x_range[1],
+                       title=title[1], x_label=x_label[1], y_label=y_label[1])
+    else:
+        # Create flexible grid (2 columns)
+        cell_widths = [4.0]
+        cell_heights = [4.0]
+        lefts = [0.75]
+        rights = [0.75]
+        bottoms = [0.75]
+        tops = [0.75]
+        fig, get_axes = flexible_gridspec(cell_widths, cell_heights, lefts, rights, bottoms, tops)
+        ax0 = get_axes(0, 0)
+        # Plot raw RMSE
+        plot_rmse_bars(ax0, rmse_raw, channels, height=height, colors=colors, labels=labels, x_range=x_range[0],
+                       title=title[0], x_label=x_label[0], y_label=y_label[0])
 
     # Save plot
     if figname:
@@ -1212,7 +1224,7 @@ def geostationnary_map(fig, ax, lat, lon, c, c_min, c_max, font_size=13, title='
     # Set title
     ax.set_title(title, fontsize=font_size, y=title_pad)
     # Set legend
-    apply_colorbar(ax, scat, font_size=cb_font, label=cb_label, label_pad=cb_labelpad, orientation='vertical',
+    apply_colorbar(ax, scat, font_size=cb_font, label=cb_label, label_pad=cb_labelpad, orientation='horizontal',
                    rotation=cb_rot, side=cb_side, size=cb_size, pad=cb_pad, vmin=c_min, vmax=c_max,
                    ticks=cb_ticks, tickw=cb_tickw, tickl=cb_tickl, tickdir=cb_dir, ticklabels=cb_ticklabels)
 

@@ -47,10 +47,16 @@ class FigureLogger(ForwardFigureLogger):
 
         # Labels
         prof_labels = model.prof_vars if hasattr(model, 'prof_vars') else None
+        # breakpoint()
         # Pressure_levels
-        pressure_levels = 0.01 * (
-            instantiate(trainer.datamodule.stage.valid.input.pressure.normalization, inverse_transform=True)
-            (to_numpy(model.results['pressure']))).flatten()
+        # if model.results['pressure'].min() > 0:
+        #     pressure_levels = 0.01 * (
+        #         instantiate(trainer.datamodule.stage.valid.input.pressure.normalization, inverse_transform=True)
+        #         (to_numpy(model.results['pressure']))).flatten()
+        # else:
+        # Convert from log10 space to physical space
+        pressure_levels = 0.01*10**(instantiate(trainer.datamodule.stage.valid.input.pressure.normalization, inverse_transform=True)
+            (to_numpy(model.results['pressure'])).flatten())
 
         # Profiles
         prof_mean = [to_numpy(model.metrics['prof_target']['mean']),

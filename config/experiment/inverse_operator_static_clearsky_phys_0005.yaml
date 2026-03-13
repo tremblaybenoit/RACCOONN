@@ -78,8 +78,8 @@ data:
             path: ${....dir}/predict_hofx_v3_smooth_cs.npy
         # Atmospheric profiles
         prof_background:
-          load:
-            path: ${....dir}/prof_background.npy
+          load: ${data.stage.train.vars.prof.load}
+          #  path: ${....dir}/prof_background.npy
           normalization: ${data.stage.train.vars.prof.normalization}
     # Validation set
     valid:
@@ -99,8 +99,8 @@ data:
             path: ${....dir}/predict_hofx_v3_smooth_cs.npy
         # Atmospheric profiles
         prof_background:
-          load:
-            path: ${....dir}/prof_background.npy
+          load: ${data.stage.valid.vars.prof.load}
+          #  path: ${....dir}/prof_background.npy
           normalization: ${data.stage.train.vars.prof.normalization}
     # Test set
     test:
@@ -120,8 +120,8 @@ data:
             path: ${....dir}/predict_hofx_v3_smooth_cs.npy
         # Atmospheric profiles
         prof_background:
-          load:
-            path: ${....dir}/prof_background.npy
+          load: ${data.stage.test.vars.prof.load}
+          #  path: ${....dir}/prof_background.npy
           normalization: ${data.stage.train.vars.prof.normalization}
 
 # Loader configuration
@@ -190,14 +190,14 @@ model:
     clear_sky: false
     # Loss term for observations
     loss_obs:
-      _target_: inverse.model.loss.MSE
+      _target_: inverse.model.loss.DiagonalQuadraticForm
     # Loss term for model variables
     loss_model:
-      _target_: inverse.model.loss.QuadraticForm
-      matrix:
-        _target_: data.pca.load_pca_buffers
-        path: ../static_clearskies_float32/normalization/pca_clouds_multivariate_10.pkl
-        buffer: 'B_inv'
+      _target_: inverse.model.loss.MSE  #QuadraticForm
+      #matrix:
+      #  _target_: data.pca.load_pca_buffers
+      #  path: ../static_clearskies_float32/normalization/pca_clouds_univariate_10.pkl
+      #  buffer: 'B_inv'
     # Loss term for boundary conditions
     loss_bcs:
       _target_: inverse.model.loss.MSE
@@ -229,7 +229,7 @@ model:
       layernorm:
         _target_: torch.nn.Identity
       activation:
-        _target_: forward.model.activation.SuperLearnableSwish
+        _target_: forward.model.activation.NonLearnableSwish
         in_features: ${model.architecture.hidden_layer.in_features}
       dropout_rate: 0.1
       init_func:

@@ -71,6 +71,11 @@ data:
               var: 'prof'
               dtype: ${data.dtype}
             axis: 1
+        # Pressure
+        pressure:
+          # Loading function
+          load:
+            path: ${....dir}/pressure_log10.npy
         # Brightness temperatures
         hofx:
           # Loading function
@@ -87,6 +92,11 @@ data:
           type: ${data.stage.train.vars.prof.type}
           # Normalization function and parameters
           normalization: ${data.stage.train.vars.prof.normalization}
+        # Pressure
+        pressure:
+          # Loading function
+          load:
+            path: ${....dir}/pressure_log10.npy
         # Brightness temperatures
         hofx:
           # Loading function
@@ -103,6 +113,11 @@ data:
           type: ${data.stage.train.vars.prof.type}
           # Normalization function and parameters
           normalization: ${data.stage.train.vars.prof.normalization}
+        # Pressure
+        pressure:
+          # Loading function
+          load:
+            path: ${....dir}/pressure_log10.npy
         # Brightness temperatures
         hofx:
           # Loading function

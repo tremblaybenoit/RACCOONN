@@ -114,7 +114,10 @@ def generate_pca_buffers(data: np.ndarray, mode: str='multivariate', pressure_fi
     vmin = np.min(data, axis=0, keepdims=True)
     vmax = np.max(data, axis=0, keepdims=True)
     increment = data - mu
+    increment_std = np.std(increment, axis=0, keepdims=True) + 1e-12
     standardized_data = increment / std  # (N, V, L)
+    normalized_data = (data - vmin.min(axis=(0, 2), keepdims=True))/(vmax.max(axis=(0, 2), keepdims=True)-vmin.min(axis=(0, 2), keepdims=True))  # (N, V, L)
+    normalized_std = np.std(normalized_data, axis=0, keepdims=True) + 1e-12  # (V, L)
     breakpoint()
 
     # Multivariate PCA
@@ -138,11 +141,37 @@ def generate_pca_buffers(data: np.ndarray, mode: str='multivariate', pressure_fi
         max_ev = np.max(pca.explained_variance_)
         damped_ev = pca.explained_variance_ + alpha * max_ev
         B_inv = pca.components_.T @ np.diag(1.0/damped_ev) @ pca.components_
-        B_inv += (1.0 / (alpha * max_ev)) * (np.eye(B_inv.shape[0]) - pca.components_.T @ pca.components_)
+        # B_inv += (1.0 / (alpha * max_ev)) * (np.eye(B_inv.shape[0]) - pca.components_.T @ pca.components_)
         # Make diagonal-only version in case we want to use it for whitening
         B_inv_d = np.diag(np.diag(B_inv))
-        B_inv_phys = B_inv * np.outer(1.0/std.flatten(), 1.0/std.flatten())
-        B_inv_d_phys = B_inv_d * np.outer(1.0/std.flatten(), 1.0/std.flatten())
+
+        # Robustly convert inverse-covariance from standardized space to physical units.
+        # std has shape (1, V, L) (because keepdims=True). Flatten to match the PCA flattening order.
+        std_flat = std.flatten()
+
+        # Clip extremely small standard deviations to avoid huge scaling factors.
+        # If your data legitimately contains near-zero-variance levels, consider a larger floor.
+        eps_base = 1e-5
+        eps = max(eps_base, 0.01 * float(np.median(std_flat)))
+        std_floor = np.maximum(std_flat, eps)
+        # breakpoint()
+        # std_floor = std_flat
+
+        # Scaling factors (1/std) for rows and columns. Use broadcasting to avoid an explicit outer allocation.
+        factors = 1.0 / std_floor
+        # Apply row and column scaling: (D^{-1} B_inv D^{-1}) = diag(factors) @ B_inv @ diag(factors)
+        B_inv_phys = (factors[:, None] * B_inv) * factors[None, :]
+        B_inv_d_phys = (factors[:, None] * B_inv_d) * factors[None, :]
+
+        # Debug / diagnostic info (useful when B_inv_phys has unexpectedly large values)
+        try:
+            max_abs = float(np.max(np.abs(B_inv_phys)))
+            mean_abs = float(np.mean(np.abs(B_inv_phys)))
+        except Exception:
+            max_abs = None
+            mean_abs = None
+        print(f"std_flat: min={std_flat.min():.3e}, median={np.median(std_flat):.3e}, max={std_flat.max():.3e}, eps={eps}")
+        print(f"B_inv_phys: max_abs={max_abs}, mean_abs={mean_abs}")
 
         # Store PCA buffers in a dictionary
         pca_buffs = {
@@ -158,7 +187,7 @@ def generate_pca_buffers(data: np.ndarray, mode: str='multivariate', pressure_fi
             'B_inv': B_inv,
             'B_inv_d': B_inv_d,
             'B_inv_phys': B_inv_phys,
-            'B_inv_d_phys': B_inv_d_phys,
+            'B_inv_d_phys': np.diag(1.0/increment_std.flatten()**2),
         }
 
     elif mode == 'univariate':
@@ -198,9 +227,21 @@ def generate_pca_buffers(data: np.ndarray, mode: str='multivariate', pressure_fi
             # Make diagonal-only version in case we want to use it for whitening
             B_inv_d = np.diag(np.diag(B_inv_v))
 
-            B_inv_phys_v = B_inv_v * np.outer(1.0/std_v.flatten(), 1.0/std_v.flatten())
-            B_inv_d_phys = B_inv_d * np.outer(1.0/std_v.flatten(), 1.0/std_v.flatten())
+            # Robust scaling for per-variable inverse covariance (avoid huge values when std is tiny)
+            std_v_flat = std_v.flatten()
+            eps_v = max(1e-5, 0.01 * float(np.median(std_v_flat)))
+            std_v_floor = np.maximum(std_v_flat, eps_v)
+            factors_v = 1.0 / std_v_floor
+            # B_inv_phys_v = (factors_v[:, None] * pca.components_.T @ np.diag(1.0/pca.explained_variance_) @ pca.components_) * factors_v[None, :]
+            B_inv_phys_v = (factors_v[:, None] * B_inv_v) * factors_v[None, :]
+            B_inv_d_phys = (factors_v[:, None] * B_inv_d) * factors_v[None, :]
             B_inv_phys.append(B_inv_phys_v)
+            # Debug logging for this variable
+            try:
+                print(f"var={v} std_v: min={std_v_flat.min():.3e}, median={np.median(std_v_flat):.3e}, max={std_v_flat.max():.3e}, eps_v={eps_v}")
+                print(f"var={v} B_inv_phys_v: max_abs={float(np.max(np.abs(B_inv_phys_v))):.3e}")
+            except Exception:
+                pass
 
             # Store PCA buffers in a dictionary
             pca_buffs[v] = {
@@ -215,7 +256,7 @@ def generate_pca_buffers(data: np.ndarray, mode: str='multivariate', pressure_fi
                 'scales_inv': 1.0/np.sqrt(pca.explained_variance_.reshape(1, -1)),
                 'B_inv': B_inv_v,
                 'B_inv_d': B_inv_d,
-                'B_inv_phys': B_inv_phys,
+                'B_inv_phys': B_inv_phys_v,
                 'B_inv_d_phys': B_inv_d_phys,
             }
 

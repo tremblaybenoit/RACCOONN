@@ -3,7 +3,7 @@ import os
 import numpy as np
 from typing import Callable
 import torch.nn as nn
-from torch.nn import MSELoss
+from forward.model.loss import CRPS
 
 
 def mse(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
@@ -801,6 +801,8 @@ class VarLossP(VarLoss):
         if isinstance(self.loss_obs, DiagonalQuadraticForm):
             loss['obs'] = self.loss_obs(hofx_pred[:, :10], target['hofx'][:, :10],
                                         target['hofx'][:, 10:])
+        elif isinstance(self.loss_obs, CRPS):
+            loss['obs'] = self.loss_obs(hofx_pred, target['hofx'])
         else:
             loss['obs'] = self.loss_obs(hofx_pred[:, :10],
                                         target['hofx'][:, :10])
@@ -825,6 +827,96 @@ class VarLossP(VarLoss):
                 else:
                     loss['model'] = self.loss_model(pred['prof'+self.key_model],
                                                     pred['prof_background'+self.key_model])
+            # Total
+            loss['total'] += self.lambda_model * loss['model'].mean()
+
+        # Sobolev regularization loss
+        if self.lambda_sobolev > 0.0:
+            loss['sobolev'] = self.sobolev_loss_fn(pred['prof'], input)
+            loss['total'] += self.lambda_sobolev * loss['sobolev'].mean()
+
+        # Boundary condition losses (where the variance is zero)
+        if self.loss_bcs is not None and self.pressure_filter is not None:
+            loss['bcs'] = self.loss_bcs(pred['prof'][:, ~pressure_filter], target['prof'][:, ~pressure_filter])
+            # Total
+            loss['total'] += self.lambda_bcs * loss['bcs'].mean()
+
+        return loss, hofx_pred
+
+
+class VarLossR(VarLoss):
+
+    def __call__(self, pred: dict, target: dict, input: dict=None) -> tuple[dict, torch.Tensor]:
+        """ Compute the combined loss between predicted profiles and target data.
+
+        Parameters
+        ----------
+        pred: dict. Dictionary containing predicted tensors.
+        target: dict. Dictionary containing target tensors.
+        input: dict. Dictionary containing input tensors for Sobolev loss.
+
+        Returns
+        -------
+        loss: dict. Dictionary containing total, observation, and model losses.
+        bt_pred: torch.Tensor. Forward-modeled brightness temperature predictions.
+        """
+
+        # Mask
+        if self.pressure_filter is not None:
+            pressure_filter = self.pressure_filter
+            pred['prof'][:, ~pressure_filter] = target['prof_background'][:, ~pressure_filter]
+            pred['prof_phys'][:, ~pressure_filter] = pred['prof_background_phys'][:, ~pressure_filter]
+            pred['prof_min_max'][:, ~pressure_filter] = pred['prof_background_min_max'][:, ~pressure_filter]
+            pred['prof_mean_stdev'][:, ~pressure_filter] = pred['prof_background_mean_stdev'][:, ~pressure_filter]
+        else:
+            pressure_filter = torch.ones_like(pred['prof_phys'], dtype=torch.bool, device=pred['prof_phys'].device)
+
+        # Compute the forward model output
+        if self.clear_sky:
+            if self.prof_pred is not None:
+                pred_prof = self.prof_pred[:pred['prof'].shape[0]].clone()
+            else:
+                pred_prof = torch.zeros((pred['prof'].shape[0], 9, pred['prof'].shape[2]), device=pred['prof'].device)
+            pred_prof[:, 0:1, ...] = pred['prof'][:, 0:1, :].clone()  #  Air temperature
+            pred_prof[:, 4:5, ...] = pred['prof'][:, 1:2, :].clone()  #  Ice particle effective radius
+            pred_prof[:, 8:9, ...] = pred['prof'][:, 2:3, :].clone()  #  Ozone mixing ratio
+            hofx_pred = self.forward_model(pred_prof, target)
+        else:
+            hofx_pred = self.forward_model(pred['prof'+self.key_obs], target)
+
+        # Initialize loss dictionary
+        loss = {}
+
+        # Observation loss: Some observation losses may require additional inputs
+        if isinstance(self.loss_obs, DiagonalQuadraticForm):
+            loss['obs'] = self.loss_obs(hofx_pred[:, :10], target['hofx'][:, :10],
+                                        target['hofx'][:, 10:])
+        elif isinstance(self.loss_obs, CRPS):
+            loss['obs'] = self.loss_obs(hofx_pred, target['hofx'])
+        else:
+            loss['obs'] = self.loss_obs(hofx_pred[:, :10],
+                                        target['hofx'][:, :10])
+        # Total
+        loss['total'] = self.lambda_obs * loss['obs'].mean()
+
+        # Model losses: Some model losses may require additional inputs
+        if self.loss_model is not None:
+            if isinstance(self.loss_model, DiagonalQuadraticForm):
+                if self.pressure_filter is not None:
+                    loss['model'] = self.loss_model(pred['prof'][:, pressure_filter],
+                                                    target['prof_background'][:, pressure_filter],
+                                                    target['prof_increment'])
+                else:
+                    loss['model'] = self.loss_model(pred['prof'],
+                                                    target['prof_background'],
+                                                    target['prof_increment'])
+            else:
+                if self.pressure_filter is not None:
+                    loss['model'] = self.loss_model(pred['prof_mean_stdev'][:, pressure_filter],
+                                                    pred['prof_target_mean_stdev'][:, pressure_filter])
+                else:
+                    loss['model'] = self.loss_model(pred['prof'+self.key_model],
+                                                    pred['prof_target'+self.key_model])
             # Total
             loss['total'] += self.lambda_model * loss['model'].mean()
 

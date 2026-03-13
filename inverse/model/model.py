@@ -9,6 +9,7 @@ from inverse.model.encoding import IdentityPositionalEncoding
 from utilities.instantiators import instantiate
 from data.transformations import mean_stdev, min_max
 import numpy as np
+import math
 
 
 class KaimingInit(nn.Module):
@@ -68,7 +69,8 @@ class SwishInit:
                 # Use Xavier Uniform for the output.
                 # This keeps the whitened PCA coefficients centered at zero
                 # while allowing enough range to hit +/- 2.0 std dev.
-                nn.init.xavier_uniform_(module.weight)
+                # nn.init.xavier_uniform_(module.weight)
+                nn.init.uniform_(module.weight, -1e-5, 1e-5)
 
             elif self.is_first_layer:
                 # The "SIREN-lite" trick: Initialize the first layer with
@@ -97,6 +99,51 @@ class SwishInit:
                     # start by doing the exact same thing.
                     nn.init.uniform_(module.bias, -0.05, 0.05)
 
+class NeuralFieldInit:
+    """
+    Custom initializer for residual MLPs with Swish activations.
+    - is_first_layer: optional special handling for the first layer
+    - is_head: final prediction layer (usually followed by sigmoid)
+    """
+
+    def __init__(self, is_first_layer: bool = False, is_head: bool = False):
+        self.is_first_layer = is_first_layer
+        self.is_head = is_head
+
+    def __call__(self, module):
+        if not isinstance(module, nn.Linear):
+            return
+
+        fan_in = module.weight.data.size(1)
+
+        # ---- 1. First layer (optional special treatment) ----
+        if self.is_first_layer:
+            std = math.sqrt(2.0 / fan_in)
+            nn.init.normal_(module.weight, mean=0.0, std=std)
+            if module.bias is not None:
+                nn.init.zeros_(module.bias)
+            return
+
+        # ---- 2. Head layer (output) ----
+        if self.is_head:
+            # Zero init is safest for sigmoid outputs
+            nn.init.zeros_(module.weight)
+            if module.bias is not None:
+                nn.init.zeros_(module.bias)
+            return
+
+        # ---- 3. Residual block output layers ----
+        if getattr(module, "_is_residual_out", False):
+            nn.init.normal_(module.weight, mean=0.0, std=1e-4)
+            if module.bias is not None:
+                nn.init.zeros_(module.bias)
+            return
+
+        # ---- 4. Standard hidden layers ----
+        std = math.sqrt(2.0 / fan_in) * 0.5  # scaled He init for Swish + residuals
+        nn.init.normal_(module.weight, mean=0.0, std=std)
+        if module.bias is not None:
+            nn.init.zeros_(module.bias)
 
 class XavierInit(nn.Module):
     """
@@ -635,6 +682,8 @@ class HydraResidualMLP(nn.Module):
                         if output_layer_l._target_ == 'inverse.model.model.SirenResidualBlock':
                             output_layer.out_features = output_layer_l.in_features
                             output_layer_l.out_features = output_layer_l.in_features
+                    elif l == 0:
+                        output_layer_l.in_features = hidden_layer.out_features
                     else:
                         output_layer_l.in_features = output_layer.out_features
                     if hasattr(output_layer_l.activation, 'in_features'):
@@ -976,7 +1025,7 @@ class PINNverseOperatorP(PINNverseOperator):
 
     def __init__(self, optimizer: DictConfig = None, loss_func: DictConfig = None, lr_scheduler: DictConfig = None,
                  architecture: DictConfig = None, parameters: DictConfig = None, transform: DictConfig = None, stats: DictConfig = None,
-                 sigmoid: bool = False, min_max: bool = True):
+                 sigmoid: bool = False, min_max: bool = True, pca_buffers: DictConfig = None):
 
         # Class inheritance
         super().__init__(optimizer=optimizer, loss_func=loss_func, lr_scheduler=lr_scheduler,
@@ -988,6 +1037,13 @@ class PINNverseOperatorP(PINNverseOperator):
         self.stats = instantiate(stats) if stats is not None else None
         self.sigmoid = sigmoid
         self.sigmoid_stats = {'min': (self.stats['min'] - self.stats['mean']) / self.stats['stdev'], 'max': (self.stats['max'] - self.stats['mean'])/ self.stats['stdev']}
+
+        # PCA Buffers
+        pca_buffers = instantiate(pca_buffers)
+        self.register_buffer('basis', torch.tensor(pca_buffers['basis']))  # (270, 1143)
+        self.register_buffer('mu', torch.tensor(pca_buffers['mu']))  # (1143,)
+        self.register_buffer('std', torch.tensor(pca_buffers['std']))  # (1143,)
+        self.register_buffer('scales', torch.tensor(pca_buffers['scales']))  # (270,)
 
     def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
         """ Perform training/validation/test step.
@@ -1018,11 +1074,11 @@ class PINNverseOperatorP(PINNverseOperator):
                 pred['prof_phys'] = pred['prof'].clone()
 
             pred['prof_min_max'] = pred['prof'].clone()
-            pred['prof_mean_stdev'] = mean_stdev(pred['prof_phys'].clone(), self.stats, axis=None)
+            pred['prof_mean_stdev'] = mean_stdev(pred['prof_phys'].clone(), self.stats, axis=None)#, stdev_thresh=1.0*np.ones_like(self.stats['stdev']))
             pred['prof_background_min_max'] = batch['target']['prof_background'].clone()
-            pred['prof_background_mean_stdev'] = mean_stdev(pred['prof_background_phys'].clone(), self.stats, axis=None)
+            pred['prof_background_mean_stdev'] = mean_stdev(pred['prof_background_phys'].clone(), self.stats, axis=None)#, stdev_thresh=1.0*np.ones_like(self.stats['stdev']))
             pred['prof_target_min_max'] = batch['target']['prof'].clone()
-            pred['prof_target_mean_stdev'] = mean_stdev(pred['prof_target_phys'].clone(), self.stats, axis=None)
+            pred['prof_target_mean_stdev'] = mean_stdev(pred['prof_target_phys'].clone(), self.stats, axis=None)#, stdev_thresh=1.0*np.ones_like(self.stats['stdev']))
         else:
 
             # Compute profiles
@@ -1039,6 +1095,9 @@ class PINNverseOperatorP(PINNverseOperator):
             if self.transform is not None:
                 pred['prof_phys'] = self.transform(pred['prof'].clone())
                 pred['prof_target_phys'] = self.transform(batch['target']['prof'].clone())
+                # pred['prof_phys'][:, 0:1, :] = pred['prof_target_phys'][:, 0:1, :].clone()
+                # pred['prof_phys'][:, 1:2, :] = pred['prof_target_phys'][:, 1:2, :].clone()
+                # pred['prof_phys'][:, 2:3, :] = pred['prof_target_phys'][:, 2:3, :].clone()
                 pred['prof_background_phys'] = self.transform(batch['target']['prof_background'].clone())
             else:
                 pred['prof_phys'] = pred['prof'].clone()
@@ -1051,10 +1110,15 @@ class PINNverseOperatorP(PINNverseOperator):
             pred['prof_target_min_max'] = min_max(pred['prof_target_phys'].clone(), self.stats, axis=1)
             pred['prof_target_mean_stdev'] = batch['target']['prof'].clone()
 
+        # Whitened PCA space
+        pred['prof_white'] = (pred['prof_mean_stdev'].clone().view(pred['prof_mean_stdev'].shape[0], -1) @ self.basis.T)/ self.scales
+        pred['prof_target_white'] = (pred['prof_target_mean_stdev'].clone().view(pred['prof_mean_stdev'].shape[0], -1) @ self.basis.T)/ self.scales
+        pred['prof_background_white'] = (pred['prof_background_mean_stdev'].clone().view(pred['prof_mean_stdev'].shape[0], -1) @ self.basis.T)/ self.scales
+
         # Register standardized for plotting
-        pred['prof'] = pred['prof_phys'].clone()
-        batch['target']['prof'] = pred['prof_target_phys'].clone()
-        batch['target']['prof_background'] = pred['prof_background_phys'].clone()
+        # pred['prof'] = pred['prof_mean_stdev'].clone()
+        # batch['target']['prof'] = pred['prof_target_mean_stdev'].clone()
+        # batch['target']['prof_background'] = pred['prof_background_mean_stdev'].clone()
 
         # Compute loss function
         loss, pred['hofx'] = self.loss_func(pred, batch['target'], batch['input'])
