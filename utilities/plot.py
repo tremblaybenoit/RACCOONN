@@ -580,6 +580,69 @@ def fig_vertical_profiles(prof: list[np.ndarray], label: list[str], stdev: list[
     return fig
 
 
+def fig_vertical_profiles3(prof: list[np.ndarray], label: list[str], stdev: list[np.ndarray] = None,
+                          y: np.ndarray=None, x_label: str = None, y_label: Union[list, str]=None,
+                          color: Union[list, str]=None, title: Union[list, str] = None, x_range=None):
+    """
+    Plot vertical profiles for target and prediction data using flexible gridspec.
+
+    Parameters
+    ----------
+    prof : list of numpy.ndarray. List containing mean profiles. Each array should have shape (n_profiles, n_levels).
+    label : list of str. Labels for the target and prediction data.
+    stdev : list of numpy.ndarray, optional. List containing standard deviation profiles. Each array should have shape (n_profiles, n_levels).
+    y : np.ndarray, optional. Vertical levels. If None, levels will be generated as 0, 1, ..., n_levels-1.
+    y_label : Union[list[str, ...], str], optional. Labels for the vertical levels. If None, default labels will be used.
+    x_label : str, optional. Label for the x-axis. If None, default label will be used.
+    color : Union[list[str, ...], str], optional. Colors for the target and prediction data. If None, default colors will be used.
+    title : str, optional. Title for the plots. If None, default titles will be used.
+    x_range : tuple, optional. Range for the x-axis. If None, computed from data.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure. Figure with vertical profiles for target and prediction.
+    """
+
+    # Check shapes
+    n_profiles, n_levels = prof[0].shape
+    for src in prof:
+        if src.shape != (n_profiles, n_levels):
+            raise ValueError("All source arrays must have the same shape (n_samples, n_profiles, n_levels).")
+
+    # If no colors, assign default colors
+    if color is None:
+        color = [colors[list(colors.keys())[c]] for c in range(len(prof))]
+
+    # From n_profiles, determine optimal layout for flexible_gridspec
+    n_rows = int(np.ceil(np.sqrt(n_profiles))) if n_profiles > 3 else 1
+    n_cols = int(np.ceil(n_profiles / n_rows)) if n_profiles > 3 else n_profiles
+    # Create a flexible gridspec
+    cell_widths = [3.0] * n_cols
+    # cell_widths = [3.1] * n_cols
+    cell_heights = [4.0] * n_rows
+    # lefts = [0.75] * n_cols
+    lefts = [0.75, 0.125, 0.125]
+    # lefts = [0.75, 0.05, 0.05]
+    # rights = [0.75] * n_cols
+    rights = [0.125, 0.125, 0.75]
+    # rights = [0.05, 0.05, 0.75]
+    bottoms = [0.75] * n_rows
+    tops = [0.75] * n_rows
+    fig, get_axes = flexible_gridspec(cell_widths, cell_heights, lefts, rights, bottoms, tops)
+
+    # Loop over profiles
+    for i in range(n_profiles):
+        ax = get_axes(i // n_cols, i % n_cols)
+        # Plot the vertical profile for each channel
+        stacked_prof = np.stack([src[i, :] for src in prof], axis=0)
+        stacked_stdev = np.stack([src[i, :] for src in stdev], axis=0) if stdev is not None else None
+        plot_title = f'Vertical profile #{i + 1}' if title is None else title[i]
+        plot_vertical_profiles(ax, stacked_prof, err=stacked_stdev, title=plot_title, y=y, y_label=y_label,
+                               label=label, x_label=x_label, x_range=x_range, color=color)
+
+    return fig
+
+
 def plot_rmse_bars(ax, values, positions, height=0.3, colors=None, labels=None, x_range=None, x_ascale='linear',
                    font_size=13, title='RMSE by channel', title_pad=1.005, x_label='RMSE (units)', y_label='Channels',
                    y_labelpad=5, x_labelpad=3, tickw=1, tickl=2.5, tickdir='out', lg_loc='upper right', lg_font=10,

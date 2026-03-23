@@ -146,6 +146,13 @@ data:
 loader:
   batch_size: 24
   num_workers: 8
+  # Split the data into training, validation, and test sets
+  stage:
+    # Prediction set
+    predict:
+      results:
+        hofx:
+          path: ${data.stage.predict.dir}/predict_hofx_clearskies_minmax_1.npy
 
 # Model parameters
 model:

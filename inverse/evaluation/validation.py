@@ -5,7 +5,7 @@ from omegaconf import DictConfig
 from data.statistics import statistics
 from utilities.logic import get_config_path
 from utilities.instantiators import instantiate
-from utilities.plot import fig_rmse_bars, fig_vertical_profiles, save_plot
+from utilities.plot import fig_rmse_bars, fig_vertical_profiles3, save_plot
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ def main(config: DictConfig) -> None:
     prof_labels = ['(c) Test set - Air temperature profile',
                    '(d) Test set - Humidity mixing ratio profile',
                    '(e) Test set - Ozone mixing ratio profile']
-    fig0 = fig_vertical_profiles([stats_prior['mean'], stats_prof['mean']], prof_mean_labels,
+    fig0 = fig_vertical_profiles3([stats_prior['mean'], stats_prof['mean']], prof_mean_labels,
                                  stdev=[stats_prior['stdev'], stats_prof['stdev']],
                                  y=pressure, y_label='Pressure (hPa)',
                                  x_label='Normalized profile value (no units)', color=prof_mean_colors,
@@ -75,7 +75,7 @@ def main(config: DictConfig) -> None:
                    '(d) Test set - Humidity mixing ratio RMSE',
                    '(e) Test set - Ozone mixing ratio RMSE']
     # Profile RMSE
-    fig1 = fig_vertical_profiles([stats_prior['rmse'], stats_prof['rmse']], prof_rmse_labels, y=pressure, y_label='Pressure (hPa)',
+    fig1 = fig_vertical_profiles3([stats_prior['rmse'], stats_prof['rmse']], prof_rmse_labels, y=pressure, y_label='Pressure (hPa)',
                                  x_label='Normalized profile RMSE (no units)', color=prof_rmse_colors,
                                  title=[f"Test set - {prof_label}" for prof_label in prof_labels])
     save_plot(fig1, config.paths.run_dir + '/Figure0_profile_rmse_test.png')
