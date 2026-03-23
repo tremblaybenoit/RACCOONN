@@ -9,7 +9,7 @@ defaults:
   - override /preparation: statistics
   - override /loader: forward_default
   - override /model: forward_emulator_smooth_cs
-  - override /trainer: gpu
+  - override /trainer: cpu
   - override /callbacks: forward_default
   - override /logger: default
 
@@ -24,6 +24,7 @@ paths:
   task_dir: "../forward_outputs"
   run_id: "smooth_minmax_1"
   data_dir: "../static_clearskies_float32"
+  checkpoint_dir: 'forward/model/checkpoints/smooth_minmax_1'
 
 # Trainer configuration
 trainer:
@@ -83,6 +84,10 @@ data:
       vars:
         # Atmospheric profiles
         prof:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/prof_background.npy
           # Normalization function and parameters
           normalization: ${data.stage.train.vars.prof.normalization}
     # Prediction set
@@ -93,6 +98,10 @@ data:
       vars:
         # Atmospheric profiles
         prof:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/prof_background.npy
           # Normalization function and parameters
           normalization: ${data.stage.train.vars.prof.normalization}
 
@@ -106,7 +115,7 @@ loader:
     predict:
       results:
         hofx:
-          path: ${data.stage.predict.dir}/predict_hofx_clearskies_minmax_1.npy
+          path: ${data.stage.predict.dir}/predict_hofx_clearskies_minmax_1_background.npy
 
 # Model parameters
 model:

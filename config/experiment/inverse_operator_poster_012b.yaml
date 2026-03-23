@@ -9,7 +9,7 @@ defaults:
   - override /preparation: inverse_default
   - override /loader: inverse_static
   - override /model: inverse_operator
-  - override /trainer: gpu
+  - override /trainer: cpu
   - override /callbacks: inverse_default
   - override /logger: default
 
@@ -24,6 +24,7 @@ paths:
   task_dir: "../inverse_outputs"
   run_id: "phys_012b"
   data_dir: ../static_clearsky_${data.dtype}
+  checkpoint_dir: "inverse/model/checkpoints/phys_012b"
 
 # Trainer configuration
 trainer:
@@ -136,6 +137,12 @@ data:
           load:
             _target_: data.io.load_npy
             path: ${....dir}/predict_hofx_clearskies_minmax_1.npy
+        # Brightness temperatures
+        hofx_background:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/predict_hofx_clearskies_minmax_1_background.npy
         # Atmospheric profiles
         prof_background:
           load:
@@ -188,7 +195,7 @@ model:
       # Function
       _target_: inverse.model.loss.ForwardModel
       # Configuration of the forward model
-      checkpoint_path: '../forward_outputs/forward_emulator_clearskies_norm/checkpoints/smooth_minmax_1/model.ckpt'
+      checkpoint_path: 'forward/model/checkpoints/smooth_minmax_1/model.ckpt'
       config_path: 'model/forward_emulator_smooth_cs.yaml'
       # Precision
       dtype: ${data.dtype}

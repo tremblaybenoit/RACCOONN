@@ -63,7 +63,6 @@ stage:
       # Input coordinates
       lat: ${data.stage.test.vars.lat}
       lon: ${data.stage.test.vars.lon}
-      scans: ${data.stage.test.vars.scans}
       pressure: ${data.stage.test.vars.pressure}
     # Variables to use as targets or additional inputs
     target:

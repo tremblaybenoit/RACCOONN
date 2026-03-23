@@ -44,8 +44,8 @@ def main(config: DictConfig) -> None:
     logger.info("Plotting spatial distribution of training, validation and test sets...")
     colors = ['#56B4E9','#E69F00', '#009E73']
     cmap = ListedColormap(colors)
-    fig = fig_geostationnary(lon, lat, mask, mask.min(), mask.max(), title='Spatial distribution of data sets',
-                             cb_cmap=cmap, cb_ticks=3, cb_ticklabels=['Train', 'Valid', 'Test'], markersize=5.)
+    fig = fig_geostationnary(lon, lat, mask, mask.min(), mask.max(), title='(a) Spatial distribution of the data',
+                             cb_cmap=cmap, cb_ticks=3, cb_label='', cb_ticklabels=['Train', 'Valid', 'Test'], markersize=20.)
     save_plot(fig, os.path.join(config.paths.data_dir, f'split.png'))
 
 if __name__ == '__main__':

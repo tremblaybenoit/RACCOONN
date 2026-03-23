@@ -5,7 +5,9 @@ from omegaconf import DictConfig
 from data.statistics import statistics
 from utilities.logic import get_config_path
 from utilities.instantiators import instantiate
-from utilities.plot import fig_rmse_bars, fig_vertical_profiles3, save_plot
+from utilities.plot import fig_rmse_bars3, fig_vertical_profiles3, save_plot
+from data.io import load_pkl
+from data.transformations import min_max, mean_stdev
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -25,60 +27,78 @@ def main(config: DictConfig) -> None:
         None.
     """
 
+    stats = load_pkl(config.data.stage.test.vars.prof.normalization.stats.path)
+
     # Load test set results (predictions)
     logger.info("Load test set results...")
     prof_pred = instantiate(config.loader.stage.test.results.prof.load)
-    prof_prior = instantiate(config.loader.stage.test.results.prof_background.load)
+    prof_prior = instantiate(config.data.stage.test.vars.prof_background.load)
     hofx_pred = instantiate(config.loader.stage.test.results.hofx.load)
-    hofx_config = config.loader.stage.test.results.hofx.load
-    hofx_config.path = ''
-    hofx_prior = instantiate(hofx_config)
+    hofx_prior = instantiate(config.data.stage.test.vars.hofx_background.load)
 
     # Load test set references
     logger.info("Load test set references...")
     prof = np.array(instantiate(config.data.stage.test.vars.prof.load)).astype(np.float32)
     hofx = np.array(instantiate(config.data.stage.test.vars.hofx.load)).astype(np.float32)
-    pressure = 0.01*10**np.array(instantiate(config.data.stage.test.results.pressure.load)).astype(np.float32)
+    pressure = 0.01*10**np.array(instantiate(config.data.stage.test.vars.pressure.load)).astype(np.float32)
+    breakpoint()
+
+    # Norm. profiles
+    # prof = mean_stdev(prof, stats['prof'], axis=None)
+    # prof_pred = mean_stdev(prof_pred, stats['prof'], axis=None)
+    # prof_prior = mean_stdev(prof_prior, stats['prof'], axis=None)
+    # prof = min_max(prof, stats['prof'], axis=1)
+    # prof_pred = min_max(prof_pred, stats['prof'], axis=1)
+    # prof_prior = min_max(prof_prior, stats['prof'], axis=1)
 
     # Create masks and compute rmse by condition
-    stats_prof = statistics(prof_pred, axis=0, which=['mean', 'stdev', 'rmse'], target=prof)
+    stats_prof = statistics(prof, axis=0, which=['mean', 'stdev', 'rmse'], target=prof)
+    stats_pred = statistics(prof_pred, axis=0, which=['mean', 'stdev', 'rmse'], target=prof)
     stats_prior = statistics(prof_prior, axis=0, which=['mean', 'stdev', 'rmse'], target=prof)
     stats_hofx = statistics(hofx_pred[:, :10], axis=0, which=['rmse'], target=hofx[:, :10])
     stats_hofx_prior = statistics(hofx_prior[:, :10], axis=0, which=['rmse'], target=hofx[:, :10])
 
     # Plots
     logger.info("Plot comparison...")
-    fig2 = fig_rmse_bars([stats_hofx['rmse'], stats_hofx_prior['rmse']],
-                         x_range=[[0, 1.5]], labels=list(['Prediction', 'Prior']),
-                         title=["(b) Test set - Forward model RMSE"])
+    print(stats_hofx_prior['rmse'].max())
+    fig2 = fig_rmse_bars3([stats_hofx['rmse'], stats_hofx_prior['rmse']],
+                          x_range=[[0, 2.65]], labels=list(['Prediction', 'Prior']),
+                          title=["(b) Test set - Forward model RMSE"],
+                          # colors=['#ff7f0e', '#2ca02c'])
+                          colors=['#E69F00', '#009E73'])
     save_plot(fig2, config.paths.run_dir + '/Figure2_rmse_bars2_test.png')
 
-    prof_mean_labels, prof_mean_colors = ['Target', 'Prediction'], ['#1f77b4', '#ff7f0e']
-    prof_rmse_labels, prof_rmse_colors = ['Target-Prediction'], ['#ff7f0e']
+    prof_mean_labels, prof_mean_colors = ['Target', 'Prediction'], ['#56B4E9', '#E69F00']  # ['#1f77b4', '#ff7f0e']
+    prof_rmse_labels, prof_rmse_colors = ['Target-Prediction'], ['#E69F00']  # ['#ff7f0e']
     prof_mean_labels.insert(0, 'Prior')
-    prof_mean_colors.insert(0, '#2ca02c')
+    prof_mean_colors.insert(0, '#009E73')  # '#2ca02c')
     prof_rmse_labels.insert(0, 'Target-Prior')
-    prof_rmse_colors.insert(0, '#2ca02c')
-
+    prof_rmse_colors.insert(0, '#009E73')  # '#2ca02c')
+    # '#56B4E9', '#E69F00', '#009E73'
 
     # Profile Mean
-    prof_labels = ['(c) Test set - Air temperature profile',
-                   '(d) Test set - Humidity mixing ratio profile',
-                   '(e) Test set - Ozone mixing ratio profile']
-    fig0 = fig_vertical_profiles3([stats_prior['mean'], stats_prof['mean']], prof_mean_labels,
-                                 stdev=[stats_prior['stdev'], stats_prof['stdev']],
+    prof_labels = ['(c) Air temperature profile',
+                   '(d) Humidity mixing ratio profile',
+                   '(e) Ozone mixing ratio profile']
+    # x_labels = ['Normalized value (no units)', 'Normalized value (no units)', 'Normalized value (no units)']
+    x_labels = ['Profile (K)', 'Profile (g/kg)', 'Profile (ppmv)']
+    fig0 = fig_vertical_profiles3([stats_prior['mean'], stats_prof['mean'], stats_pred['mean']], prof_mean_labels,
+                                 stdev=[stats_prior['stdev'], stats_prof['stdev'], stats_pred['stdev']],
                                  y=pressure, y_label='Pressure (hPa)',
-                                 x_label='Normalized profile value (no units)', color=prof_mean_colors,
-                                 title=[f"Test set - {prof_label}" for prof_label in prof_labels])
+                                 x_label=x_labels, color=prof_mean_colors,
+                                 title=[f"{prof_label}" for prof_label in prof_labels])
     save_plot(fig0, config.paths.run_dir + '/Figure0_profile_test.png')
-    prof_labels = ['(c) Test set - Air temperature RMSE',
-                   '(d) Test set - Humidity mixing ratio RMSE',
-                   '(e) Test set - Ozone mixing ratio RMSE']
+    prof_labels = ['(f) Air temperature RMSE',
+                   '(g) Humidity mixing ratio RMSE',
+                   '(h) Ozone mixing ratio RMSE']
     # Profile RMSE
-    fig1 = fig_vertical_profiles3([stats_prior['rmse'], stats_prof['rmse']], prof_rmse_labels, y=pressure, y_label='Pressure (hPa)',
-                                 x_label='Normalized profile RMSE (no units)', color=prof_rmse_colors,
-                                 title=[f"Test set - {prof_label}" for prof_label in prof_labels])
+    # x_labels = ['Normalized value (no units)', 'Normalized value (no units)', 'Normalized value (no units)']
+    x_labels = ['RMSE (K)', 'RMSE (g/kg)', 'RMSE (ppmv)']
+    fig1 = fig_vertical_profiles3([stats_prior['rmse'], stats_pred['rmse']], prof_rmse_labels, y=pressure, y_label='Pressure (hPa)',
+                                 x_label=x_labels, color=prof_rmse_colors,
+                                 title=[f"{prof_label}" for prof_label in prof_labels])
     save_plot(fig1, config.paths.run_dir + '/Figure0_profile_rmse_test.png')
+    # breakpoint()
 
 if __name__ == '__main__':
     """ Predict using the inverse model.

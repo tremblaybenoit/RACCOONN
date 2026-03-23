@@ -1116,9 +1116,9 @@ class PINNverseOperatorP(PINNverseOperator):
         pred['prof_background_white'] = (pred['prof_background_mean_stdev'].clone().view(pred['prof_mean_stdev'].shape[0], -1) @ self.basis.T)/ self.scales
 
         # Register standardized for plotting
-        # pred['prof'] = pred['prof_mean_stdev'].clone()
-        # batch['target']['prof'] = pred['prof_target_mean_stdev'].clone()
-        # batch['target']['prof_background'] = pred['prof_background_mean_stdev'].clone()
+        pred['prof'] = pred['prof_phys'].clone()
+        batch['target']['prof'] = pred['prof_target_phys'].clone()
+        batch['target']['prof_background'] = pred['prof_background_phys'].clone()
 
         # Compute loss function
         loss, pred['hofx'] = self.loss_func(pred, batch['target'], batch['input'])

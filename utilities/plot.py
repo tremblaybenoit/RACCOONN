@@ -140,6 +140,11 @@ def apply_colorbar(ax, plot, font_size: float=13, label: str='Density', label_pa
         cbar_ax = fig.add_axes([left, bottom, width, height])
         # Create colorbar
         cbar = fig.colorbar(plot, cax=cbar_ax, orientation='horizontal')
+        # Set ticks if specified
+        if ticks is not None:
+            tick_values = np.linspace(vmin, vmax, ticks)
+            cbar.set_ticks(tick_values)
+            cbar.ax.set_xticklabels([f"{v:.2f}" for v in tick_values]) if ticklabels is None else cbar.ax.set_xticklabels(ticklabels)
         # Customize ticks
         cbar.ax.tick_params(axis='x', direction=tickdir, labelsize=font_size, width=tickw, length=tickl,
                             bottom=(side=='bottom'), top=(side=='top'))
@@ -148,10 +153,10 @@ def apply_colorbar(ax, plot, font_size: float=13, label: str='Density', label_pa
         cbar.ax.xaxis.set_label_position(side)
         if label is not None:
             cbar.set_label(label, labelpad=label_pad, rotation=rotation, size=font_size)
-        if ticks is not None:
-            tick_values = np.linspace(vmin, vmax, ticks)
-            cbar.set_ticks(tick_values)
-            cbar.ax.set_xticklabels([f"{v:.2f}" for v in tick_values])
+        #if ticks is not None:
+        #    tick_values = np.linspace(vmin, vmax, ticks)
+        #    cbar.set_ticks(tick_values)
+        #    cbar.ax.set_xticklabels([f"{v:.2f}" for v in tick_values])
     else:
         # Compute dimensions
         height = bbox.height
@@ -399,7 +404,7 @@ def plot_map(ax, img, img_alpha=1.0, img_norm='linear', img_coord=(0, 0), img_sh
 
 def plot_vertical_profiles(ax, data, err=None, font_size=13, title='Mean vertical profile ± std', title_pad=1.005, y=None,
                            x_label=r'Profile value ($\sigma$)', y_label='Height (levels)', y_labelpad=5, x_labelpad=3,
-                           x_range: tuple=None, y_range: tuple=None, x_nticks=6, y_nticks=6, y_invert=True, tickw=1,
+                           x_range: tuple=None, y_range: tuple=None, x_nticks=4, y_nticks=6, y_invert=True, tickw=1,
                            tickl=2.5, tickdir='out', color=None, linew=0.5, lines='-', label = None, alpha=0.2,
                            grid=True, grid_linew=0.5, x_ascale='linear', y_ascale='linear', lg_loc='best', lg_font=10,
                            lg_ncol=1, lg_npoints=1, lg_scale=4.0, lg_spacing=0.05):
@@ -511,6 +516,11 @@ def plot_vertical_profiles(ax, data, err=None, font_size=13, title='Mean vertica
         ax.xaxis.set_major_locator(plt.MaxNLocator(x_nticks))
     if y_nticks is not None:
         ax.yaxis.set_major_locator(plt.MaxNLocator(y_nticks))
+
+    # If y_label is none, show ticks but not tick labels
+    if y_label is None:
+        # Show ticks but not tick values/labels
+        ax.yaxis.set_tick_params(labelleft=False)
 
     # Set axis labels
     ax.set_ylabel(y_label, fontsize=font_size, labelpad=y_labelpad)
@@ -637,8 +647,8 @@ def fig_vertical_profiles3(prof: list[np.ndarray], label: list[str], stdev: list
         stacked_prof = np.stack([src[i, :] for src in prof], axis=0)
         stacked_stdev = np.stack([src[i, :] for src in stdev], axis=0) if stdev is not None else None
         plot_title = f'Vertical profile #{i + 1}' if title is None else title[i]
-        plot_vertical_profiles(ax, stacked_prof, err=stacked_stdev, title=plot_title, y=y, y_label=y_label,
-                               label=label, x_label=x_label, x_range=x_range, color=color)
+        plot_vertical_profiles(ax, stacked_prof, err=stacked_stdev, title=plot_title, y=y, y_label=y_label if i == 0 else None,
+                               label=label, x_label=x_label[i], x_range=x_range, color=color, x_nticks=5)
 
     return fig
 
@@ -706,6 +716,83 @@ def plot_rmse_bars(ax, values, positions, height=0.3, colors=None, labels=None, 
                                    left=True, right=True)
     ax.get_xaxis().set_tick_params(which='both', direction=tickdir, width=tickw, length=tickl, labelsize=font_size,
                                    bottom=True, top=True)
+
+    # Set axis labels
+    ax.set_ylabel(y_label, fontsize=font_size, labelpad=y_labelpad)
+    ax.set_xlabel(x_label, fontsize=font_size, labelpad=x_labelpad)
+    # Set title
+    ax.set_title(title, fontsize=font_size, y=title_pad)
+
+    # Set legend
+    if labels is not None:
+        ax.legend(loc=lg_loc, fontsize=lg_font, labelspacing=lg_spacing, numpoints=lg_npoints, ncol=lg_ncol,
+                  markerscale=lg_scale, fancybox=False)
+
+
+def plot_rmse_bars3(ax, values, positions, height=0.25, colors=None, labels=None, x_range=None, x_ascale='linear',
+                   font_size=13, title='RMSE by channel', title_pad=1.005, x_label='RMSE (units)', y_label='Channels',
+                   y_labelpad=5, x_labelpad=3, tickw=1, tickl=2.5, tickdir='out', lg_loc='upper right', lg_font=10,
+                   lg_ncol=1, lg_npoints=1, lg_scale=4.0, lg_spacing=0.05, **bar_kwargs):
+    """
+    Bar plot.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes. Axes to plot on.
+    values : numpy.ndarray. Values to plot. Must have shape (n_groups, n_values).
+    positions : numpy.ndarray. Positions of the bars on the y-axis. Must have shape (n_groups,).
+    height : float. Height of the bars.
+    colors : list or None. Colors for the bars. If None, defaults to a single color.
+    labels : list or None. Labels for the bars. If None, no labels are shown.
+    x_range : tuple or None. Range for the y-axis. If None, computed from data.
+    x_ascale : str. Scale for the y-axis. Default is 'linear'.
+    font_size : int. Font size for the plot.
+    title : str. Title of the plot.
+    title_pad : float. Padding for the title.
+    x_label : str. Label for the x-axis.
+    y_label : str. Label for the y-axis.
+    y_labelpad : float. Padding for the y-axis label.
+    x_labelpad : float. Padding for the x-axis label.
+    tickw : float. Width of the ticks.
+    tickl : float. Length of the ticks.
+    tickdir : str. Direction of the ticks. Default is 'out'.
+    lg_loc : str. Location of the legend.
+    lg_font : int. Font size for the legend.
+    lg_ncol : int. Number of columns in the legend.
+    lg_npoints : int. Number of points in the legend.
+    lg_scale : float. Scale for the legend markers.
+    lg_spacing : float. Spacing between legend entries.
+    bar_kwargs : dict. Additional keyword arguments for the bar plot.
+
+    Return
+    ------
+    None
+    """
+
+    # Compute min and max values
+    if x_range is None:
+        x_range = compute_min_max(values, symmetric=False)
+        x_range = (0, 1.2*x_range[1])
+    # Aspect ratio
+    # ax.set_aspect(1)
+
+    n = len(values)
+    for i in range(n):
+        bars = ax.barh(positions + i * height, values[i], color=None if colors is None else colors[i],
+                       height=height, align='edge', label=None if labels is None else labels[i], **bar_kwargs)
+        bar_font_size = 8 if n <= 2 else 7
+        ax.bar_label(bars, fmt="%.2f", fontsize=bar_font_size)
+
+    # Set axis limits
+    ax.set_xlim(x_range)
+    ax.set_xscale(x_ascale)
+
+    # Set axis ticks
+    ax.get_yaxis().set_tick_params(which='both', direction=tickdir, width=tickw, length=tickl, labelsize=font_size,
+                                   left=True, right=True)
+    ax.get_xaxis().set_tick_params(which='both', direction=tickdir, width=tickw, length=tickl, labelsize=font_size,
+                                   bottom=True, top=True)
+    ax.yaxis.set_major_locator(plt.MaxNLocator(11))
 
     # Set axis labels
     ax.set_ylabel(y_label, fontsize=font_size, labelpad=y_labelpad)
@@ -789,6 +876,124 @@ def fig_rmse_bars(rmse_raw: list, rmse_norm: list=None, figname=None, channels=N
         # Plot raw RMSE
         plot_rmse_bars(ax0, rmse_raw, channels, height=height, colors=colors, labels=labels, x_range=x_range[0],
                        title=title[0], x_label=x_label[0], y_label=y_label[0])
+
+    # Save plot
+    if figname:
+        save_plot(fig, figname)
+
+    return fig
+
+
+def fig_rmse_bars2(rmse_raw: list, figname=None, channels=None, height=0.25, colors=None,
+                  labels=None, x_range=None, y_label=None, x_label=None, title=None):
+    """
+    Plot raw and normalized RMSE bars side by side using a flexible gridspec.
+
+    Parameters
+    ----------
+    rmse_raw : dict. Dictionary containing 'cloudy' and 'clear' keys with error arrays.
+    figname : str or None. If provided, the figure will be saved to this filename.
+    channels : list or None. List of channel indices to plot. If None, defaults to channels 7 to 16.
+    height : float. Height of the bars. Default is 0.3.
+    colors : list or None. List of colors for the bars. If None, defaults to ['#D81B60', '#1E88E5'].
+    labels : list or None. List of labels for the bars. If None, defaults to ['Cloudy', 'Clear Sky'].
+    x_range : list or None. List of x-axis ranges for the two plots. If None, defaults to [None, None].
+    y_label : list or None. List of y-axis labels for the two plots. If None, defaults to ['Channels', 'Channels'].
+    x_label : list or None. List of x-axis labels for the two plots.
+              If None, defaults to ['RMSE (K)', 'RMSE (Standard Deviations)']. Default is None.
+    title : list or None. List of titles for the two plots.
+            If None, defaults to ['(a) Forward model errors', '(b) Normalized forward model errors'].
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+    """
+
+    # Axis
+    channels = channels if channels is not None else np.arange(7, 17)
+    y_label = y_label if y_label is not None else ['Channels']
+    x_label = x_label if x_label is not None else [f'RMSE (K)']
+    x_range = x_range if x_range is not None else [None, None]  # [(0, 1.6), (0, 2.0)]
+    title = title if title is not None else ['(b) Forward model RMSE']
+    # Colors and labels
+    labels = labels if labels is not None else ['Clear sky', 'Cloudy', 'Day', 'Night']
+    colors_dict = {'Clear sky': '#D81B60', 'Cloudy': '#1E88E5', 'Day': '#FFC107', 'Night': 'r'}
+    colors = colors if colors is not None else [colors_dict[label] for label in labels]
+    if height is None:
+        height = 0.35 if len(labels) <= 2 else 0.175
+
+    # Plot normalized RMSE
+    # Create flexible grid (2 columns)
+    cell_widths = [4.0]
+    cell_heights = [4.0]
+    lefts = [0.75]
+    rights = [0.45]
+    bottoms = [0.75]
+    tops = [0.75]
+    fig, get_axes = flexible_gridspec(cell_widths, cell_heights, lefts, rights, bottoms, tops)
+    ax0 = get_axes(0, 0)
+    # Plot raw RMSE
+    plot_rmse_bars(ax0, rmse_raw, channels, height=height, colors=colors, labels=labels, x_range=x_range[0],
+                   title=title[0], x_label=x_label[0], y_label=y_label[0])
+
+    # Save plot
+    if figname:
+        save_plot(fig, figname)
+
+    return fig
+
+
+def fig_rmse_bars3(rmse_raw: list, figname=None, channels=None, height=0.25, colors=None,
+                  labels=None, x_range=None, y_label=None, x_label=None, title=None):
+    """
+    Plot raw and normalized RMSE bars side by side using a flexible gridspec.
+
+    Parameters
+    ----------
+    rmse_raw : dict. Dictionary containing 'cloudy' and 'clear' keys with error arrays.
+    figname : str or None. If provided, the figure will be saved to this filename.
+    channels : list or None. List of channel indices to plot. If None, defaults to channels 7 to 16.
+    height : float. Height of the bars. Default is 0.3.
+    colors : list or None. List of colors for the bars. If None, defaults to ['#D81B60', '#1E88E5'].
+    labels : list or None. List of labels for the bars. If None, defaults to ['Cloudy', 'Clear Sky'].
+    x_range : list or None. List of x-axis ranges for the two plots. If None, defaults to [None, None].
+    y_label : list or None. List of y-axis labels for the two plots. If None, defaults to ['Channels', 'Channels'].
+    x_label : list or None. List of x-axis labels for the two plots.
+              If None, defaults to ['RMSE (K)', 'RMSE (Standard Deviations)']. Default is None.
+    title : list or None. List of titles for the two plots.
+            If None, defaults to ['(a) Forward model errors', '(b) Normalized forward model errors'].
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+    """
+
+    # Axis
+    channels = channels if channels is not None else np.arange(7, 17)
+    y_label = y_label if y_label is not None else ['Channels']
+    x_label = x_label if x_label is not None else [f'RMSE (K)']
+    x_range = x_range if x_range is not None else [None, None]  # [(0, 1.6), (0, 2.0)]
+    title = title if title is not None else ['(b) Forward model RMSE']
+    # Colors and labels
+    labels = labels if labels is not None else ['Clear sky', 'Cloudy', 'Day', 'Night']
+    colors_dict = {'Clear sky': '#D81B60', 'Cloudy': '#1E88E5', 'Day': '#FFC107', 'Night': 'r'}
+    colors = colors if colors is not None else [colors_dict[label] for label in labels]
+    if height is None:
+        height = 0.35 if len(labels) <= 2 else 0.175
+
+    # Plot normalized RMSE
+    # Create flexible grid (2 columns)
+    cell_widths = [4.0]
+    cell_heights = [4.0]
+    lefts = [0.75]
+    rights = [0.75]
+    bottoms = [0.75]
+    tops = [0.75]
+    fig, get_axes = flexible_gridspec(cell_widths, cell_heights, lefts, rights, bottoms, tops)
+    ax0 = get_axes(0, 0)
+    # Plot raw RMSE
+    plot_rmse_bars3(ax0, rmse_raw, channels, height=height, colors=colors, labels=labels, x_range=x_range[0],
+                    title=title[0], x_label=x_label[0], y_label=y_label[0])
 
     # Save plot
     if figname:
@@ -1284,11 +1489,16 @@ def geostationnary_map(fig, ax, lat, lon, c, c_min, c_max, font_size=13, title='
     gl.xlabel_style = {'size': cb_font}
     gl.ylabel_style = {'size': cb_font}
 
+    # Set axis labels
+    # Add x and y labels in the middle of the respective axes with some padding
+    ax.set_ylabel('Latitude', fontsize=font_size, labelpad=5)
+    ax.set_xlabel('Longitude', fontsize=font_size, labelpad=3)
+
     # Set title
     ax.set_title(title, fontsize=font_size, y=title_pad)
     # Set legend
     apply_colorbar(ax, scat, font_size=cb_font, label=cb_label, label_pad=cb_labelpad, orientation='horizontal',
-                   rotation=cb_rot, side=cb_side, size=cb_size, pad=cb_pad, vmin=c_min, vmax=c_max,
+                   rotation=cb_rot, side='bottom', size=cb_size, pad=0.3, vmin=c_min, vmax=c_max,
                    ticks=cb_ticks, tickw=cb_tickw, tickl=cb_tickl, tickdir=cb_dir, ticklabels=cb_ticklabels)
 
 
