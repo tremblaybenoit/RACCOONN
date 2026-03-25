@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def slant_path_geometry(pressure: np.ndarray, temperature: np.ndarray, sza: np.ndarray, az: np.ndarray,
-                        lat: np.ndarray, lon: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+                        lat: np.ndarray, lon: np.ndarray) -> dict:
     """
         Compute slant path heights and latitude and longitude offsets.
 
@@ -63,11 +63,13 @@ def slant_path_geometry(pressure: np.ndarray, temperature: np.ndarray, sza: np.n
 
     # Compute Coordinate Offsets
     # Lat/Lon shifts based on Azimuth
-    dlat = (d_km * np.cos(az_rad)) / deg_to_km
-    dlon = (d_km * np.sin(az_rad)) / (deg_to_km * np.cos(lat_rad))
+    y, x = d_km * np.cos(az_rad), d_km * np.sin(az_rad)
+    dlat = y / deg_to_km
+    dlon = x / (deg_to_km * np.cos(lat_rad))
+    # TODO: Add "origin" for y, x, h
 
     # Return heights, offset latitude, offset longitude
-    return h_km, lat[:, np.newaxis]+dlat, lon[:, np.newaxis]+dlon
+    return {'x': x, 'y': y, 'z': h_km, 'lat': lat[:, np.newaxis]+dlat, 'lon': lon[:, np.newaxis]+dlon}
 
 
 def compute_slant_path_geometry(input: DictConfig, output: DictConfig) -> None:
@@ -97,22 +99,17 @@ def compute_slant_path_geometry(input: DictConfig, output: DictConfig) -> None:
     logger.info("Estimating slant path geometry...")
     logger.info(f"Latitude stats (min, max, mean, stdev): {lat.min()}, {lat.max()}, {lat.mean()}, {lat.std()}")
     logger.info(f"Longitude stats (min, max, mean, stdev): {lon.min()}, {lon.max()}, {lon.mean()}, {lon.std()}")
-    h, lat, lon = slant_path_geometry(pressure, temperature, zenith, azimuth, lat, lon)
-    logger.info(f"Height stats (min, max, mean, stdev): {h.min()}, {h.max()}, {h.mean()}, {h.std()}")
-    logger.info(f"Latitude stats (min, max, mean, stdev): {lat.min()}, {lat.max()}, {lat.mean()}, {lat.std()}")
-    logger.info(f"Longitude stats (min, max, mean, stdev): {lon.min()}, {lon.max()}, {lon.mean()}, {lon.std()}")
+    coords = slant_path_geometry(pressure, temperature, zenith, azimuth, lat, lon)
+    logger.info(f"Height stats (min, max, mean, stdev): {coords['z'].min()}, {coords['z'].max()}, {coords['z'].mean()}, {coords['z'].std()}")
+    logger.info(f"Latitude stats (min, max, mean, stdev): {coords['lat'].min()}, {coords['lat'].max()}, {coords['lat'].mean()}, {coords['lat'].std()}")
+    logger.info(f"Longitude stats (min, max, mean, stdev): {coords['lon'].min()}, {coords['lon'].max()}, {coords['lon'].mean()}, {coords['lon'].std()}")
 
     # Save results
-    logger.info("Saving data to file...")
-    if hasattr(output.lat, 'save'):
-        save_func = instantiate(output.lat.save)
-        save_func(lat)
-    if hasattr(output.lon, 'save'):
-        save_func = instantiate(output.lon.save)
-        save_func(lon)
-    if hasattr(output.h, 'save'):
-        save_func = instantiate(output.h.save)
-        save_func(h)
+    for key, value in coords.items():
+        if hasattr(output, key):
+            if hasattr(getattr(output, key), 'save'):
+                save_func = instantiate(getattr(output, key).save)
+                save_func(value)
 
     return
 

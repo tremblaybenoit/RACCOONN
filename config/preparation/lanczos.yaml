@@ -1,0 +1,298 @@
+# Lanczos decomposition
+lanczos:
+  # Atmospheric profiles
+  prof:
+    # Function
+    _target_: data.lanczos.compute_lanczos
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Profile data to compute lanczos on
+      data:
+        load:
+          _target_: data.io.load_stack
+          _recursive_: false
+          stack:
+            - ${data.stage.train.vars.prof}
+            - ${data.stage.valid.vars.prof}
+            - ${data.stage.test.vars.prof}
+      n_comp: 270
+    # What the method produces as output (pickle file)
+    output:
+      # File path to save/load the Lanczos object
+      path: ${paths.data_dir}/normalization/lanczos.pkl
+      # Save function
+      save:
+        _target_: data.io.save_pkl
+        _partial_: true
+        _args_:
+          - ${preparation.lanczos.prof.output.path}
+      # Load function
+      load:
+        _target_: data.io.load_pkl
+        _args_:
+        - ${preparation.lanczos.prof.output.path}
+  prof_train:
+    # Function
+    _target_: data.lanczos.project_lanczos
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      buffers:
+        # File path to save/load the PCA object
+        path: ${paths.data_dir}/normalization/lanczos.pkl
+        # Save function
+        save:
+          _target_: data.io.save_pkl
+          _partial_: true
+          _args_:
+            - ${paths.data_dir}/normalization/lanczos.pkl
+        # Load function
+        load:
+          _target_: data.io.load_pkl
+          _args_:
+            - ${paths.data_dir}/normalization/lanczos.pkl
+      # Profile data to project
+      data:
+        load:
+          _target_: data.io.load_var
+          _recursive_: false
+          _args_:
+            - ${data.stage.train.vars.prof}
+    output:
+      lanczos:
+        # Output path for PCA projection
+        path: ${paths.data_dir}/Train2/prof_lanczos.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preparation.lanczos.prof_train.output.lanczos.path}
+        # Load function
+        load:
+          _target_: data.io.load_npy
+          _args_:
+            - ${preparation.lanczos.prof_train.output.lanczos.path}
+            - ${data.dtype}
+        normalization: null
+  prof_valid:
+    # Function
+    _target_: data.lanczos.project_lanczos
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      buffers:
+        # File path to save/load the PCA object
+        path: ${paths.data_dir}/normalization/lanczos.pkl
+        # Save function
+        save:
+          _target_: data.io.save_pkl
+          _partial_: true
+          _args_:
+            - ${paths.data_dir}/normalization/lanczos.pkl
+        # Load function
+        load:
+          _target_: data.io.load_pkl
+          _args_:
+            - ${paths.data_dir}/normalization/lanczos.pkl
+      # Profile data to project
+      data:
+        load:
+          _target_: data.io.load_var
+          _recursive_: false
+          _args_:
+            - ${data.stage.valid.vars.prof}
+    output:
+      lanczos:
+        # Output path for PCA projection
+        path: ${paths.data_dir}/Val2/prof_lanczos.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preparation.lanczos.prof_valid.output.lanczos.path}
+        # Load function
+        load:
+          _target_: data.io.load_npy
+          _args_:
+            - ${preparation.lanczos.prof_valid.output.lanczos.path}
+            - ${data.dtype}
+        normalization: null
+  prof_test:
+    # Function
+    _target_: data.lanczos.project_lanczos
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      buffers:
+        # File path to save/load the PCA object
+        path: ${paths.data_dir}/normalization/lanczos.pkl
+        # Save function
+        save:
+          _target_: data.io.save_pkl
+          _partial_: true
+          _args_:
+            - ${paths.data_dir}/normalization/lanczos.pkl
+        # Load function
+        load:
+          _target_: data.io.load_pkl
+          _args_:
+            - ${paths.data_dir}/normalization/lanczos.pkl
+      # Profile data to project
+      data:
+        load:
+          _target_: data.io.load_var
+          _recursive_: false
+          _args_:
+            - ${data.stage.test.vars.prof}
+    output:
+      lanczos:
+        # Output path for PCA projection
+        path: ${paths.data_dir}/Test2/prof_lanczos.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preparation.lanczos.prof_test.output.lanczos.path}
+        # Load function
+        load:
+          _target_: data.io.load_npy
+          _args_:
+            - ${preparation.lanczos.prof_test.output.lanczos.path}
+            - ${data.dtype}
+        normalization: null
+  prof_background_train:
+    # Function
+    _target_: data.lanczos.project_lanczos
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      buffers:
+        # File path to save/load the PCA object
+        path: ${paths.data_dir}/normalization/lanczos.pkl
+        # Save function
+        save:
+          _target_: data.io.save_pkl
+          _partial_: true
+          _args_:
+            - ${paths.data_dir}/normalization/lanczos.pkl
+        # Load function
+        load:
+          _target_: data.io.load_pkl
+          _args_:
+            - ${paths.data_dir}/normalization/lanczos.pkl
+      # Profile data to project
+      data:
+        load:
+          _target_: data.io.load_var
+          _recursive_: false
+          _args_:
+            - ${data.stage.train.vars.prof_background}
+    output:
+      lanczos:
+        # Output path for PCA projection
+        path: ${paths.data_dir}/Train2/prof_background_lanczos.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preparation.lanczos.prof_background_train.output.lanczos.path}
+        # Load function
+        load:
+          _target_: data.io.load_npy
+          _args_:
+            - ${preparation.lanczos.prof_background_train.output.lanczos.path}
+            - ${data.dtype}
+        normalization: null
+  prof_background_valid:
+    # Function
+    _target_: data.lanczos.project_lanczos
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      buffers:
+        # File path to save/load the PCA object
+        path: ${paths.data_dir}/normalization/lanczos.pkl
+        # Save function
+        save:
+          _target_: data.io.save_pkl
+          _partial_: true
+          _args_:
+            - ${paths.data_dir}/normalization/lanczos.pkl
+        # Load function
+        load:
+          _target_: data.io.load_pkl
+          _args_:
+            - ${paths.data_dir}/normalization/lanczos.pkl
+      # Profile data to project
+      data:
+        load:
+          _target_: data.io.load_var
+          _recursive_: false
+          _args_:
+            - ${data.stage.valid.vars.prof_background}
+    output:
+      lanczos:
+        # Output path for PCA projection
+        path: ${paths.data_dir}/Val2/prof_background_lanczos.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preparation.lanczos.prof_background_valid.output.lanczos.path}
+        # Load function
+        load:
+          _target_: data.io.load_npy
+          _args_:
+            - ${preparation.lanczos.prof_background_valid.output.lanczos.path}
+            - ${data.dtype}
+        normalization: null
+  prof_background_test:
+    # Function
+    _target_: data.lanczos.project_lanczos
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      buffers:
+        # File path to save/load the PCA object
+        path: ${paths.data_dir}/normalization/lanczos.pkl
+        # Save function
+        save:
+          _target_: data.io.save_pkl
+          _partial_: true
+          _args_:
+            - ${paths.data_dir}/normalization/lanczos.pkl
+        # Load function
+        load:
+          _target_: data.io.load_pkl
+          _args_:
+            - ${paths.data_dir}/normalization/lanczos.pkl
+      # Profile data to project
+      data:
+        load:
+          _target_: data.io.load_var
+          _recursive_: false
+          _args_:
+            - ${data.stage.test.vars.prof_background}
+    output:
+      lanczos:
+        # Output path for PCA projection
+        path: ${paths.data_dir}/Test2/prof_background_lanczos.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preparation.lanczos.prof_background_test.output.lanczos.path}
+        # Load function
+        load:
+          _target_: data.io.load_npy
+          _args_:
+            - ${preparation.lanczos.prof_background_test.output.lanczos.path}
+            - ${data.dtype}
+        normalization: null

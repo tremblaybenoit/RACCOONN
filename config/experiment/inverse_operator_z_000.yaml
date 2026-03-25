@@ -22,9 +22,8 @@ task_name: "inverse_operator_z"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "phys_000"
+  run_id: "000"
   data_dir: ../static_clearsky_${data.dtype}
-  checkpoint_dir: "inverse/model/checkpoints/phys_012"
 
 # Trainer configuration
 trainer:
@@ -49,7 +48,7 @@ preparation:
       # Output path for statistics
       output:
         path: ../static_clearskies_float32/normalization/statistics_clearskies.pkl
-  # Compute slant path for the pressure levels (for pressure filtering in the loss function)
+  # Compute slant path coordinates
   slant:
     # Training set
     train:
@@ -75,12 +74,12 @@ preparation:
             _target_: numpy.save
             _partial_: true
             _args_:
-              - ${preparation.pca.prof_train.output.pca.path}
+              - ${preparation.slant.train.output.lat.path}
           # Load function
           load:
             _target_: data.io.load_npy
             _args_:
-              - ${preparation.pca.prof_train.output.pca.path}
+              - ${preparation.slant.train.output.lat.path}
               - ${data.dtype}
           normalization: ${data.stage.train.vars.lat.normalization}
         lon:
@@ -91,30 +90,62 @@ preparation:
             _target_: numpy.save
             _partial_: true
             _args_:
-              - ${preparation.pca.prof_train.output.pca.path}
+              - ${preparation.slant.train.output.lon.path}
           # Load function
           load:
             _target_: data.io.load_npy
             _args_:
-              - ${preparation.pca.prof_train.output.pca.path}
+              - ${preparation.slant.train.output.lon.path}
               - ${data.dtype}
           normalization: ${data.stage.train.vars.lon.normalization}
-        h:
+        z:
           # Output path
-          path: ${paths.data_dir}/Train2/h_slant.npy
+          path: ${paths.data_dir}/Train2/z_slant.npy
           # Save function
           save:
             _target_: numpy.save
             _partial_: true
             _args_:
-              - ${preparation.pca.prof_train.output.pca.path}
+              - ${preparation.slant.train.output.z.path}
           # Load function
           load:
             _target_: data.io.load_npy
             _args_:
-              - ${preparation.pca.prof_train.output.pca.path}
+              - ${preparation.slant.train.output.z.path}
               - ${data.dtype}
-          normalization: ${data.stage.train.vars.pressure.normalization}
+          normalization: null
+        x:
+          # Output path
+          path: ${paths.data_dir}/Train2/x_slant.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.slant.train.output.x.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.slant.train.output.x.path}
+              - ${data.dtype}
+          normalization: null
+        y:
+          # Output path
+          path: ${paths.data_dir}/Train2/y_slant.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.slant.train.output.y.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.slant.train.output.y.path}
+              - ${data.dtype}
+          normalization: null
     # Validation set
     valid:
       # Function
@@ -123,13 +154,13 @@ preparation:
       # What the method needs as input
       input:
         # Coordinates
-        lat: ${data.stage.train.vars.lat}
-        lon: ${data.stage.train.vars.lon}
-        pressure: ${data.stage.train.vars.pressure}
+        lat: ${data.stage.valid.vars.lat}
+        lon: ${data.stage.valid.vars.lon}
+        pressure: ${data.stage.valid.vars.pressure}
         # Meta data
-        meta: ${data.stage.train.vars.meta}
+        meta: ${data.stage.valid.vars.meta}
         # Profiles
-        prof: ${data.stage.train.vars.prof}
+        prof: ${data.stage.valid.vars.prof}
       output:
         lat:
           # Output path
@@ -139,14 +170,14 @@ preparation:
             _target_: numpy.save
             _partial_: true
             _args_:
-              - ${preparation.pca.prof_train.output.pca.path}
+              - ${preparation.slant.valid.output.lat.path}
           # Load function
           load:
             _target_: data.io.load_npy
             _args_:
-              - ${preparation.pca.prof_train.output.pca.path}
+              - ${preparation.slant.valid.output.lat.path}
               - ${data.dtype}
-          normalization: ${data.stage.train.vars.lat.normalization}
+          normalization: ${data.stage.valid.vars.lat.normalization}
         lon:
           # Output path
           path: ${paths.data_dir}/Val2/lon_slant.npy
@@ -155,30 +186,62 @@ preparation:
             _target_: numpy.save
             _partial_: true
             _args_:
-              - ${preparation.pca.prof_train.output.pca.path}
+              - ${preparation.slant.valid.output.lon.path}
           # Load function
           load:
             _target_: data.io.load_npy
             _args_:
-              - ${preparation.pca.prof_train.output.pca.path}
+              - ${preparation.slant.valid.output.lon.path}
               - ${data.dtype}
-          normalization: ${data.stage.train.vars.lon.normalization}
-        h:
+          normalization: ${data.stage.valid.vars.lon.normalization}
+        z:
           # Output path
-          path: ${paths.data_dir}/Val2/h_slant.npy
+          path: ${paths.data_dir}/Val2/z_slant.npy
           # Save function
           save:
             _target_: numpy.save
             _partial_: true
             _args_:
-              - ${preparation.pca.prof_train.output.pca.path}
+              - ${preparation.slant.valid.output.z.path}
           # Load function
           load:
             _target_: data.io.load_npy
             _args_:
-              - ${preparation.pca.prof_train.output.pca.path}
+              - ${preparation.slant.valid.output.z.path}
               - ${data.dtype}
-          normalization: ${data.stage.train.vars.pressure.normalization}
+          normalization: null
+        x:
+          # Output path
+          path: ${paths.data_dir}/Val2/x_slant.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.slant.valid.output.x.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.slant.valid.output.x.path}
+              - ${data.dtype}
+          normalization: null
+        y:
+          # Output path
+          path: ${paths.data_dir}/Val2/y_slant.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.slant.valid.output.y.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.slant.valid.output.y.path}
+              - ${data.dtype}
+          normalization: null
     # Test set
     test:
       # Function
@@ -187,13 +250,13 @@ preparation:
       # What the method needs as input
       input:
         # Coordinates
-        lat: ${data.stage.train.vars.lat}
-        lon: ${data.stage.train.vars.lon}
-        pressure: ${data.stage.train.vars.pressure}
+        lat: ${data.stage.test.vars.lat}
+        lon: ${data.stage.test.vars.lon}
+        pressure: ${data.stage.test.vars.pressure}
         # Meta data
-        meta: ${data.stage.train.vars.meta}
+        meta: ${data.stage.test.vars.meta}
         # Profiles
-        prof: ${data.stage.train.vars.prof}
+        prof: ${data.stage.test.vars.prof}
       output:
         lat:
           # Output path
@@ -203,14 +266,14 @@ preparation:
             _target_: numpy.save
             _partial_: true
             _args_:
-              - ${preparation.pca.prof_train.output.pca.path}
+              - ${preparation.slant.test.output.lat.path}
           # Load function
           load:
             _target_: data.io.load_npy
             _args_:
-              - ${preparation.pca.prof_train.output.pca.path}
+              - ${preparation.slant.test.output.lat.path}
               - ${data.dtype}
-          normalization: ${data.stage.train.vars.lat.normalization}
+          normalization: ${data.stage.test.vars.lat.normalization}
         lon:
           # Output path
           path: ${paths.data_dir}/Test2/lon_slant.npy
@@ -219,30 +282,62 @@ preparation:
             _target_: numpy.save
             _partial_: true
             _args_:
-              - ${preparation.pca.prof_train.output.pca.path}
+              - ${preparation.slant.test.output.lon.path}
           # Load function
           load:
             _target_: data.io.load_npy
             _args_:
-              - ${preparation.pca.prof_train.output.pca.path}
+              - ${preparation.slant.test.output.lon.path}
               - ${data.dtype}
-          normalization: ${data.stage.train.vars.lon.normalization}
-        h:
+          normalization: ${data.stage.test.vars.lon.normalization}
+        z:
           # Output path
-          path: ${paths.data_dir}/Test2/h_slant.npy
+          path: ${paths.data_dir}/Test2/z_slant.npy
           # Save function
           save:
             _target_: numpy.save
             _partial_: true
             _args_:
-              - ${preparation.pca.prof_train.output.pca.path}
+              - ${preparation.slant.test.output.z.path}
           # Load function
           load:
             _target_: data.io.load_npy
             _args_:
-              - ${preparation.pca.prof_train.output.pca.path}
+              - ${preparation.slant.test.output.z.path}
               - ${data.dtype}
-          normalization: ${data.stage.train.vars.pressure.normalization}
+          normalization: null
+        x:
+          # Output path
+          path: ${paths.data_dir}/Test2/x_slant.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.slant.test.output.x.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.slant.test.output.x.path}
+              - ${data.dtype}
+          normalization: null
+        y:
+          # Output path
+          path: ${paths.data_dir}/Test2/y_slant.npy
+          # Save function
+          save:
+            _target_: numpy.save
+            _partial_: true
+            _args_:
+              - ${preparation.slant.test.output.y.path}
+          # Load function
+          load:
+            _target_: data.io.load_npy
+            _args_:
+              - ${preparation.slant.test.output.y.path}
+              - ${data.dtype}
+          normalization: null
 
 # Data configuration
 data:

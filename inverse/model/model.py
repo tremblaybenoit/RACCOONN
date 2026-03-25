@@ -1130,6 +1130,92 @@ class PINNverseOperatorP(PINNverseOperator):
         return loss['total']
 
 
+class PINNverseOperatorLanczos(PINNverseOperator):
+    def __init__(self, lanczos_buffers: DictConfig, optimizer: DictConfig = None, loss_func: DictConfig = None,
+                 lr_scheduler: DictConfig = None, architecture: DictConfig = None,
+                 parameters: DictConfig = None):
+        """ Initialize model.
+
+        Parameters
+        ----------
+        lanczos_buffers: dict. Lanczos buffers for profile reconstruction.
+        optimizer: Callable. Optimizer for the model.
+        loss_func: Callable. Loss function for the model.
+        lr_scheduler: Callable. Learning rate scheduler for the model.
+        architecture: DictConfig. Configuration for the model architecture.
+        parameters: DictConfig. Configuration for the model parameters.
+
+        Returns
+        -------
+        None.
+        """
+
+        # Class inheritance
+        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func,
+                         architecture=architecture, parameters=parameters)
+
+        # Lanczos Buffers
+        lanczos_buffers = instantiate(lanczos_buffers)
+        self.register_buffer('x_b', torch.tensor(lanczos_buffers['x_b']))
+        self.register_buffer('L', torch.tensor(lanczos_buffers['L']))
+
+    def forward(self, x: dict) -> dict:
+        """ Forward pass through the model.
+
+            Parameters
+            ----------
+            x: dict. Input coordinates.
+
+            Returns
+            -------
+            Predicted profiles: dict.
+        """
+
+        # 1. Prepare batch metadata
+        keys_coords = ['lat', 'lon', 'scans']
+        inputs = torch.cat([x[k].view(-1, 1) for k in keys_coords if k in x], dim=-1)
+
+        # 2. Lanczos Coefficient Prediction (whitened coefficients)
+        u = self.model(inputs)
+        # 3. Profile Reconstruction
+        prof = torch.matmul(u, self.L.T) + self.x_b
+
+        # 4. Final Reshape
+        prof = prof.view(-1, self.n_prof, self.n_levels)
+        return {
+            'prof': prof,
+            'prof_white': u
+        }
+
+    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
+        """ Perform training/validation/test step.
+
+            Parameters
+            ----------
+            batch: tensor. Batch from the training set.
+            batch_nb: int. Index of the batch out of the training set.
+            stage: str. Current operation: "train", "valid", or "test".
+
+            Returns
+            -------
+            Loss value: tensor.
+        """
+        with torch.set_grad_enabled(True):
+            coords = {'lat': batch['input']['lat'].requires_grad_(True),
+                      'lon': batch['input']['lon'].requires_grad_(True)}
+
+            # Compute profiles
+            pred = self.forward(batch['input'])
+
+            # Compute loss function
+            loss, pred['hofx'] = self.loss_func(pred, batch['target'], coords)
+
+        # Logging
+        self._logging(stage, loss, batch['input'], batch['target'], pred)
+
+        return loss['total']
+
+
 class PINNverseOperatorPCA(PINNverseOperator):
     def __init__(self, pca_buffers: DictConfig, optimizer: DictConfig = None, loss_func: DictConfig = None,
                  lr_scheduler: DictConfig = None, architecture: DictConfig = None,
