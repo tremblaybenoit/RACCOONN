@@ -1025,7 +1025,7 @@ class PINNverseOperatorP(PINNverseOperator):
 
     def __init__(self, optimizer: DictConfig = None, loss_func: DictConfig = None, lr_scheduler: DictConfig = None,
                  architecture: DictConfig = None, parameters: DictConfig = None, transform: DictConfig = None, stats: DictConfig = None,
-                 sigmoid: bool = False, min_max: bool = True, pca_buffers: DictConfig = None):
+                 sigmoid: bool = False, min_max: bool = True):
 
         # Class inheritance
         super().__init__(optimizer=optimizer, loss_func=loss_func, lr_scheduler=lr_scheduler,
@@ -1037,13 +1037,6 @@ class PINNverseOperatorP(PINNverseOperator):
         self.stats = instantiate(stats) if stats is not None else None
         self.sigmoid = sigmoid
         self.sigmoid_stats = {'min': (self.stats['min'] - self.stats['mean']) / self.stats['stdev'], 'max': (self.stats['max'] - self.stats['mean'])/ self.stats['stdev']}
-
-        # PCA Buffers
-        pca_buffers = instantiate(pca_buffers)
-        self.register_buffer('basis', torch.tensor(pca_buffers['basis']))  # (270, 1143)
-        self.register_buffer('mu', torch.tensor(pca_buffers['mu']))  # (1143,)
-        self.register_buffer('std', torch.tensor(pca_buffers['std']))  # (1143,)
-        self.register_buffer('scales', torch.tensor(pca_buffers['scales']))  # (270,)
 
     def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
         """ Perform training/validation/test step.
@@ -1109,11 +1102,6 @@ class PINNverseOperatorP(PINNverseOperator):
             pred['prof_background_mean_stdev'] = batch['target']['prof_background'].clone()
             pred['prof_target_min_max'] = min_max(pred['prof_target_phys'].clone(), self.stats, axis=1)
             pred['prof_target_mean_stdev'] = batch['target']['prof'].clone()
-
-        # Whitened PCA space
-        pred['prof_white'] = (pred['prof_mean_stdev'].clone().view(pred['prof_mean_stdev'].shape[0], -1) @ self.basis.T)/ self.scales
-        pred['prof_target_white'] = (pred['prof_target_mean_stdev'].clone().view(pred['prof_mean_stdev'].shape[0], -1) @ self.basis.T)/ self.scales
-        pred['prof_background_white'] = (pred['prof_background_mean_stdev'].clone().view(pred['prof_mean_stdev'].shape[0], -1) @ self.basis.T)/ self.scales
 
         # Register standardized for plotting
         pred['prof'] = pred['prof_phys'].clone()
@@ -1184,7 +1172,7 @@ class PINNverseOperatorLanczos(PINNverseOperator):
         prof = prof.view(-1, self.n_prof, self.n_levels)
         return {
             'prof': prof,
-            'prof_white': u
+            'prof_lanczos': u
         }
 
     def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:

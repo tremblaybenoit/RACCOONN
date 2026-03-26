@@ -23,16 +23,14 @@ task_name: "inverse_operator_z"  # Experiment
 paths:
   task_dir: "../inverse_outputs"
   run_id: "000"
-  data_dir: ../static_clearsky_${data.dtype}
+  data_dir: ../static_clearskies_${data.dtype}  # ../static_clearsky_${data.dtype}
+  # TODO: First compute statistics on all data
 
 # Trainer configuration
 trainer:
   min_epochs: 1  # To prevent early stopping
   max_epochs: 960  # Number of epochs
   precision: 32  # 32-bit precision
-
-# Initialization
-# init_from_checkpoint: ../inverse_outputs/inverse_operator_static_clearsky2/checkpoints/phys_0012f/model.ckpt
 
 # Callbacks
 callbacks:
@@ -47,7 +45,7 @@ preparation:
     data:
       # Output path for statistics
       output:
-        path: ../static_clearskies_float32/normalization/statistics_clearskies.pkl
+        path: ../static_clearskies_float32/normalization/statistics_clearskies_z.pkl
   # Compute slant path coordinates
   slant:
     # Training set
@@ -379,6 +377,64 @@ data:
           load:
             path: ${....dir}/prof_background.npy
           normalization: ${data.stage.train.vars.prof.normalization}
+        # x, y, z slant coordinates
+        x:
+          # Loading function
+          load:
+            _target_: data.io.load_latlon
+            path: ${....dir}/x_slant.npy
+            scans:
+              _target_: ${....scans.load._target_}
+              path: ${....scans.load.path}
+            split: ${....split}
+            dtype: ${data.dtype}
+          # Normalization function and parameters
+          normalization:
+            _target_: data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'x'
+              dtype: ${data.dtype}
+        y:
+          # Loading function
+          load:
+            _target_: data.io.load_latlon
+            path: ${....dir}/y_slant.npy
+            scans:
+              _target_: ${....scans.load._target_}
+              path: ${....scans.load.path}
+            split: ${....split}
+            dtype: ${data.dtype}
+          # Normalization function and parameters
+          normalization:
+            _target_: data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'y'
+              dtype: ${data.dtype}
+        z:
+          # Loading function
+          load:
+            _target_: data.io.load_latlon
+            path: ${....dir}/z_slant.npy
+            scans:
+              _target_: ${....scans.load._target_}
+              path: ${....scans.load.path}
+            split: ${....split}
+            dtype: ${data.dtype}
+          # Normalization function and parameters
+          normalization:
+            _target_: data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'z'
+              dtype: ${data.dtype}
     # Validation set
     valid:
       # Variables
@@ -405,6 +461,64 @@ data:
           load:
             path: ${....dir}/prof_background.npy
           normalization: ${data.stage.train.vars.prof.normalization}
+        # x, y, z slant coordinates
+        x:
+          # Loading function
+          load:
+            _target_: data.io.load_latlon
+            path: ${....dir}/x_slant.npy
+            scans:
+              _target_: ${....scans.load._target_}
+              path: ${....scans.load.path}
+            split: ${....split}
+            dtype: ${data.dtype}
+          # Normalization function and parameters
+          normalization:
+            _target_: data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'x'
+              dtype: ${data.dtype}
+        y:
+          # Loading function
+          load:
+            _target_: data.io.load_latlon
+            path: ${....dir}/y_slant.npy
+            scans:
+              _target_: ${....scans.load._target_}
+              path: ${....scans.load.path}
+            split: ${....split}
+            dtype: ${data.dtype}
+          # Normalization function and parameters
+          normalization:
+            _target_: data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'y'
+              dtype: ${data.dtype}
+        z:
+          # Loading function
+          load:
+            _target_: data.io.load_latlon
+            path: ${....dir}/z_slant.npy
+            scans:
+              _target_: ${....scans.load._target_}
+              path: ${....scans.load.path}
+            split: ${....split}
+            dtype: ${data.dtype}
+          # Normalization function and parameters
+          normalization:
+            _target_: data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'z'
+              dtype: ${data.dtype}
     # Test set
     test:
       # Variables
@@ -437,20 +551,109 @@ data:
           load:
             path: ${....dir}/prof_background.npy
           normalization: ${data.stage.train.vars.prof.normalization}
+        # x, y, z slant coordinates
+        x:
+          # Loading function
+          load:
+            _target_: data.io.load_latlon
+            path: ${....dir}/x_slant.npy
+            scans:
+              _target_: ${....scans.load._target_}
+              path: ${....scans.load.path}
+            split: ${....split}
+            dtype: ${data.dtype}
+          # Normalization function and parameters
+          normalization:
+            _target_: data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'x'
+              dtype: ${data.dtype}
+        y:
+          # Loading function
+          load:
+            _target_: data.io.load_latlon
+            path: ${....dir}/y_slant.npy
+            scans:
+              _target_: ${....scans.load._target_}
+              path: ${....scans.load.path}
+            split: ${....split}
+            dtype: ${data.dtype}
+          # Normalization function and parameters
+          normalization:
+            _target_: data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'y'
+              dtype: ${data.dtype}
+        z:
+          # Loading function
+          load:
+            _target_: data.io.load_latlon
+            path: ${....dir}/z_slant.npy
+            scans:
+              _target_: ${....scans.load._target_}
+              path: ${....scans.load.path}
+            split: ${....split}
+            dtype: ${data.dtype}
+          # Normalization function and parameters
+          normalization:
+            _target_: data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'z'
+              dtype: ${data.dtype}
 
 # Loader configuration
 loader:
   batch_size: 24
   num_workers: 8
+  # Split the data into training, validation, and test sets
+  stage:
+    # Training set
+    train:
+      # Dataset class
+      _target_: forward.model.data_loader.TorchDataset
+      _recursive_: false
+      # Variables to use as input
+      input:
+        # Input coordinates (keeping the same names for compatibility with the model)
+        lat: ${data.stage.train.vars.y}  # lat -> y
+        lon: ${data.stage.train.vars.x}  # lon -> x
+        pressure: ${data.stage.train.vars.z}  # pressure -> z
+    # Validation set
+    valid:
+      # Dataset class
+      _target_: forward.model.data_loader.TorchDataset
+      _recursive_: false
+      # Variables to use as input
+      input:
+        # Input coordinates (keeping the same names for compatibility with the model)
+        lat: ${data.stage.valid.vars.y}  # lat -> y
+        lon: ${data.stage.valid.vars.x}  # lon -> x
+        pressure: ${data.stage.valid.vars.z}  # pressure -> z
+    # Test set
+    test:
+      # Dataset class
+      _target_: forward.model.data_loader.TorchDataset
+      _recursive_: false
+      # Variables to use as input
+      input:
+        # Input coordinates (keeping the same names for compatibility with the model)
+        lat: ${data.stage.test.vars.y}  # lat -> y
+        lon: ${data.stage.test.vars.x}  # lon -> x
+        pressure: ${data.stage.test.vars.z}  # pressure -> z
 
 # Model parameters
 model:
   _target_: inverse.model.model.PINNverseOperatorP
   stats: ${data.stage.train.vars.prof.normalization.stats}
-  pca_buffers:
-    # Load PCA buffers
-    _target_: data.pca.load_pca_buffers
-    path: ../static_clearskies_float32/normalization/pca_clouds_multivariate_10.pkl
   # Transform
   transform:
     _target_: ${data.stage.train.vars.prof.normalization._target_}
@@ -603,4 +806,4 @@ model:
 logger:
   # MLflow logger
   ports:
-    mlflow: 5026
+    mlflow: 5027
