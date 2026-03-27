@@ -41,13 +41,15 @@ def slant_path_geometry(pressure: np.ndarray, temperature: np.ndarray, sza: np.n
     # Convert angles to radians
     sza_rad = np.radians(sza)[:, np.newaxis]
     az_rad = np.radians(az)[:, np.newaxis]
-    lat_rad = np.radians(lat)[:, np.newaxis]
+    lat_deg = lat[:, np.newaxis]
+    lat_rad = np.radians(lat_deg)
+    lon_deg = lon[:, np.newaxis]
 
     # Compute Hypsometric Heights (Integration)
     # We compute the thickness (dz) between each pressure level
     # P[i] is current, P[i+1] is next (lower pressure, higher altitude)
     p_layer_ratio = np.log(pressure[:-1] / pressure[1:])
-    t_layer_avg = 0.5 * (temperature[:, 1:] + temperature[:, -1])
+    t_layer_avg = 0.5 * (temperature[:, 1:] + temperature[:, :-1])
 
     # Thickness of each layer in km
     dz = (Rd * t_layer_avg / g) * p_layer_ratio / km_factor
@@ -55,7 +57,7 @@ def slant_path_geometry(pressure: np.ndarray, temperature: np.ndarray, sza: np.n
     # Cumulative sum to get heights at each level above surface
     # We insert 0 at the start for the surface level height
     h_km = np.zeros_like(temperature)
-    h_km[:, 1:] = np.cumsum(dz, axis=1)
+    h_km[:, 1:] = np.cumsum(dz, axis=1)[::-1]  # Inverse order
 
     # Compute Horizontal Displacement (km)
     # d is the 'spread' of the ray from the vertical at height h
@@ -63,16 +65,15 @@ def slant_path_geometry(pressure: np.ndarray, temperature: np.ndarray, sza: np.n
 
     # Compute Coordinate Offsets
     # Lat/Lon shifts based on Azimuth
-    y, x = d_km * np.cos(az_rad), d_km * np.sin(az_rad)
-    dlat = y / deg_to_km
-    dlon = x / (deg_to_km * np.cos(lat_rad))
-    # TODO: Add "origin" for y, x, h
+    dy, dx = d_km * np.cos(az_rad), d_km * np.sin(az_rad)
+    dlat = dy / deg_to_km
+    dlon = dx / (deg_to_km * np.cos(lat_rad))
 
     # Return heights, offset latitude, offset longitude
-    return {'x': x, 'y': y, 'z': h_km, 'lat': lat[:, np.newaxis]+dlat, 'lon': lon[:, np.newaxis]+dlon}
+    return {'x': lon_deg*deg_to_km* np.cos(lat_rad)+dx, 'y': lat_deg*deg_to_km+dy, 'z': h_km, 'lat': lat_deg+dlat, 'lon': lon_deg+dlon}
 
 
-def compute_slant_path_geometry(input: DictConfig, output: DictConfig) -> None:
+def compute_slant_path(input: DictConfig, output: DictConfig) -> None:
     """ Compute statistics of a given dataset.
 
         Parameters
@@ -89,7 +90,7 @@ def compute_slant_path_geometry(input: DictConfig, output: DictConfig) -> None:
     logger.info("Loading data...")
     lat = load_var(input.lat)
     lon = load_var(input.lon)
-    pressure = load_var(input.pressure)
+    pressure = load_var(input.pressure)[::-1]  # Inverse order
     meta = load_var(input.meta)
     azimuth = meta[:, 3]
     zenith = meta[:, 1]

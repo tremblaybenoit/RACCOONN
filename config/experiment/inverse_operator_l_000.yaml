@@ -67,7 +67,7 @@ preparation:
       # What the method produces as output (pickle file)
       output:
         # File path to save/load the Lanczos object
-        path: ${paths.data_dir}/normalization/lanczos.pkl
+        path: ${paths.data_dir}/normalization/lanczos.pkl  # _{preparation.lanczos.prof.input.n_comp}.pkl
         # Save function
         save:
           _target_: data.io.save_pkl
@@ -86,19 +86,19 @@ preparation:
       # What the method needs as input
       input:
         buffers:
-          # File path to save/load the PCA object
-          path: ${paths.data_dir}/normalization/lanczos.pkl
+          # File path to save/load the Lanczos object
+          path: ${preparation.lanczos.prof.output.path}
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ${paths.data_dir}/normalization/lanczos.pkl
+              - ${preparation.lanczos.prof.output.path}
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ${paths.data_dir}/normalization/lanczos.pkl
+              - ${preparation.lanczos.prof.output.path}
         # Profile data to project
         data:
           load:
@@ -108,7 +108,7 @@ preparation:
               - ${data.stage.train.vars.prof}
       output:
         lanczos:
-          # Output path for PCA projection
+          # Output path for Lanczos projection
           path: ${paths.data_dir}/Train2/prof_lanczos.npy
           # Save function
           save:
@@ -130,19 +130,19 @@ preparation:
       # What the method needs as input
       input:
         buffers:
-          # File path to save/load the PCA object
-          path: ${paths.data_dir}/normalization/lanczos.pkl
+          # File path to save/load the Lanczos object
+          path: ${preparation.lanczos.prof.output.path}
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ${paths.data_dir}/normalization/lanczos.pkl
+              - ${preparation.lanczos.prof.output.path}
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ${paths.data_dir}/normalization/lanczos.pkl
+              - ${preparation.lanczos.prof.output.path}
         # Profile data to project
         data:
           load:
@@ -152,7 +152,7 @@ preparation:
               - ${data.stage.valid.vars.prof}
       output:
         lanczos:
-          # Output path for PCA projection
+          # Output path for Lanczos projection
           path: ${paths.data_dir}/Val2/prof_lanczos.npy
           # Save function
           save:
@@ -174,19 +174,19 @@ preparation:
       # What the method needs as input
       input:
         buffers:
-          # File path to save/load the PCA object
-          path: ${paths.data_dir}/normalization/lanczos.pkl
+          # File path to save/load the Lanczos object
+          path: ${preparation.lanczos.prof.output.path}
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ${paths.data_dir}/normalization/lanczos.pkl
+              - ${preparation.lanczos.prof.output.path}
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ${paths.data_dir}/normalization/lanczos.pkl
+              - ${preparation.lanczos.prof.output.path}
         # Profile data to project
         data:
           load:
@@ -196,7 +196,7 @@ preparation:
               - ${data.stage.test.vars.prof}
       output:
         lanczos:
-          # Output path for PCA projection
+          # Output path for Lanczos projection
           path: ${paths.data_dir}/Test2/prof_lanczos.npy
           # Save function
           save:
@@ -218,19 +218,19 @@ preparation:
       # What the method needs as input
       input:
         buffers:
-          # File path to save/load the PCA object
-          path: ${paths.data_dir}/normalization/lanczos.pkl
+          # File path to save/load the Lanczos object
+          path: ${preparation.lanczos.prof.output.path}
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ${paths.data_dir}/normalization/lanczos.pkl
+              - ${preparation.lanczos.prof.output.path}
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ${paths.data_dir}/normalization/lanczos.pkl
+              - ${preparation.lanczos.prof.output.path}
         # Profile data to project
         data:
           load:
@@ -240,7 +240,7 @@ preparation:
               - ${data.stage.train.vars.prof_background}
       output:
         lanczos:
-          # Output path for PCA projection
+          # Output path for Lanczos projection
           path: ${paths.data_dir}/Train2/prof_background_lanczos.npy
           # Save function
           save:
@@ -262,19 +262,19 @@ preparation:
       # What the method needs as input
       input:
         buffers:
-          # File path to save/load the PCA object
-          path: ${paths.data_dir}/normalization/lanczos.pkl
+          # File path to save/load the Lanczos object
+          path: ${preparation.lanczos.prof.output.path}
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ${paths.data_dir}/normalization/lanczos.pkl
+              - ${preparation.lanczos.prof.output.path}
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ${paths.data_dir}/normalization/lanczos.pkl
+              - ${preparation.lanczos.prof.output.path}
         # Profile data to project
         data:
           load:
@@ -284,7 +284,7 @@ preparation:
               - ${data.stage.valid.vars.prof_background}
       output:
         lanczos:
-          # Output path for PCA projection
+          # Output path for Lanczos projection
           path: ${paths.data_dir}/Val2/prof_background_lanczos.npy
           # Save function
           save:
@@ -306,19 +306,19 @@ preparation:
       # What the method needs as input
       input:
         buffers:
-          # File path to save/load the PCA object
-          path: ${paths.data_dir}/normalization/lanczos.pkl
+          # File path to save/load the Lanczos object
+          path: ${preparation.lanczos.prof.output.path}
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ${paths.data_dir}/normalization/lanczos.pkl
+              - ${preparation.lanczos.prof.output.path}
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ${paths.data_dir}/normalization/lanczos.pkl
+              - ${preparation.lanczos.prof.output.path}
         # Profile data to project
         data:
           load:
@@ -328,7 +328,7 @@ preparation:
               - ${data.stage.test.vars.prof_background}
       output:
         lanczos:
-          # Output path for PCA projection
+          # Output path for Lanczos projection
           path: ${paths.data_dir}/Test2/prof_background_lanczos.npy
           # Save function
           save:
@@ -507,25 +507,16 @@ loader:
 
 # Model parameters
 model:
-  _target_: inverse.model.model.PINNverseOperatorP
-  stats: ${data.stage.train.vars.prof.normalization.stats}
-  pca_buffers:
-    # Load PCA buffers
-    _target_: data.pca.load_pca_buffers
-    path: ../static_clearskies_float32/normalization/pca_clouds_multivariate_10.pkl
-  # Transform
-  transform:
-    _target_: ${data.stage.train.vars.prof.normalization._target_}
-    _partial_: true
-    stats: ${data.stage.train.vars.prof.normalization.stats}
-    axis: ${data.stage.train.vars.prof.normalization.axis}
-    inverse_transform: true
+  lanczos_buffers:
+    # Load Lanczos buffers
+    _target_: data.lanczos.load_lanczos_buffers
+    path: ${preparation.lanczos.prof.output.path}
   # Optimizer function and parameters
   optimizer:
     # Learning rate
     lr: 0.001
     # Weight decay (L2 regularization)
-    weight_decay: 0.00005
+    weight_decay: 0.005
   # Learning rate scheduler
   lr_scheduler:
     # Factor to reduce the learning rate
@@ -565,19 +556,15 @@ model:
     lambda_model: 1.
     lambda_bcs: 0.
     lambda_sobolev: 0. #1.e-5
-    key_obs: '_phys'  # TODO: '_phys' or '_mean_stdev'?
-    key_model: '_mean_stdev'  # TODO: '_mean_stdev' or '_min_max'?
+    key_obs: ''
+    key_model: 'lanczos'
     clear_sky: false
     # Loss term for observations
     loss_obs:
       _target_: inverse.model.loss.DiagonalQuadraticForm
     # Loss term for model variables
     loss_model:
-      _target_: inverse.model.loss.QuadraticForm
-      matrix:
-        _target_: data.pca.load_pca_buffers
-        path: ../static_clearskies_float32/normalization/pca_clouds_univariate_000.pkl
-        buffer: 'B_inv'
+      _target_: inverse.model.loss.MSE
     # Loss term for boundary conditions
     loss_bcs:
       _target_: inverse.model.loss.MSE
@@ -587,8 +574,8 @@ model:
   architecture:
     # Positional encoding
     positional_encoding:
-      _target_: inverse.model.encoding.MultiScaleGaussianEncoding
-      num_freqs: 20
+      _target_: inverse.model.encoding.RescaledPositionalEncoding
+      # num_freqs: 20
       d_input:
         _target_: builtins.int
         _args_:
@@ -597,10 +584,8 @@ model:
               - - ${model.parameters.n_lat}
                 - ${model.parameters.n_lon}
                 - ${model.parameters.n_scans}
-                - ${model.parameters.n_pressure}
-                - ${model.parameters.n_cloud}
       # [Lat, Lon, Scans, Pressure]
-      sigma_per_dim: [ 10.0, 10.0, 10.0 ]
+      # sigma_per_dim: [ 10.0, 10.0, 10.0 ]
     # Input layer
     input_layer:
       _target_: inverse.model.model.LinearBlock
@@ -633,25 +618,16 @@ model:
         is_head: false
     # Output layer
     output_skip: true
-    output_n_heads: ${model.parameters.n_prof}
+    output_n_heads: 1
     output_layer:
       _target_: inverse.model.model.LinearBlock
       in_features: ${model.architecture.hidden_layer.out_features}
-      out_features: 32
-      layernorm: ${model.architecture.hidden_layer.layernorm}
-      activation: ${model.architecture.hidden_layer.activation}
-        # _target_: forward.model.activation.NonLearnableSwish
-        # in_features: ${model.architecture.output_layer.out_features}
-      dropout_rate: 0.1
-      init_func:
-        _target_: inverse.model.model.SwishInit
-        is_first_layer: false
-        is_head: true
-    output_n_layers: 2
-    output_final_layer:
-      _target_: inverse.model.model.LinearBlock
-      in_features: ${model.architecture.hidden_layer.out_features}
-      out_features: 1
+      out_features:
+        _target_: builtins.int
+        _args_:
+          - _target_: data.pca.load_pca_buffers
+            path: ${model.lanczos_buffers.path}
+            buffer: 'n_comp'
       layernorm: ${model.architecture.input_layer.layernorm}
       activation:
         _target_: torch.nn.Identity

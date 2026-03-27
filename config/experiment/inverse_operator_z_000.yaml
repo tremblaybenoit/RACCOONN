@@ -365,7 +365,7 @@ data:
         pressure:
           # Loading function
           load:
-            path: ${....dir}/pressure_log10.npy
+            path: ${....dir}/pressure.npy
         # Brightness temperatures
         hofx:
           # Loading function
@@ -449,7 +449,7 @@ data:
         pressure:
           # Loading function
           load:
-            path: ${....dir}/pressure_log10.npy
+            path: ${....dir}/pressure.npy
         # Brightness temperatures
         hofx:
           # Loading function
@@ -533,7 +533,7 @@ data:
         pressure:
           # Loading function
           load:
-            path: ${....dir}/pressure_log10.npy
+            path: ${....dir}/pressure.npy
         # Brightness temperatures
         hofx:
           # Loading function
