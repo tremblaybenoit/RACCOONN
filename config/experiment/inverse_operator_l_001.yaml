@@ -22,8 +22,8 @@ task_name: "inverse_operator_l"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "000"
-  data_dir: ../static_clearskies_${data.dtype}  # ../static_clearsky_${data.dtype}
+  run_id: "001"
+  data_dir: ../static_clearsky_${data.dtype}
 
 # Trainer configuration
 trainer:
@@ -47,38 +47,6 @@ preparation:
         path: ../static_clearskies_float32/normalization/statistics_clearskies.pkl
   # Lanczos decomposition
   lanczos:
-    # Atmospheric profiles
-    prof:
-      # Function
-      _target_: data.lanczos.compute_lanczos
-      _recursive_: false  # Do not instantiate nested objects
-      # What the method needs as input
-      input:
-        # Profile data to compute lanczos on
-        data:
-          load:
-            _target_: data.io.load_stack
-            _recursive_: false
-            stack:
-              - ${data.stage.train.vars.prof}
-              - ${data.stage.valid.vars.prof}
-              - ${data.stage.test.vars.prof}
-        n_comp: 270
-      # What the method produces as output (pickle file)
-      output:
-        # File path to save/load the Lanczos object
-        path: ${paths.data_dir}/normalization/lanczos.pkl  # _{preparation.lanczos.prof.input.n_comp}.pkl
-        # Save function
-        save:
-          _target_: data.io.save_pkl
-          _partial_: true
-          _args_:
-            - ${preparation.lanczos.prof.output.path}
-        # Load function
-        load:
-          _target_: data.io.load_pkl
-          _args_:
-          - ${preparation.lanczos.prof.output.path}
     prof_train:
       # Function
       _target_: data.lanczos.project_lanczos
@@ -87,18 +55,18 @@ preparation:
       input:
         buffers:
           # File path to save/load the Lanczos object
-          path: ${preparation.lanczos.prof.output.path}
+          path: ../static_clearskies_float32/normalization/lanczos.pkl
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ${preparation.lanczos.prof.output.path}
+              - ${preparation.lanczos.prof_train.input.buffers.path}
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ${preparation.lanczos.prof.output.path}
+              - ${preparation.lanczos.prof_train.input.buffers.path}
         # Profile data to project
         data:
           load:
@@ -131,18 +99,18 @@ preparation:
       input:
         buffers:
           # File path to save/load the Lanczos object
-          path: ${preparation.lanczos.prof.output.path}
+          path: ${preparation.lanczos.prof_train.input.buffers.path}
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ${preparation.lanczos.prof.output.path}
+              - ${preparation.lanczos.prof_train.input.buffers.path}
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ${preparation.lanczos.prof.output.path}
+              - ${preparation.lanczos.prof_train.input.buffers.path}
         # Profile data to project
         data:
           load:
@@ -175,18 +143,18 @@ preparation:
       input:
         buffers:
           # File path to save/load the Lanczos object
-          path: ${preparation.lanczos.prof.output.path}
+          path: ${preparation.lanczos.prof_train.input.buffers.path}
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ${preparation.lanczos.prof.output.path}
+              - ${preparation.lanczos.prof_train.input.buffers.path}
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ${preparation.lanczos.prof.output.path}
+              - ${preparation.lanczos.prof_train.input.buffers.path}
         # Profile data to project
         data:
           load:
@@ -219,18 +187,18 @@ preparation:
       input:
         buffers:
           # File path to save/load the Lanczos object
-          path: ${preparation.lanczos.prof.output.path}
+          path: ${preparation.lanczos.prof_train.input.buffers.path}
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ${preparation.lanczos.prof.output.path}
+              - ${preparation.lanczos.prof_train.input.buffers.path}
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ${preparation.lanczos.prof.output.path}
+              - ${preparation.lanczos.prof_train.input.buffers.path}
         # Profile data to project
         data:
           load:
@@ -263,18 +231,18 @@ preparation:
       input:
         buffers:
           # File path to save/load the Lanczos object
-          path: ${preparation.lanczos.prof.output.path}
+          path: ${preparation.lanczos.prof_train.input.buffers.path}
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ${preparation.lanczos.prof.output.path}
+              - ${preparation.lanczos.prof_train.input.buffers.path}
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ${preparation.lanczos.prof.output.path}
+              - ${preparation.lanczos.prof_train.input.buffers.path}
         # Profile data to project
         data:
           load:
@@ -307,18 +275,18 @@ preparation:
       input:
         buffers:
           # File path to save/load the Lanczos object
-          path: ${preparation.lanczos.prof.output.path}
+          path: ${preparation.lanczos.prof_train.input.buffers.path}
           # Save function
           save:
             _target_: data.io.save_pkl
             _partial_: true
             _args_:
-              - ${preparation.lanczos.prof.output.path}
+              - ${preparation.lanczos.prof_train.input.buffers.path}
           # Load function
           load:
             _target_: data.io.load_pkl
             _args_:
-              - ${preparation.lanczos.prof.output.path}
+              - ${preparation.lanczos.prof_train.input.buffers.path}
         # Profile data to project
         data:
           load:
@@ -510,7 +478,7 @@ model:
   lanczos_buffers:
     # Load Lanczos buffers
     _target_: data.lanczos.load_lanczos_buffers
-    path: ${preparation.lanczos.prof.output.path}
+    path: ${preparation.lanczos.prof_train.input.buffers.path}
   # Optimizer function and parameters
   optimizer:
     # Learning rate
@@ -556,7 +524,7 @@ model:
     lambda_bcs: 0.
     lambda_sobolev: 0. #1.e-5
     key_obs: ''
-    key_model: 'lanczos'
+    key_model: '_lanczos'
     clear_sky: false
     # Loss term for observations
     loss_obs:

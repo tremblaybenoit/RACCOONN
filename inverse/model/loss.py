@@ -779,7 +779,7 @@ class VarLossP(VarLoss):
             pred['prof_min_max'][:, ~pressure_filter] = pred['prof_background_min_max'][:, ~pressure_filter]
             pred['prof_mean_stdev'][:, ~pressure_filter] = pred['prof_background_mean_stdev'][:, ~pressure_filter]
         else:
-            pressure_filter = torch.ones_like(pred['prof_phys'], dtype=torch.bool, device=pred['prof_phys'].device)
+            pressure_filter = torch.ones_like(pred['prof'], dtype=torch.bool, device=pred['prof'].device)
 
         # Compute the forward model output
         if self.clear_sky:

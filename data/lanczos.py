@@ -36,7 +36,7 @@ def load_lanczos_buffers(path: str, buffer: str=None) -> dict:
         'L_inv': lanczos_buffers['L_inv'],
         'eigenvalues': lanczos_buffers['eigenvalues'],
         'basis': lanczos_buffers['basis'],
-        'n_modes': lanczos_buffers['n_modes'],
+        'n_comp': lanczos_buffers['n_comp'],
     }
 
 
@@ -156,7 +156,7 @@ def generate_lanczos_buffers(data: np.ndarray, n_comp: int = 200, alpha: float =
         'L_inv': L_inv,
         'eigenvalues': evals,
         'basis': evecs,
-        'n_modes': n_comp
+        'n_comp': n_comp
     }
 
 
@@ -254,10 +254,10 @@ def main(config: DictConfig) -> None:
     """
 
     # Compute model and observation pca decompositions
-    if hasattr(config.preparation, "pca"):
-        for dataset, config_pca in config.preparation.pca.items():
+    if hasattr(config.preparation, "lanczos"):
+        for dataset, config_lanczos in config.preparation.lanczos.items():
             logger.info(f"Computing Lanczos decomposition of {dataset} set")
-            instantiate(config_pca)
+            instantiate(config_lanczos)
 
     return
 

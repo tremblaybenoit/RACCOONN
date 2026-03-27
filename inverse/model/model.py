@@ -697,10 +697,21 @@ class HydraResidualMLP(nn.Module):
             self.output_layers = PredictionHeads(output_layers)
         else:
             head_layers = []
-            for _ in range(output_n_layers):
-                head_layers.append(instantiate(output_layer))
-            if output_final_layer is not None:
-                head_layers.append(instantiate(output_final_layer))
+            for l in range(output_n_layers):
+                output_layer_l = output_layer.copy()
+                if output_skip and l == 0:
+                    output_layer_l.in_features = hidden_layer.out_features + input_layer.out_features
+                    if output_layer_l._target_ == 'inverse.model.model.SirenResidualBlock':
+                        output_layer.out_features = output_layer_l.in_features
+                        output_layer_l.out_features = output_layer_l.in_features
+                elif l == 0:
+                    output_layer_l.in_features = hidden_layer.out_features
+                else:
+                    output_layer_l.in_features = output_layer.out_features
+                if hasattr(output_layer_l.activation, 'in_features'):
+                    output_layer_l.activation.in_features = output_layer_l.out_features
+                # breakpoint()
+                head_layers.append(instantiate(output_layer_l))
             self.output_layers = nn.Sequential(*head_layers)
         # breakpoint()
 
@@ -856,7 +867,7 @@ class PINNverseOperator(BaseModel):
         prof = self.forward(batch['input'])
         return prof
 
-    def _logging_prof(self, pred: torch.Tensor, target: torch.Tensor, background: torch.Tensor=None) -> None:
+    def _logging_prof(self, pred: torch.Tensor, target: torch.Tensor, background: torch.Tensor=None, key: str='') -> None:
         """ Log profile metrics.
 
             Parameters
@@ -876,22 +887,22 @@ class PINNverseOperator(BaseModel):
         stats_target = statistics(target, axis=0, which=['mean', 'stdev'])
         stats_target = {k: v.detach() for k, v in stats_target.items()}
         # Check if statistics dictionaries are empty
-        if self.metrics.get('prof'):
-            self.metrics['prof'] = accumulate_statistics([self.metrics['prof'], stats_pred])
-            self.metrics['prof_target'] = accumulate_statistics([self.metrics['prof_target'], stats_target])
+        if self.metrics.get('prof'+key):
+            self.metrics['prof'+key] = accumulate_statistics([self.metrics['prof'+key], stats_pred])
+            self.metrics['prof_target'+key] = accumulate_statistics([self.metrics['prof_target'+key], stats_target])
         else:
-            self.metrics['prof'] = stats_pred
-            self.metrics['prof_target'] = stats_target
+            self.metrics['prof'+key] = stats_pred
+            self.metrics['prof_target'+key] = stats_target
 
         # Log mean background profiles and rmse if available
         if background is not None:
             stats_background = statistics(background, axis=0, which=['mean', 'stdev', 'rmse', 'mae'], target=target)
             stats_background = {k: v.detach() for k, v in stats_background.items()}
             # Check if statistics dictionaries are empty
-            if self.metrics.get('prof_background'):
-                self.metrics['prof_background'] = accumulate_statistics([self.metrics['prof_background'], stats_background])
+            if self.metrics.get('prof_background'+key):
+                self.metrics['prof_background'+key] = accumulate_statistics([self.metrics['prof_background'+key], stats_background])
             else:
-                self.metrics['prof_background'] = stats_background
+                self.metrics['prof_background'+key] = stats_background
 
     def _logging_prof_white(self, pred: torch.Tensor, target: torch.Tensor, background: torch.Tensor=None) -> None:
         """ Log profile metrics in "white" space (i.e., without pressure-level filtering).
@@ -1142,6 +1153,10 @@ class PINNverseOperatorLanczos(PINNverseOperator):
         super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func,
                          architecture=architecture, parameters=parameters)
 
+        # Add metrics
+        self.metrics['prof_lanczos'], self.metrics['prof_target_lanczos'], self.metrics[
+            'prof_background_lanczos'] = {}, {}, {}
+
         # Lanczos Buffers
         lanczos_buffers = instantiate(lanczos_buffers)
         self.register_buffer('x_b', torch.tensor(lanczos_buffers['x_b']))
@@ -1194,6 +1209,8 @@ class PINNverseOperatorLanczos(PINNverseOperator):
 
             # Compute profiles
             pred = self.forward(batch['input'])
+            pred['prof_background'] = batch['target']['prof_background'].clone()
+            pred['prof_background_lanczos'] = batch['target']['prof_background_lanczos'].clone()
 
             # Compute loss function
             loss, pred['hofx'] = self.loss_func(pred, batch['target'], coords)
@@ -1202,6 +1219,17 @@ class PINNverseOperatorLanczos(PINNverseOperator):
         self._logging(stage, loss, batch['input'], batch['target'], pred)
 
         return loss['total']
+
+    def _logging(self, stage: str, loss: dict, input: dict, target: dict, pred: dict) -> None:
+
+        # Class inheritance
+        super()._logging(stage, loss, input, target, pred)
+
+        # If testing, return predictions in addition to loss
+        if stage == 'valid':
+            if 'prof_lanczos' in pred and 'prof_lanczos' in target:
+                self._logging_prof(pred['prof_lanczos'], target['prof_lanczos'],
+                                   background=target.get('prof_background_lanczos', None), key='_lanczos')
 
 
 class PINNverseOperatorPCA(PINNverseOperator):

@@ -49,74 +49,57 @@ class FigureLogger(ForwardFigureLogger):
         prof_labels = model.prof_vars if hasattr(model, 'prof_vars') else None
         # breakpoint()
         # Pressure_levels
-        # if model.results['pressure'].min() > 0:
-        #     pressure_levels = 0.01 * (
-        #         instantiate(trainer.datamodule.stage.valid.input.pressure.normalization, inverse_transform=True)
-        #         (to_numpy(model.results['pressure']))).flatten()
-        # else:
-        # Convert from log10 space to physical space
-        pressure_levels = 0.01*10**(instantiate(trainer.datamodule.stage.valid.input.pressure.normalization, inverse_transform=True)
-            (to_numpy(model.results['pressure'])).flatten())
+        if model.results['pressure'].max() > 10.:
+            pressure_levels = 0.01 * (
+                instantiate(trainer.datamodule.stage.valid.input.pressure.normalization, inverse_transform=True)
+                (to_numpy(model.results['pressure']))).flatten()
+        else:
+            # Convert from log10 space to physical space
+            pressure_levels = 0.01*10**(instantiate(trainer.datamodule.stage.valid.input.pressure.normalization, inverse_transform=True)
+                (to_numpy(model.results['pressure'])).flatten())
 
         # Profiles
-        prof_mean = [to_numpy(model.metrics['prof_target']['mean']),
-                     to_numpy(model.metrics['prof']['mean'])]
-        prof_stdev = [to_numpy(model.metrics['prof_target']['stdev']),
-                      to_numpy(model.metrics['prof']['stdev'])]
-        prof_rmse = [to_numpy(model.metrics['prof']['rmse']), ]
-        prof_mean_labels, prof_mean_colors = ['Target', 'Prediction'], ['#1f77b4', '#ff7f0e']
-        prof_rmse_labels, prof_rmse_colors = ['Target-Prediction'], ['#ff7f0e']
-        if 'prof_background' in model.metrics and len(model.metrics['prof_background']) > 0:
-            prof_mean.insert(0, to_numpy(model.metrics['prof_background']['mean']))
-            prof_stdev.insert(0, to_numpy(model.metrics['prof_background']['stdev']))
-            prof_rmse.insert(0, to_numpy(model.metrics['prof_background']['rmse']))
-            prof_mean_labels.insert(0, 'Background')
-            prof_mean_colors.insert(0, '#2ca02c')
-            prof_rmse_labels.insert(0, 'Target-Background')
-            prof_rmse_colors.insert(0, '#2ca02c')
-        # Profile Mean
-        self.figs.append(fig_vertical_profiles(prof_mean, prof_mean_labels, stdev=prof_stdev,
-                                               y=pressure_levels, y_label='Pressure (hPa)',
-                                               x_label='Normalized profile value (no units)', color=prof_mean_colors,
-                                               title=[f"Epoch {current_epoch:02d} - {prof_label}" for prof_label in
-                                                      prof_labels]))
-        # Profile RMSE
-        self.figs.append(fig_vertical_profiles(prof_rmse, prof_rmse_labels, y=pressure_levels, y_label='Pressure (hPa)',
-                                               x_label='Normalized profile RMSE (no units)', color=prof_rmse_colors,
-                                               title=[f"Epoch {current_epoch:02d} - {prof_label}" for prof_label in
-                                                      prof_labels]))
-
-        # Standardized profiles
-        if 'prof_mean_stdev' in model.metrics and len(model.metrics['prof_mean_stdev']) > 0:
-            prof_mean_stdev = [to_numpy(model.metrics['prof_mean_stdev']['mean']),
-                              to_numpy(model.metrics['prof_mean_stdev']['stdev'])]
-            prof_mean_stdev_labels, prof_mean_stdev_colors = ['Target', 'Prediction'], ['#1f77b4', '#ff7f0e']
-            if 'prof_background_mean_stdev' in model.metrics and len(model.metrics['prof_background_mean_stdev']) > 0:
-                prof_mean_stdev.insert(0, to_numpy(model.metrics['prof_background_mean_stdev']['mean']))
-                prof_mean_stdev_labels.insert(0, 'Background')
-                prof_mean_stdev_colors.insert(0, '#2ca02c')
-            # Standardized profile mean and stdev
-            self.figs.append(fig_vertical_profiles(prof_mean_stdev, prof_mean_stdev_labels,
-                                                   y=pressure_levels, y_label='Pressure (hPa)',
-                                                   x_label='Standardized profile value (no units)', color=prof_mean_stdev_colors,
-                                                   title=[f"Epoch {current_epoch:02d} - {prof_label}" for prof_label in
-                                                          prof_labels]))
-
-        # Whitened profile coefficients (0 to 270)
-        if 'prof_white_background' in model.metrics and len(model.metrics['prof_white_background']) > 0:
-            coefficient_levels = np.arange(0, 689, 1)
-            prof_white_rmse = [to_numpy(model.metrics['prof_white']['rmse']).reshape(1, -1), ]
-            prof_white_rmse_labels, prof_white_rmse_colors = ['Target-Prediction'], ['#ff7f0e']
-            prof_white_rmse.insert(0, to_numpy(model.metrics['prof_white_background']['rmse'].reshape(1, -1)))
-            prof_white_rmse_labels.insert(0, 'Target-Background')
-            prof_white_rmse_colors.insert(0, '#2ca02c')
-
-            # White profile RMSE
-            self.figs.append(fig_vertical_profiles(prof_white_rmse, prof_white_rmse_labels,
-                                                   y=coefficient_levels, y_label='Coefficient Index',
-                                                   x_label='Whitened profile RMSE (no units)', color=prof_white_rmse_colors,
-                                                   title=[f"Epoch {current_epoch:02d} - {prof_label}" for prof_label in
-                                                          prof_labels]))
+        for key in ['', '_white', '_lanczos']:
+            if 'prof'+key in model.metrics and len(model.metrics['prof'+key]) > 0:
+                # Extract profiles
+                prof_mean = [to_numpy(model.metrics['prof_target'+key]['mean']),
+                             to_numpy(model.metrics['prof'+key]['mean'])]
+                prof_stdev = [to_numpy(model.metrics['prof_target'+key]['stdev']),
+                             to_numpy(model.metrics['prof'+key]['stdev'])]
+                prof_rmse = [to_numpy(model.metrics['prof'+key]['rmse']), ]
+                prof_mean_labels, prof_mean_colors = ['Target', 'Prediction'], ['#1f77b4', '#ff7f0e']
+                prof_rmse_labels, prof_rmse_colors = ['Target-Prediction'], ['#ff7f0e']
+                # Add background
+                if 'prof_background' + key in model.metrics and len(model.metrics['prof_background' + key]) > 0:
+                    prof_mean.insert(0, to_numpy(model.metrics['prof_background'+key]['mean']))
+                    prof_stdev.insert(0, to_numpy(model.metrics['prof_background' + key]['stdev']))
+                    prof_rmse.insert(0, to_numpy(model.metrics['prof_background'+key]['rmse']))
+                    prof_mean_labels.insert(0, 'Target-Background')
+                    prof_mean_colors.insert(0, '#2ca02c')
+                    prof_rmse_labels.insert(0, 'Target-Background')
+                    prof_rmse_colors.insert(0, '#2ca02c')
+                # Make adjustments based on type of profile
+                if key == '':
+                    y = pressure_levels
+                    y_label = 'Pressure (hPa)'
+                    x_label = 'Profile value (no units)'
+                else:
+                    y = np.arange(0, model.metrics['prof'+key]['rmse'].shape[0], 1)
+                    y_label = 'Coefficient Index'
+                    x_label = 'Coefficient value (no units)'
+                    prof_mean = [prof_mean[i].reshape((1, -1)) for i in range(len(prof_mean))]
+                    prof_stdev = [prof_stdev[i].reshape((1, -1)) for i in range(len(prof_stdev))]
+                    prof_rmse = [prof_rmse[i].reshape((1, -1)) for i in range(len(prof_rmse))]
+                # Profile Mean
+                self.figs.append(fig_vertical_profiles(prof_mean, prof_mean_labels, stdev=prof_stdev, y=y, y_label=y_label,
+                                                       x_label=x_label, color=prof_mean_colors,
+                                                       title=[f"Epoch {current_epoch:02d} - {prof_label}" for prof_label in
+                                                              prof_labels]))
+                # Profile RMSE
+                self.figs.append(fig_vertical_profiles(prof_rmse, prof_rmse_labels, y=y, y_label=y_label,
+                                                       x_label=x_label, color=prof_rmse_colors,
+                                                       title=[f"Epoch {current_epoch:02d} - {prof_label}" for prof_label in
+                                                              prof_labels]))
 
         # Apply parent figure builder
         super()._figurebuilder(trainer, model, tags, current_epoch)
@@ -147,13 +130,12 @@ class FigureLogger(ForwardFigureLogger):
             return
 
         # Tags for each figure
-        tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE", "Valid_RadianceRMSE"]
-        # if 'prof_mean_stdev' in model.metrics and len(model.metrics['prof_mean_stdev']) > 0:
-        #     tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE", "Valid_ProfilesMeanStdev", "Valid_RadianceRMSE"]
-        #     if 'prof_white_background' in model.metrics and len(model.metrics['prof_white_background']) > 0:
-        #         tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE", "Valid_ProfilesMeanStdev", "Valid_WhiteProfilesRMSE", "Valid_RadianceRMSE"]
-        if 'prof_white_background' in model.metrics and len(model.metrics['prof_white_background']) > 0:
-            tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE", "Valid_WhiteProfilesRMSE", "Valid_RadianceRMSE"]
+        if 'prof_background_lanczos' in model.metrics and len(model.metrics['prof_background_lanczos']) > 0:
+            tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE", "Valid_LanczosProfilesMean", "Valid_LanczosProfilesRMSE", "Valid_RadianceRMSE"]
+        elif 'prof_background_white' in model.metrics and len(model.metrics['prof_background_white']) > 0:
+            tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE", "Valid_WhiteProfilesMean", "Valid_WhiteProfilesRMSE", "Valid_RadianceRMSE"]
+        else:
+            tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE", "Valid_RadianceRMSE"]
 
         # Call the figure builder and buffer
         self._figurebuilder(trainer, model, tags, current_epoch)

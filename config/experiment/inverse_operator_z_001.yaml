@@ -22,8 +22,8 @@ task_name: "inverse_operator_z"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "000"
-  data_dir: ../static_clearskies_${data.dtype}  # ../static_clearsky_${data.dtype}
+  run_id: "001"
+  data_dir: ../static_clearsky_${data.dtype}
   # TODO: First compute statistics on all data
 
 # Trainer configuration
@@ -41,6 +41,7 @@ callbacks:
 preparation:
   # Statistics computation
   statistics:
+    # Variables for which to compute statistics
     # Variables for which to compute statistics
     data:
       # Input data for statistics computation
