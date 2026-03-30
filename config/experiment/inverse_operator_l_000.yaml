@@ -63,7 +63,7 @@ preparation:
               - ${data.stage.train.vars.prof}
               - ${data.stage.valid.vars.prof}
               - ${data.stage.test.vars.prof}
-        n_comp: 270
+        n_comp: 100
       # What the method produces as output (pickle file)
       output:
         # File path to save/load the Lanczos object

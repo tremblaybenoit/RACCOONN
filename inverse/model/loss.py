@@ -829,6 +829,7 @@ class VarLossP(VarLoss):
                                                     pred['prof_background'+self.key_model])
             # Total
             loss['total'] += self.lambda_model * loss['model'].mean()
+            loss['model_phys'] = self.loss_model(pred['prof'], target['prof'])
 
         # Sobolev regularization loss
         if self.lambda_sobolev > 0.0:
@@ -869,7 +870,7 @@ class VarLossR(VarLoss):
             pred['prof_min_max'][:, ~pressure_filter] = pred['prof_background_min_max'][:, ~pressure_filter]
             pred['prof_mean_stdev'][:, ~pressure_filter] = pred['prof_background_mean_stdev'][:, ~pressure_filter]
         else:
-            pressure_filter = torch.ones_like(pred['prof_phys'], dtype=torch.bool, device=pred['prof_phys'].device)
+            pressure_filter = torch.ones_like(pred['prof'], dtype=torch.bool, device=pred['prof'].device)
 
         # Compute the forward model output
         if self.clear_sky:
@@ -919,6 +920,7 @@ class VarLossR(VarLoss):
                                                     pred['prof_target'+self.key_model])
             # Total
             loss['total'] += self.lambda_model * loss['model'].mean()
+            loss['model_phys'] = self.loss_model(pred['prof'], target['prof'])
 
         # Sobolev regularization loss
         if self.lambda_sobolev > 0.0:

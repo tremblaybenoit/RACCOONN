@@ -558,7 +558,7 @@ class ResidualMLP(nn.Module):
         # Input layer
         self.input_layers = instantiate(input_layer)
         # Hidden layers
-        hidden_layers = []
+        hidden_layers = nn.ModuleList()
         # Build hidden layers with optional skip connections
         for _ in range(hidden_n_layers):
             hidden_layer_instance = instantiate(hidden_layer)
@@ -642,7 +642,7 @@ class HydraResidualMLP(nn.Module):
         # Input layer
         self.input_layers = instantiate(input_layer)
         # Hidden layers
-        hidden_layers = []
+        hidden_layers = nn.ModuleList()
         # Build hidden layers with optional skip connections
         for _ in range(hidden_n_layers):
             hidden_layer_instance = instantiate(hidden_layer)
@@ -656,17 +656,8 @@ class HydraResidualMLP(nn.Module):
                 hidden_layer_instance = Residual(hidden_layer_instance, projection=projection)
             hidden_layers.append(hidden_layer_instance)
         # Output layer
-
         if output_skip:
             self.hidden_layers = Concatenate(nn.Sequential(*hidden_layers))
-            # output_layer.in_features = hidden_layer.out_features + input_layer.out_features
-            # output_layer.in_features = hidden_layer.out_features + input_layer.out_features
-            # if output_n_layers > 1:
-            #     output_layer.out_features = output_layer.in_features
-            # if hasattr(output_layer.activation, 'in_features'):
-            #     output_layer.activation.in_features = output_layer.in_features
-            # if output_final_layer is not None:
-            #      output_final_layer.in_features = output_layer.out_features
         else:
             self.hidden_layers = nn.Sequential(*hidden_layers)
         # Model architecture
@@ -713,7 +704,6 @@ class HydraResidualMLP(nn.Module):
                 # breakpoint()
                 head_layers.append(instantiate(output_layer_l))
             self.output_layers = nn.Sequential(*head_layers)
-        # breakpoint()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -1211,6 +1201,8 @@ class PINNverseOperatorLanczos(PINNverseOperator):
             pred = self.forward(batch['input'])
             pred['prof_background'] = batch['target']['prof_background'].clone()
             pred['prof_background_lanczos'] = batch['target']['prof_background_lanczos'].clone()
+            pred['prof_target'] = batch['target']['prof'].clone()
+            pred['prof_target_lanczos'] = batch['target']['prof_lanczos'].clone()
 
             # Compute loss function
             loss, pred['hofx'] = self.loss_func(pred, batch['target'], coords)

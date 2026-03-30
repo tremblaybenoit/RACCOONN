@@ -22,7 +22,7 @@ task_name: "inverse_operator_l"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "001"
+  run_id: "00P"
   data_dir: ../static_clearsky_${data.dtype}
 
 # Trainer configuration
@@ -519,7 +519,7 @@ model:
           dtype: ${data.dtype}
         axis: 1
     # Weights for observation (obs), model, and boundary condition (bcs) errors
-    lambda_obs: 100.  # TODO: 0. or 1.?
+    lambda_obs: 0.  # TODO: 0. or 1.?
     lambda_model: 1.
     lambda_bcs: 0.
     lambda_sobolev: 0. #1.e-5
@@ -570,11 +570,11 @@ model:
         is_head: false
 
     # Hidden layer
-    n_hidden_layers: 4
+    n_hidden_layers: 1
     hidden_skip: false
     hidden_layer:
       _target_: inverse.model.model.SirenResidualBlock
-      in_features: 64
+      in_features: 256
       out_features: ${model.architecture.hidden_layer.in_features}
       layernorm: ${model.architecture.input_layer.layernorm}
       activation: ${model.architecture.input_layer.activation}

@@ -140,8 +140,20 @@ def generate_lanczos_buffers(data: np.ndarray, n_comp: int = 200, alpha: float =
 
     # Sort by variance (descending)
     idx = np.argsort(eigenvalues)[::-1]
-    evals = eigenvalues[idx][:n_comp]
+    sorted_evals = eigenvalues[idx]
+    evals = sorted_evals[:n_comp]
     evecs = eigenvectors[:, idx][:, :n_comp]
+
+    # Explained variance ratio
+    total_var = np.sum(sorted_evals)
+    explained_var = np.sum(evals)
+    evr = (explained_var / total_var) * 100
+    ignored_var = np.sum(sorted_evals[n_comp:])
+    theoretical_mse = ignored_var / B.shape[0]
+    theoretical_rmse = np.sqrt(theoretical_mse)
+    logger.info(f"Lanczos Quality: {n_comp} modes explain {evr:.4f}% of variance.")
+    logger.info(f"Theoretical Lower Bound for MSE:  {theoretical_mse:.6f}")
+    logger.info(f"Theoretical Lower Bound for RMSE: {theoretical_rmse:.6f}")
 
     # 5. Compute the Square Root Matrix L (B = L L^T)
     # In Lanczos space: L = Eigenvectors * sqrt(Eigenvalues)
@@ -205,14 +217,13 @@ def project_lanczos(input: DictConfig, output: DictConfig) -> None:
     return
 
 
-def compute_lanczos(input: DictConfig, output: DictConfig, pressure_filter: np.ndarray = None) -> None:
+def compute_lanczos(input: DictConfig, output: DictConfig) -> None:
     """ Compute Lanczos decomposition of a given dataset.
 
         Parameters
         ----------
         input: DictConfig. Main hydra configuration file containing all model hyperparameters.
         output: DictConfig. Output configuration.
-        pressure_filter: np.ndarray. Optional boolean array to filter pressure levels.
 
         Returns
         -------
@@ -227,7 +238,8 @@ def compute_lanczos(input: DictConfig, output: DictConfig, pressure_filter: np.n
     logger.info("Generating PCA buffers...")
     lanczos_buffs = generate_lanczos_buffers(
         data=data,
-        alpha=input.get('alpha', 0.)
+        alpha=input.get('alpha', 0.),
+        n_comp=input.get('n_comp', 200),
     )
 
     # Save statistics to file
