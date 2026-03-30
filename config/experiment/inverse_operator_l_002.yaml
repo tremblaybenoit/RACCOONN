@@ -22,7 +22,7 @@ task_name: "inverse_operator_l"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "001"
+  run_id: "002"
   data_dir: ../static_clearsky_${data.dtype}
 
 # Trainer configuration
@@ -561,28 +561,30 @@ model:
       layernorm:
         _target_: torch.nn.Identity
       activation:
-        _target_: forward.model.activation.NonLearnableSwish
-        in_features: ${model.architecture.hidden_layer.in_features}
+        _target_: forward.model.activation.Sine
+        w0: 0.1
       dropout_rate: 0.1
       init_func:
-        _target_: inverse.model.model.SwishInit
+        _target_: inverse.model.model.SirenInit
         is_first_layer: true
-        is_head: false
+        activation: ${model.architecture.input_layer.activation}
 
     # Hidden layer
-    n_hidden_layers: 4
+    n_hidden_layers: 2
     hidden_skip: false
     hidden_layer:
       _target_: inverse.model.model.SirenResidualBlock
       in_features: 64
       out_features: ${model.architecture.hidden_layer.in_features}
       layernorm: ${model.architecture.input_layer.layernorm}
-      activation: ${model.architecture.input_layer.activation}
+      activation:
+        _target_: forward.model.activation.Sine
+        w0: 0.1
       dropout_rate: ${model.architecture.input_layer.dropout_rate}
       init_func:
-        _target_: inverse.model.model.SwishInit
+        _target_: inverse.model.model.SirenInit
         is_first_layer: false
-        is_head: false
+        activation: ${model.architecture.hidden_layer.activation}
     # Output layer
     output_skip: true
     output_n_heads: 1
@@ -600,9 +602,10 @@ model:
         _target_: torch.nn.Identity
       dropout_rate: 0.0
       init_func:
-        _target_: inverse.model.model.SwishInit
+        _target_: inverse.model.model.SirenInit
         is_first_layer: false
         is_head: true
+        activation: ${model.architecture.output_layer.activation}
 
 # Logger configuration
 logger:

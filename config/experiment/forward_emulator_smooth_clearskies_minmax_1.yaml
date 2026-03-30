@@ -93,7 +93,7 @@ data:
     # Prediction set
     predict:
       # Directory
-      dir: ../static_clearskies_float32/Train2
+      dir: ../static_clearsky_float32/Train2
       # Variables
       vars:
         # Atmospheric profiles

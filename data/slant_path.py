@@ -68,7 +68,6 @@ def slant_path_geometry(pressure: np.ndarray, temperature: np.ndarray, sza: np.n
     dy, dx = d_km * np.cos(az_rad), d_km * np.sin(az_rad)
     dlat = dy / deg_to_km
     dlon = dx / (deg_to_km * np.cos(lat_rad))
-    breakpoint()
 
     # Return heights, offset latitude, offset longitude
     return {'x': lon_deg*deg_to_km* np.cos(lat_rad)+dx, 'y': lat_deg*deg_to_km+dy, 'z': h_km, 'lat': lat_deg+dlat, 'lon': lon_deg+dlon}
