@@ -196,10 +196,10 @@ class LearnableSine(nn.Module):
 class SuperLearnableSine(nn.Module):
     def __init__(self, in_features, w0=30.0):
         super().__init__()
-        # Learnable vector: one frequency per feature
-        self.freq = nn.Parameter(torch.full((in_features,), float(w0)))
+        # Each input feature gets its own learnable frequency scaling
+        self.w0 = nn.Parameter(torch.ones(in_features) * w0, requires_grad=True)
 
     def forward(self, x):
-        # Element-wise multiplication of frequencies and features
-        # x: (Batch, In_Features), self.freq: (In_Features)
-        return torch.sin(self.freq * x)
+        # x has shape (Batch, In_Features)
+        w0_constrained = torch.clamp(self.w0, min=0.0, max=30.0)
+        return torch.sin(w0_constrained * x)
