@@ -603,41 +603,6 @@ data:
 loader:
   batch_size: 24
   num_workers: 8
-  # Split the data into training, validation, and test sets
-  stage:
-    # Training set
-    train:
-      # Dataset class
-      _target_: forward.model.data_loader.TorchDataset
-      _recursive_: false
-      # Variables to use as input
-      input:
-        # Input coordinates (keeping the same names for compatibility with the model)
-        lat: ${data.stage.train.vars.y}  # lat -> y
-        lon: ${data.stage.train.vars.x}  # lon -> x
-        pressure: ${data.stage.train.vars.z}  # pressure -> z
-    # Validation set
-    valid:
-      # Dataset class
-      _target_: forward.model.data_loader.TorchDataset
-      _recursive_: false
-      # Variables to use as input
-      input:
-        # Input coordinates (keeping the same names for compatibility with the model)
-        lat: ${data.stage.valid.vars.y}  # lat -> y
-        lon: ${data.stage.valid.vars.x}  # lon -> x
-        pressure: ${data.stage.valid.vars.z}  # pressure -> z
-    # Test set
-    test:
-      # Dataset class
-      _target_: forward.model.data_loader.TorchDataset
-      _recursive_: false
-      # Variables to use as input
-      input:
-        # Input coordinates (keeping the same names for compatibility with the model)
-        lat: ${data.stage.test.vars.y}  # lat -> y
-        lon: ${data.stage.test.vars.x}  # lon -> x
-        pressure: ${data.stage.test.vars.z}  # pressure -> z
 
 # Model parameters
 model:

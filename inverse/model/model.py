@@ -234,26 +234,24 @@ class SirenInit(nn.Module):
 
                 # First layer initialization
                 if self.is_first_layer:
+                    # First layer scale: w0 is critical for spatial detail
                     bound = 1.0 / dim_in
                     nn.init.uniform_(module.weight, -bound, bound)
+                    # Ensure we don't multiply by w0 twice if the Sine block also does it
+                    # Usually, we scale the weights by w0 here.
                     module.weight *= self.w0
 
-                # Head/output layer initialization
                 elif self.is_head:
-                    # Hydra Head initialization: Small variance to maintain stability
-                    # with CRTM and prevent early training divergence.
-                    # bound = torch.sqrt(torch.tensor(1. / dim_in))
-                    # nn.init.uniform_(module.weight, -bound, bound)
-                    nn.init.xavier_uniform_(module.weight)
+                    # For Lanczos u-space: keep weights small so we start near the mean (x_b)
+                    nn.init.uniform_(module.weight, -1e-4, 1e-4)
 
-                # Subsequent layer initialization
                 else:
-                    bound = (torch.sqrt(torch.tensor(6.0 / dim_in)) / self.w0).item()
+                    # Standard SIREN hidden layer init
+                    bound = np.sqrt(6.0 / dim_in) / self.w0
                     nn.init.uniform_(module.weight, -bound, bound)
 
-            # Bias initialization
-            if hasattr(module, 'bias') and module.bias is not None:
-                nn.init.zeros_(module.bias)
+                if hasattr(module, 'bias') and module.bias is not None:
+                    nn.init.zeros_(module.bias)
 
 
 class Residual(nn.Module):
