@@ -1,16 +1,11 @@
 import pytorch_lightning as pl
 from torch.utils.data import Dataset, DataLoader
 from omegaconf import DictConfig
-from data.io import load_var_and_normalize
+from data.io import load_var_and_normalize, load_var
 from utilities.instantiators import instantiate
-from typing import Union
-from utilities.tensors import to_torch
-import multiprocessing
 import os
-from tqdm import tqdm
 import numpy as np
 import torch
-from typing import Optional
 import torch.multiprocessing as mp
 # Set this BEFORE any dataloader starts
 mp.set_sharing_strategy('file_system')
@@ -266,7 +261,6 @@ class TorchDataset(Dataset):
             else:
                 self.input_blocks[key] = data
                 self.input_blocks_keys.append(key)
-
         # 2. Automate Target Block Loading
         self.target_blocks, self.target_blocks_keys = {}, []
         self.target_consts, self.target_consts_keys = {}, []

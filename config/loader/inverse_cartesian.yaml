@@ -19,6 +19,7 @@ stage:
       x: ${data.stage.train.vars.x}
       y: ${data.stage.train.vars.y}
       z: ${data.stage.train.vars.z}
+      pressure: ${data.stage.train.vars.pressure}
     # Variables to use as targets or additional inputs
     target:
       # Forward model additional inputs
@@ -42,6 +43,7 @@ stage:
       x: ${data.stage.valid.vars.x}
       y: ${data.stage.valid.vars.y}
       z: ${data.stage.valid.vars.z}
+      pressure: ${data.stage.valid.vars.pressure}
     # Variables to use as targets or additional inputs
     target:
       # Forward model additional inputs
@@ -64,6 +66,7 @@ stage:
       x: ${data.stage.test.vars.x}
       y: ${data.stage.test.vars.y}
       z: ${data.stage.test.vars.z}
+      pressure: ${data.stage.test.vars.pressure}
     # Variables to use as targets or additional inputs
     target:
       # Forward model additional inputs
@@ -112,9 +115,10 @@ stage:
     _recursive_: false
     # Variables to use as input
     input:
-      x: ${data.stage.predict.vars.x}
-      y: ${data.stage.predict.vars.y}
-      z: ${data.stage.predict.vars.z}
+      x: ${data.stage.test.vars.x}
+      y: ${data.stage.test.vars.y}
+      z: ${data.stage.test.vars.z}
+      pressure: ${data.stage.test.vars.pressure}
     # Results
     results:
       # Atmospheric profile predictions

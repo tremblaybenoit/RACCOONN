@@ -793,16 +793,17 @@ class PINNverseOperator(BaseModel):
         # We create a list of tensors all shaped (Batch, n_levels, 1)
         tensors = []
         for k, v in x.items():
-            if v.ndim == 1:
-                # For (Batch,) -> (Batch, n_levels, 1)
-                tensors.append(v[:, None, None].expand(-1, self.n_levels, 1))
-            else:
-                # For (Batch, n_levels) -> (Batch, n_levels, 1)
-                tensors.append(v.unsqueeze(-1))
+            if k != 'pressure':
+                if v.ndim == 1:
+                    # For (Batch,) -> (Batch, n_levels, 1)
+                    tensors.append(v[:, None, None].expand(-1, self.n_levels, 1))
+                else:
+                    # For (Batch, n_levels) -> (Batch, n_levels, 1)
+                    tensors.append(v.unsqueeze(-1))
 
         # 2. Single Concatenation
         # Shape: (Batch * n_levels, num_features)
-        inputs = torch.cat(tensors, dim=-1).view(-1, len(x))
+        inputs = torch.cat(tensors, dim=-1).view(-1, len(tensors))
 
         # 3. Inference and Final Reshape
         # Output: (Batch, n_prof, n_levels)

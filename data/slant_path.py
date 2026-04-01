@@ -57,7 +57,8 @@ def slant_path_geometry(pressure: np.ndarray, temperature: np.ndarray, sza: np.n
     # Cumulative sum to get heights at each level above surface
     # We insert 0 at the start for the surface level height
     h_km = np.zeros_like(temperature)
-    h_km[:, 1:] = np.cumsum(dz, axis=1)[::-1]  # Inverse order
+    h_km[:, 1:] = np.cumsum(dz, axis=1)
+    h_km = h_km[:, ::-1] # Inverse order
 
     # Compute Horizontal Displacement (km)
     # d is the 'spread' of the ray from the vertical at height h
@@ -94,7 +95,7 @@ def compute_slant_path(input: DictConfig, output: DictConfig) -> None:
     meta = load_var(input.meta)
     azimuth = meta[:, 3]
     zenith = meta[:, 1]
-    temperature = load_var(input.prof)[:, 0]
+    temperature = load_var(input.prof)[:, 0][:, ::-1]  # Inverse order to match pressure levels
 
     # Compute offset coordinates
     logger.info("Estimating slant path geometry...")
