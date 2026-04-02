@@ -26,8 +26,8 @@ def main(config: DictConfig) -> None:
         -------
         None.
     """
-
-    stats = load_pkl(config.data.stage.test.vars.prof.normalization.stats.path)
+    # breakpoint()
+    # stats = load_pkl(config.data.stage.test.vars.prof.normalization.stats.path)
 
     # Load test set results (predictions)
     logger.info("Load test set results...")
@@ -41,7 +41,7 @@ def main(config: DictConfig) -> None:
     prof = np.array(instantiate(config.data.stage.test.vars.prof.load)).astype(np.float32)
     hofx = np.array(instantiate(config.data.stage.test.vars.hofx.load)).astype(np.float32)
     pressure = 0.01*10**np.array(instantiate(config.data.stage.test.vars.pressure.load)).astype(np.float32)
-    breakpoint()
+    # breakpoint()
 
     # Norm. profiles
     # prof = mean_stdev(prof, stats['prof'], axis=None)
