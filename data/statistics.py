@@ -267,6 +267,10 @@ def read_statistics_var(path: str, var: str, tensor: bool = False, dtype: str = 
         stats = {key: value.astype(getattr(np, dtype)) if isinstance(value, np.ndarray) else value
                  for key, value in stats.items()}
 
+    # If var is hofx, only read the first 10 values
+    if var == 'hofx':
+        stats = {key: value[0:10] for key, value in stats.items()}
+
     # Return statistics for the specified variable
     return stats
 

@@ -22,7 +22,7 @@ task_name: "forward_emulator_neuralODE"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../forward_outputs"
-  run_id: "cs_minmax_1"
+  run_id: "cs_minmax_null"
   data_dir: "../static_clearskies_float32"
   # checkpoint_dir: "forward/model/checkpoints"
 
@@ -69,7 +69,7 @@ data:
               path: ${preparation.statistics.data.output.path}
               var: 'prof'
               dtype: ${data.dtype}
-            axis: 1
+            axis: null
 
     # Validation set
     valid:
@@ -90,7 +90,7 @@ data:
     # Prediction set
     predict:
       # Directory
-      dir: ../scene_cloud_float32/Train2
+      dir: ../static_clearsky_float32/Train2
       # Variables
       vars:
         # Atmospheric profiles
@@ -108,7 +108,7 @@ loader:
     predict:
       results:
         hofx:
-          path: ${data.stage.predict.dir}/predict_hofx_clearskies_minmax_1.npy
+          path: ${data.stage.predict.dir}/predict_hofx_neuralODE.npy
 
 # Model parameters
 model:

@@ -793,13 +793,13 @@ class PINNverseOperator(BaseModel):
         # We create a list of tensors all shaped (Batch, n_levels, 1)
         tensors = []
         for k, v in x.items():
-            if k != 'pressure':
-                if v.ndim == 1:
-                    # For (Batch,) -> (Batch, n_levels, 1)
-                    tensors.append(v[:, None, None].expand(-1, self.n_levels, 1))
-                else:
-                    # For (Batch, n_levels) -> (Batch, n_levels, 1)
-                    tensors.append(v.unsqueeze(-1))
+            # if k != 'pressure':
+            if v.ndim == 1:
+                # For (Batch,) -> (Batch, n_levels, 1)
+                tensors.append(v[:, None, None].expand(-1, self.n_levels, 1))
+            else:
+                # For (Batch, n_levels) -> (Batch, n_levels, 1)
+                tensors.append(v.unsqueeze(-1))
 
         # 2. Single Concatenation
         # Shape: (Batch * n_levels, num_features)
@@ -993,7 +993,7 @@ class PINNverseOperator(BaseModel):
         # Log profile and boundary condition losses
         for key in ['model', 'bcs', 'model_phys']:
             if key in loss:
-                self.log(f"{stage}_loss_{key}", loss[key].mean(), on_epoch=True, prog_bar=True, logger=logger_flag)
+                self.log(f"{stage}_loss_{key}", loss[key].mean(), on_epoch=True, prog_bar=False, logger=logger_flag)
                 # Detailed logging per profile and variable
                 if loss[key].ndim == 3:
                     for i, var in enumerate(self.prof_vars):

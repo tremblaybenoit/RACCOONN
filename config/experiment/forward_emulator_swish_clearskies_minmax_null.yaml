@@ -8,7 +8,7 @@ defaults:
   - override /data: forward_recast
   - override /preparation: statistics
   - override /loader: forward_default
-  - override /model: forward_emulator_neuralODE_cs
+  - override /model: forward_emulator_smooth_cs
   - override /trainer: gpu
   - override /callbacks: forward_default
   - override /logger: default
@@ -17,14 +17,14 @@ defaults:
 # This allows you to overwrite only specified parameters
 
 # Task name. Note that it determines the output directory path
-task_name: "forward_emulator_neuralODE"  # Experiment
+task_name: "forward_emulator_clearskies_norm"  # Experiment
 
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../forward_outputs"
-  run_id: "cs_minmax_1"
+  run_id: "swish_minmax_null"
   data_dir: "../static_clearskies_float32"
-  # checkpoint_dir: "forward/model/checkpoints"
+  # checkpoint_dir: 'forward/model/checkpoints/smooth_minmax_1'
 
 # Trainer configuration
 trainer:
@@ -69,8 +69,7 @@ data:
               path: ${preparation.statistics.data.output.path}
               var: 'prof'
               dtype: ${data.dtype}
-            axis: 1
-
+            axis: null
     # Validation set
     valid:
       # Variables
@@ -85,23 +84,31 @@ data:
       vars:
         # Atmospheric profiles
         prof:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/prof.npy
           # Normalization function and parameters
           normalization: ${data.stage.train.vars.prof.normalization}
     # Prediction set
     predict:
       # Directory
-      dir: ../scene_cloud_float32/Train2
+      dir: ../static_clearsky_float32/Train2
       # Variables
       vars:
         # Atmospheric profiles
         prof:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/prof.npy
           # Normalization function and parameters
           normalization: ${data.stage.train.vars.prof.normalization}
 
 # Loader configuration
 loader:
   batch_size: 96
-  num_workers: 8
+  num_workers: 10
   # Split the data into training, validation, and test sets
   stage:
     # Prediction set
@@ -112,16 +119,15 @@ loader:
 
 # Model parameters
 model:
-  parameters:
-    # Model architecture
-    architecture:
-      # Dropout rate
-      dropout_rate: 0.1
-      # Number of neurons in the hidden layers
-      nnodes_bt: 128
+  # Learning rate scheduler
+  lr_scheduler:
+    # Factor to reduce the learning rate
+    factor: 0.75
+    # Number of epochs with no improvement after which learning rate will be reduced
+    # patience: 3
 
 # Logger configuration
 logger:
   # MLflow logger
   ports:
-    mlflow: 4989
+    mlflow: 4990

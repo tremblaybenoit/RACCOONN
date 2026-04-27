@@ -4,10 +4,9 @@ import torch.nn as nn
 from typing import Union, Any
 from pytorch_lightning import LightningModule
 from data.statistics import statistics, accumulate_statistics
-from forward.model.activation import Swish, Scale
+from forward.model.activation import Swish, Scale, Sine
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
-from torchdiffeq import odeint
 import gc
 
 
@@ -648,9 +647,10 @@ class CRTMModelSiren(BaseModel):
         # Neural network parameters
         nnodes_bt = parameters.architecture.nnodes_bt
         nhidden_bt = parameters.architecture.nhidden_bt
+        dropout_rate = parameters.architecture.dropout_rate
         self.max_T = parameters.data.bt_norm_max
         self.min_T = parameters.data.bt_norm_min
-        self.w0 = getattr(parameters.architecture, "siren_w0", 30.0)
+        self.w0 = getattr(parameters.architecture, "siren_w0", 10.0)
 
         # Output activations and scaling
         self.bt_output_activation = nn.Sigmoid()
@@ -662,6 +662,8 @@ class CRTMModelSiren(BaseModel):
         self.flatten = nn.Flatten()
         self.concat = lambda *tensors: torch.cat(tensors, dim=1)
         self.hidden_layers = nn.ModuleList()
+        self.sine_layers = nn.ModuleList()
+        self.dropout_layers = nn.ModuleList()
 
         # Build SIREN layers with specialized initialization
         current_dim = self.input_dim
@@ -669,6 +671,8 @@ class CRTMModelSiren(BaseModel):
             layer = nn.Linear(current_dim, nnodes_bt)
             self._siren_init(layer, is_first=(i == 0))
             self.hidden_layers.append(layer)
+            self.sine_layers.append(Sine(w0=self.w0))
+            self.dropout_layers.append(nn.Dropout(dropout_rate))
             current_dim = nnodes_bt
 
         # Output layers
@@ -710,8 +714,11 @@ class CRTMModelSiren(BaseModel):
         prof = self.flatten(input['prof'])
         x = self.concat(prof, input['surf'], input['meta'])
 
-        for layer in self.hidden_layers:
-            x = torch.sin(self.w0 * layer(x))
+        # Path 2: Non-linear Hidden Layers (Residual)
+        for dense, swish, drop in zip(self.hidden_layers, self.sine_layers, self.dropout_layers):
+            x = dense(x)
+            x = swish(x)
+            x = drop(x)
 
         # Mean output scaling
         out = self.out_T(x)
@@ -764,113 +771,6 @@ class ODEFunc(nn.Module):
         return self.net(x)
 
 
-class CRTMModelODE(BaseModel):
-    """
-    Lightning model for the CRTM emulator (Community Radiative Transfer Model) using Neural ODEs.
-    This architecture treats the hidden state as a continuous trajectory, preventing spiky
-    discontinuities in the Jacobian (adjoint).
-    """
-
-    def __init__(self, parameters: DictConfig, optimizer: DictConfig = None,
-                 lr_scheduler: DictConfig = None, loss_func: DictConfig = None):
-        """ Initialize CRTMModelODE.
-
-        Parameters
-        ----------
-        parameters: DictConfig. Configuration object containing model parameters.
-        optimizer: DictConfig. Optimizer for the model (optional).
-        lr_scheduler: DictConfig. Configuration object for the learning rate scheduler (optional).
-        loss_func: DictConfig. Loss function for the model (optional).
-
-        Returns
-        -------
-        None.
-        """
-        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func)
-
-        # Input parameters
-        self.nprofvars = len(parameters.data.use_prof_vars)
-        self.nsurfvars = len(parameters.data.use_surf_vars)
-        self.nmetavars = len(parameters.data.use_meta_vars)
-        self.nlevels = int(parameters.data.nlevels)
-        self.input_dim = self.nprofvars * self.nlevels + self.nsurfvars + self.nmetavars
-
-        # Scaling parameters
-        nnodes_bt = parameters.architecture.nnodes_bt
-        self.max_T = parameters.data.bt_norm_max
-        self.min_T = parameters.data.bt_norm_min
-
-        self.bt_output_activation = nn.Sigmoid()
-        self.std_output_activation = nn.Softplus()
-        self.std_output_activation_offset = parameters.architecture.std_output_activation_offset
-        self.std_scale_trainable = parameters.architecture.std_scale_trainable
-
-        # Architecture components
-        self.flatten = nn.Flatten()
-        self.concat = lambda *tensors: torch.cat(tensors, dim=1)
-
-        self.input_projection = nn.Linear(self.input_dim, nnodes_bt)
-        self.ode_func = ODEFunc(nnodes_bt)
-        self.register_buffer('integration_time', torch.tensor([0.0, 1.0]))
-
-        # Output layers
-        self.out_T = nn.Linear(nnodes_bt, 10)
-        self.out_std = nn.Linear(nnodes_bt, 10)
-
-        if self.std_scale_trainable:
-            self.std_scale = Scale()
-        else:
-            self.std_scale = None
-
-    def forward(self, input: dict) -> torch.Tensor:
-        """ Forward pass using Neural ODE integration.
-
-        Parameters
-        ----------
-        input: dict. Dictionary containing input tensors.
-
-        Returns
-        -------
-        torch.Tensor. Concatenated tensor of mean brightness temperatures and standard deviations.
-        """
-        prof = self.flatten(input['prof'])
-        x = self.concat(prof, input['surf'], input['meta'])
-
-        # Project to latent space
-        x = torch.tanh(self.input_projection(x))
-
-        # Solve the ODE from t=0 to t=1
-        x = odeint(self.ode_func, x, self.integration_time, rtol=1e-3, atol=1e-3)[1]
-
-        # Final BT output
-        out = self.out_T(x)
-        out = self.bt_output_activation(out)
-        out = out * (self.max_T - self.min_T) + self.min_T
-
-        # Final Uncertainty output
-        out_std = self.out_std(x)
-        out_std = self.std_output_activation(out_std)
-        if self.std_scale is not None:
-            out_std = self.std_scale(out_std)
-        out_std = out_std + self.std_output_activation_offset
-
-        return torch.cat([out, out_std], dim=1)
-
-    def predict_step(self, batch: dict, batch_nb: int):
-        """ Perform prediction step.
-
-        Parameters
-        ----------
-        batch: dict. Batch containing the 'input' dictionary.
-        batch_nb: int. Index of the batch.
-
-        Returns
-        -------
-        torch.Tensor. Predicted values.
-        """
-        return self(batch['input'])
-
-
 class ConditionalODEFunc(nn.Module):
     """
     Derivative function that treats meta/surf variables as a constant
@@ -890,68 +790,6 @@ class ConditionalODEFunc(nn.Module):
         # Concatenate atmospheric state (h) with static environmental info (context)
         combined = torch.cat([h, context], dim=1)
         return self.net(combined)
-
-
-class CRTMModelODE2(BaseModel):
-    def __init__(self, parameters: DictConfig, optimizer=None, lr_scheduler=None, loss_func=None):
-        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func)
-
-        # Dimensions
-        self.nprofvars = len(parameters.data.use_prof_vars)
-        self.nsurfvars = len(parameters.data.use_surf_vars)
-        self.nmetavars = len(parameters.data.use_meta_vars)
-        self.nlevels = int(parameters.data.nlevels)
-
-        self.latent_dim = parameters.architecture.nnodes_bt
-        self.context_dim = self.nsurfvars + self.nmetavars
-
-        # Initial projection: Maps surface level + surface variables to initial hidden state
-        self.h0_projection = nn.Linear(self.nprofvars + self.context_dim, self.latent_dim)
-
-        # Continuous block
-        self.ode_func = ConditionalODEFunc(self.latent_dim, self.context_dim)
-        self.register_buffer('integration_time', torch.tensor([0.0, 1.0]))
-
-        # Output layers
-        self.out_T = nn.Linear(self.latent_dim, 10)
-        self.out_std = nn.Linear(self.latent_dim, 10)
-        self.max_T = parameters.data.bt_norm_max
-        self.min_T = parameters.data.bt_norm_min
-
-    def forward(self, input: dict) -> torch.Tensor:
-        """ Forward pass using Neural ODE integration.
-
-        Parameters
-        ----------
-        input: dict. Dictionary containing input tensors.
-
-        Returns
-        -------
-        torch.Tensor. Concatenated tensor of mean brightness temperatures and standard deviations.
-        """
-
-        # 1. Separate inputs
-        # prof shape: (batch, nprofvars, nlevels)
-        # surf shape: (batch, nsurfvars)
-        # meta shape: (batch, nmetavars)
-        static_context = torch.cat([input['surf'], input['meta']], dim=1)
-
-        # 2. Set Initial State (h0) at the surface (level 0)
-        surface_prof = input['prof'][:, :, 0]
-        h0 = torch.tanh(self.h0_projection(torch.cat([surface_prof, static_context], dim=1)))
-
-        # 3. Integrate with Context
-        # We pass the static_context to the ode_func at every integration step
-        def func_with_context(t, h):
-            return self.ode_func(t, h, static_context)
-
-        h_final = odeint(func_with_context, h0, self.integration_time, rtol=1e-3, atol=1e-3)[1]
-
-        # 4. Output Mapping
-        out = torch.sigmoid(self.out_T(h_final)) * (self.max_T - self.min_T) + self.min_T
-        out_std = torch.nn.functional.softplus(self.out_std(h_final))  # Simplified for example
-
-        return torch.cat([out, out_std], dim=1)
 
 
 class ConditionalODEFunc2(nn.Module):
@@ -1026,7 +864,7 @@ class CRTMModelFixedODE(BaseModel):
         self.register_buffer('pressure_grid', pressure_grid)
 
         # 3. Model components
-        self.h0_projection = nn.Linear(self.nprofvars + self.context_dim, self.latent_dim)
+        self.h0_projection = nn.Linear(self.context_dim, self.latent_dim)
         self.ode_func = ConditionalODEFunc2(self.latent_dim, self.context_dim)
         self.out_T = nn.Linear(self.latent_dim, 10)
         self.out_std = nn.Linear(self.latent_dim, 10)
