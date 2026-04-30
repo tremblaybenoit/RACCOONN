@@ -642,7 +642,7 @@ class HydraResidualMLP(nn.Module):
         # Hidden layers
         hidden_layers = nn.ModuleList()
         # Build hidden layers with optional skip connections
-        for _ in range(hidden_n_layers):
+        for l in range(hidden_n_layers):
             hidden_layer_instance = instantiate(hidden_layer)
             if hidden_skip:
                 # Projection for skip connection if dimensions differ
@@ -722,6 +722,126 @@ class HydraResidualMLP(nn.Module):
         x_hidden = self.hidden_layers(x_input)
         x_output = self.output_layers(x_hidden)
         return x_output
+
+
+class HydraResidualMLP2(nn.Module):
+    def __init__(
+            self,
+            input_layer: DictConfig,
+            hidden_layer: DictConfig,
+            output_layer: DictConfig,
+            positional_encoding: DictConfig = None,
+            hidden_n_layers: int = 2,
+            hidden_skip: bool = False,  # Standard residual connections
+            inject_coords_hidden: bool = False,  # Concatenate encoding to each hidden block
+            inject_coords_output: bool = False,  # Concatenate encoding to each head
+            output_n_heads: int = 1,
+            output_n_layers: int = 1,
+            output_final_layer: DictConfig = None
+    ):
+        super().__init__()
+
+        # 1. Positional Encoding Setup
+        if positional_encoding is not None:
+            self.positional_encoding = instantiate(positional_encoding)
+        else:
+            # Fallback to identity if no encoding is provided
+            self.positional_encoding = IdentityPositionalEncoding(d_input=input_layer.in_features)
+
+        d_enc = self.positional_encoding.d_output
+        input_layer.in_features = d_enc
+
+        # 2. Input Projection
+        if input_layer._target_ == 'inverse.model.model.SirenResidualBlock':
+            input_layer.out_features = input_layer.in_features
+        self.input_layer = instantiate(input_layer)
+        current_dim = input_layer.out_features
+
+        # 3. Hidden Backbone (Residual Blocks)
+        self.hidden_layers = nn.ModuleList()
+        self.inject_coords_hidden = inject_coords_hidden
+
+        for _ in range(hidden_n_layers):
+            block_cfg = hidden_layer.copy()
+            block_cfg.in_features = current_dim
+
+            # If injecting coords, the input to the block increases
+            if inject_coords_hidden:
+                block_cfg.in_features += d_enc  # Account for concatenated encoding
+                # If residual, adjust out_features
+            if block_cfg._target_ == 'inverse.model.model.SirenResidualBlock':
+                block_cfg.out_features = block_cfg.in_features
+
+            block_instance = instantiate(block_cfg)
+
+            if hidden_skip:
+                # Handle dimension mismatch for residual skip
+                projection = None
+                if block_cfg.in_features != block_cfg.out_features:
+                    projection = nn.Linear(block_cfg.in_features, block_cfg.out_features)
+
+                # Assuming a Residual wrapper exists in your namespace
+                block_instance = Residual(block_instance, projection=projection)
+
+            self.hidden_layers.append(block_instance)
+            current_dim = block_cfg.out_features
+
+        # 4. Multi-Head Output Architecture
+        self.inject_coords_output = inject_coords_output
+        self.output_layers = nn.ModuleList()
+        output_n_heads = instantiate(output_n_heads)
+        for _ in range(output_n_heads):
+            head_steps = []
+            head_dim = current_dim
+
+            for l in range(output_n_layers):
+                l_cfg = output_layer.copy()
+
+                # Inject coordinates at the start of each head
+
+                if l == 0 and inject_coords_output:
+                    l_cfg.in_features = head_dim + d_enc
+                else:
+                    l_cfg.in_features = head_dim
+
+                # Special handling for SIREN or specific activations if needed
+                if hasattr(l_cfg.activation, 'in_features'):
+                    l_cfg.activation.in_features = l_cfg.out_features
+
+                head_steps.append(instantiate(l_cfg))
+                head_dim = l_cfg.out_features
+
+            if output_final_layer is not None:
+
+                final_cfg = output_final_layer.copy()
+                final_cfg.in_features = head_dim
+                head_steps.append(instantiate(final_cfg))
+
+            self.output_layers.append(nn.Sequential(*head_steps))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Encode coordinates
+        x_enc = self.positional_encoding(x)
+
+        # Initial projection
+        z = self.input_layer(x_enc)
+
+        # Pass through hidden layers with optional coordinate injection
+        for layer in self.hidden_layers:
+            if self.inject_coords_hidden:
+                z = torch.cat([z, x_enc], dim=-1)
+            z = layer(z)
+
+        # Pass through heads with optional coordinate injection
+        outputs = []
+        for head in self.output_layers:
+            h_input = torch.cat([z, x_enc], dim=-1) if self.inject_coords_output else z
+            outputs.append(head(h_input))
+
+        # Return a single tensor if one head, else a list or stacked tensor
+        if len(outputs) == 1:
+            return outputs[0]
+        return torch.cat(outputs, dim=-1)
 
 
 class PINNverseOperator(BaseModel):
@@ -1030,6 +1150,118 @@ class PINNverseOperatorP(PINNverseOperator):
         # Class inheritance
         super().__init__(optimizer=optimizer, loss_func=loss_func, lr_scheduler=lr_scheduler,
                          architecture=architecture, parameters=parameters, transform=transform)
+
+        self.metrics['prof_min_max'], self.metrics['prof_target_min_max'], self.metrics['prof_background_min_max'] = {}, {}, {}
+        self.metrics['prof_mean_stdev'], self.metrics['prof_target_mean_stdev'], self.metrics['prof_background_mean_stdev'] = {}, {}, {}
+        self.min_max = min_max
+        self.stats = instantiate(stats) if stats is not None else None
+        self.sigmoid = sigmoid
+        self.sigmoid_stats = {'min': (self.stats['min'] - self.stats['mean']) / self.stats['stdev'], 'max': (self.stats['max'] - self.stats['mean'])/ self.stats['stdev']}
+
+    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
+        """ Perform training/validation/test step.
+
+            Parameters
+            ----------
+            batch: tensor. Batch from the training set.
+            batch_nb: int. Index of the batch out of the training set.
+            stage: str. Current operation: "train", "valid", or "test".
+
+            Returns
+            -------
+            Loss value: tensor.
+        """
+
+        # Norm
+        if self.min_max:
+
+            # Compute profiles
+            pred = {'prof': self.forward(batch['input']).contiguous()}
+
+            # Apply transform
+            if self.transform is not None:
+                pred['prof_phys'] = self.transform(pred['prof'].clone())
+                pred['prof_target_phys'] = self.transform(batch['target']['prof'].clone())
+                pred['prof_background_phys'] = self.transform(batch['target']['prof_background'].clone())
+            else:
+                pred['prof_phys'] = pred['prof'].clone()
+
+            pred['prof_min_max'] = pred['prof'].clone()
+            pred['prof_mean_stdev'] = mean_stdev(pred['prof_phys'].clone(), self.stats, axis=None)#, stdev_thresh=1.0*np.ones_like(self.stats['stdev']))
+            pred['prof_background_min_max'] = batch['target']['prof_background'].clone()
+            pred['prof_background_mean_stdev'] = mean_stdev(pred['prof_background_phys'].clone(), self.stats, axis=None)#, stdev_thresh=1.0*np.ones_like(self.stats['stdev']))
+            pred['prof_target_min_max'] = batch['target']['prof'].clone()
+            pred['prof_target_mean_stdev'] = mean_stdev(pred['prof_target_phys'].clone(), self.stats, axis=None)#, stdev_thresh=1.0*np.ones_like(self.stats['stdev']))
+        else:
+
+            # Compute profiles
+            if self.sigmoid:
+                raw_out = self.forward(batch['input']).contiguous()
+                sig_out = torch.sigmoid(raw_out)
+                prof_minmax = min_max(sig_out.clone(), self.sigmoid_stats, axis=None)
+                pred = {'prof': prof_minmax}
+                # pred = {'prof': min_max(torch.sigmoid(self.forward(batch['input']).contiguous().clone()), self.sigmoid_stats, axis=None)}
+            else:
+                pred = {'prof': self.forward(batch['input']).contiguous()}
+
+            # Apply transform
+            if self.transform is not None:
+                pred['prof_phys'] = self.transform(pred['prof'].clone())
+                pred['prof_target_phys'] = self.transform(batch['target']['prof'].clone())
+                # pred['prof_phys'][:, 0:1, :] = pred['prof_target_phys'][:, 0:1, :].clone()
+                # pred['prof_phys'][:, 1:2, :] = pred['prof_target_phys'][:, 1:2, :].clone()
+                # pred['prof_phys'][:, 2:3, :] = pred['prof_target_phys'][:, 2:3, :].clone()
+                pred['prof_background_phys'] = self.transform(batch['target']['prof_background'].clone())
+            else:
+                pred['prof_phys'] = pred['prof'].clone()
+
+            # Compute normalized and standardized profiles for loss computation if required by the loss function
+            pred['prof_min_max'] = min_max(pred['prof_phys'].clone(), self.stats, axis=1)
+            pred['prof_mean_stdev'] = pred['prof'].clone()
+            pred['prof_background_min_max'] = min_max(pred['prof_background_phys'].clone(), self.stats, axis=1)
+            pred['prof_background_mean_stdev'] = batch['target']['prof_background'].clone()
+            pred['prof_target_min_max'] = min_max(pred['prof_target_phys'].clone(), self.stats, axis=1)
+            pred['prof_target_mean_stdev'] = batch['target']['prof'].clone()
+
+        # Register standardized for plotting
+        pred['prof'] = pred['prof_phys'].clone()
+        batch['target']['prof'] = pred['prof_target_phys'].clone()
+        batch['target']['prof_background'] = pred['prof_background_phys'].clone()
+
+        # Compute loss function
+        loss, pred['hofx'] = self.loss_func(pred, batch['target'], batch['input'])
+        detached_loss = {k: v.detach().item() if v.ndim == 0 else v.detach() for k, v in loss.items()}
+
+        # Logging
+        self._logging(stage, detached_loss, batch['input'], batch['target'], {k: v.detach() for k, v in pred.items()})
+
+        return loss['total']
+
+
+class PINNverseOperatorP2(PINNverseOperator):
+
+    def __init__(self, optimizer: DictConfig = None, loss_func: DictConfig = None, lr_scheduler: DictConfig = None,
+                 architecture: DictConfig = None, parameters: DictConfig = None, transform: DictConfig = None, stats: DictConfig = None,
+                 sigmoid: bool = False, min_max: bool = True):
+
+        # Class inheritance
+        super().__init__(optimizer=optimizer, loss_func=loss_func, lr_scheduler=lr_scheduler,
+                         architecture=architecture, parameters=parameters, transform=transform)
+
+        # Model architecture
+        self.model = HydraResidualMLP2(
+            input_layer=architecture.input_layer,  # Pass DictConfig directly
+            hidden_layer=architecture.hidden_layer,  # Pass DictConfig directly
+            output_layer=architecture.output_layer,  # Pass DictConfig directly
+            positional_encoding=architecture.get('positional_encoding', None),
+            hidden_n_layers=architecture.get('hidden_n_layers', 2),
+            hidden_skip=architecture.get('hidden_skip', False),
+            inject_coords_hidden=architecture.get('inject_coords_hidden', False),
+            inject_coords_output=architecture.get('inject_coords_output', False),
+            output_n_heads=architecture.get('output_n_heads', 1),
+            output_final_layer=architecture.get('output_final_layer', None),
+            output_n_layers=architecture.get('output_n_layers', 1),
+        )
 
         self.metrics['prof_min_max'], self.metrics['prof_target_min_max'], self.metrics['prof_background_min_max'] = {}, {}, {}
         self.metrics['prof_mean_stdev'], self.metrics['prof_target_mean_stdev'], self.metrics['prof_background_mean_stdev'] = {}, {}, {}

@@ -80,9 +80,10 @@ class CholeskyForm(torch.nn.Module):
         # 2. Solve L @ w = diff for w
         # w = L^-1 @ diff. This is the 'whitened' residual.
         # Since L is lower triangular, this is a very fast/stable back-substitution.
-        whitened_diff = torch.linalg.solve_triangular(
-            self.matrix, diff, upper=False
-        )
+        # whitened_diff = torch.linalg.solve_triangular(
+        #     self.matrix, diff, upper=False
+        # )
+        whitened_diff = torch.matmul(self.matrix, diff)
 
         # 3. Return 0.5 * sum(w^2) per batch
         # Result is [Batch]
