@@ -4,7 +4,8 @@ import torch.nn as nn
 from typing import Union, Any
 from pytorch_lightning import LightningModule
 from data.statistics import statistics, accumulate_statistics
-from forward.model.activation import Swish, Scale, Sine
+from forward.model.architecture.activation import Swish, Scale, Sine
+from forward.model.architecture.ode import PressureConditionalODEFunc
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
 import gc
@@ -459,10 +460,14 @@ class CRTMModelSiren(BaseModel):
 
 
 class ODEFunc(nn.Module):
-    """ Internal derivative function f(x, t) for the Neural ODE integration. """
+    """
+    Internal derivative function f(x, t) for the Neural ODE integration.
+    LEGACY: Use forward.model.architecture.ode.ODEFunc instead.
+    """
 
     def __init__(self, dim: int):
-        """ Initialize ODEFunc.
+        """
+        Initialize ODEFunc.
 
         Parameters
         ----------
@@ -476,7 +481,7 @@ class ODEFunc(nn.Module):
         )
 
     def forward(self, t: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-        """ Evaluate the derivative at time t. """
+        """Evaluate the derivative at time t."""
         return self.net(x)
 
 
@@ -484,6 +489,7 @@ class ConditionalODEFunc(nn.Module):
     """
     Derivative function that treats meta/surf variables as a constant
     physical 'environment' during the integration.
+    LEGACY: Use forward.model.architecture.ode.ConditionalODEFunc instead.
     """
 
     def __init__(self, latent_dim: int, context_dim: int):
@@ -505,11 +511,12 @@ class ConditionalODEFunc2(nn.Module):
     """
     Derivative function (velocity) mapping the atmospheric hidden state
     at a specific pressure level to its rate of change.
+    LEGACY: Use forward.model.architecture.ode.PressureConditionalODEFunc instead.
     """
 
     def __init__(self, latent_dim: int, context_dim: int):
         super().__init__()
-        # Input: latent_h + context_vars + pressure
+        # Input: latent_h + context_vars + pressure + profile
         self.net = nn.Sequential(
             nn.Linear(latent_dim + context_dim + 1 + 3, latent_dim),
             nn.Tanh(),
