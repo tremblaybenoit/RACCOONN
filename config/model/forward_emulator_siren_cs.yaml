@@ -1,0 +1,71 @@
+# Model
+_target_: forward.model.model.CRTMModelSiren
+_recursive_: false
+
+# Optimizer function and parameters
+optimizer:
+  # Function
+  _target_: torch.optim.Adam
+  # Learning rate
+  lr: 0.0005
+  # Weight decay (L2 regularization)
+  weight_decay: 0.0
+
+# Learning rate scheduler
+lr_scheduler:
+  # Function
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  # Mode for the scheduler
+  mode: min
+  # Factor to reduce the learning rate
+  factor: 0.2
+  # Number of epochs with no improvement after which learning rate will be reduced
+  patience: 3
+  # Minimum learning rate
+  min_lr: 1.0e-6
+  # Threshold for measuring the new optimum, to only focus on significant changes
+  threshold: 0.0
+  threshold_mode: abs
+
+# Parameters
+parameters:
+  data:
+    # Normalization parameters
+    prof_max:
+      _target_: numpy.loadtxt
+      _args_:
+        - data/normalization/prof_div.txt
+    prof_min:
+      _target_: numpy.loadtxt
+      _args_:
+        - data/normalization/prof_m.txt
+    use_meta_vars: [1, 2, 3, 4, 5, 6, 7]
+    use_prof_vars: [1, 5, 9]
+    use_surf_vars: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    bt_norm_max: 355
+    bt_norm_min: 180
+    nlevels: 127
+    prof_vars: ['Air temperature', 'Humidity mixing ratio', 'Ozone mixing ratio']
+    surf_vars: ['Ice area fraction', 'Land area fraction', 'Land type index', 'Leaf area index', 'Soil temperature',
+                'Surface snow area fraction', 'Surface snow thickness', 'Surface ice temperature',
+                'Surface soil temperature', 'Surface sea temperature', 'Surface snow temperature',
+                'Surface eastward wind component', 'Surface northward wind component',
+                'Vegetation area fraction', 'Fraction of condensed water', 'Water area fraction']
+    meta_vars: ['Sensor scan angle', 'Sensor zenith angle', 'Sensor view angle', 'Sensor azimuth angle',
+                'Sensor elevation angle', 'Solar azimuth angle', 'Solar zenith angle']
+  # Model architecture
+  architecture:
+    # Dropout rate
+    dropout_rate: 0
+    # Number of hidden layers
+    nhidden_bt: 3
+    # Number of neurons in the hidden layers
+    nnodes_bt: 512
+    # Offset and scale for the standard deviation output
+    std_output_activation_offset: 0.001
+    std_scale_trainable: true
+
+# Loss function and parameters
+loss_func:
+  # Function
+  _target_: forward.model.loss.CRPS

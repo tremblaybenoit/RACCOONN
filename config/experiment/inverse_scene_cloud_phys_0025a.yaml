@@ -17,28 +17,27 @@ defaults:
 # This allows you to overwrite only specified parameters
 
 # Task name. Note that it determines the output directory path
-task_name: "inverse_operator_exp"  # Experiment
+task_name: "inverse_operator_scene_cloud"  # Experiment
 
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "phys_001"
-  data_dir: ../static_clearsky_${data.dtype}
-  # checkpoint_dir: "inverse/model/checkpoints/phys_012"
+  run_id: "phys_0025"
+  data_dir: ../scene_cloud_${data.dtype}
 
 # Trainer configuration
 trainer:
   min_epochs: 1  # To prevent early stopping
-  max_epochs: 196  # Number of epochs
+  max_epochs: 1100  # Number of epochs
   precision: 32  # 32-bit precision
 
 # Initialization
-# init_from_checkpoint: ../inverse_outputs/inverse_operator_static_clearsky2/checkpoints/phys_0012f/model.ckpt
+# init_from_checkpoint: ../inverse_outputs/inverse_operator_scene_cloud/checkpoints/phys_0010/model.ckpt
 
 # Callbacks
 callbacks:
   early_stopping:
-    patience: 50  # Number of epochs with no improvement after which training will be stopped
+    patience: 101  # Number of epochs with no improvement after which training will be stopped
 
 # Preparation configuration
 preparation:
@@ -48,7 +47,7 @@ preparation:
     data:
       # Output path for statistics
       output:
-        path: ../static_clearskies_float32/normalization/statistics_clearskies.pkl
+        path: ../scene_clouds_float32/normalization/statistics_clouds.pkl
 
 # Data configuration
 data:
@@ -62,34 +61,28 @@ data:
       vars:
         # Atmospheric profiles
         prof:
-          # Profile types
-          type: ['Air temperature', 'Humidity mixing ratio', 'Ozone mixing ratio']
           # Normalization function and parameters
           normalization:
-            _target_: data.transformations.mean_stdev
+            _target_: data.transformations.min_max
             _partial_: true
             stats:
               _target_: data.statistics.read_statistics_var
-              path: ../static_clearskies_float32/normalization/statistics_clearskies.pkl
+              path: ${preparation.statistics.data.output.path}
               var: 'prof'
               dtype: ${data.dtype}
-            axis: null
-        # Pressure
-        pressure:
-          # Loading function
-          load:
-            path: ${....dir}/pressure_log10.npy
+            axis: 1
         # Brightness temperatures
         hofx:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_neuralODE_cs1.npy
+            path: ${....dir}/predict_hofx_minmax_1.npy
         # Atmospheric profiles
         prof_background:
           load:
-            path: ${....dir}/prof_background.npy
+            path: ${....dir}/prof_background8.npy
           normalization: ${data.stage.train.vars.prof.normalization}
+
     # Validation set
     valid:
       # Variables
@@ -100,21 +93,16 @@ data:
           type: ${data.stage.train.vars.prof.type}
           # Normalization function and parameters
           normalization: ${data.stage.train.vars.prof.normalization}
-        # Pressure
-        pressure:
-          # Loading function
-          load:
-            path: ${....dir}/pressure_log10.npy
         # Brightness temperatures
         hofx:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_neuralODE_cs1.npy
+            path: ${....dir}/predict_hofx_minmax_1.npy
         # Atmospheric profiles
         prof_background:
           load:
-            path: ${....dir}/prof_background.npy
+            path: ${....dir}/prof_background8.npy
           normalization: ${data.stage.train.vars.prof.normalization}
     # Test set
     test:
@@ -126,108 +114,92 @@ data:
           type: ${data.stage.train.vars.prof.type}
           # Normalization function and parameters
           normalization: ${data.stage.train.vars.prof.normalization}
-        # Pressure
-        pressure:
-          # Loading function
-          load:
-            path: ${....dir}/pressure_log10.npy
         # Brightness temperatures
         hofx:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_neuralODE_cs1.npy
-        # Brightness temperatures
-        hofx_background:
-          # Loading function
-          load:
-            _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_clearskies_minmax_1_background.npy
+            path: ${....dir}/predict_hofx_minmax_1.npy
         # Atmospheric profiles
         prof_background:
           load:
-            path: ${....dir}/prof_background.npy
+            path: ${....dir}/prof_background8.npy
           normalization: ${data.stage.train.vars.prof.normalization}
 
 # Loader configuration
 loader:
-  batch_size: 24
+  batch_size: 16
   num_workers: 8
 
 # Model parameters
 model:
-  _target_: inverse.model.model.PINNverseOperatorP
-  stats: ${data.stage.train.vars.prof.normalization.stats}
-  # Transform
-  transform:
-    _target_: ${data.stage.train.vars.prof.normalization._target_}
-    _partial_: true
-    stats: ${data.stage.train.vars.prof.normalization.stats}
-    axis: ${data.stage.train.vars.prof.normalization.axis}
-    inverse_transform: true
   # Optimizer function and parameters
   optimizer:
     # Learning rate
     lr: 0.001
     # Weight decay (L2 regularization)
-    weight_decay: 0.00005
+    weight_decay: 0.005
   # Learning rate scheduler
   lr_scheduler:
     # Factor to reduce the learning rate
     factor: 0.75
     # Number of epochs with no improvement after which learning rate will be reduced
-    patience: 7
+    patience: 25
   # Model parameters associated with the data (e.g., input/output dimensions) and architecture
   parameters:
     # Number of variables
     n_scans: 0
-  min_max: false # TODO: true or false?
   # Loss function and parameters
   loss_func:
     # Function
-    _target_: inverse.model.loss.VarLossR # Load loss function
+    _target_: inverse.model.loss.VarLoss # Load loss function
     # Forward model to compute the model equivalent of the observations
     forward_model:
       # Function
       _target_: inverse.model.loss.ForwardModel
       # Configuration of the forward model
-      checkpoint_path: '../forward_outputs/forward_emulator_neuralODE/checkpoints/cs_meanstdev_null/model.ckpt'
-      config_path: 'model/forward_emulator_neuralODE_cs.yaml'
+      checkpoint_path: '../forward_outputs/forward_emulator_norm/checkpoints/minmax_1/model.ckpt'
+      config_path: 'model/forward_emulator.yaml'
       # Precision
       dtype: ${data.dtype}
       # Normalization for the profile variables
-      # prof_norm:
-      #   _target_: data.transformations.min_max
-      #   _partial_: true
-      #   stats:
-      #     _target_: data.statistics.read_statistics_var
-      #     path: ../static_clearskies_float32/normalization/statistics_clearskies.pkl
-      #     var: 'prof'
-      #     dtype: ${data.dtype}
-      #   axis: 1
+      prof_norm:
+        _target_: data.transformations.min_max_to_min_max
+        _partial_: true
+        stats1:
+          _target_: data.statistics.read_statistics_var
+          path: ${preparation.statistics.data.output.path}
+          var: 'prof'
+          dtype: ${data.dtype}
+        stats2:
+          _target_: data.statistics.read_statistics_var
+          path: ../data_float32/normalization/statistics.pkl
+          var: 'prof'
+          dtype: ${data.dtype}
+        axis1: 1
+        axis2: 1
     # Weights for observation (obs), model, and boundary condition (bcs) errors
-    lambda_obs: 0.  # TODO: 0. or 1.?
+    lambda_obs: 0.
     lambda_model: 1.
-    lambda_bcs: 0.
-    lambda_sobolev: 0. #1.e-5
-    key_obs: '_mean_stdev'  # TODO: '_phys' or '_mean_stdev'?
-    key_model: '_mean_stdev'  # TODO: '_mean_stdev' or '_min_max'?
+    lambda_bcs: 1.
+    lambda_sobolev: 0.
+    # forward_channels: [0, 4, 5, 6, 7, 8, 9]
     clear_sky: false
     # Loss term for observations
     loss_obs:
-      _target_: inverse.model.loss.MSE  # DiagonalQuadraticForm
+      _target_: inverse.model.loss.MSE
     # Loss term for model variables
     loss_model:
-      _target_: inverse.model.loss.MSE #QuadraticForm
-      # matrix:
-      #   _target_: data.pca.load_pca_buffers
-      #   path: ../static_clearskies_float32/normalization/pca_clouds_univariate_000.pkl
-      #   buffer: 'B_inv'
+      _target_: inverse.model.loss.MSE
+      #matrix:
+      #  _target_: data.pca.load_pca_buffers
+      #  path: ../scene_clouds_float32/normalization/pca_clouds_pressure9.pkl
+      #  buffer: 'B_inv'
     # Loss term for boundary conditions
     loss_bcs:
       _target_: inverse.model.loss.MSE
     # Pressure filter: Consider only pressure levels with non-zero variance (for model and bcs errors)
-    pressure_filter: null  #${data.pressure_filter.load}
+    pressure_filter: ${data.pressure_filter.load}
   # Architecture components
   architecture:
     # Positional encoding
@@ -245,7 +217,7 @@ model:
                 - ${model.parameters.n_pressure}
                 - ${model.parameters.n_cloud}
       # [Lat, Lon, Scans, Pressure]
-      sigma_per_dim: [ 3.0, 3.0, 3.0 ]
+      sigma_per_dim: [ 1.0, 1.0, 1.0]
     # Input layer
     input_layer:
       _target_: inverse.model.model.LinearBlock
@@ -255,72 +227,54 @@ model:
         _target_: torch.nn.Identity
       activation:
         _target_: forward.model.activation.Sine
-        # in_features: ${model.architecture.input_layer.out_features}
-        w0: 3.0
+        w0: 30.0
       dropout_rate: 0.1
       init_func:
         _target_: inverse.model.model.SirenInit
         is_first_layer: true
-        activation: #${model.architecture.input_layer.activation}
-          _target_: forward.model.activation.Sine
-          w0: 3.0
-
+        activation: ${model.architecture.input_layer.activation}
     # Hidden layer
-    hidden_n_layers: 1
+    n_hidden_layers: 2
     hidden_skip: false
     hidden_layer:
       _target_: inverse.model.model.SirenResidualBlock
-      in_features: 128
+      in_features: 64
       out_features: ${model.architecture.hidden_layer.in_features}
       layernorm: ${model.architecture.input_layer.layernorm}
-      activation:
-        _target_: forward.model.activation.Sine
-        # in_features: ${model.architecture.hidden_layer.out_features}
-        w0: 1.0
+      activation: ${model.architecture.input_layer.activation}
       dropout_rate: ${model.architecture.input_layer.dropout_rate}
       init_func:
         _target_: inverse.model.model.SirenInit
         is_first_layer: false
-        activation: #${model.architecture.hidden_layer.activation}
-          _target_: forward.model.activation.Sine
-          w0: 1.0
+        activation: ${model.architecture.hidden_layer.activation}
     # Output layer
-    output_skip: true
+    output_skip: false
     output_n_heads: ${model.parameters.n_prof}
     output_layer:
-      _target_: inverse.model.model.LinearBlock
+      _target_: inverse.model.model.SirenResidualBlock
       in_features: ${model.architecture.hidden_layer.out_features}
-      out_features: 32
+      out_features: ${model.architecture.hidden_layer.out_features}
       layernorm: ${model.architecture.hidden_layer.layernorm}
-      activation:
-        _target_: forward.model.activation.Sine
-        # in_features: ${model.architecture.hidden_layer.out_features}
-        w0: 1.0
+      activation: ${model.architecture.hidden_layer.activation}
       dropout_rate: 0.1
-      init_func:
-        _target_: inverse.model.model.SirenInit
-        is_first_layer: false
-        is_head: true
-        activation: #${model.architecture.output_layer.activation}
-          _target_: forward.model.activation.Sine
-          w0: 1.0
-    output_n_layers: 1
+      init_func: ${model.architecture.hidden_layer.init_func}
+    output_n_layers: 2
     output_final_layer:
       _target_: inverse.model.model.LinearBlock
       in_features: ${model.architecture.hidden_layer.out_features}
       out_features: 1
       layernorm: ${model.architecture.input_layer.layernorm}
       activation:
-        _target_: torch.nn.Identity
+        _target_: torch.nn.Sigmoid
       dropout_rate: 0.0
       init_func:
         _target_: inverse.model.model.SirenInit
         is_first_layer: false
         is_head: true
-        activation: ${model.architecture.output_final_layer.activation}
+        activation: ${model.architecture.output_layer.activation}
 
 # Logger configuration
 logger:
   # MLflow logger
   ports:
-    mlflow: 5030
+    mlflow: 5018

@@ -22,7 +22,7 @@ task_name: "inverse_operator_exp"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "phys_001"
+  run_id: "phys_013"
   data_dir: ../static_clearsky_${data.dtype}
   # checkpoint_dir: "inverse/model/checkpoints/phys_012"
 
@@ -156,7 +156,7 @@ loader:
 
 # Model parameters
 model:
-  _target_: inverse.model.model.PINNverseOperatorP
+  _target_: inverse.model.model.PINNverseOperatorP3
   stats: ${data.stage.train.vars.prof.normalization.stats}
   # Transform
   transform:
@@ -266,10 +266,10 @@ model:
           w0: 3.0
 
     # Hidden layer
-    hidden_n_layers: 1
+    hidden_n_layers: 2
     hidden_skip: false
     hidden_layer:
-      _target_: inverse.model.model.SirenResidualBlock
+      _target_: inverse.model.model.LinearBlock
       in_features: 128
       out_features: ${model.architecture.hidden_layer.in_features}
       layernorm: ${model.architecture.input_layer.layernorm}
@@ -286,6 +286,8 @@ model:
           w0: 1.0
     # Output layer
     output_skip: true
+    inject_coords_output: true
+    inject_coords_hidden: true
     output_n_heads: ${model.parameters.n_prof}
     output_layer:
       _target_: inverse.model.model.LinearBlock
@@ -304,7 +306,7 @@ model:
         activation: #${model.architecture.output_layer.activation}
           _target_: forward.model.activation.Sine
           w0: 1.0
-    output_n_layers: 1
+    output_n_layers: 2
     output_final_layer:
       _target_: inverse.model.model.LinearBlock
       in_features: ${model.architecture.hidden_layer.out_features}

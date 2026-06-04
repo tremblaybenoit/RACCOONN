@@ -22,7 +22,7 @@ task_name: "inverse_operator_z"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "07R"
+  run_id: "10R"
   data_dir: ../static_clearsky_${data.dtype}
   # TODO: First compute statistics on all data
 
@@ -387,7 +387,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_clearskies_minmax_1.npy
+            path: ${....dir}/predict_hofx_neuralODE.npy
         # Atmospheric profiles
         prof_background:
           load:
@@ -465,7 +465,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_clearskies_minmax_1.npy
+            path: ${....dir}/predict_hofx_neuralODE.npy
         # Atmospheric profiles
         prof_background:
           load:
@@ -543,7 +543,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_clearskies_minmax_1.npy
+            path: ${....dir}/predict_hofx_neuralODE.npy
         # Brightness temperatures
         hofx_background:
           # Loading function
@@ -650,8 +650,8 @@ model:
       # Function
       _target_: inverse.model.loss.ForwardModel
       # Configuration of the forward model
-      checkpoint_path: 'forward/model/checkpoints/smooth_minmax_1/model.ckpt'
-      config_path: 'model/forward_emulator_smooth_cs.yaml'
+      checkpoint_path: '../forward_outputs/forward_emulator_neuralODE/checkpoints/cs_minmax_null/model-v1.ckpt'
+      config_path: 'model/forward_emulator_neuralODE_cs.yaml'
       # Precision
       dtype: ${data.dtype}
       # Normalization for the profile variables
