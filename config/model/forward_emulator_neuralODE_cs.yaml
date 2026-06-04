@@ -65,7 +65,7 @@ parameters:
     # Number of hidden layers
     nhidden_bt: 3
     # Number of neurons in the hidden layers
-    nnodes_bt: 512
+    nnodes_bt: 128
     # Offset and scale for the standard deviation output
     std_output_activation_offset: 0.001
     std_scale_trainable: true

@@ -22,7 +22,7 @@ task_name: "inverse_operator_poster2"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "phys_013a"
+  run_id: "phys_013d"
   data_dir: ../static_clearsky_${data.dtype}
   # checkpoint_dir: "inverse/model/checkpoints/phys_012"
 
@@ -66,14 +66,14 @@ data:
           type: ['Air temperature', 'Humidity mixing ratio', 'Ozone mixing ratio']
           # Normalization function and parameters
           normalization:
-            _target_: data.transformations.mean_stdev
+            _target_: data.transformations.min_max
             _partial_: true
             stats:
               _target_: data.statistics.read_statistics_var
               path: ../static_clearskies_float32/normalization/statistics_clearskies.pkl
               var: 'prof'
               dtype: ${data.dtype}
-            axis: null
+            axis: 1
         # Pressure
         pressure:
           # Loading function
@@ -181,7 +181,7 @@ model:
   parameters:
     # Number of variables
     n_scans: 0
-  min_max: false # TODO: true or false?
+  min_max: true # TODO: true or false?
   # Loss function and parameters
   loss_func:
     # Function
@@ -245,7 +245,7 @@ model:
                 - ${model.parameters.n_pressure}
                 - ${model.parameters.n_cloud}
       # [Lat, Lon, Scans, Pressure]
-      sigma_per_dim: [ 10.0, 10.0, 10.0 ]
+      sigma_per_dim: [ 1.0, 1.0, 1.0 ]
     # Input layer
     input_layer:
       _target_: inverse.model.model.LinearBlock
@@ -299,7 +299,7 @@ model:
       out_features: 1
       layernorm: ${model.architecture.input_layer.layernorm}
       activation:
-        _target_: torch.nn.Identity
+        _target_: torch.nn.Sigmoid
       dropout_rate: 0.0
       init_func:
         _target_: inverse.model.model.SwishInit

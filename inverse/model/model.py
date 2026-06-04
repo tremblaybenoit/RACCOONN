@@ -912,14 +912,16 @@ class PINNverseOperator(BaseModel):
         # 1. Vectorized expansion
         # We create a list of tensors all shaped (Batch, n_levels, 1)
         tensors = []
+        cartesian = 'z' in x.keys()
         for k, v in x.items():
             # if k != 'pressure':
-            if v.ndim == 1:
-                # For (Batch,) -> (Batch, n_levels, 1)
-                tensors.append(v[:, None, None].expand(-1, self.n_levels, 1))
-            else:
-                # For (Batch, n_levels) -> (Batch, n_levels, 1)
-                tensors.append(v.unsqueeze(-1))
+            if cartesian is False or k != 'pressure':
+                if v.ndim == 1:
+                    # For (Batch,) -> (Batch, n_levels, 1)
+                    tensors.append(v[:, None, None].expand(-1, self.n_levels, 1))
+                else:
+                    # For (Batch, n_levels) -> (Batch, n_levels, 1)
+                    tensors.append(v.unsqueeze(-1))
 
         # 2. Single Concatenation
         # Shape: (Batch * n_levels, num_features)

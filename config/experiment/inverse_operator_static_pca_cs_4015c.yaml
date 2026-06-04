@@ -6,9 +6,9 @@ defaults:
   - override /paths: default
   - override /hydra: default
   - override /data: inverse_recast
-  - override /preparation: inverse_default
+  - override /preparation: inverse_pca
   - override /loader: inverse_static
-  - override /model: inverse_operator
+  - override /model: inverse_operator_pca
   - override /trainer: cpu
   - override /callbacks: inverse_default
   - override /logger: default
@@ -17,23 +17,23 @@ defaults:
 # This allows you to overwrite only specified parameters
 
 # Task name. Note that it determines the output directory path
-task_name: "inverse_operator_poster2"  # Experiment
+task_name: "inverse_operator_static_pca_cs"  # Experiment
 
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "phys_013a"
-  data_dir: ../static_clearsky_${data.dtype}
-  # checkpoint_dir: "inverse/model/checkpoints/phys_012"
+  run_id: "4015c"
+  data_dir: ../static_${data.dtype}_cs
 
 # Trainer configuration
 trainer:
   min_epochs: 1  # To prevent early stopping
-  max_epochs: 960  # Number of epochs
+  max_epochs: 1960  # Number of epochs
   precision: 32  # 32-bit precision
 
 # Initialization
-# init_from_checkpoint: ../inverse_outputs/inverse_operator_static_clearsky2/checkpoints/phys_0012f/model.ckpt
+# init_from_checkpoint: ../inverse_outputs/inverse_operator_static_pca_cs/checkpoints/model.ckpt
+init_from_checkpoint: inverse_outputs/model/checkpoints/model_swish_background.ckpt
 
 # Callbacks
 callbacks:
@@ -48,7 +48,17 @@ preparation:
     data:
       # Output path for statistics
       output:
-        path: ../static_clearskies_float32/normalization/statistics_clearskies.pkl
+        path: ${paths.data_dir}/normalization/statistics.pkl
+  # PCA decomposition
+  pca:
+    # Atmospheric profiles
+    prof:
+      # Function
+      _target_: data.pca.compute_pca
+      _recursive_: false  # Do not instantiate nested objects
+      # What the method needs as input
+      input:
+        n_comp: 270
 
 # Data configuration
 data:
@@ -66,30 +76,49 @@ data:
           type: ['Air temperature', 'Humidity mixing ratio', 'Ozone mixing ratio']
           # Normalization function and parameters
           normalization:
-            _target_: data.transformations.mean_stdev
+            _target_: data.transformations.min_max
             _partial_: true
             stats:
               _target_: data.statistics.read_statistics_var
-              path: ../static_clearskies_float32/normalization/statistics_clearskies.pkl
+              path: ${preparation.statistics.data.output.path}
               var: 'prof'
               dtype: ${data.dtype}
-            axis: null
-        # Pressure
-        pressure:
-          # Loading function
-          load:
-            path: ${....dir}/pressure_log10.npy
+            axis: 1
         # Brightness temperatures
         hofx:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_clearskies_minmax_1.npy
+            path: ${....dir}/predict_hofx_v3_smooth_cs.npy
         # Atmospheric profiles
         prof_background:
-          load:
-            path: ${....dir}/prof_background.npy
           normalization: ${data.stage.train.vars.prof.normalization}
+        # Profile whitened
+        prof_white:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/white_prof.npy
+            split: ${....split}
+            dtype: ${data.dtype}
+          normalization: null
+        # Profile background
+        prof_white_background:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/white_prof_background.npy
+            split: ${....split}
+            dtype: ${data.dtype}
+          normalization: null
+        # Atmospheric profile increment
+        prof_white_increment:
+          # Loading function
+          load:
+            _target_: data.pca.load_pca_buffers
+            path: ${paths.data_dir}/normalization/pca.pkl
+            buffer: 'scales_inv'
+          normalization: null
     # Validation set
     valid:
       # Variables
@@ -100,22 +129,41 @@ data:
           type: ${data.stage.train.vars.prof.type}
           # Normalization function and parameters
           normalization: ${data.stage.train.vars.prof.normalization}
-        # Pressure
-        pressure:
-          # Loading function
-          load:
-            path: ${....dir}/pressure_log10.npy
         # Brightness temperatures
         hofx:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_clearskies_minmax_1.npy
+            path: ${....dir}/predict_hofx_v3_smooth_cs.npy
         # Atmospheric profiles
         prof_background:
-          load:
-            path: ${....dir}/prof_background.npy
           normalization: ${data.stage.train.vars.prof.normalization}
+        # Profile whitened
+        prof_white:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/white_prof.npy
+            split: ${....split}
+            dtype: ${data.dtype}
+          normalization: null
+        # Profile background
+        prof_white_background:
+          # Loading function
+          load:
+            _target_: data.io.load_npy
+            path: ${....dir}/white_prof_background.npy
+            split: ${....split}
+            dtype: ${data.dtype}
+          normalization: null
+        # Atmospheric profile increment
+        prof_white_increment:
+          # Loading function
+          load:
+            _target_: data.pca.load_pca_buffers
+            path: ${paths.data_dir}/normalization/pca.pkl
+            buffer: 'scales_inv'
+          normalization: null
     # Test set
     test:
       # Variables
@@ -126,51 +174,75 @@ data:
           type: ${data.stage.train.vars.prof.type}
           # Normalization function and parameters
           normalization: ${data.stage.train.vars.prof.normalization}
-        # Pressure
-        pressure:
-          # Loading function
-          load:
-            path: ${....dir}/pressure_log10.npy
         # Brightness temperatures
         hofx:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_clearskies_minmax_1.npy
-        # Brightness temperatures
-        hofx_background:
+            path: ${....dir}/predict_hofx_v3_smooth_cs.npy
+        # Atmospheric profiles
+        prof_background:
+          normalization: ${data.stage.train.vars.prof.normalization}
+        # Profile whitened
+        prof_white:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_clearskies_minmax_1_background.npy
-        # Atmospheric profiles
-        prof_background:
+            path: ${....dir}/white_prof.npy
+            split: ${....split}
+            dtype: ${data.dtype}
+          normalization: null
+        # Profile background
+        prof_white_background:
+          # Loading function
           load:
-            path: ${....dir}/prof_background.npy
-          normalization: ${data.stage.train.vars.prof.normalization}
+            _target_: data.io.load_npy
+            path: ${....dir}/white_prof_background.npy
+            split: ${....split}
+            dtype: ${data.dtype}
+          normalization: null
+        # Atmospheric profile increment
+        prof_white_increment:
+          # Loading function
+          load:
+            _target_: data.pca.load_pca_buffers
+            path: ${paths.data_dir}/normalization/pca.pkl
+            buffer: 'scales_inv'
+          normalization: null
 
 # Loader configuration
 loader:
   batch_size: 24
-  num_workers: 8
+  num_workers: 10
+  stage:
+    train:
+      target:
+        prof_white: ${data.stage.train.vars.prof_white}
+        prof_white_background: ${data.stage.train.vars.prof_white_background}
+        prof_white_increment: ${data.stage.train.vars.prof_white_increment}
+    valid:
+      target:
+        prof_white: ${data.stage.valid.vars.prof_white}
+        prof_white_background: ${data.stage.valid.vars.prof_white_background}
+        prof_white_increment: ${data.stage.valid.vars.prof_white_increment}
+    test:
+      target:
+        prof_white: ${data.stage.test.vars.prof_white}
+        prof_white_background: ${data.stage.test.vars.prof_white_background}
+        prof_white_increment: ${data.stage.test.vars.prof_white_increment}
 
 # Model parameters
 model:
-  _target_: inverse.model.model.PINNverseOperatorP
-  stats: ${data.stage.train.vars.prof.normalization.stats}
-  # Transform
-  transform:
-    _target_: ${data.stage.train.vars.prof.normalization._target_}
-    _partial_: true
-    stats: ${data.stage.train.vars.prof.normalization.stats}
-    axis: ${data.stage.train.vars.prof.normalization.axis}
-    inverse_transform: true
+  pca_buffers:
+    # Load PCA buffers
+    _target_: data.pca.load_pca_buffers
+    path: ${paths.data_dir}/normalization/pca.pkl
   # Optimizer function and parameters
   optimizer:
     # Learning rate
     lr: 0.001
     # Weight decay (L2 regularization)
-    weight_decay: 0.00005
+    weight_decay: 0
   # Learning rate scheduler
   lr_scheduler:
     # Factor to reduce the learning rate
@@ -181,59 +253,42 @@ model:
   parameters:
     # Number of variables
     n_scans: 0
-  min_max: false # TODO: true or false?
   # Loss function and parameters
   loss_func:
     # Function
-    _target_: inverse.model.loss.VarLossR # Load loss function
+    _target_: inverse.model.loss.VarLoss # Load loss function
     # Forward model to compute the model equivalent of the observations
     forward_model:
       # Function
       _target_: inverse.model.loss.ForwardModel
       # Configuration of the forward model
-      checkpoint_path: 'forward/model/checkpoints/smooth_minmax_1/model.ckpt'
+      checkpoint_path: 'forward/model/checkpoints/model_v3_smooth_cs.ckpt'
       config_path: 'model/forward_emulator_smooth_cs.yaml'
       # Precision
       dtype: ${data.dtype}
       # Normalization for the profile variables
-      prof_norm:
-        _target_: data.transformations.min_max
-        _partial_: true
-        stats:
-          _target_: data.statistics.read_statistics_var
-          path: ../static_clearskies_float32/normalization/statistics_clearskies.pkl
-          var: 'prof'
-          dtype: ${data.dtype}
-        axis: 1
+      prof_norm: null
     # Weights for observation (obs), model, and boundary condition (bcs) errors
-    lambda_obs: 0.  # TODO: 0. or 1.?
+    lambda_obs: 1.
     lambda_model: 1.
-    lambda_bcs: 0.
-    lambda_sobolev: 0. #1.e-5
-    key_obs: '_phys'  # TODO: '_phys' or '_mean_stdev'?
-    key_model: '_mean_stdev'  # TODO: '_mean_stdev' or '_min_max'?
+    lambda_bcs: 1.
+    lambda_sobolev: 1.e-5
     clear_sky: false
     # Loss term for observations
     loss_obs:
-      _target_: inverse.model.loss.MSE  # DiagonalQuadraticForm
+      _target_: inverse.model.loss.MSE
     # Loss term for model variables
     loss_model:
-      _target_: inverse.model.loss.MSE #QuadraticForm
-      # matrix:
-      #   _target_: data.pca.load_pca_buffers
-      #   path: ../static_clearskies_float32/normalization/pca_clouds_univariate_000.pkl
-      #   buffer: 'B_inv'
+      _target_: inverse.model.loss.MSE
     # Loss term for boundary conditions
     loss_bcs:
       _target_: inverse.model.loss.MSE
-    # Pressure filter: Consider only pressure levels with non-zero variance (for model and bcs errors)
-    pressure_filter: null  #${data.pressure_filter.load}
   # Architecture components
   architecture:
     # Positional encoding
     positional_encoding:
-      _target_: inverse.model.encoding.MultiScaleGaussianEncoding
-      num_freqs: 20
+      _target_: inverse.model.encoding.GaussianPositionalEncoding
+      num_freqs: 10
       d_input:
         _target_: builtins.int
         _args_:
@@ -242,10 +297,6 @@ model:
               - - ${model.parameters.n_lat}
                 - ${model.parameters.n_lon}
                 - ${model.parameters.n_scans}
-                - ${model.parameters.n_pressure}
-                - ${model.parameters.n_cloud}
-      # [Lat, Lon, Scans, Pressure]
-      sigma_per_dim: [ 10.0, 10.0, 10.0 ]
     # Input layer
     input_layer:
       _target_: inverse.model.model.LinearBlock
@@ -261,13 +312,12 @@ model:
         _target_: inverse.model.model.SwishInit
         is_first_layer: true
         is_head: false
-
     # Hidden layer
-    hidden_n_layers: 2
+    n_hidden_layers: 4
     hidden_skip: false
     hidden_layer:
       _target_: inverse.model.model.SirenResidualBlock
-      in_features: 64
+      in_features: 128
       out_features: ${model.architecture.hidden_layer.in_features}
       layernorm: ${model.architecture.input_layer.layernorm}
       activation: ${model.architecture.input_layer.activation}
@@ -278,25 +328,11 @@ model:
         is_head: false
     # Output layer
     output_skip: true
-    output_n_heads: ${model.parameters.n_prof}
+    output_n_heads: 1
     output_layer:
       _target_: inverse.model.model.LinearBlock
       in_features: ${model.architecture.hidden_layer.out_features}
-      out_features: 32
-      layernorm: ${model.architecture.hidden_layer.layernorm}
-      activation: ${model.architecture.hidden_layer.activation}
-        # _target_: forward.model.activation.NonLearnableSwish
-        # in_features: ${model.architecture.output_layer.out_features}
-      dropout_rate: 0.1
-      init_func:
-        _target_: inverse.model.model.SwishInit
-        is_first_layer: false
-        is_head: true
-    output_n_layers: 2
-    output_final_layer:
-      _target_: inverse.model.model.LinearBlock
-      in_features: ${model.architecture.hidden_layer.out_features}
-      out_features: 1
+      out_features: ${preparation.pca.prof.input.n_comp}
       layernorm: ${model.architecture.input_layer.layernorm}
       activation:
         _target_: torch.nn.Identity
@@ -310,4 +346,4 @@ model:
 logger:
   # MLflow logger
   ports:
-    mlflow: 5029
+    mlflow: 5008

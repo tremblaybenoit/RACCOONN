@@ -17,12 +17,12 @@ defaults:
 # This allows you to overwrite only specified parameters
 
 # Task name. Note that it determines the output directory path
-task_name: "inverse_operator_poster2"  # Experiment
+task_name: "inverse_operator_exp"  # Experiment
 
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "phys_013a"
+  run_id: "phys_EXP"
   data_dir: ../static_clearsky_${data.dtype}
   # checkpoint_dir: "inverse/model/checkpoints/phys_012"
 
@@ -31,9 +31,6 @@ trainer:
   min_epochs: 1  # To prevent early stopping
   max_epochs: 960  # Number of epochs
   precision: 32  # 32-bit precision
-
-# Initialization
-# init_from_checkpoint: ../inverse_outputs/inverse_operator_static_clearsky2/checkpoints/phys_0012f/model.ckpt
 
 # Callbacks
 callbacks:
@@ -84,7 +81,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_clearskies_minmax_1.npy
+            path: ${....dir}/predict_hofx_neuralODE_cs1.npy
         # Atmospheric profiles
         prof_background:
           load:
@@ -110,7 +107,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_clearskies_minmax_1.npy
+            path: ${....dir}/predict_hofx_neuralODE_cs1.npy
         # Atmospheric profiles
         prof_background:
           load:
@@ -136,7 +133,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_clearskies_minmax_1.npy
+            path: ${....dir}/predict_hofx_neuralODE_cs1.npy
         # Brightness temperatures
         hofx_background:
           # Loading function
@@ -191,26 +188,26 @@ model:
       # Function
       _target_: inverse.model.loss.ForwardModel
       # Configuration of the forward model
-      checkpoint_path: 'forward/model/checkpoints/smooth_minmax_1/model.ckpt'
-      config_path: 'model/forward_emulator_smooth_cs.yaml'
+      checkpoint_path: '../forward_outputs/forward_emulator_neuralODE/checkpoints/cs_meanstdev_null/model.ckpt'
+      config_path: 'model/forward_emulator_neuralODE_cs.yaml'
       # Precision
       dtype: ${data.dtype}
       # Normalization for the profile variables
-      prof_norm:
-        _target_: data.transformations.min_max
-        _partial_: true
-        stats:
-          _target_: data.statistics.read_statistics_var
-          path: ../static_clearskies_float32/normalization/statistics_clearskies.pkl
-          var: 'prof'
-          dtype: ${data.dtype}
-        axis: 1
+      # prof_norm:
+      #   _target_: data.transformations.min_max
+      #   _partial_: true
+      #   stats:
+      #     _target_: data.statistics.read_statistics_var
+      #     path: ../static_clearskies_float32/normalization/statistics_clearskies.pkl
+      #     var: 'prof'
+      #     dtype: ${data.dtype}
+      #   axis: 1
     # Weights for observation (obs), model, and boundary condition (bcs) errors
-    lambda_obs: 0.  # TODO: 0. or 1.?
+    lambda_obs: 1.  # TODO: 0. or 1.?
     lambda_model: 1.
     lambda_bcs: 0.
     lambda_sobolev: 0. #1.e-5
-    key_obs: '_phys'  # TODO: '_phys' or '_mean_stdev'?
+    key_obs: '_mean_stdev'  # TODO: '_phys' or '_mean_stdev'?
     key_model: '_mean_stdev'  # TODO: '_mean_stdev' or '_min_max'?
     clear_sky: false
     # Loss term for observations
@@ -266,7 +263,7 @@ model:
     hidden_n_layers: 2
     hidden_skip: false
     hidden_layer:
-      _target_: inverse.model.model.SirenResidualBlock
+      _target_: inverse.model.model.LinearBlock
       in_features: 64
       out_features: ${model.architecture.hidden_layer.in_features}
       layernorm: ${model.architecture.input_layer.layernorm}
@@ -310,4 +307,4 @@ model:
 logger:
   # MLflow logger
   ports:
-    mlflow: 5029
+    mlflow: 5030

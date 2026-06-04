@@ -22,7 +22,7 @@ task_name: "inverse_operator_poster2"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "phys_013a"
+  run_id: "phys_013c"
   data_dir: ../static_clearsky_${data.dtype}
   # checkpoint_dir: "inverse/model/checkpoints/phys_012"
 
@@ -254,13 +254,13 @@ model:
       layernorm:
         _target_: torch.nn.Identity
       activation:
-        _target_: forward.model.activation.NonLearnableSwish
-        in_features: ${model.architecture.hidden_layer.in_features}
+        _target_: forward.model.activation.Sine
+        w0: 10.0
       dropout_rate: 0.1
       init_func:
-        _target_: inverse.model.model.SwishInit
+        _target_: inverse.model.model.SirenInit
         is_first_layer: true
-        is_head: false
+        activation: ${model.architecture.input_layer.activation}
 
     # Hidden layer
     hidden_n_layers: 2
@@ -273,9 +273,9 @@ model:
       activation: ${model.architecture.input_layer.activation}
       dropout_rate: ${model.architecture.input_layer.dropout_rate}
       init_func:
-        _target_: inverse.model.model.SwishInit
+        _target_: inverse.model.model.SirenInit
         is_first_layer: false
-        is_head: false
+        activation: ${model.architecture.hidden_layer.activation}
     # Output layer
     output_skip: true
     output_n_heads: ${model.parameters.n_prof}
@@ -289,9 +289,10 @@ model:
         # in_features: ${model.architecture.output_layer.out_features}
       dropout_rate: 0.1
       init_func:
-        _target_: inverse.model.model.SwishInit
+        _target_: inverse.model.model.SirenInit
         is_first_layer: false
         is_head: true
+        activation: ${model.architecture.hidden_layer.activation}
     output_n_layers: 2
     output_final_layer:
       _target_: inverse.model.model.LinearBlock
@@ -302,9 +303,10 @@ model:
         _target_: torch.nn.Identity
       dropout_rate: 0.0
       init_func:
-        _target_: inverse.model.model.SwishInit
+        _target_: inverse.model.model.SirenInit
         is_first_layer: false
         is_head: true
+        activation: ${model.architecture.output_layer.activation}
 
 # Logger configuration
 logger:

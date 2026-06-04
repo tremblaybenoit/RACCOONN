@@ -9,7 +9,7 @@ defaults:
   - override /preparation: inverse_default
   - override /loader: inverse_static
   - override /model: inverse_operator
-  - override /trainer: cpu
+  - override /trainer: gpu
   - override /callbacks: inverse_default
   - override /logger: default
 
@@ -17,12 +17,12 @@ defaults:
 # This allows you to overwrite only specified parameters
 
 # Task name. Note that it determines the output directory path
-task_name: "inverse_operator_poster2"  # Experiment
+task_name: "inverse_operator_exp"  # Experiment
 
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "phys_013a"
+  run_id: "phys_014"
   data_dir: ../static_clearsky_${data.dtype}
   # checkpoint_dir: "inverse/model/checkpoints/phys_012"
 
@@ -38,7 +38,7 @@ trainer:
 # Callbacks
 callbacks:
   early_stopping:
-    patience: 101  # Number of epochs with no improvement after which training will be stopped
+    patience: 50  # Number of epochs with no improvement after which training will be stopped
 
 # Preparation configuration
 preparation:
@@ -84,7 +84,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_clearskies_minmax_1.npy
+            path: ${....dir}/predict_hofx_neuralODE_cs1.npy
         # Atmospheric profiles
         prof_background:
           load:
@@ -110,7 +110,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_clearskies_minmax_1.npy
+            path: ${....dir}/predict_hofx_neuralODE_cs1.npy
         # Atmospheric profiles
         prof_background:
           load:
@@ -136,7 +136,7 @@ data:
           # Loading function
           load:
             _target_: data.io.load_npy
-            path: ${....dir}/predict_hofx_clearskies_minmax_1.npy
+            path: ${....dir}/predict_hofx_neuralODE_cs1.npy
         # Brightness temperatures
         hofx_background:
           # Loading function
@@ -176,7 +176,7 @@ model:
     # Factor to reduce the learning rate
     factor: 0.75
     # Number of epochs with no improvement after which learning rate will be reduced
-    patience: 25
+    patience: 7
   # Model parameters associated with the data (e.g., input/output dimensions) and architecture
   parameters:
     # Number of variables
@@ -191,26 +191,26 @@ model:
       # Function
       _target_: inverse.model.loss.ForwardModel
       # Configuration of the forward model
-      checkpoint_path: 'forward/model/checkpoints/smooth_minmax_1/model.ckpt'
-      config_path: 'model/forward_emulator_smooth_cs.yaml'
+      checkpoint_path: '../forward_outputs/forward_emulator_neuralODE/checkpoints/cs_meanstdev_null/model.ckpt'
+      config_path: 'model/forward_emulator_neuralODE_cs.yaml'
       # Precision
       dtype: ${data.dtype}
       # Normalization for the profile variables
-      prof_norm:
-        _target_: data.transformations.min_max
-        _partial_: true
-        stats:
-          _target_: data.statistics.read_statistics_var
-          path: ../static_clearskies_float32/normalization/statistics_clearskies.pkl
-          var: 'prof'
-          dtype: ${data.dtype}
-        axis: 1
+      # prof_norm:
+      #   _target_: data.transformations.min_max
+      #   _partial_: true
+      #   stats:
+      #     _target_: data.statistics.read_statistics_var
+      #     path: ../static_clearskies_float32/normalization/statistics_clearskies.pkl
+      #     var: 'prof'
+      #     dtype: ${data.dtype}
+      #   axis: 1
     # Weights for observation (obs), model, and boundary condition (bcs) errors
     lambda_obs: 0.  # TODO: 0. or 1.?
     lambda_model: 1.
     lambda_bcs: 0.
     lambda_sobolev: 0. #1.e-5
-    key_obs: '_phys'  # TODO: '_phys' or '_mean_stdev'?
+    key_obs: '_mean_stdev'  # TODO: '_phys' or '_mean_stdev'?
     key_model: '_mean_stdev'  # TODO: '_mean_stdev' or '_min_max'?
     clear_sky: false
     # Loss term for observations
@@ -245,7 +245,7 @@ model:
                 - ${model.parameters.n_pressure}
                 - ${model.parameters.n_cloud}
       # [Lat, Lon, Scans, Pressure]
-      sigma_per_dim: [ 10.0, 10.0, 10.0 ]
+      sigma_per_dim: [ 3.0, 3.0, 3.0 ]
     # Input layer
     input_layer:
       _target_: inverse.model.model.LinearBlock
@@ -254,28 +254,36 @@ model:
       layernorm:
         _target_: torch.nn.Identity
       activation:
-        _target_: forward.model.activation.NonLearnableSwish
-        in_features: ${model.architecture.hidden_layer.in_features}
+        _target_: forward.model.activation.Sine
+        # in_features: ${model.architecture.input_layer.out_features}
+        w0: 3.0
       dropout_rate: 0.1
       init_func:
-        _target_: inverse.model.model.SwishInit
+        _target_: inverse.model.model.SirenInit
         is_first_layer: true
-        is_head: false
+        activation: #${model.architecture.input_layer.activation}
+          _target_: forward.model.activation.Sine
+          w0: 3.0
 
     # Hidden layer
     hidden_n_layers: 2
     hidden_skip: false
     hidden_layer:
-      _target_: inverse.model.model.SirenResidualBlock
-      in_features: 64
+      _target_: inverse.model.model.LinearBlock
+      in_features: 128
       out_features: ${model.architecture.hidden_layer.in_features}
       layernorm: ${model.architecture.input_layer.layernorm}
-      activation: ${model.architecture.input_layer.activation}
+      activation:
+        _target_: forward.model.activation.Sine
+        # in_features: ${model.architecture.hidden_layer.out_features}
+        w0: 1.0
       dropout_rate: ${model.architecture.input_layer.dropout_rate}
       init_func:
-        _target_: inverse.model.model.SwishInit
+        _target_: inverse.model.model.SirenInit
         is_first_layer: false
-        is_head: false
+        activation: #${model.architecture.hidden_layer.activation}
+          _target_: forward.model.activation.Sine
+          w0: 1.0
     # Output layer
     output_skip: true
     output_n_heads: ${model.parameters.n_prof}
@@ -284,15 +292,19 @@ model:
       in_features: ${model.architecture.hidden_layer.out_features}
       out_features: 32
       layernorm: ${model.architecture.hidden_layer.layernorm}
-      activation: ${model.architecture.hidden_layer.activation}
-        # _target_: forward.model.activation.NonLearnableSwish
-        # in_features: ${model.architecture.output_layer.out_features}
+      activation:
+        _target_: forward.model.activation.Sine
+        # in_features: ${model.architecture.hidden_layer.out_features}
+        w0: 1.0
       dropout_rate: 0.1
       init_func:
-        _target_: inverse.model.model.SwishInit
+        _target_: inverse.model.model.SirenInit
         is_first_layer: false
         is_head: true
-    output_n_layers: 2
+        activation: #${model.architecture.output_layer.activation}
+          _target_: forward.model.activation.Sine
+          w0: 1.0
+    output_n_layers: 1
     output_final_layer:
       _target_: inverse.model.model.LinearBlock
       in_features: ${model.architecture.hidden_layer.out_features}
@@ -302,12 +314,13 @@ model:
         _target_: torch.nn.Identity
       dropout_rate: 0.0
       init_func:
-        _target_: inverse.model.model.SwishInit
+        _target_: inverse.model.model.SirenInit
         is_first_layer: false
         is_head: true
+        activation: ${model.architecture.output_final_layer.activation}
 
 # Logger configuration
 logger:
   # MLflow logger
   ports:
-    mlflow: 5029
+    mlflow: 5030

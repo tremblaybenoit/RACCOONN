@@ -111,6 +111,7 @@ def generate_pca_buffers(data: np.ndarray, mode: str='multivariate', pressure_fi
     # Standardize
     mu = np.mean(data, axis=0, keepdims=True)  # (V, L)
     std = np.std(data, axis=0, keepdims=True) + 1e-12  # (V, L)
+    # std = np.ones_like(std)
     vmin = np.min(data, axis=0, keepdims=True)
     vmax = np.max(data, axis=0, keepdims=True)
     increment = data - mu
@@ -296,8 +297,9 @@ def generate_pca_buffers(data: np.ndarray, mode: str='multivariate', pressure_fi
     ax = get_axes(0, 0)
     # Plot covariance matrix
     plot_map(ax, np.abs(B_inv_phys), title=f"Inverse covariance matrix", plt_origin='upper',
-             cb_label=r'Values')
+             cb_label=r'Values')#, img_range=(0, 100000))
     save_plot(fig, filename='B_inv_phys.png')
+    breakpoint()
 
     return pca_buffs
 

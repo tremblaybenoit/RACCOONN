@@ -124,7 +124,8 @@ def generate_lanczos_buffers(data: np.ndarray, n_comp: int = 200, alpha: float =
 
     # 1. Compute Background (Mean) and Anomalies (Errors)
     x_b = np.mean(flat_data, axis=0)
-    err = flat_data - x_b
+    sigma = np.std(flat_data, axis=0)
+    err = (flat_data - x_b)/sigma
 
     # 2. Compute B-matrix (Covariance of anomalies)
     # B represents the 'links' between all levels and variables
