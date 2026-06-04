@@ -305,120 +305,54 @@ class BaseModel(LightningModule):
         """
 
         super().to(device, dtype=dtype, non_blocking=non_blocking)
-        if hasattr(self.loss_func, 'to'):
-            self.loss_func = self.loss_func.to(device)
+        if hasattr(self.loss, 'to'):
+            self.loss = self.loss.to(device)
         return self
 
 
 class CRTMModel(BaseModel):
     """
-    Lightning model for the CRTM emulator (Community Radiative Transfer Model) using PyTorch.
-    This is translation from Keras to Pytorch of the CRTM emulator by Howard et al. (2025).
-    Link: https://zenodo.org/records/13963758.
+    Lightning model for the CRTM emulator using configurable architecture.
+    This class maintains backward compatibility while using the new architecture-based approach.
     """
-    def __init__(self, parameters: DictConfig, optimizer: DictConfig = None, lr_scheduler: DictConfig = None,
-                 loss_func: DictConfig = None):
-        """ Initialize LightningCRTMModel.
+    def __init__(
+        self,
+        parameters: DictConfig = None,
+        optimizer: DictConfig = None,
+        scheduler: DictConfig = None,
+        loss: DictConfig = None,
+    ):
+        """
+        Initialize CRTM Model.
 
         Parameters
         ----------
-        optimizer: DictConfig. Optimizer for the model.
-        loss_func: DictConfig. Loss function for the model.
-        parameters: DictConfig. Configuration object containing model parameters.
-        lr_scheduler: DictConfig. Configuration object for the learning rate scheduler (optional).
-
-        Returns
-        -------
-        None.
+        parameters : DictConfig. Configuration object containing model parameters (for backward compatibility).
+        optimizer : DictConfig. Optimizer for the model.
+        scheduler : DictConfig. Learning rate scheduler configuration.
+        loss : DictConfig. Loss function for the model.
         """
-
-        # Class inheritance
-        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func)
-
-        # Input parameters
-        self.nprofvars = len(parameters.data.use_prof_vars)
-        self.nsurfvars = len(parameters.data.use_surf_vars)
-        self.nmetavars = len(parameters.data.use_meta_vars)
-        self.nlevels = int(parameters.data.nlevels)
-        self.prof_vars = parameters.data.prof_vars
-
-        # Neural network parameters
-        nnodes_bt = parameters.architecture.nnodes_bt
-        nhidden_bt = parameters.architecture.nhidden_bt
-        dropout_rate = parameters.architecture.dropout_rate
-        self.max_T = parameters.data.bt_norm_max
-        self.min_T = parameters.data.bt_norm_min
-        self.bt_output_activation = nn.Sigmoid()
-        self.std_output_activation = nn.Softplus()
-        self.std_output_activation_offset = parameters.architecture.std_output_activation_offset
-        self.std_scale_trainable = parameters.architecture.std_scale_trainable
-
-        # Neural network layer components
-        self.flatten = nn.Flatten()
-        self.concat = lambda *tensors: torch.cat(tensors, dim=1)
-        self.hidden_layers = nn.ModuleList()
-        self.swish_layers = nn.ModuleList()
-        self.dropout_layers = nn.ModuleList()
-
-        # First dense layer
-        self.hidden_layers.append(nn.Linear(self.nprofvars * self.nlevels + self.nsurfvars + self.nmetavars, nnodes_bt))
-        self.swish_layers.append(Swish())
-        self.dropout_layers.append(nn.Dropout(dropout_rate))
-
-        # Additional hidden layers
-        for _ in range(nhidden_bt - 1):
-            self.hidden_layers.append(nn.Linear(nnodes_bt, nnodes_bt))
-            self.swish_layers.append(Swish())
-            self.dropout_layers.append(nn.Dropout(dropout_rate))
-
-        # Output layers
-        self.out_T = nn.Linear(nnodes_bt, 10)
-        self.out_std = nn.Linear(nnodes_bt, 10)
-        if self.std_scale_trainable:
-            self.std_scale = Scale()
+        # Build architecture config from parameters (backward compatibility)
+        if parameters is not None:
+            architecture = DictConfig({
+                '_target_': 'forward.model.architecture.CRTMArchitecture',
+                'nprofvars': len(parameters.data.use_prof_vars),
+                'nsurfvars': len(parameters.data.use_surf_vars),
+                'nmetavars': len(parameters.data.use_meta_vars),
+                'nlevels': int(parameters.data.nlevels),
+                'nnodes_bt': parameters.architecture.nnodes_bt,
+                'nhidden_bt': parameters.architecture.nhidden_bt,
+                'dropout_rate': parameters.architecture.dropout_rate,
+                'bt_norm_max': parameters.data.bt_norm_max,
+                'bt_norm_min': parameters.data.bt_norm_min,
+                'std_output_activation_offset': parameters.architecture.std_output_activation_offset,
+                'std_scale_trainable': parameters.architecture.std_scale_trainable,
+            })
         else:
-            self.std_scale = None
+            architecture = None
 
-    def forward(self, input: dict) -> torch.Tensor:
-        """ Forward pass for the model.
-
-        Parameters
-        ----------
-        input: dict. Dictionary containing input tensors (profiles, surface, meta).
-            profiles: torch.Tensor. Input tensor for profiles.
-            surface: torch.Tensor. Input tensor for surface variables.
-            meta: torch.Tensor. Input tensor for meta variables.
-
-        Returns
-        -------
-        torch.Tensor. Output tensor after passing through the model.
-        """
-
-        # Reformat variables
-        prof = input['prof']  # (batch, nprofvars, nlevels)
-        prof = self.flatten(prof)
-        x = self.concat(prof, input['surf'], input['meta'])
-
-        # Foward pass through hidden layers
-        for dense, swish, drop in zip(self.hidden_layers, self.swish_layers, self.dropout_layers):
-            x = dense(x)
-            x = swish(x)
-            x = drop(x)
-
-        # Mean output
-        out = self.out_T(x)
-        out = self.bt_output_activation(out)
-        out = out * (self.max_T - self.min_T) + self.min_T
-
-        # Std output
-        out_std = self.out_std(x)
-        out_std = self.std_output_activation(out_std)
-        if self.std_scale is not None:
-            out_std = self.std_scale(out_std)
-        out_std = out_std + self.std_output_activation_offset
-
-        # Concatenate outputs
-        return torch.cat([out, out_std], dim=1)
+        # Call parent constructor
+        super().__init__(optimizer=optimizer, scheduler=scheduler, loss=loss, architecture=architecture)
 
     def predict_step(self, batch: dict, batch_nb: int):
         """ Perform prediction step.
@@ -432,321 +366,96 @@ class CRTMModel(BaseModel):
             -------
             Predicted values: tensor.
         """
-
-        # Forward pass through the model
-        return self(batch['input'])
+        return self.forward(batch)
 
 
 class CRTMModelSmooth(BaseModel):
-    def __init__(self, parameters, optimizer: DictConfig = None, lr_scheduler: DictConfig = None,
-                 loss_func: DictConfig = None):
-        """ Initialize LightningCRTMModel.
-
-        Parameters
-        ----------
-        optimizer: DictConfig. Optimizer for the model.
-        loss_func: DictConfig. Loss function for the model.
-        parameters: DictConfig. Configuration object containing model parameters.
-        lr_scheduler: DictConfig. Configuration object for the learning rate scheduler (optional).
-
-        Returns
-        -------
-        None.
-        """
-
-        # Class inheritance
-        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func)
-
-        # Input parameters (preserved names)
-        self.nprofvars = len(parameters.data.use_prof_vars)
-        self.nsurfvars = len(parameters.data.use_surf_vars)
-        self.nmetavars = len(parameters.data.use_meta_vars)
-        self.nlevels = int(parameters.data.nlevels)
-        self.prof_vars = parameters.data.prof_vars
-
-        # Dimension for the linear skip
-        self.input_dim = self.nprofvars * self.nlevels + self.nsurfvars + self.nmetavars
-
-        # Neural network parameters
-        nnodes_bt = parameters.architecture.nnodes_bt
-        nhidden_bt = parameters.architecture.nhidden_bt
-        dropout_rate = parameters.architecture.dropout_rate
-        self.max_T = parameters.data.bt_norm_max
-        self.min_T = parameters.data.bt_norm_min
-
-        # INVERSION FIX: We store the activation but will bypass it in the skip path
-        # or use a Leaky variant if you want to keep some bounding.
-        # For now, we'll keep the name for compatibility but use Identity in forward.
-        self.bt_output_activation = nn.Identity()
-
-        self.std_output_activation = nn.Softplus()
-        self.std_output_activation_offset = parameters.architecture.std_output_activation_offset
-        self.std_scale_trainable = parameters.architecture.std_scale_trainable
-
-        # --- Components ---
-        self.flatten = nn.Flatten()
-        self.concat = lambda *tensors: torch.cat(tensors, dim=1)
-
-        # 1. NEW: Linear Skip Connection (The Gradient Highway)
-        self.skip_connection = nn.Linear(self.input_dim, 10)
-
-        # 2. Hidden Layers (The Non-Linear Residual)
-        self.hidden_layers = nn.ModuleList()
-        self.swish_layers = nn.ModuleList()
-        self.dropout_layers = nn.ModuleList()
-
-        # First dense layer
-        self.hidden_layers.append(nn.Linear(self.input_dim, nnodes_bt))
-        self.swish_layers.append(Swish())
-        self.dropout_layers.append(nn.Dropout(dropout_rate))
-
-        # Additional hidden layers
-        for _ in range(nhidden_bt - 1):
-            self.hidden_layers.append(nn.Linear(nnodes_bt, nnodes_bt))
-            self.swish_layers.append(Swish())
-            self.dropout_layers.append(nn.Dropout(dropout_rate))
-
-        # Output layers
-        self.out_T = nn.Linear(nnodes_bt, 10)
-        self.out_std = nn.Linear(nnodes_bt, 10)
-
-        if self.std_scale_trainable:
-            self.std_scale = Scale()
+    """Lightning model for CRTM with smooth architecture (skip connections)."""
+    def __init__(self, parameters: DictConfig = None, optimizer: DictConfig = None,
+                 scheduler: DictConfig = None, loss: DictConfig = None):
+        """Initialize CRTM Smooth Model."""
+        # Build architecture config from parameters
+        if parameters is not None:
+            architecture = DictConfig({
+                '_target_': 'forward.model.architecture.CRTMSmoothArchitecture',
+                'nprofvars': len(parameters.data.use_prof_vars),
+                'nsurfvars': len(parameters.data.use_surf_vars),
+                'nmetavars': len(parameters.data.use_meta_vars),
+                'nlevels': int(parameters.data.nlevels),
+                'nnodes_bt': parameters.architecture.nnodes_bt,
+                'nhidden_bt': parameters.architecture.nhidden_bt,
+                'dropout_rate': parameters.architecture.dropout_rate,
+                'bt_norm_max': parameters.data.bt_norm_max,
+                'bt_norm_min': parameters.data.bt_norm_min,
+                'std_output_activation_offset': parameters.architecture.std_output_activation_offset,
+                'std_scale_trainable': parameters.architecture.std_scale_trainable,
+            })
         else:
-            self.std_scale = None
+            architecture = None
 
-    def forward(self, input: dict) -> torch.Tensor:
-        # Reformat variables
-        prof = input['prof']
-        prof = self.flatten(prof)
-        x = self.concat(prof, input['surf'], input['meta'])
-
-        # Path 1: Linear Baseline (Skip)
-        # This gives the SIREN a direct path to the radiances.
-        linear_bt = self.skip_connection(x)
-
-        # Path 2: Non-linear Hidden Layers (Residual)
-        res = x
-        for dense, swish, drop in zip(self.hidden_layers, self.swish_layers, self.dropout_layers):
-            res = dense(res)
-            res = swish(res)
-            res = drop(res)
-
-        # Mean output calculation
-        # We sum the linear and residual paths before applying the range scaling
-        residual_bt = self.out_T(res)
-
-        # Combine paths
-        # No Sigmoid here! We use the range mapping directly on the sum.
-        out = linear_bt + residual_bt
-
-        # Optional: We still use the norm_max/min to keep values in physical units,
-        # but we don't 'squash' them through a Sigmoid first.
-        # If your weights were trained with Sigmoid, this scaling might need adjustment.
-        out = out * (self.max_T - self.min_T) + self.min_T
-
-        # Std output (positivity via Softplus)
-        out_std = self.out_std(res)
-        out_std = self.std_output_activation(out_std)
-        if self.std_scale is not None:
-            out_std = self.std_scale(out_std)
-        out_std = out_std + self.std_output_activation_offset
-
-        return torch.cat([out, out_std], dim=1)
+        super().__init__(optimizer=optimizer, scheduler=scheduler, loss=loss, architecture=architecture)
 
     def predict_step(self, batch: dict, batch_nb: int):
-        """ Perform prediction step.
-
-            Parameters
-            ----------
-            batch: dict. Batch from the prediction set.
-            batch_nb: int. Index of the batch out of the prediction set.
-
-            Returns
-            -------
-            Predicted values: tensor.
-        """
-
-        # Forward pass through the model
-        return self(batch['input'])
+        """Perform prediction step."""
+        return self.forward(batch)
 
 
 class CRTMModelPCA(CRTMModelSmooth):
-    def __init__(self, parameters, optimizer: DictConfig = None, lr_scheduler: DictConfig = None,
-                 loss_func: DictConfig = None):
-        """ Initialize LightningCRTMModel.
+    """CRTM model with PCA-based profile scaling."""
+    def __init__(self, parameters: DictConfig = None, optimizer: DictConfig = None,
+                 scheduler: DictConfig = None, loss: DictConfig = None):
+        """Initialize CRTM PCA Model."""
+        super().__init__(parameters=parameters, optimizer=optimizer, scheduler=scheduler, loss=loss)
+        
+        # Store profile scaling factor
+        self.prof_scaling = parameters.data.prof_scaling if parameters is not None else 1.0
 
-        Parameters
-        ----------
-        optimizer: DictConfig. Optimizer for the model.
-        loss_func: DictConfig. Loss function for the model.
-        parameters: DictConfig. Configuration object containing model parameters.
-        lr_scheduler: DictConfig. Configuration object for the learning rate scheduler (optional).
+    def forward(self, batch: dict) -> torch.Tensor:
+        """Forward pass with profile scaling."""
+        # Scale profiles before forward pass
+        scaled_input = {
+            'prof': batch['input']['prof'] / self.prof_scaling,
+            'surf': batch['input']['surf'],
+            'meta': batch['input']['meta']
+        }
+        scaled_batch = {'input': scaled_input}
+        return super().forward(scaled_batch)
 
-        Returns
-        -------
-        None.
-        """
-
-        # Class inheritance
-        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func, parameters=parameters)
-
-        # Input parameters (preserved names)
-        self.prof_scaling = parameters.data.prof_scaling
-
-    def forward(self, input: dict) -> torch.Tensor:
-        """ Forward pass for the model with profile scaling.
-
-        Parameters
-        ----------
-        input: dict. Dictionary containing input tensors (profiles, surface, meta).
-            profiles: torch.Tensor. Input tensor for profiles.
-            surface: torch.Tensor. Input tensor for surface variables.
-            meta: torch.Tensor. Input tensor for meta variables.
-
-        Returns
-        -------
-        torch.Tensor. Output tensor after passing through the model.
-        """
-
-        return super().forward({'prof': input['prof']/self.prof_scaling, 'surf': input['surf'],
-                                'meta': input['meta']})
+    def predict_step(self, batch: dict, batch_nb: int):
+        """Perform prediction step."""
+        return self.forward(batch)
 
 
 class CRTMModelSiren(BaseModel):
-    """
-    Lightning model for the CRTM emulator (Community Radiative Transfer Model) using SIREN
-    (Sinusoidal Representation Networks). This architecture is specifically designed to
-    provide infinitely differentiable mappings, ensuring smooth adjoints for atmospheric inversions.
-    """
-
-    def __init__(self, parameters: DictConfig, optimizer: DictConfig = None,
-                 lr_scheduler: DictConfig = None, loss_func: DictConfig = None):
-        """ Initialize CRTMModelSiren.
-
-        Parameters
-        ----------
-        parameters: DictConfig. Configuration object containing model parameters.
-        optimizer: DictConfig. Optimizer for the model (optional).
-        lr_scheduler: DictConfig. Configuration object for the learning rate scheduler (optional).
-        loss_func: DictConfig. Loss function for the model (optional).
-
-        Returns
-        -------
-        None.
-        """
-        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func)
-
-        # Input parameters
-        self.nprofvars = len(parameters.data.use_prof_vars)
-        self.nsurfvars = len(parameters.data.use_surf_vars)
-        self.nmetavars = len(parameters.data.use_meta_vars)
-        self.nlevels = int(parameters.data.nlevels)
-        self.input_dim = self.nprofvars * self.nlevels + self.nsurfvars + self.nmetavars
-
-        # Neural network parameters
-        nnodes_bt = parameters.architecture.nnodes_bt
-        nhidden_bt = parameters.architecture.nhidden_bt
-        dropout_rate = parameters.architecture.dropout_rate
-        self.max_T = parameters.data.bt_norm_max
-        self.min_T = parameters.data.bt_norm_min
-        self.w0 = getattr(parameters.architecture, "siren_w0", 10.0)
-
-        # Output activations and scaling
-        self.bt_output_activation = nn.Sigmoid()
-        self.std_output_activation = nn.Softplus()
-        self.std_output_activation_offset = parameters.architecture.std_output_activation_offset
-        self.std_scale_trainable = parameters.architecture.std_scale_trainable
-
-        # Components
-        self.flatten = nn.Flatten()
-        self.concat = lambda *tensors: torch.cat(tensors, dim=1)
-        self.hidden_layers = nn.ModuleList()
-        self.sine_layers = nn.ModuleList()
-        self.dropout_layers = nn.ModuleList()
-
-        # Build SIREN layers with specialized initialization
-        current_dim = self.input_dim
-        for i in range(nhidden_bt):
-            layer = nn.Linear(current_dim, nnodes_bt)
-            self._siren_init(layer, is_first=(i == 0))
-            self.hidden_layers.append(layer)
-            self.sine_layers.append(Sine(w0=self.w0))
-            self.dropout_layers.append(nn.Dropout(dropout_rate))
-            current_dim = nnodes_bt
-
-        # Output layers
-        self.out_T = nn.Linear(nnodes_bt, 10)
-        self.out_std = nn.Linear(nnodes_bt, 10)
-
-        if self.std_scale_trainable:
-            self.std_scale = Scale()
+    """CRTM model using SIREN architecture."""
+    def __init__(self, parameters: DictConfig = None, optimizer: DictConfig = None,
+                 scheduler: DictConfig = None, loss: DictConfig = None):
+        """Initialize CRTM SIREN Model."""
+        # Build architecture config from parameters
+        if parameters is not None:
+            architecture = DictConfig({
+                '_target_': 'forward.model.architecture.CRTMSirenArchitecture',
+                'nprofvars': len(parameters.data.use_prof_vars),
+                'nsurfvars': len(parameters.data.use_surf_vars),
+                'nmetavars': len(parameters.data.use_meta_vars),
+                'nlevels': int(parameters.data.nlevels),
+                'nnodes_bt': parameters.architecture.nnodes_bt,
+                'nhidden_bt': parameters.architecture.nhidden_bt,
+                'dropout_rate': parameters.architecture.dropout_rate,
+                'siren_w0': getattr(parameters.architecture, 'siren_w0', 10.0),
+                'bt_norm_max': parameters.data.bt_norm_max,
+                'bt_norm_min': parameters.data.bt_norm_min,
+                'std_output_activation_offset': parameters.architecture.std_output_activation_offset,
+                'std_scale_trainable': parameters.architecture.std_scale_trainable,
+            })
         else:
-            self.std_scale = None
+            architecture = None
 
-    def _siren_init(self, layer: nn.Module, is_first: bool = False):
-        """ Specialized weight initialization for SIREN to ensure stable and smooth gradients.
-
-        Parameters
-        ----------
-        layer: nn.Module. Linear layer to initialize.
-        is_first: bool. Whether this is the input layer of the network.
-        """
-        with torch.no_grad():
-            if is_first:
-                limit = 1 / layer.in_features
-            else:
-                limit = np.sqrt(6 / layer.in_features) / self.w0
-            layer.weight.uniform_(-limit, limit)
-            layer.bias.uniform_(-limit, limit)
-
-    def forward(self, input: dict) -> torch.Tensor:
-        """ Forward pass for the SIREN model.
-
-        Parameters
-        ----------
-        input: dict. Dictionary containing input tensors (prof, surf, meta).
-
-        Returns
-        -------
-        torch.Tensor. Concatenated tensor of mean brightness temperatures and standard deviations.
-        """
-        prof = self.flatten(input['prof'])
-        x = self.concat(prof, input['surf'], input['meta'])
-
-        # Path 2: Non-linear Hidden Layers (Residual)
-        for dense, swish, drop in zip(self.hidden_layers, self.sine_layers, self.dropout_layers):
-            x = dense(x)
-            x = swish(x)
-            x = drop(x)
-
-        # Mean output scaling
-        out = self.out_T(x)
-        out = self.bt_output_activation(out)
-        out = out * (self.max_T - self.min_T) + self.min_T
-
-        # Uncertainty output
-        out_std = self.out_std(x)
-        out_std = self.std_output_activation(out_std)
-        if self.std_scale is not None:
-            out_std = self.std_scale(out_std)
-        out_std = out_std + self.std_output_activation_offset
-
-        return torch.cat([out, out_std], dim=1)
+        super().__init__(optimizer=optimizer, scheduler=scheduler, loss=loss, architecture=architecture)
 
     def predict_step(self, batch: dict, batch_nb: int):
-        """ Perform prediction step.
-
-        Parameters
-        ----------
-        batch: dict. Batch containing the 'input' dictionary.
-        batch_nb: int. Index of the batch.
-
-        Returns
-        -------
-        torch.Tensor. Predicted values.
-        """
-        return self(batch['input'])
+        """Perform prediction step."""
+        return self.forward(batch)
 
 
 class ODEFunc(nn.Module):

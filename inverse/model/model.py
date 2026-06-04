@@ -5,7 +5,7 @@ from torch.nn import ModuleList
 from data.statistics import statistics, accumulate_statistics
 from forward.model.model import BaseModel
 from forward.model.activation import Sine
-from inverse.model.encoding import IdentityPositionalEncoding
+from inverse.model.architecture.encoding import IdentityPositionalEncoding
 from utilities.instantiators import instantiate
 from data.transformations import mean_stdev, min_max
 import numpy as np
@@ -1251,8 +1251,8 @@ class PINNverseOperator(BaseModel):
                         self.log(f"{stage}_loss_{key}_{i}_{var}", loss[key][:, i, :].mean(), on_epoch=True,
                                  prog_bar=False, logger=logger_flag)
                 # If pressure-level filtering is involved, log only the relevant levels
-                elif loss[key].ndim == 2 and hasattr(self.loss_func, 'pressure_filter') and self.loss_func.pressure_filter is not None:
-                    n_pressure = torch.cumsum(self.loss_func.pressure_filter.sum(axis=1), dim=0)
+                elif loss[key].ndim == 2 and hasattr(self.loss, 'pressure_filter') and self.loss.pressure_filter is not None:
+                    n_pressure = torch.cumsum(self.loss.pressure_filter.sum(axis=1), dim=0)
                     for i, var in enumerate(self.prof_vars):
                         # Log loss only for the relevant pressure levels
                         start_index, end_index = n_pressure[i-1] if i > 0 else 0, n_pressure[i]
@@ -1472,7 +1472,7 @@ class PINNverseOperatorP2(PINNverseOperator):
         batch['target']['prof_background'] = pred['prof_background_phys'].clone()
 
         # Compute loss function
-        loss, pred['hofx'] = self.loss_func(pred, batch['target'], batch['input'])
+        loss, pred['hofx'] = self.loss(pred, batch['target'], batch['input'])
         detached_loss = {k: v.detach().item() if v.ndim == 0 else v.detach() for k, v in loss.items()}
 
         # Logging
@@ -1482,29 +1482,45 @@ class PINNverseOperatorP2(PINNverseOperator):
 
 
 class PINNverseOperatorP3(PINNverseOperator):
-
-    def __init__(self, optimizer: DictConfig = None, loss_func: DictConfig = None, lr_scheduler: DictConfig = None,
-                 architecture: DictConfig = None, parameters: DictConfig = None, transform: DictConfig = None, stats: DictConfig = None,
-                 sigmoid: bool = False, min_max: bool = True):
-
+    """PINN inverse operator with HydraResidualMLP3 architecture."""
+    def __init__(
+        self,
+        optimizer: DictConfig = None,
+        loss: DictConfig = None,
+        scheduler: DictConfig = None,
+        architecture: DictConfig = None,
+        parameters: DictConfig = None,
+        transform: DictConfig = None,
+        stats: DictConfig = None,
+        sigmoid: bool = False,
+        min_max: bool = True,
+    ):
+        """Initialize PINNverse Operator P3 with HydraResidualMLP3 architecture."""
         # Class inheritance
-        super().__init__(optimizer=optimizer, loss_func=loss_func, lr_scheduler=lr_scheduler,
-                         architecture=architecture, parameters=parameters, transform=transform)
-
-        # Model architecture
-        self.model = HydraResidualMLP3(
-            input_layer=architecture.input_layer,  # Pass DictConfig directly
-            hidden_layer=architecture.hidden_layer,  # Pass DictConfig directly
-            output_layer=architecture.output_layer,  # Pass DictConfig directly
-            positional_encoding=architecture.get('positional_encoding', None),
-            hidden_n_layers=architecture.get('hidden_n_layers', 2),
-            hidden_skip=architecture.get('hidden_skip', False),
-            inject_coords_hidden=architecture.get('inject_coords_hidden', False),
-            inject_coords_output=architecture.get('inject_coords_output', False),
-            output_n_heads=architecture.get('output_n_heads', 1),
-            output_final_layer=architecture.get('output_final_layer', None),
-            output_n_layers=architecture.get('output_n_layers', 1),
+        super().__init__(
+            optimizer=optimizer,
+            loss=loss,
+            scheduler=scheduler,
+            architecture=None,  # We'll build it here
+            parameters=parameters,
+            transform=transform
         )
+
+        # Model architecture - use HydraResidualMLP3
+        if architecture:
+            self.model = HydraResidualMLP3(
+                input_layer=architecture.input_layer,
+                hidden_layer=architecture.hidden_layer,
+                output_layer=architecture.output_layer,
+                positional_encoding=architecture.get('positional_encoding', None),
+                hidden_n_layers=architecture.get('hidden_n_layers', 2),
+                hidden_skip=architecture.get('hidden_skip', False),
+                inject_coords_hidden=architecture.get('inject_coords_hidden', False),
+                inject_coords_output=architecture.get('inject_coords_output', False),
+                output_n_heads=architecture.get('output_n_heads', 1),
+                output_final_layer=architecture.get('output_final_layer', None),
+                output_n_layers=architecture.get('output_n_layers', 1),
+            )
 
         self.metrics['prof_min_max'], self.metrics['prof_target_min_max'], self.metrics['prof_background_min_max'] = {}, {}, {}
         self.metrics['prof_mean_stdev'], self.metrics['prof_target_mean_stdev'], self.metrics['prof_background_mean_stdev'] = {}, {}, {}

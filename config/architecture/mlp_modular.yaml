@@ -1,0 +1,51 @@
+# MLPModular using MLPBlocks as building blocks
+_target_: inverse.model.architecture.mlp.MLPModular
+_recursive_: false
+
+# Positional encoding
+positional_encoding:
+  _target_: inverse.model.architecture.encoding.RescaledPositionalEncoding
+  d_input: 4
+
+# Input layer (single MLPBlock)
+input_layer:
+  _target_: inverse.model.architecture.mlp.MLPBlock
+  in_features: null  # Set by positional encoding output
+  out_features: 128
+  activation:
+    _target_: torch.nn.GELU
+  norm_type: layer
+  dropout_rate: 0.1
+  residual: false
+
+# Hidden layer (MLPBlock - single block with residual wrapper)
+hidden_layer:
+  _target_: inverse.model.architecture.mlp.MLPBlock
+  in_features: 128
+  out_features: 128
+  activation:
+    _target_: torch.nn.GELU
+  norm_type: layer
+  dropout_rate: 0.1
+  residual: false
+
+# Wrap hidden layer with residual connection
+hidden_skip: true
+
+# Single output layer
+output_layer:
+  _target_: inverse.model.architecture.mlp.MLPBlock
+  in_features: 128
+  out_features: 127
+  activation:
+    _target_: torch.nn.Sigmoid
+  norm_type: none
+  dropout_rate: 0.0
+  residual: false
+
+# Skip connections
+output_skip: false
+inject_encoding_hidden: false
+inject_encoding_output: false
+
+

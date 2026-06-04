@@ -1,0 +1,47 @@
+# MLPModular with coordinate injection
+_target_: inverse.model.architecture.mlp.MLPModular
+_recursive_: false
+
+# Positional encoding
+positional_encoding:
+  _target_: inverse.model.architecture.encoding.RescaledPositionalEncoding
+  d_input: 4
+
+# Input layer
+input_layer:
+  _target_: inverse.model.architecture.mlp.MLPBlock
+  in_features: null
+  out_features: 128
+  activation:
+    _target_: torch.nn.GELU
+  norm_type: layer
+  dropout_rate: 0.1
+
+# Hidden layer (MLPBlocks with multiple blocks)
+hidden_layer:
+  _target_: inverse.model.architecture.mlp.MLPBlocks
+  in_features: 128  # Will be adjusted for encoding injection
+  out_features: 128
+  hidden_features: 128
+  n_blocks: 4  # 4 blocks in the hidden layer
+  activation:
+    _target_: torch.nn.GELU
+  norm_type: layer
+  dropout_rate: 0.1
+  residual: true
+
+hidden_skip: false  # MLPBlocks already has internal residuals
+inject_encoding_hidden: true  # Inject encoding at hidden layer input
+
+# Output layer
+output_layer:
+  _target_: inverse.model.architecture.mlp.MLPBlock
+  in_features: 128  # Will be adjusted for encoding injection
+  out_features: 127
+  activation:
+    _target_: torch.nn.Sigmoid
+  dropout_rate: 0.0
+
+output_skip: false
+inject_encoding_output: true  # Inject encoding at output
+

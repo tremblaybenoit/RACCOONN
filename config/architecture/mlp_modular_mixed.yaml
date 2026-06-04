@@ -1,0 +1,51 @@
+# MLPModular mixing different activation types
+_target_: inverse.model.architecture.mlp.MLPModular
+_recursive_: false
+
+# Positional encoding
+positional_encoding:
+  _target_: inverse.model.architecture.encoding.RescaledPositionalEncoding
+  d_input: 4
+
+# Input layer with SIREN activation
+input_layer:
+  _target_: inverse.model.architecture.mlp.MLPBlock
+  in_features: null
+  out_features: 128
+  activation:
+    _target_: inverse.model.architecture.activation.Sine
+    w0: 30.0
+  norm_type: none
+  dropout_rate: 0.1
+  init_func:
+    _target_: inverse.model.model.SirenInit
+
+# Hidden layers - use MLPBlocks to control depth
+hidden_layer:
+  _target_: inverse.model.architecture.mlp.MLPBlocks
+  in_features: 128
+  out_features: 128
+  hidden_features: 256
+  n_blocks: 4  # 4 blocks in the hidden layer
+  activation:
+    _target_: torch.nn.GELU
+  norm_type: layer
+  dropout_rate: 0.1
+  residual: true
+
+hidden_skip: false  # Already has residuals inside MLPBlocks
+
+# Output layer with Tanh activation for bounded output
+output_layer:
+  _target_: inverse.model.architecture.mlp.MLPBlock
+  in_features: 128
+  out_features: 127
+  activation:
+    _target_: torch.nn.Tanh
+  norm_type: none
+  dropout_rate: 0.0
+
+output_skip: true  # Concatenate input features
+inject_encoding_hidden: false
+inject_encoding_output: false
+

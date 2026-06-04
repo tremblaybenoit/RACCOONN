@@ -1,0 +1,27 @@
+# Simple Modular MLP (replacement for hydra_mlp.yaml)
+_target_: inverse.model.architecture.mlp.ModularMLP
+_recursive_: false
+
+# Input/output dimensions
+in_features: 4  # Will be transformed by positional encoding
+out_features: 127  # Output dimension per head
+
+# Positional encoding (optional)
+positional_encoding:
+  _target_: inverse.model.architecture.encoding.RescaledPositionalEncoding
+  d_input: 4
+
+# Backbone configuration
+hidden_features: 128
+n_blocks: 3  # Input + 2 hidden blocks
+activation:
+  _target_: inverse.model.architecture.activation.Sine
+  w0: 30.0
+norm_type: none
+dropout_rate: 0.1
+residual: true
+
+# Single-task prediction
+n_heads: 1
+head_n_blocks: 1
+

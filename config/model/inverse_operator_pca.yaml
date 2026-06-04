@@ -81,7 +81,7 @@ loss_func:
 architecture:
   # Positional encoding
   positional_encoding:
-    _target_: inverse.model.encoding.RescaledPositionalEncoding
+    _target_: inverse.model.architecture.encoding.RescaledPositionalEncoding
     d_input:
       _target_: numpy.sum
       _args_:
@@ -97,7 +97,7 @@ architecture:
     layernorm:
       _target_: torch.nn.Identity
     activation:
-      _target_: forward.model.activation.Sine
+      _target_: inverse.model.architecture.activation.Sine
     dropout_rate: 0.1
     init_func:
       _target_: inverse.model.model.SirenInit

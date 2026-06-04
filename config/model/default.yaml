@@ -1,0 +1,20 @@
+# Forward Model Configuration (refactored to use separate configs)
+_target_: forward.model.model.CRTMModel
+_recursive_: false
+
+# Optimizer - reference external config
+optimizer: ${optimizer}
+
+# Scheduler - reference external config
+scheduler: ${scheduler}
+
+# Loss function - reference external config
+loss: ${loss}
+
+# Architecture - reference external config
+architecture: ${architecture}
+
+# Parameters (for backward compatibility with old model format)
+# These are only used if architecture is built from parameters
+parameters: null
+

@@ -1,0 +1,43 @@
+# Coordinate Injection Architecture Example
+# Injects positional encoding at each layer for improved spatial awareness
+
+_target_: inverse.model.architecture.HydraResidualMLP2
+_recursive_: false
+
+# Positional encoding
+positional_encoding:
+  _target_: inverse.model.architecture.encoding.RescaledPositionalEncoding
+  d_input: 4
+
+# Input layer
+input_layer:
+  in_features: null  # Set by positional encoding
+  out_features: 128
+  activation:
+    _target_: torch.nn.GELU
+  norm_type: layer
+  dropout_rate: 0.1
+
+# Hidden layers with coordinate injection
+hidden_n_layers: 4
+hidden_skip: true
+inject_coords_hidden: true  # Inject encoding at each hidden layer
+hidden_layer:
+  in_features: 128
+  out_features: 128
+  activation:
+    _target_: torch.nn.GELU
+  norm_type: layer
+  dropout_rate: 0.1
+
+# Output with coordinate injection
+inject_coords_output: true  # Inject encoding at output layer
+output_n_heads: 1
+output_n_layers: 2
+output_layer:
+  in_features: 128
+  out_features: 127
+  activation:
+    _target_: torch.nn.Sigmoid
+  dropout_rate: 0.0
+

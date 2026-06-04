@@ -1,0 +1,27 @@
+# Multi-Task Modular MLP
+_target_: inverse.model.architecture.mlp.ModularMLP
+_recursive_: false
+
+# Input/output
+in_features: 4
+out_features: 127  # Per task
+
+# Positional encoding
+positional_encoding:
+  _target_: inverse.model.architecture.encoding.RescaledPositionalEncoding
+  d_input: 4
+
+# Shared backbone
+hidden_features: 256
+n_blocks: 4
+activation:
+  _target_: torch.nn.GELU
+norm_type: layer
+dropout_rate: 0.1
+residual: true
+
+# Multi-head prediction (3 atmospheric variables)
+n_heads: 3
+head_hidden_features: 128
+head_n_blocks: 2
+

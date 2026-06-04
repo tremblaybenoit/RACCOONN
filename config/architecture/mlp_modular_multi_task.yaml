@@ -1,0 +1,54 @@
+# MLPModular with MLPBlocks for multi-layer components and multi-head output
+_target_: inverse.model.architecture.mlp.MLPModular
+_recursive_: false
+
+# Positional encoding
+positional_encoding:
+  _target_: inverse.model.architecture.encoding.RescaledPositionalEncoding
+  d_input: 4
+
+# Input layer (can use MLPBlocks for multi-layer input)
+input_layer:
+  _target_: inverse.model.architecture.mlp.MLPBlocks
+  in_features: null  # Set by encoding
+  out_features: 256
+  hidden_features: 128
+  n_blocks: 2
+  activation:
+    _target_: torch.nn.GELU
+  norm_type: layer
+  dropout_rate: 0.1
+
+# Hidden layer (MLPBlocks controls depth via n_blocks)
+hidden_layer:
+  _target_: inverse.model.architecture.mlp.MLPBlocks
+  in_features: 256
+  out_features: 256
+  hidden_features: 256
+  n_blocks: 5  # 5 blocks in hidden layer
+  activation:
+    _target_: torch.nn.GELU
+  norm_type: layer
+  dropout_rate: 0.1
+  residual: true
+
+# No need for hidden_skip since MLPBlocks has internal residuals
+hidden_skip: false
+
+# Multi-head output using PredictionHeads
+output_layer:
+  _target_: inverse.model.architecture.mlp.PredictionHeads
+  n_heads: 3  # Three prediction heads for multi-task learning
+  in_features: 256
+  out_features: 127  # Output dimension per head
+  hidden_features: 128
+  n_layers: 2
+  activation:
+    _target_: torch.nn.GELU
+  dropout_rate: 0.0
+
+output_skip: false
+inject_encoding_hidden: false
+inject_encoding_output: false
+
+

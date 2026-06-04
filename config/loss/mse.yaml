@@ -1,0 +1,3 @@
+# MSE Loss
+_target_: inverse.model.loss.MSE
+

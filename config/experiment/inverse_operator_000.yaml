@@ -232,7 +232,7 @@ model:
   architecture:
     # Positional encoding
     positional_encoding:
-      _target_: inverse.model.encoding.MultiScaleGaussianEncoding
+      _target_: inverse.model.architecture.encoding.MultiScaleGaussianEncoding
       num_freqs: 20
       d_input:
         _target_: builtins.int
@@ -254,7 +254,7 @@ model:
       layernorm:
         _target_: torch.nn.Identity
       activation:
-        _target_: forward.model.activation.NonLearnableSwish
+        _target_: inverse.model.architecture.activation.NonLearnableSwish
         in_features: ${model.architecture.hidden_layer.in_features}
       dropout_rate: 0.1
       init_func:
@@ -285,7 +285,7 @@ model:
       out_features: 32
       layernorm: ${model.architecture.hidden_layer.layernorm}
       activation: ${model.architecture.hidden_layer.activation}
-        # _target_: forward.model.activation.NonLearnableSwish
+        # _target_: inverse.model.architecture.activation.NonLearnableSwish
         # in_features: ${model.architecture.output_layer.out_features}
       dropout_rate: 0.1
       init_func:

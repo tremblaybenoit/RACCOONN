@@ -1,0 +1,51 @@
+# Multi-Head Inverse Architecture Example
+# Demonstrates using multiple prediction heads for multi-task learning
+
+_target_: inverse.model.architecture.HydraResidualMLP
+_recursive_: false
+
+# Positional encoding
+positional_encoding:
+  _target_: inverse.model.architecture.encoding.RescaledPositionalEncoding
+  d_input: 4  # lat, lon, scans, pressure
+
+# Input layer
+input_layer:
+  in_features: null  # Set by positional encoding
+  out_features: 128
+  activation:
+    _target_: inverse.model.architecture.activation.Sine
+    w0: 30.0
+  norm_type: none
+  dropout_rate: 0.1
+  init_func:
+    _target_: inverse.model.model.SirenInit
+
+# Shared hidden layers (feature extraction)
+hidden_n_layers: 3
+hidden_skip: true  # Residual connections
+hidden_layer:
+  in_features: 128
+  out_features: 128
+  activation:
+    _target_: inverse.model.architecture.activation.Sine
+    w0: 30.0
+  norm_type: none
+  dropout_rate: 0.1
+  init_func:
+    _target_: inverse.model.model.SirenInit
+
+# Multi-head output (3 heads for temperature, humidity, ozone)
+output_skip: false
+output_n_heads: 3  # Three independent heads
+output_n_layers: 2  # Each head has 2 layers
+output_layer:
+  in_features: 128
+  out_features: 127  # Vertical levels
+  activation:
+    _target_: torch.nn.Sigmoid
+  norm_type: none
+  dropout_rate: 0.0
+
+output_final_layer: null
+
