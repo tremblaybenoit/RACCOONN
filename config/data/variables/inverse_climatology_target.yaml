@@ -1,0 +1,130 @@
+# Atmospheric profiles
+prof:
+  # Profile types
+  type: ['Air temperature', 'Cloud ice particle effective radius', 'Cloud water particle effective radius',
+         'Snow particle effective radius', 'Humidity mixing ratio', 'Cloud ice mass', 'Cloud water mass',
+         'Snow mass', 'Ozone mixing ratio']
+  # Loading function
+  load:
+    _target_: data.io.load_npy
+    path: ${....dir}/prof.npy
+    split: ${....split}
+    dtype: ${data.dtype}
+  # Normalization function and parameters
+  normalization:
+    _target_: data.transformations.min_max
+    _partial_: true
+    stats:
+      _target_: data.statistics.read_statistics_var
+      path: ${preparation.statistics.data.output.path}
+      var: 'prof'
+      dtype: ${data.dtype}
+    axis: 1  # null
+# Surface variables
+surf:
+  # Surface variable types
+  type: ['Ice area fraction', 'Land area fraction', 'Land type index', 'Leaf area index', 'Soil temperature',
+         'Surface snow area fraction', 'Surface snow thickness', 'Surface ice temperature',
+         'Surface soil temperature', 'Surface sea temperature', 'Surface snow temperature',
+         'Surface eastward wind component', 'Surface northward wind component',
+         'Vegetation area fraction', 'Fraction of condensed water', 'Water area fraction']
+  # Loading function
+  load:
+    _target_: data.io.load_npy
+    path: ${....dir}/surf.npy
+    split: ${....split}
+    dtype: ${data.dtype}
+  # Normalization function and parameters
+  normalization:
+    _target_: data.transformations.NormalizeSurface
+    surfmax:
+      _target_: numpy.loadtxt
+      _args_:
+        - data/normalization/surfmax.txt
+    surfmin:
+      _target_: numpy.loadtxt
+      _args_:
+        - data/normalization/surfmin.txt
+    dtype: ${data.dtype}
+# Metadata
+meta:
+  # Metadata variable types
+  type: ['Sensor scan angle', 'Sensor zenith angle', 'Sensor view angle', 'Sensor azimuth angle',
+         'Sensor elevation angle', 'Solar azimuth angle', 'Solar zenith angle']
+  # Loading function
+  load:
+    _target_: data.io.load_npy
+    path: ${....dir}/meta.npy
+    split: ${....split}
+    dtype: ${data.dtype}
+  # Normalization function and parameters
+  normalization:
+    _target_: data.transformations.NormalizeMeta
+    settings:
+      meta_cos_vars: [ 6 ]
+      meta_scale_factor: 180
+      meta_scale_offset: -180
+      meta_scale_vars: [ ]
+      meta_sin_vars: [ 0, 1, 2, 3, 4, 5 ]
+# Brightness temperatures
+hofx:
+  # Loading function
+  load:
+    _target_: data.io.load_npy
+    path: ${....dir}/predict_hofx_v3.npy
+    split: ${....split}
+    dtype: ${data.dtype}
+# Cloud filter
+cloud_filter:
+  # Loading function
+  load:
+    _target_: data.io.load_npy
+    path: ${....dir}/cloud_filter.npy
+    split: ${....split}
+    dtype: bool
+# Profile background
+prof_background:
+  # Loading function
+  load:
+    _target_: data.io.load_npy
+    path: ${....dir}/prof_background_from_pertubations.npy
+    split: ${....split}
+    dtype: ${data.dtype}
+  # load:
+  #   _target_: data.covariance.background_from_perturbations
+  #   # What the method needs as input
+  #   input:
+  #     # Cholesky matrix
+  #     cholesky: ${preparation.covariance.B_climatological.output.cholesky}
+  #     prof: ${..prof}
+  # Normalization function and parameters
+  normalization: ${..prof.normalization}
+# Bright temperature RT solution
+hofx_crtm:
+  # Loading function
+  load:
+    _target_: data.io.load_npy
+    path: ${....dir}/hofx.npy
+    split: ${....split}
+    dtype: ${data.dtype}
+# Brightness temperature innovation
+hofx_uncertainty:
+  # Loading function
+  load:
+    _target_: data.covariance.obs_uncertainty
+    data: ${...hofx.load}
+# Bright temperature errors
+hofx_error:
+  # Loading function
+  load:
+    _target_: data.covariance.obs_error
+    data: ${...hofx.load}
+    obs: ${...hofx_crtm.load}
+# Daytime filter
+daytime_filter:
+  # Loading function
+  load:
+    _target_: data.io.load_npy
+    path: ${....dir}/daytime_filter.npy
+    split: ${....split}
+    dtype: bool

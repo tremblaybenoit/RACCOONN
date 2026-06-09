@@ -1,0 +1,250 @@
+# Error covariance matrices
+covariance:
+
+  # Error covariance matrix in model space
+  B:
+    # Function
+    _target_: data.covariance.climatological_matrix
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Variables to consider for the covariance estimation
+      data:
+        load:
+          _target_: data.io.load_stack
+          _recursive_: false
+          stack:
+            - ${data.stage.train.vars.prof}
+            - ${data.stage.valid.vars.prof}
+            - ${data.stage.test.vars.prof}
+        normalization:  ${data.stage.train.vars.prof.normalization}
+      # Pressure filter: Consider only pressure levels with non-zero variance
+      pressure_filter: null  # ${data.pressure_filter}
+    # Univariate or multivariate
+    univariate: false
+    # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
+    scaling_factor: 1.0
+    # Regularization parameter to ensure numerical stability
+    regularization_factor: 1e-3
+    # Plot flag
+    plot_flag: true
+    # Recentering
+    recenter: false
+    # What the method produces as output
+    output:
+      # Covariance matrix
+      matrix:
+        # File path to save/load the covariance matrix
+        path: data/normalization/B_climatological.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preparation.covariance.B.output.matrix.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preparation.covariance.B.output.matrix.path}
+      # Cholesky decomposition of the covariance matrix
+      cholesky:
+        # File path to save/load the Cholesky decomposition of the covariance matrix
+        path: data/normalization/B_climatological_cholesky.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preparation.covariance.B.output.cholesky.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preparation.covariance.B.output.cholesky.path}
+      # Inverse of the covariance matrix
+      inverse:
+        # File path to save/load the inverse of the covariance matrix
+        path: data/normalization/B_climatological_inverse.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preparation.covariance.B.output.inverse.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preparation.covariance.B.output.inverse.path}
+      # Inverse of the covariance matrix
+      pseudo_inverse:
+        # Parameters
+        params:
+          # Condition number threshold for the pseudo-inverse (e.g., to handle near-singular matrices)
+          rcond: 1e-3
+        # File path to save/load the inverse of the covariance matrix
+        path: data/normalization/B_climatological_pseudo_inverse.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preparation.covariance.B.output.pseudo_inverse.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preparation.covariance.B.output.pseudo_inverse.path}
+  # Training set background
+  prof_background_train:
+    # Function
+    _target_: data.covariance.background_from_perturbations
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Cholesky matrix
+      cholesky: ${preparation.covariance.B.output.cholesky}
+      prof: ${data.stage.train.vars.prof}
+      pressure_filter: ${preparation.covariance.B.input.pressure_filter}
+    output:
+      # File path to save/load the background error covariance matrix
+      path: ${data.stage.train.dir}/prof_background_from_perturbations.npy
+      # Save function
+      save:
+        _target_: numpy.save
+        _partial_: true
+        _args_:
+          - ${preparation.covariance.prof_background_train.output.path}
+      # Load function
+      load:
+        _target_: numpy.load
+        _args_:
+          - ${preparation.covariance.prof_background_train.output.path}
+  # Validation set background
+  prof_background_valid:
+    # Function
+    _target_: data.covariance.background_from_perturbations
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Cholesky matrix
+      cholesky: ${preparation.covariance.B.output.cholesky}
+      prof: ${data.stage.valid.vars.prof}
+      pressure_filter: ${preparation.covariance.B.input.pressure_filter}
+    output:
+      # File path to save/load the background error covariance matrix
+      path: ${data.stage.valid.dir}/prof_background_from_perturbations.npy
+      # Save function
+      save:
+        _target_: numpy.save
+        _partial_: true
+        _args_:
+          - ${preparation.covariance.prof_background_valid.output.path}
+      # Load function
+      load:
+        _target_: numpy.load
+        _args_:
+          - ${preparation.covariance.prof_background_valid.output.path}
+  # Test set background (not needed, for completeness)
+  prof_background_test:
+    # Function
+    _target_: data.covariance.background_from_perturbations
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Cholesky matrix
+      cholesky: ${preparation.covariance.B.output.cholesky}
+      prof: ${data.stage.test.vars.prof}
+      pressure_filter: ${preparation.covariance.B.input.pressure_filter}
+    output:
+      # File path to save/load the background error covariance matrix
+      path: ${data.stage.test.dir}/prof_background_from_perturbations.npy
+      # Save function
+      save:
+        _target_: numpy.save
+        _partial_: true
+        _args_:
+          - ${preparation.covariance.prof_background_test.output.path}
+      # Load function
+      load:
+        _target_: numpy.load
+        _args_:
+          - ${preparation.covariance.prof_background_test.output.path}
+
+  # Error covariance matrix in observation space
+  R:
+    # Function
+    _target_: data.covariance.climatological_matrix
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Innovation estimates for the observation variables
+      data:
+        load:
+          _target_: data.io.load_stack_and_normalize
+          _recursive_: false
+          stack:
+            - ${data.stage.train.vars.hofx_error}
+            - ${data.stage.valid.vars.hofx_error}
+            - ${data.stage.test.vars.hofx_error}
+        normalization: null
+    # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
+    scaling_factor: 1.0
+    # Regularization parameter to ensure numerical stability
+    regularization_factor: 0.
+    # Plot flag
+    plot_flag: true
+    # Recentering
+    recenter: true
+    # What the method produces as output
+    output:
+      # Covariance matrix
+      matrix:
+        # File path to save/load the covariance matrix
+        path: data/normalization/R_matrix.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preparation.covariance.R.output.matrix.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preparation.covariance.R.output.matrix.path}
+      # Inverse of the covariance matrix
+      inverse:
+        # File path to save/load the inverse of the covariance matrix
+        path: data/normalization/R_inverse.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preparation.covariance.R.output.inverse.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preparation.covariance.R.output.inverse.path}
+      # Pseudo-inverse of the covariance matrix
+      pseudo_inverse:
+        # Parameters
+        params:
+          # Condition number threshold for the pseudo-inverse (e.g., to handle near-singular matrices)
+          rcond: 1e-3
+        # File path to save/load the pseudo-inverse of the covariance matrix
+        path: data/normalization/R_pseudo_inverse.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preparation.covariance.R.output.pseudo_inverse.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preparation.covariance.R.output.pseudo_inverse.path}

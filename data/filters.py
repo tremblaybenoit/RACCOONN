@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def clearsky_filter(prof: Union[np.ndarray, torch.Tensor], split: Union[np.ndarray, torch.tensor] = None) \
+def clearsky_filter(prof: Union[np.ndarray, torch.Tensor], split: Union[np.ndarray, torch.Tensor] = None) \
         -> Union[np.ndarray, torch.Tensor]:
     """ Filter out profiles with clear skies.
 
@@ -39,7 +39,7 @@ def clearsky_filter(prof: Union[np.ndarray, torch.Tensor], split: Union[np.ndarr
     return clrsky
 
 
-def cloud_filter(prof: Union[np.ndarray, torch.Tensor], split: Union[np.ndarray, torch.tensor] = None) \
+def cloud_filter(prof: Union[np.ndarray, torch.Tensor], split: Union[np.ndarray, torch.Tensor] = None) \
         -> Union[np.ndarray, torch.Tensor]:
     """ Filter out profiles with clear skies.
 

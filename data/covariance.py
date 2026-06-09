@@ -1,165 +1,34 @@
 import numpy as np
+from scipy.linalg import block_diag
 import hydra
 from omegaconf import DictConfig
-from data.io import load_var_and_normalize
-from data.statistics import reduction_shape, batch_statistics
+from data.io import load_var, load_var_and_normalize
 from utilities.instantiators import instantiate
 from utilities.logic import get_config_path
 from utilities.plot import plot_map, save_plot, flexible_gridspec
 import os
 import logging
-import torch
-
 
 # Initialize logger
 logger = logging.getLogger(__name__)
 
 
-def verify_torch_numpy_flattening(n_samples, n_vars, n_levels):
-    """
-    Verifies that NumPy and PyTorch flattening (reshape vs view)
-    produce identical vector indices for the same multi-dimensional coordinate.
-    """
-    # 1. Create a coordinate-coded array
-    # Logic: (Var * 1000) + Level. e.g., Var 2, Level 45 -> 2045.0
-    arr_np = np.zeros((n_samples, n_vars, n_levels), dtype=np.float32)
-    for v in range(n_vars):
-        for l in range(n_levels):
-            arr_np[:, v, l] = (v * 1000) + l
-
-    # 2. NumPy Flattening (as done in your covariance script)
-    flat_np = arr_np.reshape(n_samples, -1)
-
-    # 3. PyTorch Flattening (as done in your VarLoss / QuadraticForm)
-    arr_pt = torch.from_numpy(arr_np)
-    flat_pt = arr_pt.view(n_samples, -1)
-
-    # 4. Comparative Checks
-    # Check 1: Do the libraries agree with each other?
-    mismatch_count = np.sum(flat_np != flat_pt.numpy())
-
-    # Check 2: Verify specific semantic indices
-    # Let's check Var 1, Level 0. In row-major, this should be at index [n_levels]
-    test_v, test_l = 1, 0
-    expected_val = (test_v * 1000) + test_l
-    actual_idx = test_v * n_levels + test_l
-
-    val_at_idx_np = flat_np[0, actual_idx]
-    val_at_idx_pt = flat_pt[0, actual_idx].item()
-
-    print(f"--- Flattening Consistency Check ---")
-    print(f"Total Mismatches (NP vs PT): {mismatch_count}")
-    print(f"Value at index {actual_idx}:")
-    print(f"  Expected: {expected_val}")
-    print(f"  NumPy:    {val_at_idx_np}")
-    print(f"  PyTorch:  {val_at_idx_pt}")
-
-    if mismatch_count == 0 and val_at_idx_np == expected_val:
-        print("SUCCESS: Flattening is consistent and Row-Major (C-style).")
-    else:
-        print("FAILURE: Mismatch in flattening logic!")
-
-
-def prepare_stable_cholesky(err_data: np.ndarray, ridge_factor: float=1e-6, max_cond: float=1e6) -> np.ndarray:
-    """ Prepare a stable Cholesky factor from error data.
-
-        Parameters
-        ----------
-        err_data: np.ndarray. Error data of shape (n_samples, n_variables...).
-        ridge_factor: float. Factor to scale the ridge added to the diagonal.
-        max_cond: float. Maximum allowed condition number (max eigenvalue / min eigenvalue).
-
-        Returns
-        -------
-        np.ndarray. Lower Cholesky factor L such that B = L @ L.T.
-    """
-
-    # 1. Force everything to float64 immediately for math stability
-    target_dtype = err_data.dtype
-    flat_err = err_data.reshape(err_data.shape[0], -1).astype(np.float64)
-
-    # B will be float64
-    B = np.cov(flat_err, rowvar=False)
-
-    # 2. Add Ridge (Explicitly float64)
-    ridge_val = np.mean(np.diag(B)) * ridge_factor
-    B += np.eye(B.shape[0], dtype=np.float64) * ridge_val
-
-    # 3. Eigen-Value Capping
-    # This is the most sensitive part; float64 is mandatory here
-    vals, vecs = np.linalg.eigh(B)
-    min_val = np.max(vals) / max_cond
-    vals_stable = np.maximum(vals, min_val)
-
-    # Reconstruct B_stable
-    bm_stable = vecs @ np.diag(vals_stable) @ vecs.T
-
-    # 4. Compute Cholesky Factor L
-    lm = np.linalg.cholesky(bm_stable)
-
-    # 5. Return to the original dtype (e.g., float32) for the NN
-    return lm.astype(target_dtype)
-
-
-def verify_cholesky_reconstruction(B_stable: np.ndarray, L: np.ndarray) -> np.ndarray:
-    """
-    Verifies that the Cholesky factor accurately reconstructs the covariance matrix.
-
-    Parameters
-    ----------
-    B_stable: np.ndarray. The stable covariance matrix.
-    L: np.ndarray. The lower Cholesky factor such that B = L @ L.T.
-
-    Returns
-    -------
-    np.ndarray. Absolute differences between B_stable and reconstructed B.
-    """
-    # 1. Reconstruct: B_reconstructed = L @ L.T
-    B_rec = L @ L.T
-
-    # 2. Compute Residuals
-    abs_diff = np.abs(B_stable - B_rec)
-    max_err = np.max(abs_diff)
-    mean_err = np.mean(abs_diff)
-
-    # 3. Check Condition Numbers (The 'Health' of the matrix)
-    # Higher condition numbers = more numerical instability
-    cond_B = np.linalg.cond(B_stable)
-    cond_L = np.linalg.cond(L)
-
-    print("--- Cholesky Sanity Check ---")
-    print(f"Max Absolute Reconstruction Error: {max_err:.2e}")
-    print(f"Mean Absolute Reconstruction Error: {mean_err:.2e}")
-    print(f"Condition Number of B: {cond_B:.2e}")
-    print(f"Condition Number of L: {cond_L:.2e} (Should be ~sqrt of B)")
-
-    # Threshold for float32 safety
-    if max_err > 1e-4:
-        print("⚠️ WARNING: Significant reconstruction error. Check your dtypes.")
-    if cond_B > 1e10:
-        print("⚠️ WARNING: B is extremely ill-conditioned. NN training may be unstable.")
-    else:
-        print("✅ SUCCESS: Matrix is stable and reconstruction is accurate.")
-
-    return abs_diff
-
-
-def innovation_error(data: np.ndarray, ref: np.ndarray) -> np.ndarray:
-    """ Return uncertainy estimation of the radiance data.
+def obs_error(data: np.ndarray, obs: np.ndarray) -> np.ndarray:
+    """ Return innovation of the radiance data.
 
         Parameters
         ----------
         data: np.ndarray. Radiances of shape (n_samples, n_channels).
+        obs:
 
         Returns
         -------
-        np.ndarray. Spatiotemporal standard deviation of the dataset.
+        np.ndarray. Solution.
     """
-    return data[:, :10]-ref[:, :10]
+    return data[:, :10]-obs[:, :10]
 
 
-
-def innovation_uncertainty(data: np.ndarray) -> np.ndarray:
+def obs_uncertainty(data: np.ndarray) -> np.ndarray:
     """ Return uncertainy estimation of the radiance data.
 
         Parameters
@@ -175,30 +44,7 @@ def innovation_uncertainty(data: np.ndarray) -> np.ndarray:
     return data[:, 10:]
 
 
-def background_climatology(data: np.ndarray, axis: int=0, keepdims: bool=True) \
-        -> np.ndarray:
-    """ Compute spatiotemporal mean of a given dataset.
-
-        Parameters
-        ----------
-        data: np.ndarray. Input profiles of shape (n_samples, n_profiles, n_levels).
-        axis: int or tuple of int. Axis or axes along which the means are computed.
-        keepdims: bool. If True, the reduced axes are left in the result as dimensions with size one.
-
-        Returns
-        -------
-        np.ndarray. Spatiotemporal mean of the dataset.
-    """
-
-    # Compute mean
-    data_mean = batch_statistics(data, which=['mean'], axis=axis)['mean']
-    # Apply keepdims if necessary
-    if keepdims and data_mean.ndim < data.ndim:
-        data_mean = np.expand_dims(data_mean, axis=axis)
-    return data_mean
-
-
-def background_increment(config_true: DictConfig, config_background: DictConfig) -> np.ndarray:
+def increment(config_true: DictConfig, config_background: DictConfig) -> np.ndarray:
     """ Compute error between ground truth and background.
 
         Parameters
@@ -226,30 +72,175 @@ def background_increment(config_true: DictConfig, config_background: DictConfig)
     return np.subtract(x_true, x_background, out=x_true)
 
 
-def save_cholesky_factor(err_data, inflation=1.0, ridge=1e-6):
+def background_from_perturbations(input: DictConfig, output: DictConfig) -> np.ndarray | None:
+    """ Compute the background from the model error covariance matrix and perturbations.
+
+        Parameters
+        ----------
+        input: DictConfig. Main hydra configuration file containing all model hyperparameters.
+        output: DictConfig. Output configuration.
+
+        Returns
+        -------
+        None.
     """
-    Computes and saves the Lower Cholesky factor L.
-    B = L @ L.T
+
+    # Load Cholesky matrix
+    cov_cholesky = load_var(input.cholesky)
+    # Load samples
+    x_t = load_var_and_normalize(input.prof)
+    x_dims = x_t.shape
+    x_t = x_t.reshape(x_dims[0], -1)
+
+    # Compute random perturbations from a normal distribution
+    logger.info(f"Generating independent random perturbations for {x_dims[0]} samples...")
+    p = np.random.normal(0, 1, size=(cov_cholesky.shape[1], x_dims[0]))
+    dx = (cov_cholesky @ p).T
+
+    # Pressure filter
+    if hasattr(input, 'pressure_filter') and input.pressure_filter is not None:
+        logger.info("Applying pressure filter...")
+        # Load filter
+        pressure_filter = instantiate(input.pressure_filter.load)
+        if x_dims[1] != pressure_filter.shape[0]:
+            pressure_filter = np.take(pressure_filter, [0, 4, 8], axis=0)
+        # Compute background by applying perturbations to samples
+        logger.info("Apply perturbations...")
+        x_t[:, np.flatnonzero(pressure_filter)] += dx
+    else:
+        # Compute background by applying perturbations to samples
+        logger.info("Apply perturbations...")
+        x_t += dx
+
+    # Reshape
+    x_t = x_t.reshape(x_dims)
+
+    # Unnormalize the data prior to saving
+    if hasattr(input.prof, 'normalization'):
+        norm_func = instantiate(input.prof.normalization, inverse_transform=True)
+        x_t = norm_func(x_t)
+
+    # Save to file
+    if output is not None and hasattr(output, 'save'):
+        logger.info(f"Saving background to {output.path}...")
+        save_func = instantiate(output.save)
+        save_func(x_t)
+        return None
+    else:
+        return x_t
+
+
+def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor: float = 1.0, regularization_factor: float = 1.0,
+                          plot_flag: bool=True, recenter: bool=False, univariate: bool = False) -> None:
+    """ Compute climatological covariance matrix of a given dataset.
+
+        Parameters
+        ----------
+        input: DictConfig. Main hydra configuration file containing all model hyperparameters.
+        output: DictConfig. Output configuration.
+        plot_flag: bool. If True, plot the covariance matrix.
+        recenter: bool. If True, recenter by removing the mean.
+
+        Returns
+        -------
+        None.
     """
-    # 1. Compute Standard Covariance
-    flat_err = err_data.reshape(err_data.shape[0], -1)
-    cov = np.cov(flat_err, rowvar=False) * inflation
 
-    # 2. Add Ridge (Tikhonov Regularization)
-    # This ensures the matrix is strictly Positive Definite
-    cov = cov + np.eye(cov.shape[1]) * ridge
+    # Begin by loading the data and normalizing it
+    logger.info("Loading data...")
+    data = load_var_and_normalize(input.data)
+    n_samples, n_vars = data.shape[0], data.shape[1]
 
-    # 3. Compute Lower Cholesky
-    try:
-        L = np.linalg.cholesky(cov)
-        logger.info("Successfully computed Cholesky factor L.")
-    except np.linalg.LinAlgError:
-        # If it fails, the ridge was too small or data is constant
-        eigvals = np.linalg.eigvalsh(cov)
-        logger.error(f"Matrix not PD. Min eigenvalue: {np.min(eigvals)}")
-        raise
+    # Apply recentering
+    if recenter:
+        logger.info("Recentering data around the mean...")
+        # Compute spatiotemporal mean
+        mu = np.mean(data, axis=0)
+        # Compute anomalies (thruth - climatological mean)
+        data -= mu
 
-    return L.astype(np.float32)
+    # Pressure filter (background only)
+    if hasattr(input, 'pressure_filter') and input.pressure_filter is not None:
+        # Load filter
+        pressure_filter = instantiate(input.pressure_filter.load)
+        if n_vars != pressure_filter.shape[0]:
+            pressure_filter = np.take(pressure_filter, [0, 4, 8], axis=0)
+    else:
+        pressure_filter = None
+
+    # Univariate matrix computation steps
+    if univariate:
+        # Check dimensions
+        if data.ndim <=2:
+            raise ValueError("Univariate covariance matrix computation requires data with more than 2 dimensions.")
+        # Initialize empty matrix
+        m = []
+        # Loop over varialbes
+        for i in range(n_vars):
+            # Compute sub-matrix
+            data_i = data[:, i]
+            # Apply pressure filter
+            if pressure_filter is not None:
+                logger.info(f"Applying pressure filter for variable {i}...")
+                # Remove constant pressure levels from the data
+                data_i = np.take(data_i, np.flatnonzero(pressure_filter[i]), axis=1)
+            # Store diagonal block
+            logger.info(f"Computing univariate covariance matrix for variable {i}...")
+            m.append(scaling_factor*(data_i.T @ data_i)/(n_samples-1))
+        # Assemble
+        del data_i
+        cov = {'matrix': block_diag(*m)}
+    # Multivariate matrix computation steps
+    else:
+        # Flatten data
+        data = data.reshape(n_samples, -1)
+        # Apply pressure filter
+        if pressure_filter is not None:
+            logger.info("Applying pressure filter...")
+            # Remove constant pressure levels from the data
+            data = np.take(data, np.flatnonzero(pressure_filter), axis=1)
+        # Compute matrix
+        logger.info("Computing covariance matrix...")
+        cov = {'matrix': scaling_factor*(data.T @ data)/(n_samples-1)}
+    # Release memory
+    del data
+
+    # Apply regularization
+    if regularization_factor > 0:
+        logger.info("Applying regularization factor...")
+        cov['matrix'] += regularization_factor * np.mean(np.diag(cov['matrix'])) * np.eye(cov['matrix'].shape[0])
+    # Compute Cholesky decomposition
+    if hasattr(output, 'cholesky'):
+        logger.info("Computing Cholesky decomposition...")
+        cov['cholesky'] = np.linalg.cholesky(cov['matrix'])
+    # Compute matrix inverse
+    if hasattr(output, 'inverse'):
+        logger.info("Computing the inverse of the covariance matrix...")
+        cov['inverse'] = np.linalg.inv(cov['matrix'])
+    # Compute matrix pseudo-inverse
+    if hasattr(output, 'pseudo_inverse'):
+        logger.info("Computing the pseudo-inverse of the covariance matrix...")
+        rcond = output.pseudo_inverse.get('params.rcond', 1.e-3)
+        cov['pseudo_inverse'] = np.linalg.pinv(cov['matrix'], rcond=rcond)
+
+    # Loop over keys
+    for key in list(cov.keys()):
+        # Save to file
+        if hasattr(output, key):
+            if hasattr(output[key], 'save'):
+               logger.info(f"Saving {key} matrix...")
+               save_func = instantiate(output[key].save)
+               save_func(cov[key])
+            # Plot covariance matrix if requested
+            if plot_flag and key in ['matrix', 'inverse', 'pseudo_inverse']:
+                logger.info(f"Plotting {key} matrix...")
+                fig, get_axes = flexible_gridspec(cell_widths=[4.0], cell_heights=[4.0],
+                                                  lefts=[1.00], rights=[1.00], bottoms=[1.00], tops=[1.00])
+                ax = get_axes(0, 0)
+                plot_map(ax, cov[key], title=f"Covariance matrix: {key}", plt_origin='upper', cb_label=r'Values')
+                save_plot(fig, filename=os.path.splitext(output[key].path)[0] + '.png')
+
+    return
 
 
 def covariance_matrix(input: DictConfig, output: DictConfig, plot_flag: bool=True, recenter: bool=False,

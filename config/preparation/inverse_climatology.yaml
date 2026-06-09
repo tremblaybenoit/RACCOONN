@@ -1,0 +1,5 @@
+# Configuration to load multiple preparation methods
+defaults:
+  - statistics
+  - covariance_climatology
+  - _self_
