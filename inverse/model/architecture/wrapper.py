@@ -1,7 +1,3 @@
-"""
-Wrapper modules for building complex architectures.
-Adapted from 3DClouds repository for RACCOONN.
-"""
 import torch
 import torch.nn as nn
 from typing import Union
@@ -13,7 +9,7 @@ class Residual(nn.Module):
     def __init__(
         self,
         module: Union[nn.Module, nn.ModuleList],
-        projection: nn.Module = None,
+        projection: nn.Module | None = None,
     ) -> None:
         """
         Initialize Residual block.
@@ -57,7 +53,7 @@ class Concatenate(nn.Module):
     def __init__(
         self,
         module: Union[nn.Module, nn.ModuleList],
-        projection: nn.Module = None,
+        projection: nn.Module | None = None,
         dim: int = -1,
     ) -> None:
         """
@@ -79,7 +75,7 @@ class Concatenate(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
-        skip: torch.Tensor = None,
+        skip: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Forward pass: cat([projection(skip or x), module(x)], dim).

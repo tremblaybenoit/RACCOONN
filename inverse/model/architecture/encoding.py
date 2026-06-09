@@ -4,7 +4,7 @@ import torch.nn as nn
 
 class IdentityPositionalEncoding(nn.Module):
     """ Identity Positional Encoding. This is a simple positional encoding that does not change the input."""
-    def __init__(self, d_input: int):
+    def __init__(self, d_input: int) -> None:
         """ Initialize Identity Positional Encoding.
 
         Parameters
@@ -50,7 +50,12 @@ class RescaledPositionalEncoding(IdentityPositionalEncoding):
 
 class GaussianPositionalEncoding(nn.Module):
     """ Gaussian Positional Encoding. Credit: Robert Jarolim, Momchil Molnar."""
-    def __init__(self, num_freqs: int, d_input: int, sigma: float = 1.0):
+    def __init__(
+            self,
+            num_freqs: int,
+            d_input: int,
+            sigma: float = 1.0
+    ) -> None:
         """ Initialize Gaussian Positional Encoding.
 
         Parameters
@@ -101,7 +106,12 @@ class MultiScaleGaussianEncoding(nn.Module):
     Scales frequency bandwidth per dimension to match physical scales.
     """
 
-    def __init__(self, num_freqs: int, d_input: int, sigma_per_dim: list = None):
+    def __init__(
+            self,
+            num_freqs: int,
+            d_input: int,
+            sigma_per_dim: list | None = None
+    ) -> None:
         """ Initialize Multi-Scale Gaussian Positional Encoding.
 
         Parameters
@@ -121,17 +131,16 @@ class MultiScaleGaussianEncoding(nn.Module):
         # Set default sigmas if not provided
         if sigma_per_dim is None:
             sigma_per_dim = [1.0] * d_input
-
         sigmas = torch.tensor(sigma_per_dim, dtype=torch.float32)
 
         # 1. Identify which dimensions want encoding (sigma > 0)
         self.register_buffer("encoding_mask", sigmas > 0)
-        self.d_encoded = self.encoding_mask.sum().item()
+        self.d_encoded = int(self.encoding_mask.sum().item())
 
         # 2. Only generate frequencies for those specific dimensions
         if self.d_encoded > 0:
             # Filter sigmas to only active dimensions: (1, d_encoded)
-            active_sigmas = sigmas[self.encoding_mask].unsqueeze(0)
+            active_sigmas = sigmas[self.encoding_mask.bool()].unsqueeze(0)
 
             # (num_freqs, d_encoded)
             base_freqs = torch.randn(num_freqs, self.d_encoded)
@@ -144,7 +153,10 @@ class MultiScaleGaussianEncoding(nn.Module):
         # Output = [All original dims] + [2 * num_freqs * active dims]
         self.d_output = d_input + (self.num_freqs * 2 * self.d_encoded)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(
+            self,
+            x: torch.Tensor
+    ) -> torch.Tensor:
         """ Forward pass through the Multi-Scale Gaussian Positional Encoding.
 
         Parameters
@@ -161,7 +173,7 @@ class MultiScaleGaussianEncoding(nn.Module):
 
         if self.frequencies is not None:
             # Select only the columns of x that need encoding
-            x_to_encode = x[:, self.encoding_mask]  # (B, d_encoded)
+            x_to_encode = x[:, self.encoding_mask.bool()]  # (B, d_encoded)
 
             # Project: (B, 1, d_encoded) * (num_freqs, d_encoded) -> (B, num_freqs, d_encoded)
             # Broadcasting works automatically here if we unsqueeze correctly

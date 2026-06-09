@@ -113,7 +113,7 @@ class SuperLearnableSwish(nn.Module):
 
 class NonLearnableSwish(nn.Module):
 
-    def __init__(self, in_features, b: float = 1.0):
+    def __init__(self, b: float = 1.0):
         super().__init__()
         # Initializing with 1.0 (SiLU)
         self.b = b

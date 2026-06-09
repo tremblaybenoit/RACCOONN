@@ -1,5 +1,6 @@
 # Example MLPModular configuration demonstrating output_layer options
 # This is a reference file showing different ways to configure the output layer
+# and weight initialization strategies.
 
 _target_: inverse.model.architecture.mlp.MLPModular
 _recursive_: false
@@ -10,6 +11,7 @@ positional_encoding:
   d_input: 4
 
 # Input layer
+# By default, uses auto-selected initialization based on activation function
 input_layer:
   _target_: inverse.model.architecture.mlp.MLPBlock
   in_features: null  # Set by positional encoding
@@ -18,8 +20,13 @@ input_layer:
     _target_: torch.nn.GELU
   norm_type: layer
   dropout_rate: 0.1
+  init_func: null  # Set to null for auto-detection (xavier for GELU)
+  # Or explicitly set to override:
+  # init_func:
+  #   _target_: inverse.model.architecture.mlp.init_weights_he
 
 # Hidden layer
+# All initialization in MLPBlocks is done per-block using auto-detection
 hidden_layer:
   _target_: inverse.model.architecture.mlp.MLPBlocks
   in_features: 128
@@ -31,6 +38,7 @@ hidden_layer:
   norm_type: layer
   dropout_rate: 0.1
   residual: true
+  init_func: null  # Set to null for auto-detection (xavier for GELU)
 
 # ============================================================
 # OUTPUT LAYER OPTIONS - Choose ONE of the following:
@@ -84,11 +92,41 @@ output_layer:
 #   final_activation:
 #     _target_: torch.nn.Sigmoid
 #   dropout_rate: 0.0
+#   init_func: null
+
+
+# ============================================================
+# WEIGHT INITIALIZATION EXAMPLES
+# ============================================================
+# Weight initialization can be:
+# 1. AUTO-DETECTED based on activation function (init_func: null, default):
+#    - Sine/LearnableSine: Uniform initialization
+#    - ReLU/Leaky ReLU/Swish: He initialization
+#    - GELU/Tanh/Sigmoid/Scale/Snake: Xavier initialization
+#
+# 2. EXPLICITLY SPECIFIED in init_func parameter:
+#    - init_weights_default: Xavier uniform
+#    - init_weights_xavier: Xavier with gain
+#    - init_weights_he: He initialization
+#    - init_weights_siren_first: SIREN first layer
+#    - init_weights_siren_hidden: SIREN hidden layer
+#    - init_weights_uniform: Custom uniform
+
+# Example: Override auto-detection with custom init
+# input_layer:
+#   _target_: inverse.model.architecture.mlp.MLPBlock
+#   in_features: null
+#   out_features: 128
+#   activation:
+#     _target_: torch.nn.GELU
+#   norm_type: layer
+#   dropout_rate: 0.1
+#   init_func:
+#     _target_: inverse.model.architecture.mlp.init_weights_he
 
 # Skip connections
 hidden_skip: false  # MLPBlocks already has internal residuals
 output_skip: false
 inject_encoding_hidden: false
 inject_encoding_output: false
-
 

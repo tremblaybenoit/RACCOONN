@@ -1,4 +1,4 @@
-# MLPModular mixing different activation types
+# MLPModular mixing different activation types and initialization strategies
 _target_: inverse.model.architecture.mlp.MLPModular
 _recursive_: false
 
@@ -8,6 +8,7 @@ positional_encoding:
   d_input: 4
 
 # Input layer with SIREN activation
+# Note: Automatically uses uniform initialization based on activation
 input_layer:
   _target_: inverse.model.architecture.mlp.MLPBlock
   in_features: null
@@ -17,10 +18,10 @@ input_layer:
     w0: 30.0
   norm_type: none
   dropout_rate: 0.1
-  init_func:
-    _target_: inverse.model.model.SirenInit
+  init_func: null  # Set to null for auto-detection (uniform for Sine)
 
 # Hidden layers - use MLPBlocks to control depth
+# MLPBlocks automatically uses xavier initialization (for GELU)
 hidden_layer:
   _target_: inverse.model.architecture.mlp.MLPBlocks
   in_features: 128
@@ -32,10 +33,11 @@ hidden_layer:
   norm_type: layer
   dropout_rate: 0.1
   residual: true
-
+  init_func: null  # Set to null for auto-detection (xavier for GELU)
 hidden_skip: false  # Already has residuals inside MLPBlocks
 
 # Output layer with Tanh activation for bounded output
+# Automatically uses xavier initialization based on activation
 output_layer:
   _target_: inverse.model.architecture.mlp.MLPBlock
   in_features: 128
@@ -44,8 +46,8 @@ output_layer:
     _target_: torch.nn.Tanh
   norm_type: none
   dropout_rate: 0.0
+  init_func: null  # Set to null for auto-detection (xavier for Tanh)
 
 output_skip: true  # Concatenate input features
 inject_encoding_hidden: false
 inject_encoding_output: false
-

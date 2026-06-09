@@ -4,7 +4,11 @@ from utilities.instantiators import instantiate
 
 
 class CRTMForward:
-    def __init__(self, checkpoint_path, config_path):
+    def __init__(
+            self,
+            checkpoint_path: str,
+            config_path: str
+    ) -> None:
         """ Initialize CRTM forward model.
 
         Parameters
@@ -31,7 +35,12 @@ class CRTMForward:
         # Set the model to evaluation mode
         self.model.eval()
 
-    def to(self, device, dtype=None, non_blocking=False):
+    def to(
+            self,
+            device,
+            dtype: torch.dtype | None = None,
+            non_blocking: bool = False
+    ) -> 'CRTMForward':
         """ Move the model to the specified device.
 
         Parameters
@@ -47,7 +56,10 @@ class CRTMForward:
         self.model.to(device, dtype=dtype, non_blocking=non_blocking)
         return self
 
-    def __call__(self, x):
+    def __call__(
+            self,
+            x: torch.Tensor
+    ) -> torch.Tensor:
         """ Call the forward model.
 
         Parameters
