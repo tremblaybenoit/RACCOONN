@@ -265,6 +265,55 @@ class QuadraticForm(torch.nn.Module):
         return quadratic_form(pred.view(pred.shape[0], -1), target.view(pred.shape[0], -1),
                               self.matrix)
 
+class DynamicQuadraticForm(torch.nn.Module):
+    """ Dynamically compute inverse of R from the inverse of the correlation matrix and the target standard deviation. """
+
+    def __init__(self, matrix: np.ndarray):
+        """ Initialize the QuadraticForm module.
+
+        Parameters
+        ----------
+        matrix: np.ndarray. Correlation matrix inverse to compute the quadratic form with.
+
+        Returns
+        -------
+        None.
+        """
+        super().__init__()
+        self.matrix = torch.from_numpy(matrix)
+
+    def to(self, device):
+        """ Move the module to a specified device.
+
+        Parameters
+        ----------
+        device: torch.device. Device to move the module to.
+        """
+        super().to(device)
+        self.matrix = self.matrix.to(device)
+
+        return self
+
+    def __call__(self, pred: torch.Tensor, target: torch.Tensor, diag: torch.Tensor) -> torch.Tensor:
+        """ Compute Quadratic form, but first update R dynamically
+
+        Parameters
+        ----------
+        pred: torch.Tensor. Predicted tensor. Shape: (n_samples, n_channels)
+        target: torch.Tensor. True values. Shape: (n_samples, n_channels)
+        diag: torch.Tensor. Diagonal elements of the matrix to compute the quadratic form with. Shape: (n_samples, n_channels)
+
+        Returns
+        -------
+        torch.Tensor. Quadratic form of the difference between predicted and target tensors.
+        """
+
+        # Flatten inputs to (n_samples, n_channels)
+        p = pred.view(pred.shape[0], -1)
+        t = target.view(target.shape[0], -1)
+        d = diag.view(diag.shape[0], -1)
+        return quadratic_form(p / d, t / d, self.matrix)
+
 
 def diagonal_quadratic_form(pred: torch.Tensor, target: torch.Tensor, diag: torch.Tensor) -> torch.Tensor:
     """ Compute the diagonal quadratic form of the difference between predicted and target tensors.
@@ -799,7 +848,7 @@ class VarLossP(VarLoss):
         loss = {}
 
         # Observation loss: Some observation losses may require additional inputs
-        if isinstance(self.loss_obs, DiagonalQuadraticForm):
+        if isinstance(self.loss_obs, (DiagonalQuadraticForm, DynamicQuadraticForm)):
             loss['obs'] = self.loss_obs(hofx_pred[:, :10], target['hofx'][:, :10],
                                         target['hofx'][:, 10:])
         elif isinstance(self.loss_obs, CRPS):
@@ -812,7 +861,7 @@ class VarLossP(VarLoss):
 
         # Model losses: Some model losses may require additional inputs
         if self.loss_model is not None:
-            if isinstance(self.loss_model, DiagonalQuadraticForm):
+            if isinstance(self.loss_model, (DiagonalQuadraticForm, DynamicQuadraticForm)):
                 if self.pressure_filter is not None:
                     loss['model'] = self.loss_model(pred['prof'][:, pressure_filter],
                                                     target['prof_background'][:, pressure_filter],
@@ -848,7 +897,7 @@ class VarLossP(VarLoss):
 
 class VarLossR(VarLoss):
 
-    def __call__(self, pred: dict, target: dict, input: dict=None) -> tuple[dict, torch.Tensor]:
+    def __call__(self, pred: dict, target: dict, input: dict | None =None) -> tuple[dict, torch.Tensor]:
         """ Compute the combined loss between predicted profiles and target data.
 
         Parameters
@@ -890,7 +939,7 @@ class VarLossR(VarLoss):
         loss = {}
 
         # Observation loss: Some observation losses may require additional inputs
-        if isinstance(self.loss_obs, DiagonalQuadraticForm):
+        if isinstance(self.loss_obs, (DiagonalQuadraticForm, DynamicQuadraticForm)):
             loss['obs'] = self.loss_obs(hofx_pred[:, :10], target['hofx'][:, :10],
                                         target['hofx'][:, 10:])
         elif isinstance(self.loss_obs, CRPS):
@@ -903,7 +952,7 @@ class VarLossR(VarLoss):
 
         # Model losses: Some model losses may require additional inputs
         if self.loss_model is not None:
-            if isinstance(self.loss_model, DiagonalQuadraticForm):
+            if isinstance(self.loss_model, (DiagonalQuadraticForm, DynamicQuadraticForm)):
                 if self.pressure_filter is not None:
                     loss['model'] = self.loss_model(pred['prof'][:, pressure_filter],
                                                     target['prof_background'][:, pressure_filter],
@@ -998,7 +1047,7 @@ class VarLossPCA(torch.nn.Module):
 
         # Model losses: Some model losses may require additional inputs
         if self.loss_model is not None:
-            if isinstance(self.loss_model, (DiagonalQuadraticForm, DiagonalQuadraticHuberForm)):
+            if isinstance(self.loss_model, (DiagonalQuadraticForm, DynamicQuadraticForm)):
                 loss['model'] = self.loss_model(pred['prof_white'],
                                                 target['prof_white_background'],
                                                 target['prof_white_increment'])
@@ -1434,7 +1483,7 @@ class VarLossHybridPCA3(torch.nn.Module):
         loss = {}
 
         # Observation loss: Some observation losses may require additional inputs
-        if isinstance(self.loss_obs, DiagonalQuadraticForm):
+        if isinstance(self.loss_obs, (DiagonalQuadraticForm, DiagonalQuadraticHuberForm)):
             if self.forward_channels is not None:
                 loss['obs'] = self.loss_obs(hofx_pred[:, self.forward_channels], target['hofx'][:, self.forward_channels],
                                             target['hofx'][:, 10:])

@@ -6,7 +6,7 @@ defaults:
   - override /paths: default
   - override /hydra: default
   - override /data: inverse_climatology
-  - override /preparation: inverse_climatology
+  - override /preparation: inverse_default
   - override /loader: inverse_static
   - override /model: inverse_operator
   - override /trainer: cpu
@@ -22,13 +22,13 @@ task_name: "inverse_operator_climatology"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "000"
-  data_dir: ../static_clearskies_${data.dtype}
+  run_id: "001"
+  data_dir: ../static_clearsky_${data.dtype}
 
 # Trainer configuration
 trainer:
   min_epochs: 1  # To prevent early stopping
-  max_epochs: 196  # Number of epochs
+  max_epochs: 2  # Number of epochs
   precision: 32  # 32-bit precision
 
 # Initialization
@@ -53,6 +53,8 @@ preparation:
 data:
   # Precision
   dtype: 'float32'
+  # Pressure filter
+  pressure_filter: null
   # Split ratios for training, validation, and test sets
   stage:
     # Training set
@@ -87,7 +89,7 @@ data:
         # Atmospheric profiles
         prof_background:
           load:
-            path: ${....dir}/prof_background.npy
+            seed: 75
           normalization: ${data.stage.train.vars.prof.normalization}
     # Validation set
     valid:
@@ -113,7 +115,7 @@ data:
         # Atmospheric profiles
         prof_background:
           load:
-            path: ${....dir}/prof_background.npy
+            seed: 48
           normalization: ${data.stage.train.vars.prof.normalization}
     # Test set
     test:
@@ -145,7 +147,7 @@ data:
         # Atmospheric profiles
         prof_background:
           load:
-            path: ${....dir}/prof_background.npy
+            seed: 15
           normalization: ${data.stage.train.vars.prof.normalization}
 
 # Loader configuration
@@ -214,14 +216,15 @@ model:
     clear_sky: false
     # Loss term for observations
     loss_obs:
-      _target_: inverse.model.loss.MSE  # DiagonalQuadraticForm
+      # _target_: inverse.model.loss.MSE
+      # _target_: DiagonalQuadraticForm
+      _target_: inverse.model.loss.DynamicQuadraticForm
+      matrix: ${preparation.covariance.R.output.matrix_inverse.load}
     # Loss term for model variables
     loss_model:
-      _target_: inverse.model.loss.MSE #QuadraticForm
-      # matrix:
-      #   _target_: data.pca.load_pca_buffers
-      #   path: ../static_clearskies_float32/normalization/pca_clouds_univariate_000.pkl
-      #   buffer: 'B_inv'
+      _target_: inverse.model.loss.MSE
+      # _target_: QuadraticForm
+      # matrix: ${preparation.covariance.B.output.matrix_pseudo_inverse.load}
     # Loss term for boundary conditions
     loss_bcs:
       _target_: inverse.model.loss.MSE

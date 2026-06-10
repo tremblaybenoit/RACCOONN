@@ -19,7 +19,7 @@ covariance:
             - ${data.stage.test.vars.prof}
         normalization:  ${data.stage.train.vars.prof.normalization}
       # Pressure filter: Consider only pressure levels with non-zero variance
-      pressure_filter: null  # ${data.pressure_filter}
+      pressure_filter: null
     # Univariate or multivariate
     univariate: false
     # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)

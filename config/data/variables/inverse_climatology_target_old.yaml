@@ -86,14 +86,18 @@ cloud_filter:
 prof_background:
   # Loading function
   load:
-    _target_: data.covariance.background_from_perturbations
-    _recursive_: false  # Do not instantiate nested objects
-    # What the method needs as input
-    input:
-      # Cholesky matrix
-      cholesky: ${preparation.covariance.B.output.cholesky}
-      prof: ${....prof}
-      pressure_filter: ${data.pressure_filter}
+    _target_: data.io.load_npy
+    path: ${....dir}/prof_background_from_pertubations.npy
+    split: ${....split}
+    dtype: ${data.dtype}
+  # load:
+  #   _target_: data.covariance.background_from_perturbations
+  #   # What the method needs as input
+  #   input:
+  #     # Cholesky matrix
+  #     cholesky: ${preparation.covariance.B_climatological.output.cholesky}
+  #     prof: ${..prof}
+  # Normalization function and parameters
   normalization: ${..prof.normalization}
 # Bright temperature RT solution
 hofx_crtm:
@@ -116,7 +120,7 @@ hofx_error:
     _target_: data.covariance.obs_error
     data: ${...hofx.load}
     obs: ${...hofx_crtm.load}
-# Daytime
+# Daytime filter
 daytime_filter:
   # Loading function
   load:
