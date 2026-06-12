@@ -28,7 +28,7 @@ paths:
 # Trainer configuration
 trainer:
   min_epochs: 1  # To prevent early stopping
-  max_epochs: 2  # Number of epochs
+  max_epochs: 196  # Number of epochs
   precision: 32  # 32-bit precision
 
 # Initialization
@@ -217,13 +217,13 @@ model:
     # Loss term for observations
     loss_obs:
       # _target_: inverse.model.loss.MSE
-      # _target_: DiagonalQuadraticForm
+      # _target_: inverse.model.loss.DiagonalQuadraticForm
       _target_: inverse.model.loss.DynamicQuadraticForm
       matrix: ${preparation.covariance.R.output.matrix_inverse.load}
     # Loss term for model variables
     loss_model:
       _target_: inverse.model.loss.MSE
-      # _target_: QuadraticForm
+      # _target_: inverse.model.loss.QuadraticForm
       # matrix: ${preparation.covariance.B.output.matrix_pseudo_inverse.load}
     # Loss term for boundary conditions
     loss_bcs:

@@ -22,7 +22,7 @@ task_name: "inverse_operator_climatology"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "004"
+  run_id: "018"
   data_dir: ../static_clearsky_${data.dtype}
 
 # Trainer configuration
@@ -32,7 +32,7 @@ trainer:
   precision: 32  # 32-bit precision
 
 # Initialization
-# init_from_checkpoint: ../inverse_outputs/inverse_operator_static_clearsky2/checkpoints/phys_0012f/model.ckpt
+# init_from_checkpoint: ../inverse_outputs/inverse_operator_climatology/checkpoints/008/model.ckpt
 
 # Callbacks
 callbacks:
@@ -207,7 +207,7 @@ model:
       #     dtype: ${data.dtype}
       #   axis: 1
     # Weights for observation (obs), model, and boundary condition (bcs) errors
-    lambda_obs: 0.001
+    lambda_obs: 0.
     lambda_model: 1.
     lambda_bcs: 0.
     lambda_sobolev: 0. #1.e-5
@@ -217,9 +217,9 @@ model:
     # Loss term for observations
     loss_obs:
       # _target_: inverse.model.loss.MSE
-      # _target_: inverse.model.loss.DiagonalQuadraticForm
-      _target_: inverse.model.loss.DynamicQuadraticForm
-      matrix: ${preparation.covariance.R.output.matrix_inverse.load}
+      _target_: inverse.model.loss.DiagonalQuadraticForm
+      # _target_: inverse.model.loss.DynamicQuadraticForm
+      # matrix: ${preparation.covariance.R.output.matrix_inverse.load}
     # Loss term for model variables
     loss_model:
       # _target_: inverse.model.loss.MSE

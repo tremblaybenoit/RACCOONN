@@ -315,6 +315,59 @@ class DynamicQuadraticForm(torch.nn.Module):
         return quadratic_form(p / d, t / d, self.matrix)
 
 
+class NoisyDynamicQuadraticForm(torch.nn.Module):
+    """ Dynamically compute inverse of R from the inverse of the correlation matrix and the target standard deviation. """
+
+    def __init__(self, matrix: np.ndarray):
+        """ Initialize the QuadraticForm module.
+
+        Parameters
+        ----------
+        matrix: np.ndarray. Correlation matrix inverse to compute the quadratic form with.
+
+        Returns
+        -------
+        None.
+        """
+        super().__init__()
+        self.matrix = torch.from_numpy(matrix)
+        self.register_buffer("instrument_noise",
+                             torch.from_numpy(np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.3])))
+
+    def to(self, device):
+        """ Move the module to a specified device.
+
+        Parameters
+        ----------
+        device: torch.device. Device to move the module to.
+        """
+        super().to(device)
+        self.matrix = self.matrix.to(device)
+
+        return self
+
+    def __call__(self, pred: torch.Tensor, target: torch.Tensor, diag: torch.Tensor) -> torch.Tensor:
+        """ Compute Quadratic form, but first update R dynamically
+
+        Parameters
+        ----------
+        pred: torch.Tensor. Predicted tensor. Shape: (n_samples, n_channels)
+        target: torch.Tensor. True values. Shape: (n_samples, n_channels)
+        diag: torch.Tensor. Diagonal elements of the matrix to compute the quadratic form with. Shape: (n_samples, n_channels)
+
+        Returns
+        -------
+        torch.Tensor. Quadratic form of the difference between predicted and target tensors.
+        """
+
+        # Flatten inputs to (n_samples, n_channels)
+        p = pred.view(pred.shape[0], -1)
+        t = target.view(target.shape[0], -1)
+        d = torch.sqrt(diag.view(diag.shape[0], -1)**2 + self.instrument_noise**2)
+        return quadratic_form(p / d, t / d, self.matrix)
+
+
+
 def diagonal_quadratic_form(pred: torch.Tensor, target: torch.Tensor, diag: torch.Tensor) -> torch.Tensor:
     """ Compute the diagonal quadratic form of the difference between predicted and target tensors.
 
@@ -373,7 +426,52 @@ class DiagonalQuadraticForm(torch.nn.Module):
         -------
         torch.Tensor. Diagonal quadratic form of the difference between predicted and target tensors.
         """
+
         return diagonal_quadratic_form(pred, target, diag)
+
+
+class NoisyDiagonalQuadraticForm(torch.nn.Module):
+    """ Diagonal quadratic form loss module."""
+    def __init__(self):
+        """ Initialize the DiagonalQuadraticForm module.
+
+        Parameters
+        ----------
+        None.
+
+        Returns
+        -------
+        None.
+        """
+        super().__init__()
+        self.register_buffer("instrument_noise",
+                             torch.from_numpy(np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.3])))
+
+    def to(self, device):
+        """ Move the module to a specified device.
+
+        Parameters
+        ----------
+        device: torch.device. Device to move the module to.
+        """
+        super().to(device)
+        return self
+
+    def __call__(self, pred: torch.Tensor, target: torch.Tensor, diag: torch.Tensor) -> torch.Tensor:
+        """ Compute the diagonal quadratic form of the difference between predicted and target tensors.
+
+        Parameters
+        ----------
+        pred: torch.Tensor. Predicted tensor.
+        target: torch.Tensor. True values.
+        diag: torch.Tensor. Diagonal elements of the matrix to compute the quadratic form with.
+
+        Returns
+        -------
+        torch.Tensor. Diagonal quadratic form of the difference between predicted and target tensors.
+        """
+
+        return diagonal_quadratic_form(pred, target, torch.sqrt(diag**2+self.instrument_noise**2))
 
 
 def kl_divergence_normal(mu_pred, sigma_pred, mu_target, sigma_target):
@@ -848,7 +946,8 @@ class VarLossP(VarLoss):
         loss = {}
 
         # Observation loss: Some observation losses may require additional inputs
-        if isinstance(self.loss_obs, (DiagonalQuadraticForm, DynamicQuadraticForm)):
+        if isinstance(self.loss_obs, (DiagonalQuadraticForm, DynamicQuadraticForm,
+                                      NoisyDiagonalQuadraticForm, NoisyDynamicQuadraticForm)):
             loss['obs'] = self.loss_obs(hofx_pred[:, :10], target['hofx'][:, :10],
                                         target['hofx'][:, 10:])
         elif isinstance(self.loss_obs, CRPS):
@@ -858,6 +957,7 @@ class VarLossP(VarLoss):
                                         target['hofx'][:, :10])
         # Total
         loss['total'] = self.lambda_obs * loss['obs'].mean()
+        loss['obs_mse'] = mse(hofx_pred[:, :10], target['hofx'][:, :10])
 
         # Model losses: Some model losses may require additional inputs
         if self.loss_model is not None:
@@ -877,9 +977,11 @@ class VarLossP(VarLoss):
                 else:
                     loss['model'] = self.loss_model(pred['prof'+self.key_model],
                                                     pred['prof_background'+self.key_model])
+
             # Total
             loss['total'] += self.lambda_model * loss['model'].mean()
-            loss['model_phys'] = self.loss_model(pred['prof'], target['prof'])
+            loss['model_target'] = self.loss_model(pred['prof'+self.key_model], pred['prof_target'+self.key_model])
+            loss['model_mse'] = mse(pred['prof' + self.key_model], pred['prof_target' + self.key_model])
 
         # Sobolev regularization loss
         if self.lambda_sobolev > 0.0:
@@ -939,7 +1041,8 @@ class VarLossR(VarLoss):
         loss = {}
 
         # Observation loss: Some observation losses may require additional inputs
-        if isinstance(self.loss_obs, (DiagonalQuadraticForm, DynamicQuadraticForm)):
+        if isinstance(self.loss_obs, (DiagonalQuadraticForm, DynamicQuadraticForm,
+                                      NoisyDiagonalQuadraticForm, NoisyDynamicQuadraticForm)):
             loss['obs'] = self.loss_obs(hofx_pred[:, :10], target['hofx'][:, :10],
                                         target['hofx'][:, 10:])
         elif isinstance(self.loss_obs, CRPS):
@@ -949,6 +1052,7 @@ class VarLossR(VarLoss):
                                         target['hofx'][:, :10])
         # Total
         loss['total'] = self.lambda_obs * loss['obs'].mean()
+        loss['obs_mse'] = mse(hofx_pred[:, :10], target['hofx'][:, :10])
 
         # Model losses: Some model losses may require additional inputs
         if self.loss_model is not None:
@@ -970,7 +1074,9 @@ class VarLossR(VarLoss):
                                                     pred['prof_target'+self.key_model])
             # Total
             loss['total'] += self.lambda_model * loss['model'].mean()
-            loss['model_phys'] = self.loss_model(pred['prof'], target['prof'])
+            loss['model_target'] = self.loss_model(pred['prof'+self.key_model],
+                                                   pred['prof_target'+self.key_model])
+            loss['model_mse'] = mse(pred['prof' + self.key_model], pred['prof_target' + self.key_model])
 
         # Sobolev regularization loss
         if self.lambda_sobolev > 0.0:

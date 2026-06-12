@@ -22,7 +22,7 @@ task_name: "inverse_operator_climatology"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "004"
+  run_id: "008"
   data_dir: ../static_clearsky_${data.dtype}
 
 # Trainer configuration
@@ -217,9 +217,9 @@ model:
     # Loss term for observations
     loss_obs:
       # _target_: inverse.model.loss.MSE
-      # _target_: inverse.model.loss.DiagonalQuadraticForm
-      _target_: inverse.model.loss.DynamicQuadraticForm
-      matrix: ${preparation.covariance.R.output.matrix_inverse.load}
+      _target_: inverse.model.loss.DiagonalQuadraticForm
+      # _target_: inverse.model.loss.DynamicQuadraticForm
+      # matrix: ${preparation.covariance.R.output.matrix_inverse.load}
     # Loss term for model variables
     loss_model:
       # _target_: inverse.model.loss.MSE

@@ -217,19 +217,19 @@ model:
     # Loss term for observations
     loss_obs:
       # _target_: inverse.model.loss.MSE
-      # _target_: DiagonalQuadraticForm
-      _target_: DynamicQuadraticForm
+      # _target_: inverse.model.loss.DiagonalQuadraticForm
+      _target_: inverse.model.loss.DynamicQuadraticForm
       matrix: ${preparation.covariance.R.output.matrix_inverse.load}
     # Loss term for model variables
     loss_model:
       # _target_: inverse.model.loss.MSE
-      _target_: QuadraticForm
+      _target_: inverse.model.loss.QuadraticForm
       matrix: ${preparation.covariance.B.output.matrix_pseudo_inverse.load}
     # Loss term for boundary conditions
     loss_bcs:
       _target_: inverse.model.loss.MSE
     # Pressure filter: Consider only pressure levels with non-zero variance (for model and bcs errors)
-    pressure_filter: ${data.pressure_filter.load}
+    pressure_filter: null
   # Architecture components
   architecture:
     # Positional encoding

@@ -1242,9 +1242,9 @@ class PINNverseOperator(BaseModel):
         if 'total' in loss:
             self.log(f"{stage}_loss", loss['total'], on_epoch=True, prog_bar=stage == 'valid', logger=logger_flag)
         # Log profile and boundary condition losses
-        for key in ['model', 'bcs', 'model_phys']:
+        for key in ['model', 'bcs', 'model_target', 'model_mse']:
             if key in loss:
-                self.log(f"{stage}_loss_{key}", loss[key].mean(), on_epoch=True, prog_bar=stage == 'valid' and key == 'model', logger=logger_flag)
+                self.log(f"{stage}_loss_{key}", loss[key].mean(), on_epoch=True, prog_bar=stage == 'valid' and key in ['model', 'model_mse'], logger=logger_flag)
                 # Detailed logging per profile and variable
                 if loss[key].ndim == 3:
                     for i, var in enumerate(self.prof_vars):
@@ -1265,6 +1265,12 @@ class PINNverseOperator(BaseModel):
             if loss['obs'].ndim == 2:
                 for i in range(loss['obs'].shape[1]):
                     self.log(f"{stage}_loss_obs_{i}", loss['obs'][:, i].mean(), on_epoch=True, prog_bar=False,
+                             logger=logger_flag)
+        if 'obs_mse' in loss:
+            self.log(f"{stage}_loss_obs_mse", loss['obs_mse'].mean(), on_epoch=True, prog_bar=False, logger=logger_flag)
+            if loss['obs_mse'].ndim == 2:
+                for i in range(loss['obs_mse'].shape[1]):
+                    self.log(f"{stage}_loss_obs_mse_{i}", loss['obs_mse'][:, i].mean(), on_epoch=True, prog_bar=False,
                              logger=logger_flag)
 
         # Log Sobolev loss

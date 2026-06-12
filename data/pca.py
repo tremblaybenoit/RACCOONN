@@ -14,7 +14,7 @@ from utilities.plot import plot_map, save_plot, flexible_gridspec
 logger = logging.getLogger(__name__)
 
 
-def load_pca_buffers(path: str, buffer: str=None) -> dict:
+def load_pca_buffers(path: str, buffer: str | None =None) -> dict:
     """ Load PCA buffers from a given file.
 
     Parameters
