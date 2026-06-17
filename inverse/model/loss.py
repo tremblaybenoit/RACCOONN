@@ -980,8 +980,8 @@ class VarLossP(VarLoss):
 
             # Total
             loss['total'] += self.lambda_model * loss['model'].mean()
-            loss['model_target'] = self.loss_model(pred['prof'+self.key_model], pred['prof_target'+self.key_model])
-            loss['model_mse'] = mse(pred['prof' + self.key_model], pred['prof_target' + self.key_model])
+            # loss['model_target'] = self.loss_model(pred['prof'+self.key_model], pred['prof_target'+self.key_model])
+            loss['model_mse'] = mse(pred['prof_mean_stdev'], pred['prof_target_mean_stdev'])
 
         # Sobolev regularization loss
         if self.lambda_sobolev > 0.0:
@@ -1076,7 +1076,7 @@ class VarLossR(VarLoss):
             loss['total'] += self.lambda_model * loss['model'].mean()
             loss['model_target'] = self.loss_model(pred['prof'+self.key_model],
                                                    pred['prof_target'+self.key_model])
-            loss['model_mse'] = mse(pred['prof' + self.key_model], pred['prof_target' + self.key_model])
+            loss['model_mse'] = mse(pred['prof_mean_stdev'], pred['prof_target_mean_stdev'])
 
         # Sobolev regularization loss
         if self.lambda_sobolev > 0.0:

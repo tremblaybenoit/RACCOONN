@@ -37,6 +37,67 @@ class KaimingInit(nn.Module):
             nn.init.zeros_(module.bias)
 
 
+class CVTZeroInit:
+    """
+    Weight initializer tailored for CVT (Control Variable Transformation) networks.
+    Forces the final output head to generate absolute zeros at Step 0 (ensuring x = x_b),
+    while maintaining optimal signal propagation through the hidden layers.
+    """
+
+    def __init__(self, is_first_layer: bool = False, is_head: bool = False):
+        """
+        Initialize CVTZeroInit.
+
+        Parameters
+        ----------
+        is_first_layer: bool. Flag indicating if the module is the first layer.
+        is_head: bool. Flag indicating if the module is the final CVT output head.
+        """
+        self.is_first_layer = is_first_layer
+        self.is_head = is_head
+
+    def __call__(self, module):
+        """
+        CVT weights initialization function.
+        """
+        if not hasattr(module, 'weight') or module.weight is None:
+            return
+
+        with torch.no_grad():
+            dim_in = module.weight.size(1)
+
+            if self.is_head:
+                # --- Crucial for CVT ---
+                # Hard-zero out the final layer weights. Regardless of what the trunk
+                # passes forward, multiplying by 0 guarantees chi = 0 at initialization.
+                nn.init.zeros_(module.weight)
+
+            elif self.is_first_layer:
+                # The "SIREN-lite" trick: Keep a wider uniform distribution for the
+                # input layer to prevent a flat-start across the Swish/SiLU activations.
+                scale = 1.0 / dim_in
+                nn.init.uniform_(module.weight, -scale, scale)
+
+            else:
+                # For hidden layers, maintain the variance scaling with a Swish gain
+                # of sqrt(2) so backprop flows easily through the deep network trunk.
+                gain = np.sqrt(2.0)
+                std = gain / np.sqrt(float(dim_in))
+                nn.init.normal_(module.weight, mean=0, std=std)
+
+            # --- Bias Initialization ---
+            if hasattr(module, 'bias') and module.bias is not None:
+                if self.is_head:
+                    # --- Crucial for CVT ---
+                    # The output bias must be completely zeroed out. Any non-zero bias
+                    # here would create a systematic offset from your background profile.
+                    nn.init.zeros_(module.bias)
+                else:
+                    # Small uniform noise in hidden biases breaks spatial symmetry,
+                    # preventing hidden neurons from updating identically.
+                    nn.init.uniform_(module.bias, -0.05, 0.05)
+
+
 class SwishInit:
     """
     Improved Swish weights initializer for Coordinate-based PINNs.
@@ -1293,7 +1354,7 @@ class PINNverseOperatorP(PINNverseOperator):
         self.min_max = min_max
         self.stats = instantiate(stats) if stats is not None else None
         self.sigmoid = sigmoid
-        self.sigmoid_stats = {'min': (self.stats['min'] - self.stats['mean']) / self.stats['stdev'], 'max': (self.stats['max'] - self.stats['mean'])/ self.stats['stdev']}
+        # self.sigmoid_stats = {'min': (self.stats['min'] - self.stats['mean']) / self.stats['stdev'], 'max': (self.stats['max'] - self.stats['mean'])/ self.stats['stdev']}
 
     def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
         """ Perform training/validation/test step.
@@ -1598,6 +1659,81 @@ class PINNverseOperatorP3(PINNverseOperator):
 
         return loss['total']
 
+
+class PINNverseOperatorControl(PINNverseOperatorP):
+    def __init__(self, cholesky: DictConfig, optimizer: DictConfig | None = None, loss_func: DictConfig | None = None,
+                 lr_scheduler: DictConfig | None = None, architecture: DictConfig | None = None,
+                 parameters: DictConfig | None = None, transform: DictConfig | None = None) -> None:
+        """ Initialize model.
+
+        Parameters
+        ----------
+
+        optimizer: Callable. Optimizer for the model.
+        loss_func: Callable. Loss function for the model.
+        lr_scheduler: Callable. Learning rate scheduler for the model.
+        architecture: DictConfig. Configuration for the model architecture.
+        parameters: DictConfig. Configuration for the model parameters.
+
+        Returns
+        -------
+        None.
+        """
+
+        # Class inheritance
+        super().__init__(optimizer=optimizer, lr_scheduler=lr_scheduler, loss_func=loss_func,
+                         architecture=architecture, parameters=parameters, transform=transform)
+
+        # Add metrics
+        self.metrics['prof_control'], self.metrics['prof_target_control'], self.metrics[
+            'prof_background_control'] = {}, {}, {}
+
+        # Cholesky matrix
+        self.register_buffer('L', torch.tensor(instantiate(cholesky)))
+
+    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
+        """ Perform training/validation/test step.
+
+            Parameters
+            ----------
+            batch: tensor. Batch from the training set.
+            batch_nb: int. Index of the batch out of the training set.
+            stage: str. Current operation: "train", "valid", or "test".
+
+            Returns
+            -------
+            Loss value: tensor.
+        """
+
+        # Compute profiles:
+        # (1) In Control space
+        pred = {'prof_control': self.forward(batch['input']).contiguous()}
+        pred['prof_background_control'] = 0.*pred['prof_control']
+        # (2) In standardized space
+        pred['prof_background_mean_stdev'] = batch['target']['prof_background'].clone()
+        pred['prof_mean_stdev'] = torch.matmul(pred['prof_control'].clone().view(-1, self.n_prof*self.n_levels), self.L.T)
+        pred['prof_mean_stdev'] = pred['prof_mean_stdev'].view(-1, self.n_prof, self.n_levels)
+        pred['prof_mean_stdev'] += pred['prof_background_mean_stdev']
+        pred['prof_target_mean_stdev'] = batch['target']['prof'].clone()
+        # (3) In physical space
+        pred['prof_phys'] = self.transform(pred['prof_mean_stdev'].clone())
+        pred['prof_background_phys'] = self.transform(pred['prof_background_mean_stdev'].clone())
+        pred['prof_target_phys'] = self.transform(pred['prof_target_mean_stdev'].clone())
+
+        # Register physical for plotting
+        pred['prof'] = pred['prof_phys'].clone()
+        batch['target']['prof'] = pred['prof_target_phys'].clone()
+        batch['target']['prof_background'] = pred['prof_background_phys'].clone()
+
+        # Compute loss function
+        loss, pred['hofx'] = self.loss_func(pred, batch['target'], batch['input'])
+        detached_loss = {k: v.detach().item() if v.ndim == 0 else v.detach() for k, v in loss.items()}
+
+        # Logging
+        self._logging(stage, detached_loss, batch['input'], batch['target'],
+                      {k: v.detach() for k, v in pred.items()})
+
+        return loss['total']
 
 
 class PINNverseOperatorLanczos(PINNverseOperator):

@@ -71,7 +71,7 @@ class FigureLogger(ForwardFigureLogger):
                     prof_mean.insert(0, to_numpy(model.metrics['prof_background'+key]['mean']))
                     prof_stdev.insert(0, to_numpy(model.metrics['prof_background' + key]['stdev']))
                     prof_rmse.insert(0, to_numpy(model.metrics['prof_background'+key]['rmse']))
-                    prof_mean_labels.insert(0, 'Target-Background')
+                    prof_mean_labels.insert(0, 'Background')
                     prof_mean_colors.insert(0, '#2ca02c')
                     prof_rmse_labels.insert(0, 'Target-Background')
                     prof_rmse_colors.insert(0, '#2ca02c')
