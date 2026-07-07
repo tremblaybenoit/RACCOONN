@@ -9,13 +9,19 @@ stage:
   train:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # HOFX (Simulated Observations)
-      hofx: &train
+      # Surface variables
+      surf: &train
         # Dataset class
         _target_: forward.model.data_loader.TorchDataset
         _recursive_: false
-        # Path to the HOFX (simulated observations) file
-        path: ${....dir}/hofx.npy
+        # Path to the surface variables file
+        path: ${....dir}/surf.npy
+        # Surface variable types
+        type: ['Ice area fraction', 'Land area fraction', 'Land type index', 'Leaf area index', 'Soil temperature',
+               'Surface snow area fraction', 'Surface snow thickness', 'Surface ice temperature',
+               'Surface soil temperature', 'Surface sea temperature', 'Surface snow temperature',
+               'Surface eastward wind component', 'Surface northward wind component',
+               'Vegetation area fraction', 'Fraction of condensed water', 'Water area fraction']
         # Loading function
         load:
           _target_: data.io.load_npy
@@ -24,35 +30,38 @@ stage:
           dtype: ${data.dtype}
         # Transformations to apply
         transformations:
-          # Per-variable normalization
+          # Surface normalization
           normalization:
-            _target_: data.transformations.min_max
-            _partial_: true
-            stats:
-              _target_: data.statistics.read_statistics_var
-              path: ${preparation.statistics.data.output.path}
-              var: 'hofx'
-              dtype: ${data.dtype}
+            _target_: data.transformations.NormalizeSurface
+            surfmax:
+              _target_: numpy.loadtxt
+              _args_:
+                - ${oc.env:RACCOONN_ROOT}/data/normalization/surfmax.txt  # Using environment variable for portability
+            surfmin:
+              _target_: numpy.loadtxt
+              _args_:
+                - ${oc.env:RACCOONN_ROOT}/data/normalization/surfmin.txt
+            dtype: ${data.dtype}
   # Validation set
   valid:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # HOFX (Simulated Observations)
-      hofx:
+      # Surface variables
+      surf:
         <<: *train
   # Test set
   test:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # HOFX (Simulated Observations)
-      hofx:
-          <<: *train
+      # Surface variables
+      surf:
+        <<: *train
     # Results-specific configuration for the test stage
     results:
-      # HOFX (Simulated Observations)
-      hofx:
-        # Path to the HOFX results file
-        path: ${paths.run_dir}/test_hofx.npy
+      # Surface variables
+      surf:
+        # Path to the surface variables results file
+        path: ${paths.run_dir}/test_surf.npy
         # Save function
         save:
           _target_: numpy.save
@@ -66,16 +75,13 @@ stage:
   # Predict set
   predict:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # HOFX (Simulated Observations)
-      hofx:
-        <<: *train
+    variables: ${...test.variables}
     # Results-specific configuration for the predict stage
     results:
-      # HOFX (Simulated Observations)
-      hofx:
-        # Path to the HOFX results file
-        path: ${paths.run_dir}/predict_hofx.npy
+      # Surface variables
+      surf:
+        # Path to the surface variables results file
+        path: ${paths.run_dir}/predict_surf.npy
         # Save function
         save:
           _target_: numpy.save
@@ -90,16 +96,18 @@ stage:
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # HOFX (Simulated Observations)
-      hofx:
+      # Surface variables
+      surf:
+        # Surface variable types
+        type: ${data.stage.train.variables.surf.type}
         # Loading function
         load:
           _target_: numpy.concatenate
           _args_:
-            - - ${data.stage.train.variables.hofx.load}
-              - ${data.stage.valid.variables.hofx.load}
-              - ${data.stage.test.variables.hofx.load}
+            - - ${data.stage.train.variables.surf.load}
+              - ${data.stage.valid.variables.surf.load}
+              - ${data.stage.test.variables.surf.load}
             - 0
         # Transformations to apply
-        transformations: ${data.stage.train.variables.hofx.transformations}
+        transformations: ${data.stage.train.variables.surf.transformations}
 

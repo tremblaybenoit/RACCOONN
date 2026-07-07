@@ -16,13 +16,15 @@ stage:
         _recursive_: false
         # Path to the scans data file
         path: ${....dir}/scans.txt
+        # Type of scans
+        type: 'Time'
         # Loading function
         load:
           _target_: data.io.load_scans
           path: ${..path}
           lat:
-            _target_: ${data.stage.train.variables.lat.load._target_}
-            path: ${data.stage.train.variables.lat.load.path}
+            _target_: ${....lat.load._target_}
+            path: ${....lat.load.path}
           split: ${....split}
           dtype: ${data.dtype}
         # Transformations to apply
@@ -49,52 +51,17 @@ stage:
     variables:
       # Scans
       scans:
-          <<: *train
-    # Results-specific configuration for the test stage
-    results:
-      # Scans
-      scans:
-        # Path to the scans results file
-        path: ${paths.run_dir}/test_scans.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${..path}
-        load:
-          _target_: data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
-  # Predict set
-  predict:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Scans
-      scans:
         <<: *train
-    # Results-specific configuration for the predict stage
-    results:
-      # Scans
-      scans:
-        # Path to the scans results file
-        path: ${paths.run_dir}/predict_scans.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${..path}
-        load:
-          _target_: data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
+  # Predict set
+  predict: ${..test}
   # Source data (complete dataset)
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Scans
       scans:
+        # Type of scans
+        type: ${data.stage.train.variables.scans.type}
         # Loading function
         load:
           _target_: numpy.concatenate

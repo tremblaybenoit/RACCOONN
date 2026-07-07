@@ -9,52 +9,51 @@ stage:
   train:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Cloud filter
-      cloud_filter: &train
+      # Daytime mask
+      daytime_mask: &train
         # Dataset class
         _target_: forward.model.data_loader.TorchDataset
         _recursive_: false
-        # Loading function (cloud filter is computed, not loaded directly)
+        # Type of data
+        type: 'Daytime mask'
+        # Loading function (daytime filter is computed, not loaded directly)
         load:
-          _target_: data.filters.cloud_filter
+          _target_: data.filters.daytime_mask
           _args_:
-            - ${data.stage.train.variables.meta.load}
+            - ${....meta.load}
         # Transformations to apply
         transformations: null
   # Validation set
   valid:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Cloud filter
-      cloud_filter:
+      # Daytime mask
+      daytime_mask:
         <<: *train
   # Test set
   test:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Cloud filter
-      cloud_filter:
-          <<: *train
-  # Predict set
-  predict:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Cloud filter
-      cloud_filter:
+      # Daytime mask
+      daytime_mask:
         <<: *train
+  # Predict set
+  predict: ${..test}
   # Source data (complete dataset)
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Cloud filter
-      cloud_filter:
+      # Daytime mask
+      daytime_mask:
+        # Type of data
+        type: ${data.stage.train.variables.daytime_mask.type}
         # Loading function
         load:
           _target_: numpy.concatenate
           _args_:
-            - - ${data.stage.train.variables.cloud_filter.load}
-              - ${data.stage.valid.variables.cloud_filter.load}
-              - ${data.stage.test.variables.cloud_filter.load}
+            - - ${data.stage.train.variables.daytime_mask.load}
+              - ${data.stage.valid.variables.daytime_mask.load}
+              - ${data.stage.test.variables.daytime_mask.load}
             - 0
         # Transformations to apply
         transformations: null

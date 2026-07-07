@@ -20,6 +20,8 @@ class NormalizeProfiles:
         -------
         None.
         """
+
+        # Class inheritance
         super().__init__()
 
         # Load min and max profiles
@@ -414,66 +416,6 @@ def mean_stdev(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_trans
         return affine(data, acc_stdev, acc_mean, inverse_transform=not inverse_transform)
 
 
-def mean_stdev_to_mean_stdev(data: Union[np.ndarray, torch.Tensor], stats1: Dict, stats2: Dict, inverse_transform: bool = False, axis1: int=None,
-                             axis2: int=None) -> Union[np.ndarray, torch.Tensor]:
-    """ Standardize dataset.
-
-        Parameters
-        ----------
-        data: arr or tensor. Contains data to transform.
-        stats1: arr or tensor. Statistics of the data.
-        stats2: arr or tensor. Statistics of the data.
-        inverse_transform: bool. False for standardization, True for unstandardization.
-        axis1: int or None. Axis along which to standardize. If None, standardize across all dimensions.
-        axis2: int or None. Axis along which to standardize. If None, standardize across all dimensions.
-
-        Returns
-        -------
-        data_transform: arr or tensor. Standardized/unstandardized dataset.
-    """
-    if axis1 is None:
-        data1 = affine(data, stats1['stdev'], stats1['mean'], inverse_transform=inverse_transform)
-    else:
-        # acc_stats = [{'mean': stats['mean'], 'stdev': stats['stdev'], 'n_samples': 1}]
-        acc_mean = stats1['mean'].mean(axis=axis1, keepdims=True)
-        acc_var = (stats1['stdev']**2 + (stats1['mean'] - acc_mean)**2).mean(axis=axis1, keepdims=True)
-        acc_stdev = np.sqrt(acc_var)
-        data1 = affine(data, acc_stdev, acc_mean, inverse_transform=inverse_transform)
-    if axis2 is None:
-        return affine(data1, stats2['stdev'], stats2['mean'], inverse_transform=not inverse_transform)
-    else:
-        # acc_stats = [{'mean': stats['mean'], 'stdev': stats['stdev'], 'n_samples': 1}]
-        acc_mean = stats2['mean'].mean(axis=axis2, keepdims=True)
-        acc_var = (stats2['stdev']**2 + (stats2['mean'] - acc_mean)**2).mean(axis=axis2, keepdims=True)
-        acc_stdev = np.sqrt(acc_var)
-        return affine(data1, acc_stdev, acc_mean, inverse_transform=not inverse_transform)
-
-
-def min_max_to_min_max(data: Union[np.ndarray, torch.Tensor], stats1: Dict, stats2: Dict, inverse_transform: bool = False, axis1: int=None,
-                       axis2: int=None) -> Union[np.ndarray, torch.Tensor]:
-    """ Normalize dataset.
-        data: arr or tensor. Contains data to transform.
-        stats1: arr or tensor. Statistics of the data.
-        stats2: arr or tensor. Statistics of the data.
-        inverse_transform: bool. False for normalization, True for unnormalization.
-        axis1: int or None. Axis along which to normalize. If None, normalize across all dimensions.
-        axis2: int or None. Axis along which to normalize. If None, normalize across all dimensions.
-        Returns
-        -------
-        data_transform: arr or tensor. Normalized/unnormalized dataset.
-    """
-    if axis1 is None:
-        data1 = affine(data, stats1['max']-stats1['min'], stats1['min'], inverse_transform=inverse_transform)
-    else:
-        data1 = affine(data, stats1['max'].max(axis=axis1, keepdims=True) - stats1['min'].min(axis=axis1, keepdims=True),
-                       stats1['min'].min(axis=axis1, keepdims=True), inverse_transform=inverse_transform)
-    if axis2 is None:
-        return affine(data1, stats2['max']-stats2['min'], stats2['min'], inverse_transform=not inverse_transform)
-    else:
-        return affine(data1, stats2['max'].max(axis=axis2, keepdims=True) - stats2['min'].min(axis=axis2, keepdims=True),
-                       stats2['min'].min(axis=axis2, keepdims=True), inverse_transform=not inverse_transform)
-
-
 def min_max(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform: bool = False, axis=None) \
         -> Union[np.ndarray, torch.Tensor]:
     """ Normalize dataset.
@@ -615,29 +557,3 @@ def clip(data: Union[np.ndarray, torch.Tensor], stats: Dict) \
     else:
         raise TypeError("Input data must be a numpy array or a torch tensor.")
 
-
-def sym_log(data: Union[np.ndarray, torch.Tensor], inverse_transform: bool = False) \
-           -> Union[np.ndarray, torch.Tensor]:
-    """ Apply symmetric logarithm transformation to the data.
-
-        Parameters
-        ----------
-        data: arr or tensor. Contains data to transform.
-        inverse_transform: bool. False for log transform, True for inverse transform.
-
-        Returns
-        -------
-        data_transform: arr or tensor. Transformed dataset.
-    """
-
-    # Apply symmetric logarithm transformation based on the type of data
-    if inverse_transform:
-        if isinstance(data, np.ndarray):
-            return np.sign(data) * (np.expm1(np.abs(data)))
-        else:
-            return torch.sign(data) * (torch.exp(torch.abs(data)) - 1)
-    else:
-        if isinstance(data, np.ndarray):
-            return np.sign(data) * np.log1p(np.abs(data))
-        else:
-            return torch.sign(data) * torch.log1p(torch.abs(data))

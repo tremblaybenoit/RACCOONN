@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-from typing import Union
 import hydra
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
@@ -12,8 +11,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def clearsky_filter(prof: Union[np.ndarray, torch.Tensor], split: Union[np.ndarray, torch.tensor] = None) \
-        -> Union[np.ndarray, torch.Tensor]:
+def clearsky_mask(prof: np.ndarray | torch.Tensor, split: np.ndarray | torch.Tensor | None = None) \
+        -> np.ndarray | torch.Tensor:
     """ Filter out profiles with clear skies.
 
         Parameters
@@ -27,20 +26,20 @@ def clearsky_filter(prof: Union[np.ndarray, torch.Tensor], split: Union[np.ndarr
     """
 
     if isinstance(prof, torch.Tensor):
-        clrsky = (prof[:, 5, :].sum(dim=1) == 0) & (prof[:, 6, :].sum(dim=1) == 0)
-        clrsky = clrsky & (prof[:, 7, :].sum(dim=1) == 0)
+        c = (prof[:, 5, :].sum(dim=1) == 0) & (prof[:, 6, :].sum(dim=1) == 0)
+        c = c & (prof[:, 7, :].sum(dim=1) == 0)
     else:
-        clrsky = (prof[:, 5, :].sum(axis=1) == 0) & (prof[:, 6, :].sum(axis=1) == 0)
-        clrsky = clrsky & (prof[:, 7, :].sum(axis=1) == 0)
+        c = (prof[:, 5, :].sum(axis=1) == 0) & (prof[:, 6, :].sum(axis=1) == 0)
+        c = c & (prof[:, 7, :].sum(axis=1) == 0)
 
     # Apply split
     if split is not None:
-        clrsky = clrsky[split]
-    return clrsky
+        c = c[split]
+    return c
 
 
-def cloud_filter(prof: Union[np.ndarray, torch.Tensor], split: Union[np.ndarray, torch.tensor] = None) \
-        -> Union[np.ndarray, torch.Tensor]:
+def cloud_mask(prof: np.ndarray | torch.Tensor, split: np.ndarray | torch.Tensor | None = None) \
+        -> np.ndarray | torch.Tensor:
     """ Filter out profiles with clear skies.
 
         Parameters
@@ -53,10 +52,10 @@ def cloud_filter(prof: Union[np.ndarray, torch.Tensor], split: Union[np.ndarray,
         np.ndarray or torch.Tensor. Boolean mask indicating cloudy/clear-sky profiles.
     """
 
-    return ~clearsky_filter(prof, split=split)
+    return ~clearsky_mask(prof, split=split)
 
 
-def pressure_filter(prof: Union[np.ndarray, torch.Tensor], threshold: float = 1.e-6) -> Union[np.ndarray, torch.Tensor]:
+def pressure_mask(prof: np.ndarray | torch.Tensor, threshold: float = 1.e-8) -> np.ndarray | torch.Tensor:
     """ Filter out profiles based on a pressure threshold.
 
         Parameters
@@ -72,7 +71,7 @@ def pressure_filter(prof: Union[np.ndarray, torch.Tensor], threshold: float = 1.
     return batch_statistics(prof, which=['mean', 'variance'], axis=0)['variance'] > threshold
 
 
-def daytime_filter(meta: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:
+def daytime_mask(meta: np.ndarray | torch.Tensor) -> np.ndarray | torch.Tensor:
     """ Filter out profiles based on daytime/nighttime condition.
 
         Parameters
@@ -85,6 +84,22 @@ def daytime_filter(meta: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, t
     """
 
     return meta[:, 6] >= 90
+
+
+def compute_mask(input: DictConfig, output: DictConfig) -> None:
+    """ Compute masks for a given dataset.
+
+        Parameters
+        ----------
+        input: DictConfig. Input configuration.
+        output: DictConfig. Output configuration.
+
+        Returns
+        -------
+        None.
+    """
+
+    return
 
 
 @hydra.main(version_base=None, config_path=get_config_path(), config_name="default")
@@ -103,9 +118,9 @@ def main(config: DictConfig) -> None:
 
     # Compute filters
     if hasattr(config.preparation, "filters"):
-        for filter, config_filter in config.preparation.filters.items():
-            logger.info(f"Computing filter for {filter}")
-            instantiate(config_filter)
+        for key, config in config.preparation.filters.items():
+            logger.info(f"Computing filter: {key}")
+            instantiate(config)
 
     return
 
@@ -121,7 +136,7 @@ if __name__ == '__main__':
 
         Returns
         -------
-        zarr file containing data statistics.
+        Masks and filters.
     """
 
     main()

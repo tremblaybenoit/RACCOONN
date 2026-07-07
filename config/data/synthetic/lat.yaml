@@ -9,20 +9,22 @@ stage:
   train:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Longitude
-      lon: &train
+      # Latitude
+      lat: &train
         # Dataset class
         _target_: forward.model.data_loader.TorchDataset
         _recursive_: false
-        # Path to the longitude data file
-        path: ${....dir}/lon.npy
+        # Path to the latitude data file
+        path: ${....dir}/lat.npy
+        # Type of data
+        type: 'Latitude (degrees)'
         # Loading function
         load:
           _target_: data.io.load_latlon
           path: ${..path}
           scans:
-            _target_: ${data.stage.train.variables.scans.load._target_}
-            path: ${data.stage.train.variables.scans.load.path}
+            _target_: ${....scans.load._target_}
+            path: ${....scans.load.path}
           split: ${....split}
           dtype: ${data.dtype}
         # Transformations to apply
@@ -34,75 +36,39 @@ stage:
             stats:
               _target_: data.statistics.read_statistics_var
               path: ${preparation.statistics.data.output.path}
-              var: 'lon'
+              var: 'lat'
               dtype: ${data.dtype}
   # Validation set
   valid:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Longitude
-      lon:
+      # Latitude
+      lat:
         <<: *train
   # Test set
   test:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Longitude
-      lon:
-          <<: *train
-    # Results-specific configuration for the test stage
-    results:
-      # Longitude
-      lon:
-        # Path to the longitude results file
-        path: ${paths.run_dir}/test_lon.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${..path}
-        load:
-          _target_: data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
-  # Predict set
-  predict:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Longitude
-      lon:
+      # Latitude
+      lat:
         <<: *train
-    # Results-specific configuration for the predict stage
-    results:
-      # Longitude
-      lon:
-        # Path to the longitude results file
-        path: ${paths.run_dir}/predict_lon.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${..path}
-        load:
-          _target_: data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
+  # Predict set
+  predict: ${..test}
   # Source data (complete dataset)
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Longitude
-      lon:
+      # Latitude
+      lat:
+        # Type of data
+        type: ${data.stage.train.variables.lat.type}
         # Loading function
         load:
           _target_: numpy.concatenate
           _args_:
-            - - ${data.stage.train.variables.lon.load}
-              - ${data.stage.valid.variables.lon.load}
-              - ${data.stage.test.variables.lon.load}
+            - - ${data.stage.train.variables.lat.load}
+              - ${data.stage.valid.variables.lat.load}
+              - ${data.stage.test.variables.lat.load}
             - 0
         # Transformations to apply
-        transformations: ${data.stage.train.variables.lon.transformations}
-
+        transformations: ${data.stage.train.variables.lat.transformations}

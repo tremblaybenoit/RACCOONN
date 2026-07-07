@@ -14,13 +14,12 @@ stage:
         # Dataset class
         _target_: forward.model.data_loader.TorchDataset
         _recursive_: false
-        # Path to the longitude slant data file
-        path: ${....dir}/lon_slant.npy
+        # Path to the latitude slant data file
+        path: ${preparation.slant.train.output.lat.path}
+        # Type of data
+        type: 'Longitude (degrees)'
         # Loading function
-        load:
-          _target_: data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
+        load: ${preparation.slant.train.output.lat.load}
         # Transformations to apply
         transformations:
           # Per-variable normalization
@@ -39,58 +38,31 @@ stage:
       # Longitude (slant)
       lon_slant:
         <<: *train
+        # Path to the latitude slant data file
+        path: ${preparation.slant.valid.output.lon.path}
+        # Loading function
+        load: ${preparation.slant.valid.output.lon.load}
   # Test set
   test:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Longitude (slant)
       lon_slant:
-          <<: *train
-    # Results-specific configuration for the test stage
-    results:
-      # Longitude (slant)
-      lon_slant:
-        # Path to the longitude slant results file
-        path: ${paths.run_dir}/test_lon_slant.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${..path}
-        load:
-          _target_: data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
-  # Predict set
-  predict:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Longitude (slant)
-      lon_slant:
         <<: *train
-    # Results-specific configuration for the predict stage
-    results:
-      # Longitude (slant)
-      lon_slant:
-        # Path to the longitude slant results file
-        path: ${paths.run_dir}/predict_lon_slant.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${..path}
-        load:
-          _target_: data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
+        # Path to the latitude slant data file
+        path: ${preparation.slant.test.output.lon.path}
+        # Loading function
+        load: ${preparation.slant.test.output.lon.load}
+  # Predict set
+  predict: ${..test}
   # Source data (complete dataset)
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Longitude (slant)
       lon_slant:
+        # Type of data
+        type: ${data.stage.train.variables.lon_slant.type}
         # Loading function
         load:
           _target_: numpy.concatenate

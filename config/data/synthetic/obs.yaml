@@ -9,53 +9,64 @@ stage:
   train:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Daytime filter
-      daytime_filter: &train
+      # Observations
+      obs: &train
         # Dataset class
         _target_: forward.model.data_loader.TorchDataset
         _recursive_: false
-        # Loading function (daytime filter is computed, not loaded directly)
+        # Path to the observations file
+        path: ${....dir}/obs.npy
+        # Type of data
+        type: 'Observations (no units)'
+        # Loading function
         load:
-          _target_: data.filters.daytime_filter
-          _args_:
-            - ${data.stage.train.variables.meta.load}
+          _target_: data.io.load_npy
+          path: ${..path}
+          split: ${....split}
+          dtype: ${data.dtype}
         # Transformations to apply
-        transformations: null
+        transformations:
+          # Per-variable normalization
+          normalization:
+            _target_: data.transformations.identity
+            _partial_: true
+            stats:
+              _target_: data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'obs'
+              dtype: ${data.dtype}
   # Validation set
   valid:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Daytime filter
-      daytime_filter:
+      # Observations
+      obs:
         <<: *train
   # Test set
   test:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Daytime filter
-      daytime_filter:
-          <<: *train
-  # Predict set
-  predict:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Daytime filter
-      daytime_filter:
+      # Observations
+      obs:
         <<: *train
+  # Predict set
+  predict: ${..test}
   # Source data (complete dataset)
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Daytime filter
-      daytime_filter:
+      # Observations
+      obs:
+        # Type of data
+        type: ${data.stage.train.variables.obs.type}
         # Loading function
         load:
           _target_: numpy.concatenate
           _args_:
-            - - ${data.stage.train.variables.daytime_filter.load}
-              - ${data.stage.valid.variables.daytime_filter.load}
-              - ${data.stage.test.variables.daytime_filter.load}
+            - - ${data.stage.train.variables.obs.load}
+              - ${data.stage.valid.variables.obs.load}
+              - ${data.stage.test.variables.obs.load}
             - 0
         # Transformations to apply
-        transformations: null
+        transformations: ${data.stage.train.variables.obs.transformations}
 

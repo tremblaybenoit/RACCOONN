@@ -16,6 +16,8 @@ stage:
         _recursive_: false
         # Path to the metadata file
         path: ${....dir}/meta.npy
+        # Type of data
+        type: 'Meta data'
         # Loading function
         load:
           _target_: data.io.load_npy
@@ -46,52 +48,17 @@ stage:
     variables:
       # Metadata
       meta:
-          <<: *train
-    # Results-specific configuration for the test stage
-    results:
-      # Metadata
-      meta:
-        # Path to the metadata results file
-        path: ${paths.run_dir}/test_meta.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${..path}
-        load:
-          _target_: data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
-  # Predict set
-  predict:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Metadata
-      meta:
         <<: *train
-    # Results-specific configuration for the predict stage
-    results:
-      # Metadata
-      meta:
-        # Path to the metadata results file
-        path: ${paths.run_dir}/predict_meta.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${..path}
-        load:
-          _target_: data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
+  # Predict set
+  predict: ${..test}
   # Source data (complete dataset)
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Metadata
       meta:
+        # Type of data
+        type: ${data.stage.train.variables.meta.type}
         # Loading function
         load:
           _target_: numpy.concatenate

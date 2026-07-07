@@ -1,11 +1,16 @@
 defaults:
-  - variables/inverse_input@stage.train.vars
-  - variables/inverse_input@stage.valid.vars
-  - variables/inverse_input@stage.test.vars
-  - variables/inverse_input@stage.predict.vars
-  - variables/inverse_target@stage.train.vars
-  - variables/inverse_target@stage.valid.vars
-  - variables/inverse_target@stage.test.vars
+  - synthetic/cloud_mask
+  - synthetic/daytime_mask
+  - synthetic/hofx
+  - synthetic/lat
+  - synthetic/lon
+  - synthetic/meta
+  - synthetic/obs
+  - synthetic/pressure
+  - synthetic/prof
+  - synthetic/scans
+  - synthetic/surf
+
 
 # Configuration to download the training and testing data
 download:

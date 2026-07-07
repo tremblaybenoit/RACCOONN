@@ -9,49 +9,55 @@ stage:
   train:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Z coordinate (slant)
-      z_slant: &train
+      # HOFX (Simulated Observations)
+      hofx: &train
         # Dataset class
         _target_: forward.model.data_loader.TorchDataset
         _recursive_: false
-        # Path to the z slant coordinate file
-        path: ${....dir}/z_slant.npy
+        # Path to the HOFX (simulated observations) file
+        path: ${....dir}/hofx.npy
+        # Channels
+        type: [
+          'Channel 7', 'Channel 8', 'Channel 9', 'Channel 10', 'Channel 11', 'Channel 12',
+          'Channel 13', 'Channel 14', 'Channel 15', 'Channel 16'
+        ]
         # Loading function
         load:
           _target_: data.io.load_npy
           path: ${..path}
+          split: ${....split}
           dtype: ${data.dtype}
         # Transformations to apply
         transformations:
           # Per-variable normalization
           normalization:
-            _target_: data.transformations.min_max
+            _target_: data.transformations.identity
             _partial_: true
             stats:
               _target_: data.statistics.read_statistics_var
               path: ${preparation.statistics.data.output.path}
-              var: 'z_slant'
+              var: 'hofx'
               dtype: ${data.dtype}
   # Validation set
   valid:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Z coordinate (slant)
-      z_slant:
+      # HOFX (Simulated Observations)
+      hofx:
         <<: *train
   # Test set
   test:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Z coordinate (slant)
-      z_slant:
-          <<: *train
+      # HOFX (Simulated Observations)
+      hofx:
+        <<: *train
     # Results-specific configuration for the test stage
     results:
-      # Z coordinate (slant)
-      z_slant:
-        # Path to the z slant results file
-        path: ${paths.run_dir}/test_z_slant.npy
+      # HOFX (Simulated Observations)
+      hofx:
+        # Path to the HOFX results file
+        path: ${paths.run_dir}/test_hofx.npy
         # Save function
         save:
           _target_: numpy.save
@@ -65,16 +71,13 @@ stage:
   # Predict set
   predict:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Z coordinate (slant)
-      z_slant:
-        <<: *train
+    variables: ${...test.variables}
     # Results-specific configuration for the predict stage
     results:
-      # Z coordinate (slant)
-      z_slant:
-        # Path to the z slant results file
-        path: ${paths.run_dir}/predict_z_slant.npy
+      # HOFX (Simulated Observations)
+      hofx:
+        # Path to the HOFX results file
+        path: ${paths.run_dir}/predict_hofx.npy
         # Save function
         save:
           _target_: numpy.save
@@ -89,16 +92,18 @@ stage:
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Z coordinate (slant)
-      z_slant:
+      # HOFX (Simulated Observations)
+      hofx:
+        # Channels
+        type: ${data.stage.train.variables.hofx.type}
         # Loading function
         load:
           _target_: numpy.concatenate
           _args_:
-            - - ${data.stage.train.variables.z_slant.load}
-              - ${data.stage.valid.variables.z_slant.load}
-              - ${data.stage.test.variables.z_slant.load}
+            - - ${data.stage.train.variables.hofx.load}
+              - ${data.stage.valid.variables.hofx.load}
+              - ${data.stage.test.variables.hofx.load}
             - 0
         # Transformations to apply
-        transformations: ${data.stage.train.variables.z_slant.transformations}
+        transformations: ${data.stage.train.variables.hofx.transformations}
 

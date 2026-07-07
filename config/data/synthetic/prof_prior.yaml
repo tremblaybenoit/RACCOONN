@@ -10,93 +10,65 @@ stage:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Atmospheric profiles
-      prof: &train
+      prof_prior: &train
         # Dataset class
         _target_: forward.model.data_loader.TorchDataset
         _recursive_: false
         # Path to the atmospheric profiles file
-        path: ${....dir}/prof.npy
+        path: null
         # Profile types
         type: ['Air temperature', 'Cloud ice particle effective radius', 'Cloud water particle effective radius',
                'Snow particle effective radius', 'Humidity mixing ratio', 'Cloud ice mass', 'Cloud water mass',
                'Snow mass', 'Ozone mixing ratio']
         # Loading function
         load:
-          _target_: data.io.load_npy
-          path: ${..path}
-          split: ${....split}
-          dtype: ${data.dtype}
+          _target_: data.covariance.prior_from_bounded_perturbations
+          stats: ${....prof.transformations.normalization.stats}
+          seed: 75
+          # What the method needs as input
+          input:
+            # Cholesky matrix
+            cholesky: ${preparation.covariance.B_uni_stdn_temporal.output.cholesky}
         # Transformations to apply
-        transformations:
-          # Per-variable normalization
-          normalization: null
+        transformations: ${...prof.transformations}
   # Validation set
   valid:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Atmospheric profiles
-      prof:
+      prof_prior:
         <<: *train
+        # Loading function
+        load:
+          seed: 48
   # Test set
   test:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Atmospheric profiles
-      prof:
-          <<: *train
-    # Results-specific configuration for the test stage
-    results:
-      # Atmospheric profiles
-      prof:
-        # Path to the atmospheric profiles results file
-        path: ${paths.run_dir}/test_prof.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${..path}
-        load:
-          _target_: data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
-  # Predict set
-  predict:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Atmospheric profiles
-      prof:
+      prof_prior:
         <<: *train
-    # Results-specific configuration for the predict stage
-    results:
-      # Atmospheric profiles
-      prof:
-        # Path to the atmospheric profiles results file
-        path: ${paths.run_dir}/predict_prof.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${..path}
+        # Loading function
         load:
-          _target_: data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
+          seed: 15
+  # Predict set
+  predict: ${..test}
   # Source data (complete dataset)
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Atmospheric profiles
-      prof:
+      prof_prior:
+        # Type of the atmospheric profiles
+        type: ${data.stage.train.variables.prof_prior.type}
         # Loading function
         load:
           _target_: numpy.concatenate
           _args_:
-            - - ${data.stage.train.variables.prof.load}
-              - ${data.stage.valid.variables.prof.load}
-              - ${data.stage.test.variables.prof.load}
+            - - ${data.stage.train.variables.prof_prior.load}
+              - ${data.stage.valid.variables.prof_prior.load}
+              - ${data.stage.test.variables.prof_prior.load}
             - 0
         # Transformations to apply
-        transformations: ${data.stage.train.variables.prof.transformations}
+        transformations: ${data.stage.train.variables.prof_prior.transformations}
 

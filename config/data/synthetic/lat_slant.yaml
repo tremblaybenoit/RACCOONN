@@ -15,12 +15,11 @@ stage:
         _target_: forward.model.data_loader.TorchDataset
         _recursive_: false
         # Path to the latitude slant data file
-        path: ${....dir}/lat_slant.npy
+        path: ${preparation.slant.train.output.lat.path}
+        # Type of data
+        type: 'Latitude (degrees)'
         # Loading function
-        load:
-          _target_: data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
+        load: ${preparation.slant.train.output.lat.load}
         # Transformations to apply
         transformations:
           # Per-variable normalization
@@ -39,58 +38,31 @@ stage:
       # Latitude (slant)
       lat_slant:
         <<: *train
+        # Path to the latitude slant data file
+        path: ${preparation.slant.valid.output.lat.path}
+        # Loading function
+        load: ${preparation.slant.valid.output.lat.load}
   # Test set
   test:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Latitude (slant)
       lat_slant:
-          <<: *train
-    # Results-specific configuration for the test stage
-    results:
-      # Latitude (slant)
-      lat_slant:
-        # Path to the latitude slant results file
-        path: ${paths.run_dir}/test_lat_slant.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${..path}
-        load:
-          _target_: data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
-  # Predict set
-  predict:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Latitude (slant)
-      lat_slant:
         <<: *train
-    # Results-specific configuration for the predict stage
-    results:
-      # Latitude (slant)
-      lat_slant:
-        # Path to the latitude slant results file
-        path: ${paths.run_dir}/predict_lat_slant.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${..path}
-        load:
-          _target_: data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
+        # Path to the latitude slant data file
+        path: ${preparation.slant.test.output.lat.path}
+        # Loading function
+        load: ${preparation.slant.test.output.lat.load}
+  # Predict set
+  predict: ${..test}
   # Source data (complete dataset)
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Latitude (slant)
       lat_slant:
+        # Type of data
+        type: ${data.stage.train.variables.lat_slant.type}
         # Loading function
         load:
           _target_: numpy.concatenate

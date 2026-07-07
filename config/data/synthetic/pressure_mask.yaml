@@ -1,0 +1,38 @@
+# Format:
+#   stage:
+#   -- source: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+stage:
+  # Source data (complete dataset)
+  source: &source
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Pressure mask
+      pressure_mask:
+        # Dataset class
+        _target_: forward.model.data_loader.TorchDataset
+        _recursive_: false
+        # Type of data
+        type: 'Pressure mask'
+        # Path to the pressure mask file
+        path: ${data.preparation.filters.pressure_mask.output.path}
+        # Loading function
+        # load:
+        #   _target_: data.filters.pressure_mask
+        #   prof: ${data.stage.source.variables.prof.load}
+        load:
+          _target_: data.io.load_npy
+          path: ${..path}
+  # Training set
+  train:
+    <<: *source
+  # Validation set
+  valid:
+    <<: *source
+  # Test set
+  test:
+    <<: *source
+  # Predict set
+  predict: ${..test}

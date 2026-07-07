@@ -1,0 +1,76 @@
+# Format:
+#   stage:
+#   -- source: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+stage:
+  # Training set
+  train:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # X coordinate (slant)
+      x_slant: &train
+        # Dataset class
+        _target_: forward.model.data_loader.TorchDataset
+        _recursive_: false
+        # Path to the latitude slant data file
+        path: ${preparation.slant.train.output.x.path}
+        # Type of data
+        type: 'x (km)'
+        # Loading function
+        load: ${preparation.slant.train.output.x.load}
+        # Transformations to apply
+        transformations:
+          # Per-variable normalization
+          normalization:
+            _target_: data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'x_slant'
+              dtype: ${data.dtype}
+  # Validation set
+  valid:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # X coordinate (slant)
+      x_slant:
+        <<: *train
+        # Path to the latitude slant data file
+        path: ${preparation.slant.valid.output.x.path}
+        # Loading function
+        load: ${preparation.slant.valid.output.x.load}
+  # Test set
+  test:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # X coordinate (slant)
+      x_slant:
+        <<: *train
+        # Path to the latitude slant data file
+        path: ${preparation.slant.test.output.x.path}
+        # Loading function
+        load: ${preparation.slant.test.output.x.load}
+  # Predict set
+  predict: ${..test}
+  # Source data (complete dataset)
+  source:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # X coordinate (slant)
+      x_slant:
+        # Type of data
+        type: ${data.stage.train.variables.x_slant.type}
+        # Loading function
+        load:
+          _target_: numpy.concatenate
+          _args_:
+            - - ${data.stage.train.variables.x_slant.load}
+              - ${data.stage.valid.variables.x_slant.load}
+              - ${data.stage.test.variables.x_slant.load}
+            - 0
+          # Transformations to apply
+          transformations: ${data.stage.train.variables.x_slant.transformations}
+

@@ -9,96 +9,67 @@ stage:
   train:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Pressure
-      pressure: &train
+      # Pressure (log-transformed)
+      pressure_log: &train
         # Dataset class
         _target_: forward.model.data_loader.TorchDataset
         _recursive_: false
         # Path to the pressure data file
         path: ${....dir}/pressure.npy
+        # Type of pressure levels
+        type: 'Log10(pressure)'
         # Loading function
         load:
-          _target_: data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
+          _target_: numpy.log10
+          _args_:
+          - _target_: data.units.pa_to_hpa
+            pressure:
+              _target_: data.io.load_npy
+              path: ${....path}
+              dtype: ${data.dtype}
         # Transformations to apply
         transformations:
-          # Per-variable normalization
+          # Per-variable normalization with log transform
           normalization:
             _target_: data.transformations.min_max
             _partial_: true
             stats:
               _target_: data.statistics.read_statistics_var
               path: ${preparation.statistics.data.output.path}
-              var: 'pressure'
+              var: 'pressure_log'
               dtype: ${data.dtype}
   # Validation set
   valid:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Pressure
-      pressure:
+      # Pressure (log-transformed)
+      pressure_log:
         <<: *train
   # Test set
   test:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Pressure
-      pressure:
-          <<: *train
-    # Results-specific configuration for the test stage
-    results:
-      # Pressure
-      pressure:
-        # Path to the pressure results file
-        path: ${paths.run_dir}/test_pressure.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${..path}
-        load:
-          _target_: data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
-  # Predict set
-  predict:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Pressure
-      pressure:
+      # Pressure (log-transformed)
+      pressure_log:
         <<: *train
-    # Results-specific configuration for the predict stage
-    results:
-      # Pressure
-      pressure:
-        # Path to the pressure results file
-        path: ${paths.run_dir}/predict_pressure.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${..path}
-        load:
-          _target_: data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
+  # Predict set
+  predict: ${..test}
   # Source data (complete dataset)
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Pressure
-      pressure:
+      # Pressure (log-transformed)
+      pressure_log:
+        # Type of pressure levels
+        type: ${data.stage.train.variables.pressure_log.type}
         # Loading function
         load:
           _target_: numpy.concatenate
           _args_:
-            - - ${data.stage.train.variables.pressure.load}
-              - ${data.stage.valid.variables.pressure.load}
-              - ${data.stage.test.variables.pressure.load}
+            - - ${data.stage.train.variables.pressure_log.load}
+              - ${data.stage.valid.variables.pressure_log.load}
+              - ${data.stage.test.variables.pressure_log.load}
             - 0
         # Transformations to apply
-        transformations: ${data.stage.train.variables.pressure.transformations}
+        transformations: ${data.stage.train.variables.pressure_log.transformations}
 

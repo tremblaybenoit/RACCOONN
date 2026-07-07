@@ -9,19 +9,17 @@ stage:
   train:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Surface variables
-      surf: &train
+      # Atmospheric profiles
+      prof: &train
         # Dataset class
         _target_: forward.model.data_loader.TorchDataset
         _recursive_: false
-        # Path to the surface variables file
-        path: ${....dir}/surf.npy
-        # Surface variable types
-        type: ['Ice area fraction', 'Land area fraction', 'Land type index', 'Leaf area index', 'Soil temperature',
-               'Surface snow area fraction', 'Surface snow thickness', 'Surface ice temperature',
-               'Surface soil temperature', 'Surface sea temperature', 'Surface snow temperature',
-               'Surface eastward wind component', 'Surface northward wind component',
-               'Vegetation area fraction', 'Fraction of condensed water', 'Water area fraction']
+        # Path to the atmospheric profiles file
+        path: ${....dir}/prof.npy
+        # Profile types
+        type: ['Air temperature', 'Cloud ice particle effective radius', 'Cloud water particle effective radius',
+               'Snow particle effective radius', 'Humidity mixing ratio', 'Cloud ice mass', 'Cloud water mass',
+               'Snow mass', 'Ozone mixing ratio']
         # Loading function
         load:
           _target_: data.io.load_npy
@@ -30,38 +28,28 @@ stage:
           dtype: ${data.dtype}
         # Transformations to apply
         transformations:
-          # Surface normalization
-          normalization:
-            _target_: data.transformations.NormalizeSurface
-            surfmax:
-              _target_: numpy.loadtxt
-              _args_:
-                - data/normalization/surfmax.txt
-            surfmin:
-              _target_: numpy.loadtxt
-              _args_:
-                - data/normalization/surfmin.txt
-            dtype: ${data.dtype}
+          # Per-variable normalization
+          normalization: null
   # Validation set
   valid:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Surface variables
-      surf:
+      # Atmospheric profiles
+      prof:
         <<: *train
   # Test set
   test:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Surface variables
-      surf:
-          <<: *train
+      # Atmospheric profiles
+      prof:
+        <<: *train
     # Results-specific configuration for the test stage
     results:
-      # Surface variables
-      surf:
-        # Path to the surface variables results file
-        path: ${paths.run_dir}/test_surf.npy
+      # Atmospheric profiles
+      prof:
+        # Path to the atmospheric profiles results file
+        path: ${paths.run_dir}/test_prof.npy
         # Save function
         save:
           _target_: numpy.save
@@ -75,16 +63,13 @@ stage:
   # Predict set
   predict:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Surface variables
-      surf:
-        <<: *train
+    variables: ${...test.variables}
     # Results-specific configuration for the predict stage
     results:
-      # Surface variables
-      surf:
-        # Path to the surface variables results file
-        path: ${paths.run_dir}/predict_surf.npy
+      # Atmospheric profiles
+      prof:
+        # Path to the atmospheric profiles results file
+        path: ${paths.run_dir}/predict_prof.npy
         # Save function
         save:
           _target_: numpy.save
@@ -99,16 +84,18 @@ stage:
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
-      # Surface variables
-      surf:
+      # Atmospheric profiles
+      prof:
+        # Type of the atmospheric profiles
+        type: ${data.stage.train.variables.prof.type}
         # Loading function
         load:
           _target_: numpy.concatenate
           _args_:
-            - - ${data.stage.train.variables.surf.load}
-              - ${data.stage.valid.variables.surf.load}
-              - ${data.stage.test.variables.surf.load}
+            - - ${data.stage.train.variables.prof.load}
+              - ${data.stage.valid.variables.prof.load}
+              - ${data.stage.test.variables.prof.load}
             - 0
         # Transformations to apply
-        transformations: ${data.stage.train.variables.surf.transformations}
+        transformations: ${data.stage.train.variables.prof.transformations}
 
