@@ -1,0 +1,108 @@
+# Format:
+#   stage:
+#   -- source: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+stage:
+  # Training set
+  train:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Scans
+      scans: &train
+        # Dataset class
+        _target_: forward.model.data_loader.TorchDataset
+        _recursive_: false
+        # Path to the scans data file
+        path: ${....dir}/scans.txt
+        # Loading function
+        load:
+          _target_: data.io.load_scans
+          path: ${..path}
+          lat:
+            _target_: ${data.stage.train.variables.lat.load._target_}
+            path: ${data.stage.train.variables.lat.load.path}
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Transformations to apply
+        transformations:
+          # Per-variable normalization
+          normalization:
+            _target_: data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'scans'
+              dtype: ${data.dtype}
+  # Validation set
+  valid:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Scans
+      scans:
+        <<: *train
+  # Test set
+  test:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Scans
+      scans:
+          <<: *train
+    # Results-specific configuration for the test stage
+    results:
+      # Scans
+      scans:
+        # Path to the scans results file
+        path: ${paths.run_dir}/test_scans.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${..path}
+        load:
+          _target_: data.io.load_npy
+          path: ${..path}
+          dtype: ${data.dtype}
+  # Predict set
+  predict:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Scans
+      scans:
+        <<: *train
+    # Results-specific configuration for the predict stage
+    results:
+      # Scans
+      scans:
+        # Path to the scans results file
+        path: ${paths.run_dir}/predict_scans.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${..path}
+        load:
+          _target_: data.io.load_npy
+          path: ${..path}
+          dtype: ${data.dtype}
+  # Source data (complete dataset)
+  source:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Scans
+      scans:
+        # Loading function
+        load:
+          _target_: numpy.concatenate
+          _args_:
+            - - ${data.stage.train.variables.scans.load}
+              - ${data.stage.valid.variables.scans.load}
+              - ${data.stage.test.variables.scans.load}
+            - 0
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.scans.transformations}
+

@@ -1,0 +1,51 @@
+defaults:
+  - variables/cloud_filter
+  - variables/daytime_filter
+  - variables/hofx
+  - variables/lat
+  - variables/lat_slant
+  - variables/lon
+  - variables/lon_slant
+  - variables/meta
+  - variables/obs
+  - variables/pressure
+  - variables/pressure_log
+  - variables/prof
+  - variables/scans
+  - variables/surf
+  - variables/x_slant
+  - variables/y_slant
+  - variables/z_slant
+
+# dtype
+dtype: 'float32'
+
+# Split the data into training, validation, and test sets
+stage:
+  # Training set
+  train:
+    # Path to training data
+    dir: ${paths.data_dir}/Train2
+    # Split
+    split: null
+
+  # Validation set
+  valid:
+    # Path to validation data
+    dir: ${paths.data_dir}/Val2
+    # Split
+    split: null
+
+  # Test set
+  test:
+    # Path to test data
+    dir: ${paths.data_dir}/Test2
+    # Split
+    split: null
+
+  # Prediction set (NOTE: By default, we use the test set as the prediction set for demonstration purposes)
+  predict:
+    # Path to prediction data
+    dir: ${paths.data_dir}/Test2
+    # Split
+    split: null

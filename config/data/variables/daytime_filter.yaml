@@ -1,0 +1,61 @@
+# Format:
+#   stage:
+#   -- source: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+stage:
+  # Training set
+  train:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Daytime filter
+      daytime_filter: &train
+        # Dataset class
+        _target_: forward.model.data_loader.TorchDataset
+        _recursive_: false
+        # Loading function (daytime filter is computed, not loaded directly)
+        load:
+          _target_: data.filters.daytime_filter
+          _args_:
+            - ${data.stage.train.variables.meta.load}
+        # Transformations to apply
+        transformations: null
+  # Validation set
+  valid:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Daytime filter
+      daytime_filter:
+        <<: *train
+  # Test set
+  test:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Daytime filter
+      daytime_filter:
+          <<: *train
+  # Predict set
+  predict:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Daytime filter
+      daytime_filter:
+        <<: *train
+  # Source data (complete dataset)
+  source:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Daytime filter
+      daytime_filter:
+        # Loading function
+        load:
+          _target_: numpy.concatenate
+          _args_:
+            - - ${data.stage.train.variables.daytime_filter.load}
+              - ${data.stage.valid.variables.daytime_filter.load}
+              - ${data.stage.test.variables.daytime_filter.load}
+            - 0
+        # Transformations to apply
+        transformations: null
+

@@ -1,0 +1,102 @@
+# Format:
+#   stage:
+#   -- source: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+stage:
+  # Training set
+  train:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Atmospheric profiles
+      prof: &train
+        # Dataset class
+        _target_: forward.model.data_loader.TorchDataset
+        _recursive_: false
+        # Path to the atmospheric profiles file
+        path: ${....dir}/prof.npy
+        # Profile types
+        type: ['Air temperature', 'Cloud ice particle effective radius', 'Cloud water particle effective radius',
+               'Snow particle effective radius', 'Humidity mixing ratio', 'Cloud ice mass', 'Cloud water mass',
+               'Snow mass', 'Ozone mixing ratio']
+        # Loading function
+        load:
+          _target_: data.io.load_npy
+          path: ${..path}
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Transformations to apply
+        transformations:
+          # Per-variable normalization
+          normalization: null
+  # Validation set
+  valid:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Atmospheric profiles
+      prof:
+        <<: *train
+  # Test set
+  test:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Atmospheric profiles
+      prof:
+          <<: *train
+    # Results-specific configuration for the test stage
+    results:
+      # Atmospheric profiles
+      prof:
+        # Path to the atmospheric profiles results file
+        path: ${paths.run_dir}/test_prof.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${..path}
+        load:
+          _target_: data.io.load_npy
+          path: ${..path}
+          dtype: ${data.dtype}
+  # Predict set
+  predict:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Atmospheric profiles
+      prof:
+        <<: *train
+    # Results-specific configuration for the predict stage
+    results:
+      # Atmospheric profiles
+      prof:
+        # Path to the atmospheric profiles results file
+        path: ${paths.run_dir}/predict_prof.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${..path}
+        load:
+          _target_: data.io.load_npy
+          path: ${..path}
+          dtype: ${data.dtype}
+  # Source data (complete dataset)
+  source:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Atmospheric profiles
+      prof:
+        # Loading function
+        load:
+          _target_: numpy.concatenate
+          _args_:
+            - - ${data.stage.train.variables.prof.load}
+              - ${data.stage.valid.variables.prof.load}
+              - ${data.stage.test.variables.prof.load}
+            - 0
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.prof.transformations}
+

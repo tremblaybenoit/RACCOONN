@@ -1,0 +1,104 @@
+# Format:
+#   stage:
+#   -- source: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+stage:
+  # Training set
+  train:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Pressure
+      pressure: &train
+        # Dataset class
+        _target_: forward.model.data_loader.TorchDataset
+        _recursive_: false
+        # Path to the pressure data file
+        path: ${....dir}/pressure.npy
+        # Loading function
+        load:
+          _target_: data.io.load_npy
+          path: ${..path}
+          dtype: ${data.dtype}
+        # Transformations to apply
+        transformations:
+          # Per-variable normalization
+          normalization:
+            _target_: data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'pressure'
+              dtype: ${data.dtype}
+  # Validation set
+  valid:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Pressure
+      pressure:
+        <<: *train
+  # Test set
+  test:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Pressure
+      pressure:
+          <<: *train
+    # Results-specific configuration for the test stage
+    results:
+      # Pressure
+      pressure:
+        # Path to the pressure results file
+        path: ${paths.run_dir}/test_pressure.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${..path}
+        load:
+          _target_: data.io.load_npy
+          path: ${..path}
+          dtype: ${data.dtype}
+  # Predict set
+  predict:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Pressure
+      pressure:
+        <<: *train
+    # Results-specific configuration for the predict stage
+    results:
+      # Pressure
+      pressure:
+        # Path to the pressure results file
+        path: ${paths.run_dir}/predict_pressure.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${..path}
+        load:
+          _target_: data.io.load_npy
+          path: ${..path}
+          dtype: ${data.dtype}
+  # Source data (complete dataset)
+  source:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Pressure
+      pressure:
+        # Loading function
+        load:
+          _target_: numpy.concatenate
+          _args_:
+            - - ${data.stage.train.variables.pressure.load}
+              - ${data.stage.valid.variables.pressure.load}
+              - ${data.stage.test.variables.pressure.load}
+            - 0
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.pressure.transformations}
+
