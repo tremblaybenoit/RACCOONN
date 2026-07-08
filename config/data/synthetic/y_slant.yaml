@@ -10,7 +10,7 @@ stage:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Y coordinate (slant)
-      y_slant: &train
+      y_slant:
         # Dataset class
         _target_: forward.model.data_loader.TorchDataset
         _recursive_: false
@@ -24,7 +24,7 @@ stage:
         transformations:
           # Per-variable normalization
           normalization:
-            _target_: data.transformations.min_max
+            _target_: data.transformations.min_may
             _partial_: true
             stats:
               _target_: data.statistics.read_statistics_var
@@ -37,33 +37,40 @@ stage:
     variables:
       # Y coordinate (slant)
       y_slant:
-        <<: *train
+        # Dataset class
+        _target_: ${data.stage.train.variables.y_slant._target_}
+        _recursive_: false
         # Path to the latitude slant data file
         path: ${preparation.slant.valid.output.y.path}
+        # Type of data
+        type: ${data.stage.train.variables.y_slant.type}
         # Loading function
         load: ${preparation.slant.valid.output.y.load}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.y_slant.transformations}
   # Test set
   test:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Y coordinate (slant)
       y_slant:
-        <<: *train
+        # Dataset class
+        _target_: ${data.stage.train.variables.y_slant._target_}
+        _recursive_: false
         # Path to the latitude slant data file
         path: ${preparation.slant.test.output.y.path}
+        # Type of data
+        type: ${data.stage.train.variables.y_slant.type}
         # Loading function
         load: ${preparation.slant.test.output.y.load}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.y_slant.transformations}
   # Predict set
   predict:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Y coordinate (slant)
-      y_slant:
-        <<: *train
-        # Path to the latitude slant data file
-        path: ${preparation.slant.test.output.y.path}
-        # Loading function
-        load: ${preparation.slant.test.output.y.load}
+      y_slant: ${data.stage.test.variables.y_slant}
   # Source data (complete dataset)
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -79,7 +86,7 @@ stage:
             - - ${data.stage.train.variables.y_slant.load}
               - ${data.stage.valid.variables.y_slant.load}
               - ${data.stage.test.variables.y_slant.load}
-            - 0
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.y_slant.transformations}
+              - 0
+          # Transformations to apply
+          transformations: ${data.stage.train.variables.y_slant.transformations}
 

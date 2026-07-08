@@ -10,7 +10,7 @@ stage:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Z coordinate (slant)
-      z_slant: &train
+      z_slant:
         # Dataset class
         _target_: forward.model.data_loader.TorchDataset
         _recursive_: false
@@ -37,33 +37,40 @@ stage:
     variables:
       # Z coordinate (slant)
       z_slant:
-        <<: *train
+        # Dataset class
+        _target_: ${data.stage.train.variables.z_slant._target_}
+        _recursive_: false
         # Path to the latitude slant data file
         path: ${preparation.slant.valid.output.z.path}
+        # Type of data
+        type: ${data.stage.train.variables.z_slant.type}
         # Loading function
         load: ${preparation.slant.valid.output.z.load}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.z_slant.transformations}
   # Test set
   test:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Z coordinate (slant)
       z_slant:
-        <<: *train
+        # Dataset class
+        _target_: ${data.stage.train.variables.z_slant._target_}
+        _recursive_: false
         # Path to the latitude slant data file
-        path: ${preparation.slant.test.output.z.path}
+        path: ${preparation.slant.valid.output.z.path}
+        # Type of data
+        type: ${data.stage.train.variables.z_slant.type}
         # Loading function
         load: ${preparation.slant.test.output.z.load}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.z_slant.transformations}
   # Predict set
   predict:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Z coordinate (slant)
-      z_slant:
-        <<: *train
-        # Path to the latitude slant data file
-        path: ${preparation.slant.test.output.z.path}
-        # Loading function
-        load: ${preparation.slant.test.output.z.load}
+      z_slant: ${data.stage.test.variables.z_slant}
   # Source data (complete dataset)
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.

@@ -6,7 +6,7 @@
 # Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
 stage:
   # Source data (complete dataset)
-  source: &source
+  source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Pressure mask
@@ -26,13 +26,10 @@ stage:
           _target_: data.io.load_npy
           path: ${..path}
   # Training set
-  train:
-    <<: *source
+  train: ${..source}
   # Validation set
-  valid:
-    <<: *source
+  valid: ${..source}
   # Test set
-  test:
-    <<: *source
+  test: ${..source}
   # Predict set
-  predict: ${..test}
+  predict: ${..source}

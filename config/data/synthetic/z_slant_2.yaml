@@ -1,0 +1,331 @@
+# Format:
+#   stage:
+#   -- source: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
+
+# Variable-specific configuration, keyed by variable name for potential multi-variable support.
+variables:
+  # Z coordinate (slant)
+  z_slant:
+    # Type of data
+    type: 'z (km)'
+    # Transformations to apply
+    transformations:
+      # Per-variable normalization
+      normalization:
+        _target_: data.transformations.min_max
+        _partial_: true
+        stats:
+          _target_: data.statistics.read_statistics_var
+          path: ${preparation.statistics.data.output.path}
+          var: 'z_slant'
+          dtype: ${data.dtype}
+    # Loading function
+    load:
+      # Stage-specific
+      train: ${preparation.slant.train.output.z.load}
+      valid: ${preparation.slant.valid.output.z.load}
+      test: ${preparation.slant.test.output.z.load}
+      source:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${data.stage.train.variables.z_slant.load}
+            - ${data.stage.valid.variables.z_slant.load}
+            - ${data.stage.test.variables.z_slant.load}
+          - 0
+
+
+# Variable-specific configuration, keyed by variable name for potential multi-variable support.
+variables1:
+  # Z coordinate (slant)
+  z_slant:
+    # Type of data
+    type: 'z (km)'
+    # Transformations to apply
+    transformations:
+      # Per-variable normalization
+      normalization:
+        _target_: data.transformations.min_max
+        _partial_: true
+        stats:
+          _target_: data.statistics.read_statistics_var
+          path: ${preparation.statistics.data.output.path}
+          var: 'z_slant'
+          dtype: ${data.dtype}
+    # Stage-specific loading
+    stage:
+      # Training set
+      train:
+        # Dataset class
+        _target_: forward.model.data_loader.TorchDataset
+        _recursive_: false
+        # Path to the latitude slant data file
+        path: ${preparation.slant.train.output.z.path}
+        # Loading function
+        load: ${preparation.slant.train.output.z.load}
+      # Validation set
+      valid:
+        # Dataset class
+        _target_: ${data.variables.z_slant.stage.train._target_}
+        _recursive_: false
+        # Path to the latitude slant data file
+        path: ${preparation.slant.valid.output.z.path}
+        # Loading function
+        load: ${preparation.slant.valid.output.z.load}
+      test:
+        # Dataset class
+        _target_: ${data.variables.z_slant.stage.train._target_}
+        _recursive_: false
+        # Path to the latitude slant data file
+        path: ${preparation.slant.test.output.z.path}
+        # Loading function
+        load: ${preparation.slant.test.output.z.load}
+      source:
+        # Path to the latitude slant data file
+        path: [${preparation.slant.train.output.z.path}, ${preparation.slant.valid.output.z.path}, ${preparation.slant.test.output.z.path}]
+        # Loading function
+        load:
+          _target_: numpy.concatenate
+          _args_:
+            - - ${data.stage.train.variables.z_slant.load}
+              - ${data.stage.valid.variables.z_slant.load}
+              - ${data.stage.test.variables.z_slant.load}
+            - 0
+
+
+# Variable-specific configuration, keyed by variable name for potential multi-variable support.
+variables1:
+  # Z coordinate (slant)
+  z_slant:
+    # Type of data
+    type: 'z (km)'
+    # Transformations to apply
+    transformations:
+      # Per-variable normalization
+      normalization:
+        _target_: data.transformations.min_max
+        _partial_: true
+        stats:
+          _target_: data.statistics.read_statistics_var
+          path: ${preparation.statistics.data.output.path}
+          var: 'z_slant'
+          dtype: ${data.dtype}
+    # Stage-specific loading
+    load:
+      # Training set
+      train:
+        # Dataset class
+        _target_: forward.model.data_loader.TorchDataset
+        _recursive_: false
+        # Path to the latitude slant data file
+        path: ${preparation.slant.train.output.z.path}
+        # Loading function
+        load: ${preparation.slant.train.output.z.load}
+      # Validation set
+      valid:
+        # Dataset class
+        _target_: ${data.variables.z_slant.stage.train._target_}
+        _recursive_: false
+        # Path to the latitude slant data file
+        path: ${preparation.slant.valid.output.z.path}
+        # Loading function
+        load: ${preparation.slant.valid.output.z.load}
+      test:
+        # Dataset class
+        _target_: ${data.variables.z_slant.stage.train._target_}
+        _recursive_: false
+        # Path to the latitude slant data file
+        path: ${preparation.slant.test.output.z.path}
+        # Loading function
+        load: ${preparation.slant.test.output.z.load}
+      source:
+        # Path to the latitude slant data file
+        path: [${preparation.slant.train.output.z.path}, ${preparation.slant.valid.output.z.path}, ${preparation.slant.test.output.z.path}]
+        # Loading function
+        load:
+          _target_: numpy.concatenate
+          _args_:
+            - - ${data.stage.train.variables.z_slant.load}
+              - ${data.stage.valid.variables.z_slant.load}
+              - ${data.stage.test.variables.z_slant.load}
+            - 0
+
+
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+stage:
+  # Training set
+  train:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Z coordinate (slant)
+      z_slant:
+        # Dataset class
+        _target_: forward.model.data_loader.TorchDataset
+        _recursive_: false
+        # Path to the latitude slant data file
+        path: ${preparation.slant.train.output.z.path}
+        # Type of data
+        type: 'z (km)'
+        # Loading function
+        load: ${preparation.slant.train.output.z.load}
+        # Transformations to apply
+        transformations:
+          # Per-variable normalization
+          normalization:
+            _target_: data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'z_slant'
+              dtype: ${data.dtype}
+  # Validation set
+  valid:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Z coordinate (slant)
+      z_slant:
+        # Dataset class
+        _target_: ${data.stage.train.variables.z_slant._target_}
+        _recursive_: false
+        # Path to the latitude slant data file
+        path: ${preparation.slant.valid.output.z.path}
+        # Type of data
+        type: ${data.stage.train.variables.z_slant.type}
+        # Loading function
+        load: ${preparation.slant.valid.output.z.load}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.z_slant.transformations}
+  # Test set
+  test:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Z coordinate (slant)
+      z_slant:
+        # Dataset class
+        _target_: ${data.stage.train.variables.z_slant._target_}
+        _recursive_: false
+        # Path to the latitude slant data file
+        path: ${preparation.slant.valid.output.z.path}
+        # Type of data
+        type: ${data.stage.train.variables.z_slant.type}
+        # Loading function
+        load: ${preparation.slant.test.output.z.load}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.z_slant.transformations}
+  # Predict set
+  predict:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Z coordinate (slant)
+      z_slant: ${data.stage.test.variables.z_slant}
+  # Source data (complete dataset)
+  source:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Z coordinate (slant)
+      z_slant:
+        # Type of data
+        type: ${data.stage.train.variables.z_slant.type}
+        # Loading function
+        load:
+          _target_: numpy.concatenate
+          _args_:
+            - - ${data.stage.train.variables.z_slant.load}
+              - ${data.stage.valid.variables.z_slant.load}
+              - ${data.stage.test.variables.z_slant.load}
+            - 0
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.z_slant.transformations}
+
+
+
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+stage:
+  # Training set
+  train:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Z coordinate (slant)
+      z_slant:
+        # Dataset class
+        _target_: forward.model.data_loader.TorchDataset
+        _recursive_: false
+        # Path to the latitude slant data file
+        path: ${preparation.slant.train.output.z.path}
+        # Type of data
+        type: 'z (km)'
+        # Loading function
+        load: ${preparation.slant.train.output.z.load}
+        # Transformations to apply
+        transformations:
+          # Per-variable normalization
+          normalization:
+            _target_: data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              var: 'z_slant'
+              dtype: ${data.dtype}
+  # Validation set
+  valid:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Z coordinate (slant)
+      z_slant:
+        # Dataset class
+        _target_: ${data.stage.train.variables.z_slant._target_}
+        _recursive_: false
+        # Path to the latitude slant data file
+        path: ${preparation.slant.valid.output.z.path}
+        # Type of data
+        type: ${data.stage.train.variables.z_slant.type}
+        # Loading function
+        load: ${preparation.slant.valid.output.z.load}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.z_slant.transformations}
+  # Test set
+  test:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Z coordinate (slant)
+      z_slant:
+        # Dataset class
+        _target_: ${data.stage.train.variables.z_slant._target_}
+        _recursive_: false
+        # Path to the latitude slant data file
+        path: ${preparation.slant.valid.output.z.path}
+        # Type of data
+        type: ${data.stage.train.variables.z_slant.type}
+        # Loading function
+        load: ${preparation.slant.test.output.z.load}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.z_slant.transformations}
+  # Predict set
+  predict:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Z coordinate (slant)
+      z_slant: ${data.stage.test.variables.z_slant}
+  # Source data (complete dataset)
+  source:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Z coordinate (slant)
+      z_slant:
+        # Type of data
+        type: ${data.stage.train.variables.z_slant.type}
+        # Loading function
+        load:
+          _target_: numpy.concatenate
+          _args_:
+            - - ${data.stage.train.variables.z_slant.load}
+              - ${data.stage.valid.variables.z_slant.load}
+              - ${data.stage.test.variables.z_slant.load}
+            - 0
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.z_slant.transformations}
+

@@ -10,7 +10,7 @@ stage:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Longitude
-      lon: &train
+      lon:
         # Dataset class
         _target_: forward.model.data_loader.TorchDataset
         _recursive_: false
@@ -44,16 +44,54 @@ stage:
     variables:
       # Longitude
       lon:
-        <<: *train
+        # Dataset class
+        _target_: ${data.stage.train.variables.lon._target_}
+        _recursive_: false
+        # Path to the longitude data file
+        path: ${....dir}/lon.npy
+        # Type of data
+        type: ${data.stage.train.variables.lon.type}
+        # Loading function
+        load:
+          _target_: ${data.stage.train.variables.lon.load._target_}
+          path: ${..path}
+          scans:
+            _target_: ${....scans.load._target_}
+            path: ${....scans.load.path}
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.lon.transformations}
   # Test set
   test:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Longitude
       lon:
-        <<: *train
+        # Dataset class
+        _target_: ${data.stage.train.variables.lon._target_}
+        _recursive_: false
+        # Path to the longitude data file
+        path: ${....dir}/lon.npy
+        # Type of data
+        type: ${data.stage.train.variables.lon.type}
+        # Loading function
+        load:
+          _target_: ${data.stage.train.variables.lon.load._target_}
+          path: ${..path}
+          scans:
+            _target_: ${....scans.load._target_}
+            path: ${....scans.load.path}
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.lon.transformations}
   # Predict set
-  predict: ${..test}
+  predict:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Longitude
+      lon: ${...test.variables.lon}
   # Source data (complete dataset)
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.

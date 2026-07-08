@@ -10,7 +10,7 @@ stage:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Surface variables
-      surf: &train
+      surf:
         # Dataset class
         _target_: forward.model.data_loader.TorchDataset
         _recursive_: false
@@ -36,11 +36,11 @@ stage:
             surfmax:
               _target_: numpy.loadtxt
               _args_:
-                - ${oc.env:RACCOONN_ROOT}/data/normalization/surfmax.txt  # Using environment variable for portability
+                - data/normalization/surfmax.txt
             surfmin:
               _target_: numpy.loadtxt
               _args_:
-                - ${oc.env:RACCOONN_ROOT}/data/normalization/surfmin.txt
+                - data/normalization/surfmin.txt
             dtype: ${data.dtype}
   # Validation set
   valid:
@@ -48,14 +48,42 @@ stage:
     variables:
       # Surface variables
       surf:
-        <<: *train
+        # Dataset class
+        _target_: ${data.stage.train.variables.surf._target_}
+        _recursive_: false
+        # Path to the surface variables file
+        path: ${....dir}/surf.npy
+        # Surface variable types
+        type: ${data.stage.train.variables.surf.type}
+        # Loading function
+        load:
+          _target_: ${data.stage.train.variables.surf.load._target_}
+          path: ${..path}
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.surf.transformations}
   # Test set
   test:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Surface variables
       surf:
-        <<: *train
+        # Dataset class
+        _target_: ${data.stage.train.variables.surf._target_}
+        _recursive_: false
+        # Path to the surface variables file
+        path: ${....dir}/surf.npy
+        # Surface variable types
+        type: ${data.stage.train.variables.surf.type}
+        # Loading function
+        load:
+          _target_: ${data.stage.train.variables.surf.load._target_}
+          path: ${..path}
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.surf.transformations}
     # Results-specific configuration for the test stage
     results:
       # Surface variables
@@ -75,7 +103,24 @@ stage:
   # Predict set
   predict:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables: ${...test.variables}
+    variables:
+      # Surface variables
+      surf:
+        # Dataset class
+        _target_: ${data.stage.train.variables.surf._target_}
+        _recursive_: false
+        # Path to the surface variables file
+        path: ${....dir}/surf.npy
+        # Surface variable types
+        type: ${data.stage.train.variables.surf.type}
+        # Loading function
+        load:
+          _target_: ${data.stage.train.variables.surf.load._target_}
+          path: ${..path}
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.surf.transformations}
     # Results-specific configuration for the predict stage
     results:
       # Surface variables

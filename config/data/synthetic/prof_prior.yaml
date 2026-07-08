@@ -10,7 +10,7 @@ stage:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Atmospheric profiles
-      prof_prior: &train
+      prof_prior:
         # Dataset class
         _target_: forward.model.data_loader.TorchDataset
         _recursive_: false
@@ -30,29 +30,57 @@ stage:
             # Cholesky matrix
             cholesky: ${preparation.covariance.B_uni_stdn_temporal.output.cholesky}
         # Transformations to apply
-        transformations: ${...prof.transformations}
+        transformations: ${data.stage.train.variables.prof_prior.transformations}
   # Validation set
   valid:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Atmospheric profiles
       prof_prior:
-        <<: *train
+        # Dataset class
+        _target_: ${data.stage.train.variables.prof_prior._target_}
+        _recursive_: false
+        # Path to the atmospheric profiles file
+        path: ${....dir}/prof.npy
+        # Profile types
+        type: ${data.stage.train.variables.prof_prior.type}
         # Loading function
         load:
+          _target_: ${data.stage.train.variables.prof_prior.load._target_}
+          path: ${..path}
+          split: ${....split}
+          dtype: ${data.dtype}
           seed: 48
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.prof_prior.transformations}
   # Test set
   test:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Atmospheric profiles
       prof_prior:
-        <<: *train
+        # Dataset class
+        _target_: ${data.stage.train.variables.prof_prior._target_}
+        _recursive_: false
+        # Path to the atmospheric profiles file
+        path: ${....dir}/prof.npy
+        # Profile types
+        type: ${data.stage.train.variables.prof_prior.type}
         # Loading function
         load:
+          _target_: ${data.stage.train.variables.prof_prior.load._target_}
+          path: ${..path}
+          split: ${....split}
+          dtype: ${data.dtype}
           seed: 15
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.prof_prior.transformations}
   # Predict set
-  predict: ${..test}
+  predict:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Atmospheric profiles
+      prof_prior: ${...test.variables.prof_prior}
   # Source data (complete dataset)
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.

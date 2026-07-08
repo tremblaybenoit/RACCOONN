@@ -10,7 +10,7 @@ stage:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # HOFX (Simulated Observations)
-      hofx: &train
+      hofx:
         # Dataset class
         _target_: forward.model.data_loader.TorchDataset
         _recursive_: false
@@ -44,14 +44,42 @@ stage:
     variables:
       # HOFX (Simulated Observations)
       hofx:
-        <<: *train
+        # Dataset class
+        _target_: ${data.stage.train.variables.hofx._target_}
+        _recursive_: false
+        # Path to the HOFX (simulated observations) file
+        path: ${....dir}/hofx.npy
+        # Channels
+        type: ${data.stage.train.variables.hofx.type}
+        # Loading function
+        load:
+          _target_: ${data.stage.train.variables.hofx.load._target_}
+          path: ${..path}
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.hofx.transformations}
   # Test set
   test:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # HOFX (Simulated Observations)
       hofx:
-        <<: *train
+        # Dataset class
+        _target_: ${data.stage.train.variables.hofx._target_}
+        _recursive_: false
+        # Path to the HOFX (simulated observations) file
+        path: ${....dir}/hofx.npy
+        # Channels
+        type: ${data.stage.train.variables.hofx.type}
+        # Loading function
+        load:
+          _target_: ${data.stage.train.variables.hofx.load._target_}
+          path: ${..path}
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.hofx.transformations}
     # Results-specific configuration for the test stage
     results:
       # HOFX (Simulated Observations)
@@ -71,7 +99,9 @@ stage:
   # Predict set
   predict:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables: ${...test.variables}
+    variables:
+      # HOFX (Simulated Observations)
+      hofx: ${data.stage.test.variables.hofx}
     # Results-specific configuration for the predict stage
     results:
       # HOFX (Simulated Observations)

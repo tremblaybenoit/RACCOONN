@@ -10,7 +10,7 @@ stage:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Observations
-      obs: &train
+      obs:
         # Dataset class
         _target_: forward.model.data_loader.TorchDataset
         _recursive_: false
@@ -41,16 +41,48 @@ stage:
     variables:
       # Observations
       obs:
-        <<: *train
+        # Dataset class
+        _target_: ${data.stage.train.variables.obs._target_}
+        _recursive_: false
+        # Path to the observations file
+        path: ${....dir}/obs.npy
+        # Type of data
+        type: ${data.stage.train.variables.obs.type}
+        # Loading function
+        load:
+          _target_: ${data.stage.train.variables.obs.load._target_}
+          path: ${..path}
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.obs.transformations}
   # Test set
   test:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Observations
       obs:
-        <<: *train
+        # Dataset class
+        _target_: ${data.stage.train.variables.obs._target_}
+        _recursive_: false
+        # Path to the observations file
+        path: ${....dir}/obs.npy
+        # Type of data
+        type: ${data.stage.train.variables.obs.type}
+        # Loading function
+        load:
+          _target_: ${data.stage.train.variables.obs.load._target_}
+          path: ${..path}
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.obs.transformations}
   # Predict set
-  predict: ${..test}
+  predict:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Observations
+      obs: ${...test.variables.obs}
   # Source data (complete dataset)
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.

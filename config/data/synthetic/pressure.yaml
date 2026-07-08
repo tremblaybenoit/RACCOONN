@@ -10,7 +10,7 @@ stage:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Pressure
-      pressure: &train
+      pressure:
         # Dataset class
         _target_: forward.model.data_loader.TorchDataset
         _recursive_: false
@@ -43,16 +43,52 @@ stage:
     variables:
       # Pressure
       pressure:
-        <<: *train
+        # Dataset class
+        _target_: ${data.stage.train.variables.pressure._target_}
+        _recursive_: false
+        # Path to the pressure data file
+        path: ${....dir}/pressure.npy
+        # Type of pressure levels
+        type: ${data.stage.train.variables.pressure.type}
+        # Loading function
+        load:
+          _target_: ${data.stage.train.variables.pressure.load._target_}
+          pressure:
+            _target_: ${data.stage.train.variables.pressure.load.pressure._target_}
+            path: ${..path}
+            split: ${....split}
+            dtype: ${data.dtype}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.pressure.transformations}
   # Test set
   test:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Pressure
       pressure:
-        <<: *train
+        # Dataset class
+        _target_: ${data.stage.train.variables.pressure._target_}
+        _recursive_: false
+        # Path to the pressure data file
+        path: ${....dir}/pressure.npy
+        # Type of pressure levels
+        type: ${data.stage.train.variables.pressure.type}
+        # Loading function
+        load:
+          _target_: ${data.stage.train.variables.pressure.load._target_}
+          pressure:
+            _target_: ${data.stage.train.variables.pressure.load.pressure._target_}
+            path: ${..path}
+            split: ${....split}
+            dtype: ${data.dtype}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.pressure.transformations}
   # Predict set
-  predict: ${..test}
+  predict:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Pressure
+      pressure: ${...test.variables.pressure}
   # Source data (complete dataset)
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.

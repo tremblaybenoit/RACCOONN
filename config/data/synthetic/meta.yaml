@@ -10,7 +10,7 @@ stage:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Metadata
-      meta: &train
+      meta:
         # Dataset class
         _target_: forward.model.data_loader.TorchDataset
         _recursive_: false
@@ -34,23 +34,55 @@ stage:
               meta_scale_factor: 180
               meta_scale_offset: -180
               meta_scale_vars: [ ]
-              meta_sin_vars: [ 0, 1, 2, 3, 4, 5 ]
+              dtype: ${data.dtype}
   # Validation set
   valid:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Metadata
       meta:
-        <<: *train
+        # Dataset class
+        _target_: ${data.stage.train.variables.meta._target_}
+        _recursive_: false
+        # Path to the metadata file
+        path: ${....dir}/meta.npy
+        # Type of data
+        type: ${data.stage.train.variables.meta.type}
+        # Loading function
+        load:
+          _target_: ${data.stage.train.variables.meta.load._target_}
+          path: ${..path}
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.meta.transformations}
   # Test set
   test:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
     variables:
       # Metadata
       meta:
-        <<: *train
+        # Dataset class
+        _target_: ${data.stage.train.variables.meta._target_}
+        _recursive_: false
+        # Path to the metadata file
+        path: ${....dir}/meta.npy
+        # Type of data
+        type: ${data.stage.train.variables.meta.type}
+        # Loading function
+        load:
+          _target_: ${data.stage.train.variables.meta.load._target_}
+          path: ${..path}
+          split: ${....split}
+          dtype: ${data.dtype}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.meta.transformations}
   # Predict set
-  predict: ${..test}
+  predict:
+    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+    variables:
+      # Metadata
+      meta: ${...test.variables.meta}
   # Source data (complete dataset)
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
