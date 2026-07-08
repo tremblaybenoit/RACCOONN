@@ -1,4 +1,5 @@
 defaults:
+  - synthetic/clear_mask
   - synthetic/cloud_mask
   - synthetic/daytime_mask
   - synthetic/hofx
@@ -7,6 +8,7 @@ defaults:
   - synthetic/meta
   - synthetic/obs
   - synthetic/pressure
+  - synthetic/pressure_log
   - synthetic/prof
   - synthetic/scans
   - synthetic/surf
@@ -44,6 +46,6 @@ stage:
   # Prediction set (NOTE: By default, we use the test set as the prediction set for demonstration purposes)
   predict:
     # Path to prediction data
-    dir: ${paths.data_dir}/Test2
+    dir: ${data.stage.test.dir}
     # Split
-    split: null
+    split: ${data.stage.test.split}

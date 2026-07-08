@@ -1,63 +1,37 @@
 defaults:
+  - synthetic/clear_mask
   - synthetic/cloud_mask
   - synthetic/daytime_mask
   - synthetic/hofx
+  - synthetic/hofx_forward
   - synthetic/lat
   - synthetic/lon
   - synthetic/meta
   - synthetic/obs
   - synthetic/pressure
+  - synthetic/pressure_log
+  - synthetic/pressure_mask
   - synthetic/prof
+  - synthetic/prof_prior
   - synthetic/scans
   - synthetic/surf
-
-
-# Configuration to download the training and testing data
-download:
-  dir: ${paths.data_dir}
-  url: "https://zenodo.org/record/1482223/files/GOES-16_ML_Training_Testing_Data.zip?download=1"
 
 # dtype
 dtype: 'float32'
 
-# Pressure filter
-pressure_filter:
-  load:
-    _target_: data.filters.pressure_filter
-    prof:
-      _target_: data.io.load_stack_and_normalize
-      _recursive_: false
-      stack:
-        - load: ${data.stage.train.vars.prof.load}
-          normalization:
-            _target_: data.transformations.min_max
-            _partial_: true
-            stats:
-              _target_: data.statistics.read_statistics_var
-              path: ${preparation.statistics.data.output.path}
-              var: 'prof'
-              dtype: ${data.dtype}
-            axis: null
-        - load: ${data.stage.valid.vars.prof.load}
-          normalization:
-            _target_: data.transformations.min_max
-            _partial_: true
-            stats:
-              _target_: data.statistics.read_statistics_var
-              path: ${preparation.statistics.data.output.path}
-              var: 'prof'
-              dtype: ${data.dtype}
-            axis: null
-        - load: ${data.stage.test.vars.prof.load}
-          normalization:
-            _target_: data.transformations.min_max
-            _partial_: true
-            stats:
-              _target_: data.statistics.read_statistics_var
-              path: ${preparation.statistics.data.output.path}
-              var: 'prof'
-              dtype: ${data.dtype}
-            axis: null
+# Variables to use as input/output
+# select_input:
+#   'lat', 'lon', 'scans', 'pressure'
+# ]
+# select_target: [
+#   'meta', 'surf', 'hofx_forward', 'prof', 'prof_prior',
+#   'clear_mask', 'cloud_mask', 'daytime_mask',
+# ]
+# TODO: Make a "support" variable list for variables that are not used as input or output but are still needed for processing
+#       Or pass directly to callbacks, e.g. for the daytime mask
+select_input: ['lat', 'lon', 'scans', 'pressure']
+select_target: ['meta', 'surf', 'hofx_forward', 'prof', 'prof_prior']
+# select_support: ['clear_mask', 'cloud_mask', 'daytime_mask', 'pressure_mask']
 
 # Split the data into training, validation, and test sets
 stage:
@@ -66,11 +40,16 @@ stage:
     # Path to training data
     dir: ${paths.data_dir}/Train2
     # Split
-    split:
-      _target_: ${data.stage.train.vars.cloud_filter.load._target_}
-      _args_:
-        - _target_: ${data.stage.train.vars.prof.load._target_}
-          path: ${data.stage.train.vars.prof.load.path}
+    split: null
+    # Variables
+    variables:
+      # Atmospheric profiles
+      prof:
+        # Transformations to apply
+        transformations:
+          # Per-variable normalization
+          normalization:
+            _target_: data.transformations.min_max
 
 
   # Validation set
@@ -78,26 +57,36 @@ stage:
     # Path to validation data
     dir: ${paths.data_dir}/Val2
     # Split
-    split:
-      _target_: ${data.stage.valid.vars.cloud_filter.load._target_}
-      _args_:
-        - _target_: ${data.stage.valid.vars.prof.load._target_}
-          path: ${data.stage.valid.vars.prof.load.path}
+    split: null
+    # Variables
+    variables:
+      # Atmospheric profiles
+      prof:
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.prof.transformations}
 
   # Test set
   test:
     # Path to test data
     dir: ${paths.data_dir}/Test2
     # Split
-    split:
-      _target_: ${data.stage.test.vars.cloud_filter.load._target_}
-      _args_:
-        - _target_: ${data.stage.test.vars.prof.load._target_}
-          path: ${data.stage.test.vars.prof.load.path}
+    split: null
+    # Variables
+    variables:
+      # Atmospheric profiles
+      prof:
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.prof.transformations}
 
   # Prediction set (NOTE: By default, we use the test set as the prediction set for demonstration purposes)
   predict:
     # Path to prediction data
-    dir: ${paths.data_dir}/Test2
+    dir: ${data.stage.test.dir}
     # Split
     split: ${data.stage.test.split}
+    # Variables
+    variables:
+      # Atmospheric profiles
+      prof:
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.prof.transformations}
