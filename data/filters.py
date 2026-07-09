@@ -68,6 +68,8 @@ def pressure_mask(prof: np.ndarray | torch.Tensor, threshold: float = 1.e-8) -> 
         np.ndarray or torch.Tensor. Boolean mask indicating profiles above the pressure threshold.
     """
 
+    # TODO: Improve - Compute directly from stats?
+
     return batch_statistics(prof, which=['mean', 'variance'], axis=0)['variance'] > threshold
 
 
@@ -98,6 +100,7 @@ def compute_mask(input: DictConfig, output: DictConfig) -> None:
         -------
         None.
     """
+    # TODO: Finish implementing
 
     return
 

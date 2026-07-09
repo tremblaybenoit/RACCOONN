@@ -18,7 +18,4 @@ sweep:
 job_logging:
   handlers:
     file:
-      # ${hydra.runtime.output_dir} refers to the run.dir above
-      # filename: ${hydra.runtime.output_dir}/${task_name}.log
-      # filename: ${paths.run_dir}/${task_name}.log
       filename: ${paths.run_dir}/${task_name}_${now:%Y-%m-%d}_${now:%H-%M-%S}.log

@@ -1,4 +1,3 @@
-from typing import Union, Dict
 import numpy as np
 import torch
 
@@ -6,7 +5,8 @@ import torch
 class NormalizeProfiles:
     """ Normalize profiles using min-max scaling. """
 
-    def __init__(self, profmin: np.ndarray, profmax: np.ndarray, inverse_transform: bool=False, dtype: str='float32'):
+    def __init__(self, profmin: np.ndarray, profmax: np.ndarray, inverse_transform: bool=False,
+                 dtype: str='float32') -> None:
         """ Initialize NormalizeProfiles.
 
         Parameters
@@ -33,7 +33,7 @@ class NormalizeProfiles:
         # Inverse transform flag
         self.inverse_transform = inverse_transform
 
-    def forward(self, x: Union[torch.Tensor, np.ndarray]) -> Union[torch.Tensor, np.ndarray]:
+    def forward(self, x: torch.Tensor | np.ndarray) -> torch.Tensor | np.ndarray:
         """ Forward pass for NormalizeProfiles.
 
         Parameters
@@ -75,7 +75,8 @@ class NormalizeProfiles:
 
 class NormalizeSurface:
     """ Normalize surface using min-max scaling. """
-    def __init__(self, surfmin, surfmax, inverse_transform=False, dtype='float32'):
+    def __init__(self, surfmin: np.ndarray, surfmax: np.ndarray, inverse_transform: bool=False,
+                 dtype: str='float32') -> None:
         """ Initialize NormalizeSurface.
 
         Parameters
@@ -90,6 +91,7 @@ class NormalizeSurface:
         None.
         """
 
+        # Class inheritance
         super().__init__()
 
         # Assignment
@@ -102,7 +104,7 @@ class NormalizeSurface:
         self.inverse_transform = inverse_transform
 
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor | np.ndarray) -> torch.Tensor | np.ndarray:
         """ Forward pass for NormalizeSurface.
 
         Parameters
@@ -145,7 +147,7 @@ class NormalizeSurface:
 class NormalizeMeta:
     """ Normalize meta variables using sine and cosine transformations. """
 
-    def __init__(self, settings: dict):
+    def __init__(self, settings: dict) -> None:
         """ Initialize NormalizeMeta.
 
         Parameters
@@ -162,6 +164,7 @@ class NormalizeMeta:
         None.
         """
 
+        # Class inheritance
         super().__init__()
 
         # Load settings
@@ -171,7 +174,7 @@ class NormalizeMeta:
         self.meta_scale_factor = settings['meta_scale_factor']
         self.meta_scale_offset = settings['meta_scale_offset']
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor | np.ndarray) -> torch.Tensor | np.ndarray:
         """ Forward pass for NormalizeMeta.
 
         Parameters
@@ -211,8 +214,8 @@ class NormalizeMeta:
     __call__ = forward  # Make the instance callable for normalization
 
 
-def broadcast(var1: Union[np.ndarray, torch.Tensor], var2: Union[np.ndarray, torch.Tensor, float, int]) \
-        -> Union[np.ndarray, torch.Tensor]:
+def broadcast(var1: np.ndarray | torch.Tensor, var2: np.ndarray | torch.Tensor | float | int) \
+        -> np.ndarray | torch.Tensor:
     """ Broadcast var2 to the same dimensions as var1.
         Works for both numpy arrays and torch tensors.
 
@@ -238,6 +241,8 @@ def broadcast(var1: Union[np.ndarray, torch.Tensor], var2: Union[np.ndarray, tor
         if isinstance(var2, torch.Tensor):
             if var2.device.type != 'cpu':
                 var2 = var2.detach().cpu().numpy()
+            else:
+                var2 = var2.numpy()
         # Else var 2 is a numpy array
         # Ensure same dtype
         dtype = np.result_type(var1.dtype, var2.dtype)
@@ -266,9 +271,8 @@ def broadcast(var1: Union[np.ndarray, torch.Tensor], var2: Union[np.ndarray, tor
         raise TypeError("Input variables must be numpy arrays or torch tensors.")
 
 
-def multiplication(data: Union[np.ndarray, torch.Tensor], factor: Union[np.ndarray, torch.Tensor],
-                   inverse_transform: bool = False) \
-        -> Union[np.ndarray, torch.Tensor]:
+def multiplication(data: np.ndarray | torch.Tensor, factor: np.ndarray | torch.Tensor,
+                   inverse_transform: bool = False) -> np.ndarray | torch.Tensor:
     """ Multiply dataset by a factor.
 
         Parameters
@@ -285,7 +289,7 @@ def multiplication(data: Union[np.ndarray, torch.Tensor], factor: Union[np.ndarr
     # Broadcast to data dimensions
     scaling_factor = broadcast(data, factor)
 
-    # Unstandardization or standardization
+    # Un-standardization or standardization
     if inverse_transform:
         # Avoid division by zero
         eps = np.finfo(scaling_factor.dtype).eps if isinstance(scaling_factor, np.ndarray) \
@@ -299,9 +303,8 @@ def multiplication(data: Union[np.ndarray, torch.Tensor], factor: Union[np.ndarr
             else np.multiply(data, scaling_factor, out=data)
 
 
-def translation(data: Union[np.ndarray, torch.Tensor], value: Union[np.ndarray, torch.Tensor],
-                inverse_transform: bool = False) \
-        -> Union[np.ndarray, torch.Tensor]:
+def translation(data: np.ndarray | torch.Tensor, value: np.ndarray | torch.Tensor,
+                inverse_transform: bool = False) -> np.ndarray | torch.Tensor:
     """ Shift dataset by adding a value.
 
         Parameters
@@ -318,7 +321,7 @@ def translation(data: Union[np.ndarray, torch.Tensor], value: Union[np.ndarray, 
     # Broadcast to data dimensions
     shift_value = broadcast(data, value)
 
-    # Unstandardization or standardization
+    # Un-standardization or standardization
     if inverse_transform:
         # Subtract
         return data.sub_(shift_value) if isinstance(data, torch.Tensor) else np.subtract(data, shift_value, out=data)
@@ -326,9 +329,8 @@ def translation(data: Union[np.ndarray, torch.Tensor], value: Union[np.ndarray, 
         return data.add_(shift_value) if isinstance(data, torch.Tensor) else np.add(data, shift_value, out=data)
 
 
-def affine(data: Union[np.ndarray, torch.Tensor], factor: Union[np.ndarray, torch.Tensor],
-           value: Union[np.ndarray, torch.Tensor], inverse_transform: bool = False) \
-        -> Union[np.ndarray, torch.Tensor]:
+def affine(data: np.ndarray | torch.Tensor, factor: np.ndarray | torch.Tensor, value: np.ndarray | torch.Tensor,
+           inverse_transform: bool = False) -> np.ndarray | torch.Tensor:
     """ Affine transformation (linear scaling): data_transform = factor*data + value.
 
         Parameters
@@ -354,83 +356,49 @@ def affine(data: Union[np.ndarray, torch.Tensor], factor: Union[np.ndarray, torc
         return translation(data, value, inverse_transform=inverse_transform)
 
 
-def stdev(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform: bool = False, axis: int=None) \
-        -> Union[np.ndarray, torch.Tensor]:
-    """ Divide/multiply dataset by stddev.
-
-        Parameters
-        ----------
-        data: arr or tensor. Contains data to transform.
-        stats: arr or tensor. Statistics of the data.
-        inverse_transform: bool. False for standardization, True for unstandardization.
-        axis: int or None. Axis along which to standardize. If None, standardize across all dimensions.
-
-        Returns
-        -------
-        data_transform: arr or tensor. Standardized/unstandardized dataset.
-    """
-    if axis is None:
-        return multiplication(data, stats['stdev'], inverse_transform=not inverse_transform)
-    else:
-        acc_mean = stats['mean'].mean(axis=axis, keepdims=True)
-        acc_var = (stats['stdev'] ** 2 + (stats['mean'] - acc_mean) ** 2).mean(axis=axis, keepdims=True)
-        acc_stdev = np.sqrt(acc_var)
-        return multiplication(data, acc_stdev, inverse_transform=not inverse_transform)
-
-
-def mean_stdev(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform: bool = False, axis: int=None,
-               stdev_thresh: Union[np.ndarray, torch.Tensor] = None) \
-        -> Union[np.ndarray, torch.Tensor]:
+def mean_stdev(data: np.ndarray | torch.Tensor, stats: dict, inverse_transform: bool = False, axis: int | None=None) \
+        -> np.ndarray | torch.Tensor:
     """ Standardize dataset.
 
         Parameters
         ----------
         data: arr or tensor. Contains data to transform.
         stats: arr or tensor. Statistics of the data.
-        inverse_transform: bool. False for standardization, True for unstandardization.
+        inverse_transform: bool. False for standardization, True for un-standardization.
         axis: int or None. Axis along which to standardize. If None, standardize across all dimensions.
-        stdev_thresh: arr or tensor. Threshold for standard deviation to avoid division by zero.
 
         Returns
         -------
         data_transform: arr or tensor. Standardized/unstandardized dataset.
     """
 
-    # If stdev_thresh is provided, ensure it's broadcastable to the shape of stats['stdev']
-    std = stats['stdev']
-    if stdev_thresh is not None:
-        stdev_thresh = broadcast(std, stdev_thresh)
-        # Replace any stdev values below the threshold with the threshold value
-        if isinstance(std, np.ndarray):
-            std = np.where(std < stdev_thresh, stdev_thresh, std)
-        else:
-            std = torch.where(std < stdev_thresh, stdev_thresh, std)
-
+    # Transform as is or along a specific axis
     if axis is None:
-        return affine(data, std, stats['mean'], inverse_transform=not inverse_transform)
+        return affine(data, stats['stdev'], stats['mean'], inverse_transform=not inverse_transform)
     else:
-        # acc_stats = [{'mean': stats['mean'], 'stdev': stats['stdev'], 'n_samples': 1}]
         acc_mean = stats['mean'].mean(axis=axis, keepdims=True)
-        acc_var = (std**2 + (stats['mean'] - acc_mean)**2).mean(axis=axis, keepdims=True)
+        acc_var = (stats['stdev']**2 + (stats['mean'] - acc_mean)**2).mean(axis=axis, keepdims=True)
         acc_stdev = np.sqrt(acc_var)
         return affine(data, acc_stdev, acc_mean, inverse_transform=not inverse_transform)
 
 
-def min_max(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform: bool = False, axis=None) \
-        -> Union[np.ndarray, torch.Tensor]:
+def min_max(data: np.ndarray | torch.Tensor, stats: dict, inverse_transform: bool = False, axis: int | None=None) \
+        -> np.ndarray | torch.Tensor:
     """ Normalize dataset.
 
         Parameters
         ----------
         data: arr or tensor. Contains data to transform.
         stats: arr or tensor. Statistics of the data.
-        inverse_transform: bool. False for normalization, True for unnormalization.
+        inverse_transform: bool. False for normalization, True for un-normalization.
         axis: int or None. Axis along which to normalize. If None, normalize across all dimensions.
 
         Returns
         -------
         data_transform: arr or tensor. Normalized/unnormalized dataset.
     """
+
+    # Transform as is or along a specific axis
     if axis is None:
         return affine(data, stats['max']-stats['min'], stats['min'], inverse_transform=not inverse_transform)
     else:
@@ -438,36 +406,14 @@ def min_max(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transfor
                       stats['min'].min(axis=axis, keepdims=True), inverse_transform=not inverse_transform)
 
 
-def max(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform: bool = False, axis=None)\
-        -> Union[np.ndarray, torch.Tensor]:
-    """ Divide dataset by its maximum value.
-
-        Parameters
-        ----------
-        data: arr or tensor. Contains data to transform.
-        stats: arr or tensor. Statistics of the data.
-        inverse_transform: bool. False for normalization, True for unnormalization.
-        axis: int or None. Axis along which to normalize. If None, normalize across all dimensions.
-
-        Returns
-        -------
-        data_transform: arr or tensor. Transformed dataset.
-    """
-    if axis is None:
-        return multiplication(data, stats['max'], inverse_transform=not inverse_transform)
-    else:
-        return multiplication(data, stats['max'].max(axis=axis, keepdims=True), inverse_transform=not inverse_transform)
-
-
-def median(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform: bool = False) \
-           -> Union[np.ndarray, torch.Tensor]:
+def median(data: np.ndarray | torch.Tensor, stats: dict, inverse_transform: bool = False) -> np.ndarray | torch.Tensor:
     """ Divide dataset by its median.
 
         Parameters
         ----------
         data: arr or tensor. Contains data to transform.
         stats: arr or tensor. Statistics of the data.
-        inverse_transform: bool. False for normalization, True for unnormalization
+        inverse_transform: bool. False for normalization, True for un-normalization
 
         Returns
         -------
@@ -477,8 +423,7 @@ def median(data: Union[np.ndarray, torch.Tensor], stats: Dict, inverse_transform
     return multiplication(data, stats['median'], inverse_transform=not inverse_transform)
 
 
-def identity(data: Union[np.ndarray, torch.Tensor], **kwargs) \
-           -> Union[np.ndarray, torch.Tensor]:
+def identity(data: np.ndarray | torch.Tensor, **kwargs) -> np.ndarray | torch.Tensor:
     """ Identity transformation.
 
         Parameters
@@ -493,8 +438,7 @@ def identity(data: Union[np.ndarray, torch.Tensor], **kwargs) \
     return data
 
 
-def sin_cos(data: Union[np.ndarray, torch.Tensor], **kwargs) \
-           -> Union[tuple[np.ndarray, ...], tuple[torch.Tensor, ...]]:
+def sin_cos(data: np.ndarray | torch.Tensor, **kwargs) -> tuple[np.ndarray, ...] | tuple[torch.Tensor, ...]:
     """ Apply sine and cosine transformation to the data.
 
         Parameters
@@ -526,8 +470,7 @@ def sin_cos(data: Union[np.ndarray, torch.Tensor], **kwargs) \
         return sin_out, cos_out
 
 
-def clip(data: Union[np.ndarray, torch.Tensor], stats: Dict) \
-           -> Union[np.ndarray, torch.Tensor]:
+def clip(data: np.ndarray | torch.Tensor, stats: dict) -> np.ndarray | torch.Tensor:
     """ Clip the data to the specified range.
 
         Parameters
@@ -550,7 +493,6 @@ def clip(data: Union[np.ndarray, torch.Tensor], stats: Dict) \
     elif isinstance(data, torch.Tensor):
         min_value = torch.as_tensor(min_value, device=data.device, dtype=data.dtype)
         max_value = torch.as_tensor(max_value, device=data.device, dtype=data.dtype)
-        # Diffuser si besoin
         min_value = min_value.expand_as(data)
         max_value = max_value.expand_as(data)
         return torch.clamp(data, min=min_value, max=max_value)

@@ -1,0 +1,82 @@
+# @package _global_
+# Experiment-specific Hydra structure
+
+# Overriding default structure
+defaults:
+  - override /paths: default
+  - override /hydra: default
+  - override /data: inverse_default
+  - override /preparation: inverse_default
+  - override /loader: default
+  - override /model: inverse_default
+  - override /trainer: gpu
+  - override /callbacks: inverse_default
+  - override /logger: default
+
+# All parameters below will be merged with parameters from default configurations set above.
+# This allows you to overwrite only specified parameters
+
+# Task name. Note that it determines the output directory path
+task_name: "inverse"  # Experiment
+
+# Run id (unique identifier for the run)
+paths:
+  task_dir: "../inverse_outputs"
+  run_id: "default"
+  data_dir: ../data_${data.dtype}
+  # checkpoint_dir: "inverse/model/checkpoints"
+
+# Data configuration
+data:
+  # Precision
+  dtype: 'float32'
+  # Split ratios for training, validation, and test sets
+  stage:
+    # Training set
+    train:
+      # Variables
+      variables:
+        # Atmospheric profiles
+        prof:
+          # Transformations
+          transformations:
+            # Normalization function and parameters
+            normalization:
+              _target_: data.transformations.min_max
+              _partial_: true
+              stats:
+                _target_: data.statistics.read_statistics_var
+                path: ${preparation.statistics.data.output.path}
+                var: 'prof'
+                dtype: ${data.dtype}
+              axis: 1
+    # Validation set
+    valid:
+      # Variables
+      variables:
+        # Atmospheric profiles
+        prof:
+          # Transformations
+          transformations: ${data.stage.train.vars.prof.transformations}
+    # Test set
+    test:
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Transformations
+          transformations: ${data.stage.train.vars.prof.transformations}
+    # Prediction set
+    predict:
+      # Variables
+      vars:
+        # Atmospheric profiles
+        prof:
+          # Transformations
+          transformations: ${data.stage.train.vars.prof.transformations}
+
+# Logger configuration
+logger:
+  # MLflow logger
+  ports:
+    mlflow: 5002

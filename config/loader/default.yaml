@@ -6,7 +6,9 @@ num_workers: 16  # Number of workers for data loading
 persistent_workers: true  # Keep workers alive between epochs
 pin_memory: true  # Pin memory for faster data transfer to GPU
 
+# Stage-specific data loader configurations
 stage:
+  # Training stage
   train:
     _target_: forward.model.loader.MultivariateDataset
     _recursive_: false
@@ -22,6 +24,7 @@ stage:
       _target_: src.model.loader.select_variables
       config: ${data.stage.train.variables}
       keys: ${data.select_context}
+  # Validation stage
   valid:
     _target_: ${loader.stage.train._target_}
     _recursive_: false
@@ -37,6 +40,7 @@ stage:
       _target_: src.model.loader.select_variables
       config: ${data.stage.valid.variables}
       keys: ${data.select_context}
+  # Test stage
   test:
     _target_: ${loader.stage.train._target_}
     _recursive_: false
@@ -65,6 +69,7 @@ stage:
         _args_:
           - ${loader.stage.test.results.path}
         lazy: true
+  # Prediction stage
   predict:
     _target_: ${loader.stage.train._target_}
     _recursive_: false
