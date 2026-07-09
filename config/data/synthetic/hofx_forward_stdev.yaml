@@ -12,7 +12,7 @@ stage:
       # HOFX (Simulated Observations)
       hofx_forward_stdev:
         # Dataset class
-        _target_: forward.model.data_loader.TorchDataset
+        _target_: forward.model.data_loader.EagerDataset
         _recursive_: false
         # Path to the HOFX (simulated observations) file
         path: ${....dir}/hofx_forward.npy

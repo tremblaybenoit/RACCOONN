@@ -12,7 +12,7 @@ stage:
       # Metadata
       meta:
         # Dataset class
-        _target_: forward.model.data_loader.TorchDataset
+        _target_: forward.model.data_loader.EagerDataset
         _recursive_: false
         # Path to the metadata file
         path: ${....dir}/meta.npy

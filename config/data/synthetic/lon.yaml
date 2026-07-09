@@ -12,7 +12,7 @@ stage:
       # Longitude
       lon:
         # Dataset class
-        _target_: forward.model.data_loader.TorchDataset
+        _target_: forward.model.data_loader.EagerDataset
         _recursive_: false
         # Path to the longitude data file
         path: ${....dir}/lon.npy

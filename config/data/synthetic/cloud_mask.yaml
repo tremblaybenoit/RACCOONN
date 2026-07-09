@@ -12,7 +12,7 @@ stage:
       # Cloud mask
       cloud_mask:
         # Dataset class
-        _target_: forward.model.data_loader.TorchDataset
+        _target_: forward.model.data_loader.EagerDataset
         _recursive_: false
         # Type of data
         type: 'Cloud mask'

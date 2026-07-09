@@ -12,7 +12,7 @@ stage:
       # Pressure mask
       pressure_mask:
         # Dataset class
-        _target_: forward.model.data_loader.TorchDataset
+        _target_: forward.model.data_loader.ConstantDataset
         _recursive_: false
         # Type of data
         type: 'Pressure mask'

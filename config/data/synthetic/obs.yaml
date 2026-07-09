@@ -12,7 +12,7 @@ stage:
       # Observations
       obs:
         # Dataset class
-        _target_: forward.model.data_loader.TorchDataset
+        _target_: forward.model.data_loader.EagerDataset
         _recursive_: false
         # Path to the observations file
         path: ${....dir}/obs.npy

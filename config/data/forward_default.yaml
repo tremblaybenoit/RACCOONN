@@ -19,6 +19,7 @@ dtype: 'float32'
 # Variables to use as input/output
 select_input: ['prof', 'meta', 'surf']
 select_target: ['hofx']
+select_context: ['clear_mask', 'cloud_mask', 'daytime_mask']
 
 # Split the data into training, validation, and test sets
 stage:

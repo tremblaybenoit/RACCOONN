@@ -11,7 +11,7 @@ stage:
   # Training set
   train:
     # Dataset class
-    _target_: forward.model.data_loader.TorchDataset
+    _target_: forward.model.data_loader.MultivariateDataset
     _recursive_: false
     # Variables to use as input
     input:

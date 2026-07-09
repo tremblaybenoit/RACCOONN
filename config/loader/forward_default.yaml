@@ -1,5 +1,5 @@
 # Data loader configuration for forward model training
-_target_: forward.model.data_loader.Dataloader
+_target_: forward.model.loader.Dataloader
 _recursive_: false
 batch_size: 32  # Batch size for training
 num_workers: 16  # Number of workers for data loading
@@ -11,7 +11,7 @@ stage:
   # Training set
   train:
     # Dataset class
-    _target_: forward.model.data_loader.TorchDataset
+    _target_: forward.model.data_loader.MultivariateDataset
     _recursive_: false
     # Variables to use as input
     input:
