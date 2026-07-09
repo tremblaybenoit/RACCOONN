@@ -1,0 +1,85 @@
+# Data loader configuration for forward model training
+_target_: forward.model.loader.Dataloader
+_recursive_: false
+batch_size: 32  # Batch size for training
+num_workers: 16  # Number of workers for data loading
+persistent_workers: true  # Keep workers alive between epochs
+pin_memory: true  # Pin memory for faster data transfer to GPU
+
+stage:
+  train:
+    _target_: forward.model.loader.MultivariateDataset
+    _recursive_: false
+    input:
+      _target_: src.model.loader.select_variables
+      config: ${data.stage.train.variables}
+      keys: ${data.select_input}
+    target:
+      _target_: src.model.loader.select_variables
+      config: ${data.stage.train.variables}
+      keys: ${data.select_output}
+    context:
+      _target_: src.model.loader.select_variables
+      config: ${data.stage.train.variables}
+      keys: ${data.select_context}
+  valid:
+    _target_: ${loader.stage.train._target_}
+    _recursive_: false
+    input:
+      _target_: src.model.loader.select_variables
+      config: ${data.stage.valid.variables}
+      keys: ${data.select_input}
+    target:
+      _target_: src.model.loader.select_variables
+      config: ${data.stage.valid.variables}
+      keys: ${data.select_output}
+    context:
+      _target_: src.model.loader.select_variables
+      config: ${data.stage.valid.variables}
+      keys: ${data.select_context}
+  test:
+    _target_: ${loader.stage.train._target_}
+    _recursive_: false
+    input:
+      _target_: src.model.loader.select_variables
+      config: ${data.stage.context.variables}
+      keys: ${data.select_input}
+    target:
+      _target_: src.model.loader.select_variables
+      config: ${data.stage.context.variables}
+      keys: ${data.select_output}
+    context:
+      _target_: src.model.loader.select_variables
+      config: ${data.stage.context.variables}
+      keys: ${data.select_context}
+    results:
+      path: ${paths.run_dir}/test_results.nc
+      save:
+        _target_: data.io.save_xarray
+        _partial_: true
+        _args_:
+          - ${loader.stage.test.results.path}
+      load:
+        _target_: data.io.load_xarray
+        _partial_: true
+        _args_:
+          - ${loader.stage.test.results.path}
+        lazy: true
+  predict:
+    _target_: ${loader.stage.train._target_}
+    _recursive_: false
+    input: ${loader.stage.test.input}
+    results:
+      path: ${paths.run_dir}/predict_results.nc
+      save:
+        _target_: data.io.save_xarray
+        _partial_: true
+        _args_:
+          - ${loader.stage.predict.results.path}
+      load:
+        _target_: data.io.load_xarray
+        _partial_: true
+        _args_:
+          - ${loader.stage.predict.results.path}
+        lazy: true
+# TODO: Adapt results based on data config

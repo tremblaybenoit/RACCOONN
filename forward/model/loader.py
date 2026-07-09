@@ -1,6 +1,6 @@
 import pytorch_lightning as pl
 from torch.utils.data import Dataset, DataLoader
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from utilities.instantiators import instantiate
 import os
 import numpy as np
@@ -541,3 +541,36 @@ class MultivariateDataset(Dataset):
             out['context'] = context_dict
 
         return out
+
+
+def select_variables(config: DictConfig, keys: list[str] | str | None = None) -> DictConfig:
+    """ Filter data configs to keep only selected ones.
+
+        This function is called at loader initialization to create a multivariate
+        config that will be iterated over. It reduces the full config (which may include all)
+        to only the subset specified in keys, preserving interpolations and nested configs.
+
+        Parameters
+        ----------
+        config : DictConfig. Complete data configs (e.g. data.stage.train.variables).
+        keys : list[str] | str | None. Instrument names to keep. If a single string,
+               wraps it in a set. If None, returns config unchanged.
+
+        Returns
+        -------
+        DictConfig. Filtered config containing only selected instruments and their
+                   nested configs, suitable for MultiSatDataset to iterate over.
+    """
+
+    if not keys:
+        return config
+
+    # Normalize keys to a set for lookups
+    keys_set = {keys} if isinstance(keys, str) else set(keys)
+
+    # Create a new DictConfig with only selected keys
+    filtered = OmegaConf.create({
+        k: v for k, v in config.items() if k in keys_set
+    })
+
+    return filtered
