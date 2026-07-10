@@ -182,7 +182,7 @@ To account for missing dependencies, add the `--rerun-incomplete` flag:
 snakemake --dry-run --rerun-incomplete --verbose test --config hydra-experiment=inverse_operator
 ```
 
-To draw a [directed acyclic graph (DAG)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) of the training workflow (e.g., [`inverse/train.mmd`](inverse/train.mmd) for Snakefile rule [`test`](Snakefile)):
+To draw a [directed acyclic graph (DAG)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) of the training workflow (e.g., [`inverse/train.mmd`](src/train.mmd) for Snakefile rule [`test`](Snakefile)):
 
 ```bash
 snakemake test --rulegraph mermaid-js --config hydra-experiment=inverse_operator > train.mmd

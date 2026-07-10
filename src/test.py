@@ -1,9 +1,9 @@
 import logging
 import hydra
 from omegaconf import DictConfig
-import torch
-from forward.train import Operator
+from src.train import Operator
 from utilities.logic import get_config_path
+import torch
 # Force full FP32 matmul on CUDA (disable TF32) for more reproducible numerics
 torch.set_float32_matmul_precision('highest')
 torch.backends.cuda.matmul.allow_tf32 = False
@@ -27,16 +27,16 @@ def main(config: DictConfig) -> None:
     """
 
     # Initialize trainer object
-    logger.info("Initializing the inverse model...")
-    inverse_model = Operator(config)
+    logger.info("Initializing model...")
+    forward_model = Operator(config)
 
-    # Train the model
-    logger.info("Training the inverse model...")
-    inverse_model.train()
+    # Evaluate on test set
+    logger.info("Testing model...")
+    forward_model.test()
 
 
 if __name__ == '__main__':
-    """ Train radiative transfer inverse operator.
+    """ Test model.
 
         Parameters
         ----------

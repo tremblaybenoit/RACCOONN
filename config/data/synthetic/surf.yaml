@@ -12,7 +12,7 @@ stage:
       # Surface variables
       surf:
         # Dataset class
-        _target_: forward.model.data_loader.EagerDataset
+        _target_: src.loader.dataset.EagerDataset
         _recursive_: false
         # Path to the surface variables file
         path: ${....dir}/surf.npy
@@ -24,7 +24,7 @@ stage:
                'Vegetation area fraction', 'Fraction of condensed water', 'Water area fraction']
         # Loading function
         load:
-          _target_: data.io.load_npy
+          _target_: src.data.io.load_npy
           path: ${..path}
           split: ${....split}
           dtype: ${data.dtype}
@@ -32,7 +32,7 @@ stage:
         transformations:
           # Surface normalization
           normalization:
-            _target_: data.transformations.NormalizeSurface
+            _target_: src.data.transformations.NormalizeSurface
             surfmax:
               _target_: numpy.loadtxt
               _args_:
@@ -97,7 +97,7 @@ stage:
           _args_:
             - ${..path}
         load:
-          _target_: data.io.load_npy
+          _target_: src.data.io.load_npy
           path: ${..path}
           dtype: ${data.dtype}
   # Predict set
@@ -134,7 +134,7 @@ stage:
           _args_:
             - ${..path}
         load:
-          _target_: data.io.load_npy
+          _target_: src.data.io.load_npy
           path: ${..path}
           dtype: ${data.dtype}
   # Source data (complete dataset)

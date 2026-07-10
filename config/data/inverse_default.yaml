@@ -41,7 +41,7 @@ stage:
         transformations:
           # Per-variable normalization
           normalization:
-            _target_: data.transformations.min_max
+            _target_: src.data.transformations.min_max
 
   # Validation set
   valid:

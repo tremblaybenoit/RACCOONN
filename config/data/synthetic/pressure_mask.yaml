@@ -12,7 +12,7 @@ stage:
       # Pressure mask
       pressure_mask:
         # Dataset class
-        _target_: forward.model.data_loader.ConstantDataset
+        _target_: src.loader.dataset.ConstantDataset
         _recursive_: false
         # Type of data
         type: 'Pressure mask'
@@ -20,10 +20,10 @@ stage:
         path: ${data.preparation.filters.pressure_mask.output.path}
         # Loading function
         # load:
-        #   _target_: data.filters.pressure_mask
+        #   _target_: src.data.filters.pressure_mask
         #   prof: ${data.stage.source.variables.prof.load}
         load:
-          _target_: data.io.load_npy
+          _target_: src.data.io.load_npy
           path: ${..path}
   # Training set
   train: ${..source}

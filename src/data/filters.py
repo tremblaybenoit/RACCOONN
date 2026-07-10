@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def clearsky_mask(prof: np.ndarray | torch.Tensor, split: np.ndarray | torch.Tensor | None = None) \
+def clear_mask(prof: np.ndarray | torch.Tensor, split: np.ndarray | torch.Tensor | None = None) \
         -> np.ndarray | torch.Tensor:
     """ Filter out profiles with clear skies.
 
@@ -52,7 +52,7 @@ def cloud_mask(prof: np.ndarray | torch.Tensor, split: np.ndarray | torch.Tensor
         np.ndarray or torch.Tensor. Boolean mask indicating cloudy/clear-sky profiles.
     """
 
-    return ~clearsky_mask(prof, split=split)
+    return ~clear_mask(prof, split=split)
 
 
 def pressure_mask(prof: np.ndarray | torch.Tensor, threshold: float = 1.e-8) -> np.ndarray | torch.Tensor:

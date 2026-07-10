@@ -12,13 +12,13 @@ stage:
       # Cloud mask
       cloud_mask:
         # Dataset class
-        _target_: forward.model.data_loader.EagerDataset
+        _target_: src.loader.dataset.EagerDataset
         _recursive_: false
         # Type of data
         type: 'Cloud mask'
         # Loading function (cloud filter is computed, not loaded directly)
         load:
-          _target_: data.filters.cloud_mask
+          _target_: src.data.filters.cloud_mask
           _args_:
             - ${....meta.load}
         # Transformations to apply

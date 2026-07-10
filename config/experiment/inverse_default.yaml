@@ -42,10 +42,10 @@ data:
           transformations:
             # Normalization function and parameters
             normalization:
-              _target_: data.transformations.min_max
+              _target_: src.data.transformations.min_max
               _partial_: true
               stats:
-                _target_: data.statistics.read_statistics_var
+                _target_: src.data.statistics.read_statistics_var
                 path: ${preparation.statistics.data.output.path}
                 var: 'prof'
                 dtype: ${data.dtype}

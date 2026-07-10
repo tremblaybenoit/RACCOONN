@@ -12,7 +12,7 @@ stage:
       # Atmospheric profiles
       prof_prior:
         # Dataset class
-        _target_: forward.model.data_loader.EagerDataset
+        _target_: src.loader.dataset.EagerDataset
         _recursive_: false
         # Path to the atmospheric profiles file
         path: null
@@ -22,7 +22,7 @@ stage:
                'Snow mass', 'Ozone mixing ratio']
         # Loading function
         load:
-          _target_: data.covariance.prior_from_bounded_perturbations
+          _target_: src.data.covariance.prior_from_bounded_perturbations
           stats: ${....prof.transformations.normalization.stats}
           seed: 75
           # What the method needs as input

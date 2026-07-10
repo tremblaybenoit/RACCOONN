@@ -10,7 +10,7 @@ pin_memory: true  # Pin memory for faster data transfer to GPU
 stage:
   # Training stage
   train:
-    _target_: forward.model.loader.MultivariateDataset
+    _target_: src.loader.dataset.MultivariateDataset
     _recursive_: false
     input:
       _target_: src.model.loader.select_variables
@@ -59,12 +59,12 @@ stage:
     results:
       path: ${paths.run_dir}/test_results.nc
       save:
-        _target_: data.io.save_xarray
+        _target_: src.data.io.save_xarray
         _partial_: true
         _args_:
           - ${loader.stage.test.results.path}
       load:
-        _target_: data.io.load_xarray
+        _target_: src.data.io.load_xarray
         _partial_: true
         _args_:
           - ${loader.stage.test.results.path}
@@ -77,12 +77,12 @@ stage:
     results:
       path: ${paths.run_dir}/predict_results.nc
       save:
-        _target_: data.io.save_xarray
+        _target_: src.data.io.save_xarray
         _partial_: true
         _args_:
           - ${loader.stage.predict.results.path}
       load:
-        _target_: data.io.load_xarray
+        _target_: src.data.io.load_xarray
         _partial_: true
         _args_:
           - ${loader.stage.predict.results.path}

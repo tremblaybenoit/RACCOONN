@@ -33,7 +33,7 @@ def slant_path_geometry(pressure: np.ndarray, temperature: np.ndarray, sza: np.n
     """
 
     # Constants
-    Rd = 287.05
+    rd = 287.05
     g = 9.81
     km_factor = 1000.0
     deg_to_km = 111.12
@@ -52,7 +52,7 @@ def slant_path_geometry(pressure: np.ndarray, temperature: np.ndarray, sza: np.n
     t_layer_avg = 0.5 * (temperature[:, 1:] + temperature[:, :-1])
 
     # Thickness of each layer in km
-    dz = (Rd * t_layer_avg / g) * p_layer_ratio / km_factor
+    dz = (rd * t_layer_avg / g) * p_layer_ratio / km_factor
 
     # Cumulative sum to get heights at each level above surface
     # We insert 0 at the start for the surface level height
@@ -71,7 +71,8 @@ def slant_path_geometry(pressure: np.ndarray, temperature: np.ndarray, sza: np.n
     dlon = dx / (deg_to_km * np.cos(lat_rad))
 
     # Return heights, offset latitude, offset longitude
-    return {'x': lon_deg*deg_to_km* np.cos(lat_rad)+dx, 'y': lat_deg*deg_to_km+dy, 'z': h_km, 'lat': lat_deg+dlat, 'lon': lon_deg+dlon}
+    return {'x': lon_deg*deg_to_km* np.cos(lat_rad)+dx, 'y': lat_deg*deg_to_km+dy,
+            'z': h_km, 'lat': lat_deg+dlat, 'lon': lon_deg+dlon}
 
 
 def compute_slant_path(input: DictConfig, output: DictConfig) -> None:

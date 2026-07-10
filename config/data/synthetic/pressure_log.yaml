@@ -12,7 +12,7 @@ stage:
       # Pressure (log-transformed)
       pressure_log:
         # Dataset class
-        _target_: forward.model.data_loader.ConstantDataset
+        _target_: src.loader.dataset.ConstantDataset
         _recursive_: false
         # Path to the pressure data file
         path: ${....dir}/pressure.npy
@@ -22,19 +22,19 @@ stage:
         load:
           _target_: numpy.log10
           _args_:
-          - _target_: data.units.pa_to_hpa
+          - _target_: src.data.units.pa_to_hpa
             pressure:
-              _target_: data.io.load_npy
+              _target_: src.data.io.load_npy
               path: ${....path}
               dtype: ${data.dtype}
         # Transformations to apply
         transformations:
           # Per-variable normalization with log transform
           normalization:
-            _target_: data.transformations.min_max
+            _target_: src.data.transformations.min_max
             _partial_: true
             stats:
-              _target_: data.statistics.read_statistics_var
+              _target_: src.data.statistics.read_statistics_var
               path: ${preparation.statistics.data.output.path}
               var: 'pressure_log'
               dtype: ${data.dtype}

@@ -3,8 +3,8 @@ import pickle
 import torch
 from omegaconf import DictConfig, ListConfig
 from utilities.instantiators import instantiate
-from data.transformations import identity
-from typing import Union
+from src.data.transformations import identity
+from typing import Literal
 
 
 def save_pkl(path: str, data: dict) -> None:
@@ -20,6 +20,7 @@ def save_pkl(path: str, data: dict) -> None:
         None.
     """
 
+    # Open file
     with open(path, 'wb') as file:
         # noinspection PyTypeChecker
         pickle.dump(data, file)
@@ -37,13 +38,14 @@ def load_pkl(path: str) -> dict:
         data: dict. The loaded dictionary.
     """
 
+    # Open file
     with open(path, 'rb') as file:
         # noinspection PyTypeChecker
         data = pickle.load(file)
     return data
 
 
-def save_torch(path: str, data: Union[dict, torch.Tensor]) -> None:
+def save_torch(path: str, data: dict | torch.Tensor) -> None:
     """ Save a dictionary as a torch file.
 
         Parameters
@@ -59,7 +61,7 @@ def save_torch(path: str, data: Union[dict, torch.Tensor]) -> None:
     torch.save(data, path)
 
 
-def load_torch(path: str) -> Union[dict, torch.Tensor]:
+def load_torch(path: str) -> dict | torch.Tensor:
     """ Load a dictionary from a torch file.
 
         Parameters
@@ -74,7 +76,8 @@ def load_torch(path: str) -> Union[dict, torch.Tensor]:
     return torch.load(path)
 
 
-def load_npy(path: str, split: Union[np.ndarray, int, slice] = None, dtype: str = None, mmap_mode=None) -> np.ndarray:
+def load_npy(path: str, split: np.ndarray | int | slice | None = None, dtype: str | None = None,
+             mmap_mode: Literal["r+", "r", "w+", "c"] | None =None) -> np.ndarray:
     """ Load a numpy array from a .npy file and optionally split it.
 
         Parameters:
@@ -120,7 +123,8 @@ def load_npy(path: str, split: Union[np.ndarray, int, slice] = None, dtype: str 
             return out
 
 
-def load_latlon(path: str, scans: np.ndarray = None, split: np.ndarray = None, dtype: str = 'float32') -> np.ndarray:
+def load_latlon(path: str, scans: np.ndarray | None = None, split: np.ndarray | None = None,
+                dtype: str = 'float32') -> np.ndarray:
     """ Load latitude or longitude variable and tile it to match the number of scans.
 
         Parameters
@@ -163,7 +167,8 @@ def load_latlon(path: str, scans: np.ndarray = None, split: np.ndarray = None, d
     return np.asarray(latlon, dtype=dtype)
 
 
-def load_scans(path: str, lat: np.ndarray = None, split: np.ndarray = None, dtype: str = 'float32') -> np.ndarray:
+def load_scans(path: str, lat: np.ndarray | None = None, split: np.ndarray | None = None,
+               dtype: str = 'float32') -> np.ndarray:
     """ Load scan variable and repeat it to match the number of coordinates.
 
         Parameters
@@ -193,7 +198,7 @@ def load_scans(path: str, lat: np.ndarray = None, split: np.ndarray = None, dtyp
     return scans
 
 
-def load_var(config: DictConfig, split: Union[np.ndarray, int, slice] = None) -> np.ndarray:
+def load_var(config: DictConfig, split: np.ndarray | int | slice | None = None) -> np.ndarray:
     """ Load variable.
 
         Parameters
@@ -230,7 +235,7 @@ def load_var(config: DictConfig, split: Union[np.ndarray, int, slice] = None) ->
         return out
 
 
-def load_var_and_normalize(config: DictConfig, split: Union[np.ndarray, int, slice] = None) -> np.ndarray:
+def load_var_and_normalize(config: DictConfig, split: np.ndarray | int | slice | None = None) -> np.ndarray:
     """ Load and normalize variable.
 
         Parameters
@@ -266,7 +271,7 @@ def load_var_and_normalize(config: DictConfig, split: Union[np.ndarray, int, sli
     np.take(data, split, axis=0, out=out)
     # Normalize and return
     return f_norm(out)
-
+# TODO: Verify type
 
 def load_stack(stack: ListConfig) -> np.ndarray:
     """ Load and stack multiple variables.
@@ -298,18 +303,3 @@ def load_stack_and_normalize(stack: ListConfig) -> np.ndarray:
 
     # Load and stack variables along the last axis
     return np.concatenate([load_var_and_normalize(c) for c in stack], axis=0)
-
-
-def extract_indices(indices: np.ndarray, filter: np.ndarray = None) -> np.ndarray:
-    """ Extract split indices for a given stage from the configuration.
-
-        Parameters
-        ----------
-        indices: np.ndarray. Array of indices for the specified stage.
-        filter: np.ndarray, optional. Boolean array to filter the indices. Defaults to None.
-
-        Returns
-        -------
-        np.ndarray. Array of indices for the specified stage, or None if not found.
-    """
-    return indices[filter[indices]] if filter is not None else indices

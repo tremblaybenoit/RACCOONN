@@ -12,7 +12,7 @@ stage:
       # Longitude
       lon:
         # Dataset class
-        _target_: forward.model.data_loader.EagerDataset
+        _target_: src.loader.dataset.EagerDataset
         _recursive_: false
         # Path to the longitude data file
         path: ${....dir}/lon.npy
@@ -20,7 +20,7 @@ stage:
         type: 'Longitude (degrees)'
         # Loading function
         load:
-          _target_: data.io.load_latlon
+          _target_: src.data.io.load_latlon
           path: ${..path}
           scans:
             _target_: ${....scans.load._target_}
@@ -31,10 +31,10 @@ stage:
         transformations:
           # Per-variable normalization
           normalization:
-            _target_: data.transformations.min_max
+            _target_: src.data.transformations.min_max
             _partial_: true
             stats:
-              _target_: data.statistics.read_statistics_var
+              _target_: src.data.statistics.read_statistics_var
               path: ${preparation.statistics.data.output.path}
               var: 'lon'
               dtype: ${data.dtype}

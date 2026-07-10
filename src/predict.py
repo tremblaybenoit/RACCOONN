@@ -2,7 +2,7 @@ import logging
 import hydra
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
-from inverse.train import Operator
+from src.train import Operator
 from utilities.logic import get_config_path
 import torch
 # Force full FP32 matmul on CUDA (disable TF32) for more reproducible numerics
@@ -28,21 +28,22 @@ def main(config: DictConfig) -> None:
     """
 
     # Initialize trainer object
-    logger.info("Initializing inverse model...")
-    inverse_model = Operator(config)
+    logger.info("Initializing model...")
+    forward_model = Operator(config)
 
     # Evaluate on prediction set
-    logger.info("Predicting using the inverse model...")
-    pred = inverse_model.predict(config.loader)
+    logger.info("Predicting using the model...")
+    pred = forward_model.predict(config.loader)
 
     # Save predictions to file
     logger.info("Saving predictions to file...")
-    save_function = instantiate(config.loader.stage.predict.results.prof.save)
+    save_function = instantiate(config.loader.stage.predict.results.output.save)
     save_function(pred)
+    # TODO: Update for proper handling of results
 
 
 if __name__ == '__main__':
-    """ Predict using the inverse operator.
+    """ Predict using the model.
 
         Parameters
         ----------
@@ -52,7 +53,7 @@ if __name__ == '__main__':
 
         Returns
         -------
-        Prediction.
+        checkpoint: Training weights & biases.
     """
 
     main()
