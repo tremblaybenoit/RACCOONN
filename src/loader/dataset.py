@@ -1,6 +1,7 @@
 from torch.utils.data import Dataset
 from omegaconf import DictConfig, OmegaConf
 from utilities.instantiators import instantiate
+from utilities.tensors import array_to_tensor
 import os
 import numpy as np
 import torch
@@ -11,17 +12,15 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
 
 class UnivariateDataset(Dataset):
-    """ Base class for eager-loaded single-variable datasets with transformation pipelines.
+    """ Base class for single-variable datasets with transformation pipelines.
 
-        Loads data from a file once at initialization, applies a transformation pipeline
-        (preprocessing, normalization, etc.) in order, and stores the result in shared
-        memory tensors for efficient multiprocessing. Subclasses control how indexing
-        works and handle different data shapes.
+        Provides common infrastructure for building transformation pipelines
+        (preprocessing, normalization, etc.) and applying them in order.
+        Subclasses control how data is loaded (eager vs. lazy) and how indexing works.
     """
 
     def __init__(
         self,
-        load: DictConfig,
         transformations: DictConfig | None = None,
         **kwargs,
     ) -> None:
@@ -45,9 +44,6 @@ class UnivariateDataset(Dataset):
         # Class inheritance
         super().__init__()
 
-        # Store load config for later use
-        self.load_cfg = load
-
         # Build transformation pipeline in order
         self.pipeline = []
         self.pipeline_inverse = []
@@ -64,55 +60,25 @@ class UnivariateDataset(Dataset):
         # Reverse the order of the inverse transformations
         self.pipeline_inverse.reverse()
 
-    def _load(self) -> torch.Tensor:
-        """ Load data from file without transformations.
+    def _transform(self, data: np.ndarray | torch.Tensor) -> np.ndarray | torch.Tensor:
+        """ Apply transformation pipeline.
+
+            Parameters
+            ----------
+            data: torch.Tensor. Input data tensor.
 
             Returns
             -------
-            torch.Tensor. Raw data tensor in shared memory.
+            torch.Tensor. Transformed data tensor.
         """
 
-        # Load data using the instantiated load config
-        arr = instantiate(self.load_cfg)
-
-        # Convert to contiguous array for efficient memory layout
-        arr = np.ascontiguousarray(arr)
-
-        # Create torch tensor from numpy array
-        t = torch.from_numpy(arr)
-
-        # Enable sharing across processes
-        t.share_memory_()
-
-        return t
-
-    def _load_and_transform(self) -> torch.Tensor:
-        """ Load data from file and apply transformation pipeline.
-
-            Returns
-            -------
-            torch.Tensor. Transformed data tensor in shared memory.
-        """
-
-        # Load raw data
-        arr = instantiate(self.load_cfg)
-
-        # Apply transformations in sequence
+        # Apply inverse transformations in sequence
         for transform in self.pipeline:
-            arr = transform(arr)
+            data = transform(data)
 
-        # Convert to contiguous array for efficient memory layout
-        arr = np.ascontiguousarray(arr)
+        return data
 
-        # Create torch tensor from numpy array
-        t = torch.from_numpy(arr)
-
-        # Enable sharing across processes
-        t.share_memory_()
-
-        return t
-
-    def _inverse_transform(self, data: torch.Tensor) -> torch.Tensor:
+    def _inverse_transform(self, data: np.ndarray | torch.Tensor) -> np.ndarray | torch.Tensor:
         """ Apply inverse transformation pipeline.
 
             Parameters
@@ -154,11 +120,11 @@ class UnivariateDataset(Dataset):
 
 
 class EagerDataset(UnivariateDataset):
-    """ Dataset for single variables with per-sample indexed data.
+    """ Base class for eager-loaded single-variable datasets.
 
-        Inherits from UnivariateDataset. Loads data from a file, applies a transformation
-        pipeline, and stores the result in shared memory. Each __getitem__ call returns
-        data at the specified index for efficient indexed access across samples.
+        Inherits from UnivariateDataset. Loads data from a file at initialization,
+        applies a transformation pipeline, and stores the result in shared memory.
+        Designed to be subclassed or used directly for indexed per-sample access.
     """
 
     def __init__(
@@ -181,10 +147,37 @@ class EagerDataset(UnivariateDataset):
         """
 
         # Initialize base class
-        super().__init__(load=load, transformations=transformations, **kwargs)
+        super().__init__(transformations=transformations, **kwargs)
 
-        # Load and transform data once at initialization (will be stored in subclass)
+        # Load and transform data once at initialization
+        self.load_cfg = load
         self.data = self._load_and_transform()
+
+    def _load(self) -> np.ndarray:
+        """ Load data from file without transformations.
+
+            Returns
+            -------
+            np.ndarray. Raw data array.
+        """
+        # Load data using the instantiated load config
+        return instantiate(self.load_cfg)
+
+    def _load_and_transform(self) -> torch.Tensor:
+        """ Load data from file and apply transformation pipeline.
+
+            Returns
+            -------
+            torch.Tensor. Transformed data tensor in shared memory.
+        """
+        # Load raw data
+        arr = self._load()
+
+        # Apply transformations in sequence
+        arr = self._transform(arr)
+
+        # Convert to tensor with shared memory
+        return array_to_tensor(arr)
 
     def __len__(self) -> int:
         """ Return length of the dataset.
@@ -209,12 +202,12 @@ class EagerDataset(UnivariateDataset):
         return self.data[idx]
 
 
-class ConstantDataset(UnivariateDataset):
+class ConstantDataset(EagerDataset):
     """ Dataset for single variables with constant (non-indexed) values.
 
-        Inherits from UnivariateDataset. Loads data from a file, applies a transformation
-        pipeline, and stores the result as a single constant tensor in shared memory.
-        Each __getitem__ call returns the same value regardless of index.
+        Inherits from EagerDataset. Loads a constant value at initialization and
+        returns the same value regardless of index. Each __getitem__ call returns
+        the same constant tensor.
 
         Ideal for variables that have a fixed value shared across all samples.
     """
@@ -244,11 +237,8 @@ class ConstantDataset(UnivariateDataset):
         # Whether to squeeze the data or not
         self.squeeze = squeeze
 
-        # Initialize base class
+        # Initialize parent class (loads and transforms data)
         super().__init__(load=load, transformations=transformations, **kwargs)
-
-        # Load and transform data once at initialization (will be stored in subclass)
-        self.data = self._load_and_transform()
 
         # Apply squeeze if requested
         if self.squeeze and self.data.shape[0] == 1:
@@ -277,6 +267,82 @@ class ConstantDataset(UnivariateDataset):
             torch.Tensor. The constant tensor (same for all indices).
         """
         return self.data
+
+
+class LazyDataset(UnivariateDataset):
+    """ Dataset for single variables with on-demand file loading.
+
+        Inherits from UnivariateDataset. Instead of loading all data at initialization,
+        LazyDataset discovers a list of file paths and loads them on-demand in __getitem__.
+        Each sample is loaded from disk, transformed via the pipeline, and returned.
+
+        Ideal for large datasets where eager loading would consume too much memory.
+        Transforms are applied identically to EagerDataset, but only for the requested sample.
+    """
+
+    def __init__(
+        self,
+        path: DictConfig,
+        load: DictConfig,
+        transformations: DictConfig | None = None,
+        **kwargs,
+    ) -> None:
+        """ Initialize LazyDataset.
+
+            Parameters
+            ----------
+            path            : DictConfig. Config with _target_ pointing to a file discovery
+                              function (e.g. data.filters.filter_files) that returns a list
+                              of file paths. File discovery and split boundaries are fully
+                              embedded via Hydra interpolation.
+            load            : DictConfig. Loading function config (e.g. data.io.load_npy)
+                              with _target_ specifying the loader function. At runtime,
+                              this will be instantiated with path=files[idx].
+            transformations : DictConfig or None. Transformation pipeline config.
+            **kwargs        : Additional fields from config passed but not used.
+
+            Returns
+            -------
+            None.
+        """
+
+        # Initialize base class (builds transformation pipelines)
+        super().__init__(transformations=transformations, **kwargs)
+
+        # Resolve file list at construction time; split is baked-in via Hydra interpolation
+        self.files = instantiate(path)
+        self.load_fn = instantiate(load)
+
+    def __len__(self) -> int:
+        """ Return length of the dataset.
+
+            Returns
+            -------
+            int: Number of files in the discovered file list.
+        """
+        return len(self.files)
+
+    def __getitem__(self, idx: int) -> torch.Tensor:
+        """ Load one file on-demand, apply transformations, and return.
+
+            Parameters
+            ----------
+            idx : int. Index into the file list.
+
+            Returns
+            -------
+            torch.Tensor. Transformed data from the loaded file.
+        """
+
+        # Load the file at this index using the instantiated load config
+        arr = self.load_fn(path=self.files[idx])
+
+        # Apply transformations in sequence
+        for transform in self.pipeline:
+            arr = transform(arr)
+
+        # Convert to tensor without shared memory (not needed for on-demand, single-use tensors)
+        return array_to_tensor(arr, shared=False)
 
 
 class MultivariateDataset(Dataset):
