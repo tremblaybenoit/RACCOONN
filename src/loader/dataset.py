@@ -22,18 +22,19 @@ class UnivariateDataset(Dataset):
     def __init__(
         self,
         transformations: DictConfig | None = None,
+        as_tensor: bool = True,
         **kwargs,
     ) -> None:
         """ Initialize UnivariateDataset.
 
             Parameters
             ----------
-            load           : DictConfig. Loading function config (e.g. data.io.load_npy)
-                             with _target_ specifying the loader function.
             transformations: DictConfig or None. Contains transformation steps for this variable:
                              - preprocessing: initial transformations (if any)
                              - normalization: statistical normalization (if any)
                              - ... additional steps as needed, all with _partial_: true
+            as_tensor      : bool. If True, return torch.Tensor; if False, return np.ndarray.
+                             Default True (tensor).
             **kwargs       : Additional fields from config passed but not used by base class.
 
             Returns
@@ -43,6 +44,9 @@ class UnivariateDataset(Dataset):
 
         # Class inheritance
         super().__init__()
+
+        # Store output format preference
+        self.as_tensor = as_tensor
 
         # Build transformation pipeline in order
         self.pipeline = []
@@ -65,14 +69,14 @@ class UnivariateDataset(Dataset):
 
             Parameters
             ----------
-            data: torch.Tensor. Input data tensor.
+            data: np.ndarray or torch.Tensor. Input data.
 
             Returns
             -------
-            torch.Tensor. Transformed data tensor.
+            np.ndarray or torch.Tensor. Transformed data.
         """
 
-        # Apply inverse transformations in sequence
+        # Apply transformations in sequence
         for transform in self.pipeline:
             data = transform(data)
 
@@ -83,11 +87,11 @@ class UnivariateDataset(Dataset):
 
             Parameters
             ----------
-            data: torch.Tensor. Transformed data tensor.
+            data: np.ndarray or torch.Tensor. Transformed data.
 
             Returns
             -------
-            torch.Tensor. Inverse transformed data tensor.
+            np.ndarray or torch.Tensor. Inverse transformed data.
         """
 
         # Apply inverse transformations in sequence
@@ -95,6 +99,7 @@ class UnivariateDataset(Dataset):
             data = transform(data)
 
         return data
+
 
     def __len__(self) -> int:
         """ Return length of the dataset. Must be implemented by subclass.
@@ -105,7 +110,7 @@ class UnivariateDataset(Dataset):
         """
         raise NotImplementedError("Subclass must implement __len__")
 
-    def __getitem__(self, idx: int) -> torch.Tensor:
+    def __getitem__(self, idx: int) -> np.ndarray | torch.Tensor:
         """ Get item from dataset. Must be implemented by subclass.
 
             Parameters
@@ -114,7 +119,7 @@ class UnivariateDataset(Dataset):
 
             Returns
             -------
-            torch.Tensor. Data at the given index.
+            np.ndarray or torch.Tensor. Data at the given index, format determined by as_tensor.
         """
         raise NotImplementedError("Subclass must implement __getitem__")
 
@@ -123,23 +128,27 @@ class EagerDataset(UnivariateDataset):
     """ Base class for eager-loaded single-variable datasets.
 
         Inherits from UnivariateDataset. Loads data from a file at initialization,
-        applies a transformation pipeline, and stores the result in shared memory.
+        applies a transformation pipeline, and stores the result as numpy array.
         Designed to be subclassed or used directly for indexed per-sample access.
+        Output format (numpy or tensor) is controlled by as_tensor parameter.
     """
 
     def __init__(
         self,
         load: DictConfig,
         transformations: DictConfig | None = None,
+        as_tensor: bool = True,
         **kwargs,
     ) -> None:
         """ Initialize EagerDataset.
 
             Parameters
             ----------
-            load        : DictConfig. Loading function config (e.g. data.io.load_npy).
-            transformations: DictConfig or None. Transformation pipeline config.
-            **kwargs    : Additional fields from config passed but not used.
+            load            : DictConfig. Loading function config (e.g. data.io.load_npy).
+            transformations : DictConfig or None. Transformation pipeline config.
+            as_tensor       : bool. If True, return tensors; if False, return numpy arrays.
+                              Default True.
+            **kwargs        : Additional fields from config passed but not used.
 
             Returns
             -------
@@ -147,49 +156,49 @@ class EagerDataset(UnivariateDataset):
         """
 
         # Initialize base class
-        super().__init__(transformations=transformations, **kwargs)
+        super().__init__(transformations=transformations, as_tensor=as_tensor, **kwargs)
 
         # Load and transform data once at initialization
         self.load_cfg = load
-        self.data = self._load_and_transform()
+        self.data = self._load()
 
-    def _load(self) -> np.ndarray:
-        """ Load data from file without transformations.
-
-            Returns
-            -------
-            np.ndarray. Raw data array.
-        """
-        # Load data using the instantiated load config
-        return instantiate(self.load_cfg)
-
-    def _load_and_transform(self) -> torch.Tensor:
+    def _load(self) -> np.ndarray | torch.Tensor:
         """ Load data from file and apply transformation pipeline.
 
             Returns
             -------
-            torch.Tensor. Transformed data tensor in shared memory.
+            np.ndarray or torch.Tensor. Transformed data in requested format.
+                - If as_tensor=True: torch.Tensor with shared memory (for multiprocessing efficiency).
+                - If as_tensor=False: np.ndarray (contiguous).
         """
         # Load raw data
-        arr = self._load()
+        arr = instantiate(self.load_cfg)
 
-        # Apply transformations in sequence
-        arr = self._transform(arr)
+        # Apply transformations in sequence if pipeline exists
+        if self.pipeline:
+            arr = self._transform(arr)
 
-        # Convert to tensor with shared memory
-        return array_to_tensor(arr)
+        # Convert to requested output format (only once, at init time)
+        if self.as_tensor:
+            # Tensor with shared memory for multiprocessing
+            return array_to_tensor(arr, shared=True)
+        else:
+            # Keep as contiguous numpy array
+            return np.ascontiguousarray(arr)
 
     def __len__(self) -> int:
         """ Return length of the dataset.
 
             Returns
             -------
-            int: Number of samples (first dimension of data tensor).
+            int: Number of samples (first dimension of data array).
         """
         return len(self.data)
 
-    def __getitem__(self, idx: int) -> torch.Tensor:
+    def __getitem__(self, idx: int) -> np.ndarray | torch.Tensor:
         """ Get item from dataset by index.
+
+            Data format (numpy or tensor) is determined by as_tensor parameter set at init time.
 
             Parameters
             ----------
@@ -197,7 +206,7 @@ class EagerDataset(UnivariateDataset):
 
             Returns
             -------
-            torch.Tensor. Data at the given index.
+            np.ndarray or torch.Tensor. Data at the given index (already in requested format).
         """
         return self.data[idx]
 
@@ -207,7 +216,7 @@ class ConstantDataset(EagerDataset):
 
         Inherits from EagerDataset. Loads a constant value at initialization and
         returns the same value regardless of index. Each __getitem__ call returns
-        the same constant tensor.
+        the same constant, with output format controlled by as_tensor parameter.
 
         Ideal for variables that have a fixed value shared across all samples.
     """
@@ -217,6 +226,7 @@ class ConstantDataset(EagerDataset):
         load: DictConfig,
         transformations: DictConfig | None = None,
         squeeze: bool = True,
+        as_tensor: bool = True,
         **kwargs,
     ) -> None:
         """ Initialize ConstantDataset.
@@ -226,6 +236,8 @@ class ConstantDataset(EagerDataset):
             load            : DictConfig. Loading function config with _target_ specifying the loader.
             transformations : DictConfig or None. Transformation pipeline config.
             squeeze         : bool. If True and data has shape[0]==1, squeeze the first dimension.
+                              Default True.
+            as_tensor       : bool. If True, return tensors; if False, return numpy arrays.
                               Default True.
             **kwargs        : Additional fields from config passed but not used.
 
@@ -238,11 +250,11 @@ class ConstantDataset(EagerDataset):
         self.squeeze = squeeze
 
         # Initialize parent class (loads and transforms data)
-        super().__init__(load=load, transformations=transformations, **kwargs)
+        super().__init__(load=load, transformations=transformations, as_tensor=as_tensor, **kwargs)
 
         # Apply squeeze if requested
         if self.squeeze and self.data.shape[0] == 1:
-            self.constant = self.data.squeeze(0)
+            self.data = self.data.squeeze(0)
 
     def __len__(self) -> int:
         """ Return length of the dataset.
@@ -255,8 +267,10 @@ class ConstantDataset(EagerDataset):
         """
         return 1
 
-    def __getitem__(self, idx: int) -> torch.Tensor:
+    def __getitem__(self, idx: int) -> np.ndarray | torch.Tensor:
         """ Get constant value (index is ignored).
+
+            Data format (numpy or tensor) is determined by as_tensor parameter set at init time.
 
             Parameters
             ----------
@@ -264,7 +278,7 @@ class ConstantDataset(EagerDataset):
 
             Returns
             -------
-            torch.Tensor. The constant tensor (same for all indices).
+            np.ndarray or torch.Tensor. The constant value (already in requested format).
         """
         return self.data
 
@@ -275,6 +289,7 @@ class LazyDataset(UnivariateDataset):
         Inherits from UnivariateDataset. Instead of loading all data at initialization,
         LazyDataset discovers a list of file paths and loads them on-demand in __getitem__.
         Each sample is loaded from disk, transformed via the pipeline, and returned.
+        Output format (numpy or tensor) is controlled by as_tensor parameter.
 
         Ideal for large datasets where eager loading would consume too much memory.
         Transforms are applied identically to EagerDataset, but only for the requested sample.
@@ -285,6 +300,7 @@ class LazyDataset(UnivariateDataset):
         path: DictConfig,
         load: DictConfig,
         transformations: DictConfig | None = None,
+        as_tensor: bool = True,
         **kwargs,
     ) -> None:
         """ Initialize LazyDataset.
@@ -299,6 +315,8 @@ class LazyDataset(UnivariateDataset):
                               with _target_ specifying the loader function. At runtime,
                               this will be instantiated with path=files[idx].
             transformations : DictConfig or None. Transformation pipeline config.
+            as_tensor       : bool. If True, return tensors; if False, return numpy arrays.
+                              Default True.
             **kwargs        : Additional fields from config passed but not used.
 
             Returns
@@ -307,7 +325,7 @@ class LazyDataset(UnivariateDataset):
         """
 
         # Initialize base class (builds transformation pipelines)
-        super().__init__(transformations=transformations, **kwargs)
+        super().__init__(transformations=transformations, as_tensor=as_tensor, **kwargs)
 
         # Resolve file list at construction time; split is baked-in via Hydra interpolation
         self.files = instantiate(path)
@@ -322,8 +340,8 @@ class LazyDataset(UnivariateDataset):
         """
         return len(self.files)
 
-    def __getitem__(self, idx: int) -> torch.Tensor:
-        """ Load one file on-demand, apply transformations, and return.
+    def __getitem__(self, idx: int) -> np.ndarray | torch.Tensor:
+        """ Load one file on-demand, apply transformations, and convert to requested format.
 
             Parameters
             ----------
@@ -331,18 +349,25 @@ class LazyDataset(UnivariateDataset):
 
             Returns
             -------
-            torch.Tensor. Transformed data from the loaded file.
+            np.ndarray or torch.Tensor. Transformed data from the loaded file,
+                                         format determined by as_tensor.
         """
 
         # Load the file at this index using the instantiated load config
         arr = self.load_fn(path=self.files[idx])
 
-        # Apply transformations in sequence
-        for transform in self.pipeline:
-            arr = transform(arr)
+        # Ensure contiguous array
+        arr = np.ascontiguousarray(arr)
 
-        # Convert to tensor without shared memory (not needed for on-demand, single-use tensors)
-        return array_to_tensor(arr, shared=False)
+        # Apply transformations in sequence if pipeline exists
+        if self.pipeline:
+            arr = self._transform(arr)
+
+        # Convert to requested output format (per-item, no shared memory for ephemeral tensors)
+        if self.as_tensor:
+            return array_to_tensor(arr, shared=False)
+        else:
+            return arr
 
 
 class MultivariateDataset(Dataset):
@@ -353,6 +378,9 @@ class MultivariateDataset(Dataset):
         (load, transformations, etc.). MultivariateDataset instantiates each one independently
         and combines them into aligned samples, supporting mixed dataset types
         (e.g., both EagerDataset and ConstantDataset).
+
+        The as_tensor parameter is imposed on all sub-datasets, overriding their individual
+        settings for consistency.
     """
 
     def __init__(
@@ -361,6 +389,7 @@ class MultivariateDataset(Dataset):
         target: DictConfig | None = None,
         context: DictConfig | None = None,
         results: DictConfig | None = None,
+        as_tensor: bool = True,
     ) -> None:
         """ Initialize MultivariateDataset.
 
@@ -375,6 +404,9 @@ class MultivariateDataset(Dataset):
             context : DictConfig or None. Same structure as input for context variables.
                       Must contain the same number of entries in the same order as input.
             results : DictConfig or None. Results configuration for saving outputs.
+            as_tensor : bool. If True, all sub-datasets return tensors; if False, numpy arrays.
+                        This value is imposed on all sub-datasets, overriding their configs.
+                        Default True.
 
             Returns
             -------
@@ -384,26 +416,50 @@ class MultivariateDataset(Dataset):
         # Class inheritance
         super().__init__()
 
-        # Instantiate input datasets; preserve order via keys list
-        self.input_keys = list(input.keys())
+        # Helper function to impose as_tensor on dataset configs per variable
+        def _impose_as_tensor(cfg_dict: DictConfig, as_tensor_value: bool) -> DictConfig:
+            """
+            Override as_tensor in dataset config for each variable.
+
+            For each variable (key), modify its dataset config to set as_tensor.
+            This ensures all sub-datasets respect the parent's as_tensor setting.
+            """
+            modified = OmegaConf.create(cfg_dict)
+            for variable_name in modified.keys():
+                # For this variable, override as_tensor in its dataset config
+                variable_cfg = modified[variable_name]
+                modified[variable_name] = OmegaConf.merge(variable_cfg, {'as_tensor': as_tensor_value})
+            return modified
+
+        # Impose as_tensor on input datasets (one per input variable)
+        input_modified = _impose_as_tensor(input, as_tensor)
+        self.input_keys = list(input_modified.keys())
         self.input_datasets = {
             key: instantiate(cfg)
-            for key, cfg in input.items()
+            for key, cfg in input_modified.items()
         }
 
-        # Instantiate target datasets if provided; aligned 1:1 with input
+        # Impose as_tensor on target datasets if provided (one per target variable)
         self.target_keys = list(target.keys()) if target is not None else None
-        self.target_datasets = (
-            {key: instantiate(cfg) for key, cfg in target.items()}
-            if target is not None else None
-        )
+        if target is not None:
+            target_modified = _impose_as_tensor(target, as_tensor)
+            self.target_datasets = {
+                key: instantiate(cfg)
+                for key, cfg in target_modified.items()
+            }
+        else:
+            self.target_datasets = None
 
-        # Instantiate context datasets if provided; aligned 1:1 with input
+        # Impose as_tensor on context datasets if provided (one per context variable)
         self.context_keys = list(context.keys()) if context is not None else None
-        self.context_datasets = (
-            {key: instantiate(cfg) for key, cfg in context.items()}
-            if context is not None else None
-        )
+        if context is not None:
+            context_modified = _impose_as_tensor(context, as_tensor)
+            self.context_datasets = {
+                key: instantiate(cfg)
+                for key, cfg in context_modified.items()
+            }
+        else:
+            self.context_datasets = None
 
         # Store results config
         self.results = results
