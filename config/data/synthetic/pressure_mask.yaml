@@ -19,12 +19,7 @@ stage:
         # Path to the pressure mask file
         path: ${data.preparation.filters.pressure_mask.output.path}
         # Loading function
-        # load:
-        #   _target_: src.data.filters.pressure_mask
-        #   prof: ${data.stage.source.variables.prof.load}
-        load:
-          _target_: src.data.io.load_npy
-          path: ${..path}
+        load: ${data.preparation.filters.pressure_mask.output.load}
   # Training set
   train: ${..source}
   # Validation set

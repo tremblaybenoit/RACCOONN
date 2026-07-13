@@ -1,2 +1,3 @@
 defaults:
+  - statistics
   - _self_

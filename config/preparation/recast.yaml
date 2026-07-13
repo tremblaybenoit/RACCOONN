@@ -1,0 +1,25 @@
+# Recast data to new format, spatiotemporal distribution
+recast:
+  # Operation
+  to_float32:
+    # Function
+    _target_: src.data.recast.recast
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Variables
+      variables:
+        # Atmospheric profiles
+        prof:
+
+
+    # What the method produces as output
+    output:
+      # Save function
+      save:
+        _target_: numpy.save
+        path: ${..path}
+      # Load function
+      load:
+        _target_: src.data.io.load_npy
+        path: ${..path}

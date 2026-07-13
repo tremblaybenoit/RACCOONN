@@ -119,16 +119,15 @@ def compute_slant_path(input: DictConfig, output: DictConfig) -> None:
 
 @hydra.main(version_base=None, config_path=get_config_path(), config_name="default")
 def main(config: DictConfig) -> None:
-    """
-    Compute covariance matrices of given datasets.
+    """ Determine the data coordinate offsets along the slant path.
 
-    Parameters
-    ----------
-    config: DictConfig. Main hydra configuration file containing all model hyperparameters.
+        Parameters
+        ----------
+        config: DictConfig. Main hydra configuration file containing all model hyperparameters.
 
-    Returns
-    -------
-    None.
+        Returns
+        -------
+        None.
     """
 
     # Compute latitude and longitude offsets
@@ -141,7 +140,7 @@ def main(config: DictConfig) -> None:
 
 
 if __name__ == '__main__':
-    """ Compute slant path offsets.
+    """ Determine the data coordinate offsets along the slant path.
 
         Parameters
         ----------
@@ -151,7 +150,7 @@ if __name__ == '__main__':
 
         Returns
         -------
-        Corrected latitude & longitude.
+        Corrected latitude and longitude, and cartesian coordinates.
     """
 
     main()

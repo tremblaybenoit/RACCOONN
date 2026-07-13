@@ -46,7 +46,7 @@ class NormalizeProfiles:
         """
 
         # Apply transformation
-        return affine(x, self.profmax, self.profmin, inverse_transform=~self.inverse_transform)
+        return affine(x, self.profmax, self.profmin, inverse_transform=not self.inverse_transform)
 
     __call__ = forward  # Make the instance callable for normalization
 
@@ -117,7 +117,7 @@ class NormalizeSurface:
         """
 
         # Apply transformation
-        return affine(x, self.surfmax-self.surfmin, self.surfmin, inverse_transform=~self.inverse_transform)
+        return affine(x, self.surfmax-self.surfmin, self.surfmin, inverse_transform=not self.inverse_transform)
 
     __call__ = forward  # Make the instance callable for normalization
 
@@ -296,26 +296,31 @@ def multiplication(data: np.ndarray | torch.Tensor, factor: np.ndarray | torch.T
             else torch.finfo(scaling_factor.dtype).eps
         denom = scaling_factor + eps
         # Divide
-        return data.div_(denom) if isinstance(data, torch.Tensor) else np.divide(data, denom, out=data)
+        if isinstance(data, torch.Tensor):
+            return data.div_(denom)  # type: ignore
+        else:
+            return np.divide(data, denom, out=data)
     else:
         # Multiply
-        return data.mul_(scaling_factor) if isinstance(data, torch.Tensor) \
-            else np.multiply(data, scaling_factor, out=data)
+        if isinstance(data, torch.Tensor):
+            return data.mul_(scaling_factor)  # type: ignore
+        else:
+            return np.multiply(data, scaling_factor, out=data)
 
 
 def translation(data: np.ndarray | torch.Tensor, value: np.ndarray | torch.Tensor,
                 inverse_transform: bool = False) -> np.ndarray | torch.Tensor:
     """ Shift dataset by adding a value.
 
-        Parameters
-        ----------
-        data: arr or tensor. Contains data to transform.
-        value: arr or tensor. Shift to be added to the data.
-        inverse_transform: bool. False for subtracting, True for adding.
+         Parameters
+         ----------
+         data: arr or tensor. Contains data to transform.
+         value: arr or tensor. Shift to be added to the data.
+         inverse_transform: bool. False for subtracting, True for adding.
 
-        Returns
-        -------
-        data_transform: arr or tensor. Translated dataset.
+         Returns
+         -------
+         data_transform: arr or tensor. Translated dataset.
     """
 
     # Broadcast to data dimensions
@@ -324,9 +329,15 @@ def translation(data: np.ndarray | torch.Tensor, value: np.ndarray | torch.Tenso
     # Un-standardization or standardization
     if inverse_transform:
         # Subtract
-        return data.sub_(shift_value) if isinstance(data, torch.Tensor) else np.subtract(data, shift_value, out=data)
+        if isinstance(data, torch.Tensor):
+            return data.sub_(shift_value)  # type: ignore
+        else:
+            return np.subtract(data, shift_value, out=data)
     else:
-        return data.add_(shift_value) if isinstance(data, torch.Tensor) else np.add(data, shift_value, out=data)
+        if isinstance(data, torch.Tensor):
+            return data.add_(shift_value)  # type: ignore
+        else:
+            return np.add(data, shift_value, out=data)
 
 
 def affine(data: np.ndarray | torch.Tensor, factor: np.ndarray | torch.Tensor, value: np.ndarray | torch.Tensor,

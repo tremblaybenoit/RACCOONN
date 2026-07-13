@@ -3,7 +3,7 @@ slant:
   # Training set
   train:
     # Function
-    _target_: data.slant_path.compute_slant_path
+    _target_: src.data.slant.compute_slant_path
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:
@@ -18,7 +18,7 @@ slant:
     output:
       lat:
         # Output path
-        path: ${paths.data_dir}/Train2/lat_slant.npy
+        path: ${data.stage.train.dir}/lat_slant.npy
         # Save function
         save:
           _target_: numpy.save
@@ -27,14 +27,13 @@ slant:
             - ${preparation.slant.train.output.lat.path}
         # Load function
         load:
-          _target_: data.io.load_npy
+          _target_: src.data.io.load_npy
           _args_:
             - ${preparation.slant.train.output.lat.path}
             - ${data.dtype}
-        normalization: ${data.stage.train.vars.lat.normalization}
       lon:
         # Output path
-        path: ${paths.data_dir}/Train2/lon_slant.npy
+        path: ${data.stage.train.dir}/lon_slant.npy
         # Save function
         save:
           _target_: numpy.save
@@ -43,14 +42,13 @@ slant:
             - ${preparation.slant.train.output.lon.path}
         # Load function
         load:
-          _target_: data.io.load_npy
+          _target_: src.data.io.load_npy
           _args_:
             - ${preparation.slant.train.output.lon.path}
             - ${data.dtype}
-        normalization: ${data.stage.train.vars.lon.normalization}
       z:
         # Output path
-        path: ${paths.data_dir}/Train2/z_slant.npy
+        path: ${data.stage.train.dir}/z_slant.npy
         # Save function
         save:
           _target_: numpy.save
@@ -59,14 +57,13 @@ slant:
             - ${preparation.slant.train.output.z.path}
         # Load function
         load:
-          _target_: data.io.load_npy
+          _target_: src.data.io.load_npy
           _args_:
             - ${preparation.slant.train.output.z.path}
             - ${data.dtype}
-        normalization: null
       x:
         # Output path
-        path: ${paths.data_dir}/Train2/x_slant.npy
+        path: ${data.stage.train.dir}/x_slant.npy
         # Save function
         save:
           _target_: numpy.save
@@ -75,14 +72,13 @@ slant:
             - ${preparation.slant.train.output.x.path}
         # Load function
         load:
-          _target_: data.io.load_npy
+          _target_: src.data.io.load_npy
           _args_:
             - ${preparation.slant.train.output.x.path}
             - ${data.dtype}
-        normalization: null
       y:
         # Output path
-        path: ${paths.data_dir}/Train2/y_slant.npy
+        path: ${data.stage.train.dir}/y_slant.npy
         # Save function
         save:
           _target_: numpy.save
@@ -91,15 +87,14 @@ slant:
             - ${preparation.slant.train.output.y.path}
         # Load function
         load:
-          _target_: data.io.load_npy
+          _target_: src.data.io.load_npy
           _args_:
             - ${preparation.slant.train.output.y.path}
             - ${data.dtype}
-        normalization: null
   # Validation set
   valid:
     # Function
-    _target_: data.slant_path.compute_slant_path
+    _target_: src.data.slant.compute_slant_path
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:
@@ -114,7 +109,7 @@ slant:
     output:
       lat:
         # Output path
-        path: ${paths.data_dir}/Val2/lat_slant.npy
+        path: ${data.stage.valid.dir}/lat_slant.npy
         # Save function
         save:
           _target_: numpy.save
@@ -123,14 +118,13 @@ slant:
             - ${preparation.slant.valid.output.lat.path}
         # Load function
         load:
-          _target_: data.io.load_npy
+          _target_: src.data.io.load_npy
           _args_:
             - ${preparation.slant.valid.output.lat.path}
             - ${data.dtype}
-        normalization: ${data.stage.valid.vars.lat.normalization}
       lon:
         # Output path
-        path: ${paths.data_dir}/Val2/lon_slant.npy
+        path: ${data.stage.valid.dir}/lon_slant.npy
         # Save function
         save:
           _target_: numpy.save
@@ -139,14 +133,13 @@ slant:
             - ${preparation.slant.valid.output.lon.path}
         # Load function
         load:
-          _target_: data.io.load_npy
+          _target_: src.data.io.load_npy
           _args_:
             - ${preparation.slant.valid.output.lon.path}
             - ${data.dtype}
-        normalization: ${data.stage.valid.vars.lon.normalization}
       z:
         # Output path
-        path: ${paths.data_dir}/Val2/z_slant.npy
+        path: ${data.stage.valid.dir}/z_slant.npy
         # Save function
         save:
           _target_: numpy.save
@@ -155,14 +148,13 @@ slant:
             - ${preparation.slant.valid.output.z.path}
         # Load function
         load:
-          _target_: data.io.load_npy
+          _target_: src.data.io.load_npy
           _args_:
             - ${preparation.slant.valid.output.z.path}
             - ${data.dtype}
-        normalization: null
       x:
         # Output path
-        path: ${paths.data_dir}/Val2/x_slant.npy
+        path: ${data.stage.valid.dir}/x_slant.npy
         # Save function
         save:
           _target_: numpy.save
@@ -171,14 +163,13 @@ slant:
             - ${preparation.slant.valid.output.x.path}
         # Load function
         load:
-          _target_: data.io.load_npy
+          _target_: src.data.io.load_npy
           _args_:
             - ${preparation.slant.valid.output.x.path}
             - ${data.dtype}
-        normalization: null
       y:
         # Output path
-        path: ${paths.data_dir}/Val2/y_slant.npy
+        path: ${data.stage.valid.dir}/y_slant.npy
         # Save function
         save:
           _target_: numpy.save
@@ -187,15 +178,14 @@ slant:
             - ${preparation.slant.valid.output.y.path}
         # Load function
         load:
-          _target_: data.io.load_npy
+          _target_: src.data.io.load_npy
           _args_:
             - ${preparation.slant.valid.output.y.path}
             - ${data.dtype}
-        normalization: null
   # Test set
   test:
     # Function
-    _target_: data.slant_path.compute_slant_path
+    _target_: src.data.slant.compute_slant_path
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:
@@ -210,7 +200,7 @@ slant:
     output:
       lat:
         # Output path
-        path: ${paths.data_dir}/Test2/lat_slant.npy
+        path: ${data.stage.test.dir}/lat_slant.npy
         # Save function
         save:
           _target_: numpy.save
@@ -219,14 +209,13 @@ slant:
             - ${preparation.slant.test.output.lat.path}
         # Load function
         load:
-          _target_: data.io.load_npy
+          _target_: src.data.io.load_npy
           _args_:
             - ${preparation.slant.test.output.lat.path}
             - ${data.dtype}
-        normalization: ${data.stage.test.vars.lat.normalization}
       lon:
         # Output path
-        path: ${paths.data_dir}/Test2/lon_slant.npy
+        path: ${data.stage.test.dir}/lon_slant.npy
         # Save function
         save:
           _target_: numpy.save
@@ -235,14 +224,13 @@ slant:
             - ${preparation.slant.test.output.lon.path}
         # Load function
         load:
-          _target_: data.io.load_npy
+          _target_: src.data.io.load_npy
           _args_:
             - ${preparation.slant.test.output.lon.path}
             - ${data.dtype}
-        normalization: ${data.stage.test.vars.lon.normalization}
       z:
         # Output path
-        path: ${paths.data_dir}/Test2/z_slant.npy
+        path: ${data.stage.test.dir}/z_slant.npy
         # Save function
         save:
           _target_: numpy.save
@@ -251,14 +239,13 @@ slant:
             - ${preparation.slant.test.output.z.path}
         # Load function
         load:
-          _target_: data.io.load_npy
+          _target_: src.data.io.load_npy
           _args_:
             - ${preparation.slant.test.output.z.path}
             - ${data.dtype}
-        normalization: null
       x:
         # Output path
-        path: ${paths.data_dir}/Test2/x_slant.npy
+        path: ${data.stage.test.dir}/x_slant.npy
         # Save function
         save:
           _target_: numpy.save
@@ -267,14 +254,13 @@ slant:
             - ${preparation.slant.test.output.x.path}
         # Load function
         load:
-          _target_: data.io.load_npy
+          _target_: src.data.io.load_npy
           _args_:
             - ${preparation.slant.test.output.x.path}
             - ${data.dtype}
-        normalization: null
       y:
         # Output path
-        path: ${paths.data_dir}/Test2/y_slant.npy
+        path: ${data.stage.test.dir}/y_slant.npy
         # Save function
         save:
           _target_: numpy.save
@@ -283,8 +269,7 @@ slant:
             - ${preparation.slant.test.output.y.path}
         # Load function
         load:
-          _target_: data.io.load_npy
+          _target_: src.data.io.load_npy
           _args_:
             - ${preparation.slant.test.output.y.path}
             - ${data.dtype}
-        normalization: null

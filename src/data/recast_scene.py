@@ -14,26 +14,6 @@ from scipy.spatial import cKDTree
 logger = logging.getLogger(__name__)
 
 
-def onion_peel_boundary(coords, layers=5):
-    all_indices = np.arange(len(coords))
-    boundary_indices = []
-    current_coords = coords.copy()
-    current_indices = all_indices.copy()
-
-    for _ in range(layers):
-        if len(current_coords) < 3: break
-        hull = ConvexHull(current_coords)
-        # Store the original indices of the hull vertices
-        boundary_indices.extend(current_indices[hull.vertices])
-        # Remove these points and repeat
-        mask = np.ones(len(current_coords), dtype=bool)
-        mask[hull.vertices] = False
-        current_coords = current_coords[mask]
-        current_indices = current_indices[mask]
-
-    return np.array(boundary_indices)
-
-
 def main(in_dir, in_precision, out_dir, out_precision, out_cloud_filter, out_clearsky_filter,
          timestep=None, lat_min=None, lat_max=None, lon_min=None, lon_max=None) -> None:
     """
@@ -57,11 +37,6 @@ def main(in_dir, in_precision, out_dir, out_precision, out_cloud_filter, out_cle
     -------
     None.
     """
-
-    # Steps:
-    # 1. Resave data in original precision, but computing beforehand some of the quantities for simplicity (e.g., background, filters, etc).
-    # 2. Resave data from 1. in new precision (float32).
-    # 3. Filter data into clearsky/cloudy cases and resave in both precisions.
 
     # Output directory
     os.makedirs(out_dir, exist_ok=True)
@@ -113,9 +88,6 @@ def main(in_dir, in_precision, out_dir, out_precision, out_cloud_filter, out_cle
     has_cloud_neighbor = cloud_extent[neigh].any(axis=1)
 
     # fraction of the total span used as tolerance (adjust as needed)
-    frac_lat, frac_lon = 0.050, 0.050
-    lat_span = lat_max - lat_extent.min()
-    lon_span = lon_max - lon_extent.min()
     tol_lat = 0.75 # frac_lat * lat_span if lat_span > 0 else frac_lat * (abs(lat_extent.max()) + 1e-6)
     tol_lon = 0.75 # frac_lon * lon_span if lon_span > 0 else frac_lon * (abs(lon_extent.max()) + 1e-6)
     has_edge = (
@@ -145,27 +117,6 @@ def main(in_dir, in_precision, out_dir, out_precision, out_cloud_filter, out_cle
     # Number of samples, scans, coordinates
     n_scans = np.unique(scans).shape[0]
     n_coords = mask.sum()
-    # Establish boundaries of spatial domain. We want to ensure that no validation/test points are alone or on boundaries.
-    # Look for hull points and add to training set.
-
-
-
-    # fraction of the total span used as tolerance (adjust as needed)
-    frac_lat, frac_lon = 0.050, 0.050
-    lat_span = lat_max - lat_extent.min()
-    lon_span = lon_max - lon_extent.min()
-    tol_lat = frac_lat * lat_span if lat_span > 0 else frac_lat * (abs(lat_extent.max()) + 1e-6)
-    tol_lon = frac_lon * lon_span if lon_span > 0 else frac_lon * (abs(lon_extent.max()) + 1e-6)
-    edge_indices = np.flatnonzero(
-            (lat_extent >= lat_max - tol_lat) |
-            (lat_extent <= lat_min + tol_lat) |
-             (lon_extent >= lon_max - tol_lon) |
-             (lon_extent <= lon_min + tol_lon)
-    )
-    # remaining_indices = np.setdiff1d(np.arange(n_coords), hull_indices)
-    # Update indices
-    # hull_indices = np.flatnonzero(mask)[hull_indices]
-    # remaining_indices = np.flatnonzero(mask)[remaining_indices]
 
     # Static scenario: We only extract one timestep (scan). We shuffle lat/lon pairs across the training,
     # validation and test sets. However, the hull_indices must be part of the training set indices.
@@ -191,7 +142,7 @@ def main(in_dir, in_precision, out_dir, out_precision, out_cloud_filter, out_cle
         out_dir_stage = os.path.join(out_dir, stage_name)
         os.makedirs(out_dir_stage, exist_ok=True)
 
-    # Load data, concatenante, filter out, and save
+    # Load data, concatenate, filter out, and save
     for filename in tqdm(filenames):
         print(filename)
 
@@ -207,8 +158,6 @@ def main(in_dir, in_precision, out_dir, out_precision, out_cloud_filter, out_cle
                 # If clearsky profiles, only keep non-zero profile types
                 if out_clearsky_filter:
                     data = np.take(data, [0, 4, 8], axis=1)
-                # Compute background
-                prof_background = data[spatial_mask].mean(axis=0, keepdims=True)
 
             # Loop over stages and save filtered data
             for stage_name in stages:
@@ -218,19 +167,6 @@ def main(in_dir, in_precision, out_dir, out_precision, out_cloud_filter, out_cle
                 indices = stages_indices[stage_name]
                 # Filter data
                 data_out = np.take(data, indices, axis=0)
-                # If profiles, also save increments
-                if filename == "prof.npy":
-                    # Compute profile increments
-                    prof_increment = data_out - prof_background
-                    # Save profile background and increments
-                    prof_background_path = os.path.join(out_dir_stage, "prof_background.npy")
-                    np.save(prof_background_path, prof_background.astype(out_precision))
-                    logger.info("Saved profile background to `%s`", prof_background_path)
-                    prof_increment_path = os.path.join(out_dir_stage, "prof_increment.npy")
-                    np.save(prof_increment_path, prof_increment.astype(out_precision))
-                    logger.info("Saved profile increments to `%s`", prof_increment_path)
-                    del prof_increment
-                    gc.collect()
                 # Save filtered data
                 out_path = os.path.join(out_dir_stage, filename)
                 np.save(out_path, data_out.astype(out_precision))

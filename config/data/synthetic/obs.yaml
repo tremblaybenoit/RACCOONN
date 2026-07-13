@@ -33,7 +33,7 @@ stage:
             stats:
               _target_: src.data.statistics.read_statistics_var
               path: ${preparation.statistics.data.output.path}
-              var: 'obs'
+              key: 'obs'
               dtype: ${data.dtype}
   # Validation set
   valid:

@@ -110,69 +110,6 @@ def regularize_b_matrix_spectral(B: np.ndarray, variance_fraction: float = 0.99,
     return W
 
 
-def prior_from_perturbations(input: DictConfig, output: DictConfig | None = None,
-                                  seed: int | None = None) -> np.ndarray | None:
-    """ Compute the prior from the model error covariance matrix and perturbations.
-
-        Parameters
-        ----------
-        input: DictConfig. Main hydra configuration file containing all model hyperparameters.
-        output: DictConfig. Output configuration.
-        seed: int. Seed to ensure reproducibility.
-
-        Returns
-        -------
-        None.
-    """
-
-    # Load Cholesky matrix
-    cov_cholesky = load_var(input.cholesky)
-    # Load samples
-    x_t = load_var_and_normalize(input.prof)
-    x_dims = x_t.shape
-    x_t = x_t.reshape(x_dims[0], -1)
-
-    # Initialize independent random number generator
-    rng = np.random.default_rng(seed)
-
-    # Compute random perturbations from a normal distribution
-    logger.info(f"Generating independent random perturbations for {x_dims[0]} samples...")
-    p = rng.normal(0, 1, size=(cov_cholesky.shape[1], x_dims[0]))
-    dx = (cov_cholesky @ p).T
-
-    # Pressure filter
-    if hasattr(input, 'pressure_filter') and input.pressure_filter is not None:
-        logger.info("Applying pressure filter...")
-        # Load filter
-        pressure_filter = instantiate(input.pressure_filter.load)
-        if x_dims[1] != pressure_filter.shape[0]:
-            pressure_filter = np.take(pressure_filter, [0, 4, 8], axis=0)
-        # Compute prior by applying perturbations to samples
-        logger.info("Apply perturbations...")
-        x_t[:, np.flatnonzero(pressure_filter)] += dx
-    else:
-        # Compute prior by applying perturbations to samples
-        logger.info("Apply perturbations...")
-        x_t += dx
-
-    # Reshape
-    x_t = x_t.reshape(x_dims)
-
-    # Unnormalize the data prior to saving
-    if hasattr(input.prof, 'normalization'):
-        norm_func = instantiate(input.prof.normalization, inverse_transform=True)
-        x_t = norm_func(x_t)
-
-    # Save to file
-    if output is not None and hasattr(output, 'save'):
-        logger.info(f"Saving prior to {output.path}...")
-        save_func = instantiate(output.save)
-        save_func(x_t)
-        return None
-    else:
-        return x_t
-
-
 def prior_from_bounded_perturbations(input: DictConfig, stats: DictConfig, output: DictConfig | None = None,
                                      seed: int | None = None) -> np.ndarray | None:
     """ Compute the prior from the model error covariance matrix and perturbations.
@@ -283,16 +220,21 @@ def prior_from_bounded_perturbations(input: DictConfig, stats: DictConfig, outpu
         return final_x_phys
 
 
-def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor: float = 1.0, regularization_factor: float = 1.0,
-                          plot_flag: bool=True, recenter: bool=False, univariate: bool = False, mean_type: str='spatiotemporal') -> None:
+def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor: float = 1.0,
+                          regularization_factor: float = 1.0, plot_flag: bool=True, recenter: bool=False,
+                          univariate: bool = False, mean_type: str='spatiotemporal') -> None:
     """ Compute climatological covariance matrix of a given dataset.
 
         Parameters
         ----------
         input: DictConfig. Main hydra configuration file containing all model hyperparameters.
         output: DictConfig. Output configuration.
+        scaling_factor: float. Scaling factor for covariance matrix.
+        regularization_factor: float. Regularization factor for covariance matrix.
         plot_flag: bool. If True, plot the covariance matrix.
         recenter: bool. If True, recenter by removing the mean.
+        univariate: bool. If True, compute univariate covariance matrix.
+        mean_type: str. Type of mean to compute ('spatiotemporal' or 'temporal').
 
         Returns
         -------
@@ -314,7 +256,7 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
         # Compute spatiotemporal mean
         if mean_type == 'spatiotemporal':
             mu = np.mean(data, axis=0)
-            # Compute anomalies (thruth - climatological mean)
+            # Compute anomalies (truth - mean)
             data -= mu
         # Compute temporal mean (but maintain coordinate dependency)
         elif mean_type == 'temporal':
@@ -356,25 +298,27 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
                 # 4. Compute the local temporal mean for each unique coordinate
                 group_means = group_sums / group_counts  # Shape: (n_unique_coords, n_features)
 
-                # 5. # Compute anomalies (thruth - climatological mean)
+                # 5. # Compute anomalies (truth - climatological mean)
                 data -= group_means[inverse_indices]  # Shape: (n_samples, n_features)
                 # Broadcast the means back out to match the original sample layout
                 data = data.reshape(data_shape)
                 # Denominator (computation of the mean)
                 denom = n_samples - n_unique_coords
             else:
-                raise ValueError("Timesteps not found.")
+                mu = np.mean(data)
+                # Compute anomalies (truth - mean)
+                data -= mu
         else:
             raise ValueError("mean_type not supported.")
 
     # Pressure filter (prior only)
-    if hasattr(input, 'pressure_filter') and input.pressure_filter is not None:
+    if hasattr(input, 'pressure_mask') and input.pressure_mask is not None:
         # Load filter
-        pressure_filter = instantiate(input.pressure_filter.load)
-        if n_vars != pressure_filter.shape[0]:
-            pressure_filter = np.take(pressure_filter, [0, 4, 8], axis=0)
+        pressure_mask = instantiate(input.pressure_mask.load)
+        if n_vars != pressure_mask.shape[0]:
+            pressure_mask = np.take(pressure_mask, [0, 4, 8], axis=0)
     else:
-        pressure_filter = None
+        pressure_mask = None
 
     # Univariate matrix computation steps
     if univariate:
@@ -383,15 +327,15 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
             raise ValueError("Univariate covariance matrix computation requires data with more than 2 dimensions.")
         # Initialize empty matrix
         m = []
-        # Loop over varialbes
+        # Loop over variables
         for i in range(n_vars):
             # Compute sub-matrix
             data_i = data[:, i]
-            # Apply pressure filter
-            if pressure_filter is not None:
-                logger.info(f"Applying pressure filter for variable {i}...")
+            # Apply pressure mask
+            if pressure_mask is not None:
+                logger.info(f"Applying pressure mask for variable {i}...")
                 # Remove constant pressure levels from the data
-                data_i = np.take(data_i, np.flatnonzero(pressure_filter[i]), axis=1)
+                data_i = np.take(data_i, np.flatnonzero(pressure_mask[i]), axis=1)
             # Store diagonal block
             logger.info(f"Computing univariate covariance matrix for variable {i}...")
             m.append(scaling_factor*(data_i.T @ data_i)/denom)
@@ -402,11 +346,11 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
     else:
         # Flatten data
         data = data.reshape(n_samples, -1)
-        # Apply pressure filter
-        if pressure_filter is not None:
-            logger.info("Applying pressure filter...")
+        # Apply pressure mask
+        if pressure_mask is not None:
+            logger.info("Applying pressure mask...")
             # Remove constant pressure levels from the data
-            data = np.take(data, np.flatnonzero(pressure_filter), axis=1)
+            data = np.take(data, np.flatnonzero(pressure_mask), axis=1)
         # Compute matrix
         logger.info("Computing covariance matrix...")
         cov = {'matrix': scaling_factor*(data.T @ data)/denom}

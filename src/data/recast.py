@@ -1,337 +1,462 @@
-import numpy as np
-from data.filters import clearsky_filter, pressure_filter, daytime_filter
 import os
-import logging
-from utilities.tensors import to_numpy
-from data.io import load_npy, load_latlon, load_scans
-from data.covariance import innovation_uncertainty, background_climatology
+import numpy as np
+import hydra
+from omegaconf import DictConfig, OmegaConf
+from scipy.spatial import ConvexHull
 from tqdm import tqdm
 import gc
-import argparse
+import logging
+from utilities.logic import get_config_path
+from utilities.instantiators import instantiate
+from src.data.filters import clear_mask, cloud_mask
 
 
 logger = logging.getLogger(__name__)
 
 
-def main(in_dir, in_precision, out_dir, out_precision, out_cloud_filter, out_clearsky_filter) -> None:
-    """
-    Compute statistics of a given dataset.
+def load_file(path: str, dtype: str = 'float32', filetype: str | None = None):
+    """Load file with auto-detection of format (npy/txt) if not specified."""
+    if filetype is None:
+        # Auto-detect from extension
+        if path.endswith('.npy'):
+            filetype = 'npy'
+        elif path.endswith(('.txt', '.csv')):
+            filetype = 'txt'
+        else:
+            raise ValueError(f"Cannot auto-detect format for {path}")
+
+    if filetype == 'npy':
+        data = np.load(path)
+    elif filetype == 'txt':
+        data = np.loadtxt(path)
+    else:
+        raise ValueError(f"Unsupported filetype: {filetype}")
+
+    # Convert to desired dtype
+    if data.dtype != dtype:
+        data = data.astype(dtype)
+
+    return data
+
+
+def save_file(data: np.ndarray, path: str, filetype: str = 'npy', **kwargs):
+    """Save file in specified format."""
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    if filetype == 'npy':
+        np.save(path, data)
+    elif filetype == 'txt':
+        np.savetxt(path, data, **kwargs)
+    else:
+        raise ValueError(f"Unsupported filetype: {filetype}")
+
+    logger.info(f"Saved {path}")
+
+
+def apply_filters(data: np.ndarray,
+                  cloud_mask: np.ndarray | None = None,
+                  spatial_mask: np.ndarray | None = None,
+                  temporal_mask: np.ndarray | None = None,
+                  only_cloud: bool = False,
+                  only_clear: bool = False) -> np.ndarray:
+    """Apply combination of cloud/clear, spatial, and temporal filters."""
+
+    combined_mask = np.ones(data.shape[0], dtype=bool)
+
+    # Cloud/clear filtering
+    if cloud_mask is not None:
+        if only_cloud:
+            combined_mask &= cloud_mask.astype(bool)
+        elif only_clear:
+            combined_mask &= ~cloud_mask.astype(bool)
+
+    # Spatial filtering
+    if spatial_mask is not None:
+        combined_mask &= spatial_mask
+
+    # Temporal filtering
+    if temporal_mask is not None:
+        combined_mask &= temporal_mask
+
+    return data[combined_mask]
+
+
+def reshuffle_spatiotemporal(input_path: str, output_path: str,
+                             split_ratios: dict | None = None,
+                             single_scan: int | None = None) -> None:
+    """Reshuffle data into train/valid/test splits using spatial boundaries.
+
+    Useful for static scenarios (single timestep) to create meaningful train/valid/test
+    splits based on spatial location (convex hull boundaries) rather than just timesteps.
 
     Parameters
     ----------
-    in_dir: str. Input data directory.
-    in_precision: str. Input data precision (e.g., 'float32', 'float64').
-    out_dir: str. Output data directory.
-    out_precision: str. Output data precision (e.g., 'float32', 'float64').
-    out_cloud_filter: bool. If True, output only cloudy profiles.
-    out_clearsky_filter: bool. If True, output only clearsky profiles.
-
-    Returns
-    -------
-    None.
+    input_path: str. Path to recasted data containing prof.npy, lat.npy, lon.npy, etc.
+    output_path: str. Base path where to save new splits (train/, valid/, test/)
+    split_ratios: dict or None. Split proportions {train: 0.6, valid: 0.2, test: 0.2}
+                 Default: {train: 0.6, valid: 0.2, test: 0.2}
+    single_scan: int or None. If specified, extract only this scan before splitting
     """
+    logger.info(f"Reshuffling data spatiotemporal splits...")
 
-    # Steps:
-    # 1. Resave data in original precision, but computing beforehand some of the quantities for simplicity (e.g., background, filters, etc).
-    # 2. Resave data from 1. in new precision (float32).
-    # 3. Filter data into clearsky/cloudy cases and resave in both precisions.
+    # Default split
+    if split_ratios is None:
+        split_ratios = {'train': 0.6, 'valid': 0.2, 'test': 0.2}
 
-    # Output directory
-    os.makedirs(out_dir, exist_ok=True)
+    # Validate split ratios
+    total = sum(split_ratios.values())
+    if abs(total - 1.0) > 1e-6:
+        raise ValueError(f"Split ratios must sum to 1.0, got {total}")
 
-    # Input data directories
-    for stage_name in tqdm(["Train2", "Val2", "Test2"]):
+    # Load coordinate data
+    lat = np.load(os.path.join(input_path, 'lat.npy'))
+    lon = np.load(os.path.join(input_path, 'lon.npy'))
 
-        # Input directory
-        in_dir_stage = os.path.join(in_dir, stage_name)
-        # Output directory
-        out_dir_stage = os.path.join(out_dir, stage_name)
-        os.makedirs(out_dir_stage, exist_ok=True)
+    # Load scans if available
+    scans_path = os.path.join(input_path, 'scans.npy')
+    scans = np.load(scans_path) if os.path.exists(scans_path) else np.arange(len(lat))
 
-        # Load profiles and convert to desired precision
-        prof_path = os.path.join(in_dir_stage, "prof.npy")
-        prof = load_npy(prof_path, dtype=in_precision)
+    # Filter to single scan if requested
+    if single_scan is not None:
+        mask = scans == single_scan
+        lat = lat[mask]
+        lon = lon[mask]
+        scans = scans[mask]
+        logger.info(f"  Filtered to scan {single_scan}: {len(lat)} samples")
 
-        # Convert to desired precision
-        if in_precision != out_precision:
-            prof = to_numpy(prof, dtype=out_precision)
+    # Compute spatial boundaries using convex hull
+    n_samples = len(lat)
+    coords = np.column_stack((lat, lon))
 
-        # Compute clearsky/cloudy filters
-        clearsky_mask = clearsky_filter(prof).astype(np.bool_, copy=False)
-        cloud_mask = ~clearsky_mask
+    logger.info(f"  Computing convex hull for {n_samples} samples...")
+    hull = ConvexHull(coords)
+    hull_indices = hull.vertices
+    remaining_indices = np.setdiff1d(np.arange(n_samples), hull_indices)
 
-        # Apply mask
-        if out_cloud_filter:
-            if out_clearsky_filter:
-                raise ValueError("Cannot output both cloud and clearsky filters.")
-            prof_filter = cloud_mask
-            prof = prof[prof_filter]
-            cloud_mask = cloud_mask[prof_filter]
-        elif out_clearsky_filter:
-            prof_filter = clearsky_mask
-            prof = prof[prof_filter]
-            cloud_mask = cloud_mask[prof_filter]
-            # Extract non-zero profiles types
-            prof = np.take(prof, [0, 4, 8], axis=1)
-        else:
-            prof_filter = None
+    logger.info(f"  Boundary points: {len(hull_indices)}, Interior points: {len(remaining_indices)}")
 
-        # Save cloud filter in input directory
-        cloud_filter_path = os.path.join(out_dir_stage, "cloud_filter.npy")
-        np.save(cloud_filter_path, cloud_mask)
-        logger.info("Saved cloud filter to `%s`", cloud_filter_path)
-        del cloud_mask
-        gc.collect()
+    # Shuffle remaining indices
+    np.random.seed(42)  # For reproducibility
+    np.random.shuffle(remaining_indices)
 
-        # Save profiles in new directory
-        prof_out_path = os.path.join(out_dir_stage, "prof.npy")
-        np.save(prof_out_path, prof)
-        logger.info("Saved profiles to `%s`", prof_out_path)
+    # Create splits: give boundary points to training
+    split_indices = {'train': [], 'valid': [], 'test': []}
+    split_indices['train'].extend(hull_indices)
 
-        # Compute pressure filter
-        pressure_mask = pressure_filter(prof).astype(np.bool_, copy=False)
-        # Save pressure filter in new directory
-        pressure_filter_path = os.path.join(out_dir, "pressure_filter.npy")
-        np.save(pressure_filter_path, pressure_mask)
-        logger.info("Saved pressure filter to `%s`", pressure_filter_path)
-        del pressure_mask
-        gc.collect()
+    # Split remaining points according to ratios
+    remaining_train = int(split_ratios['train'] * len(remaining_indices))
+    remaining_valid = int(split_ratios['valid'] * len(remaining_indices))
 
-        # Compute background profiles (mean profile) in a memory efficient way
-        # prof_mean = background_climatology(prof, keepdims=True)
-        # prof_background_path = os.path.join(out_dir_stage, "prof_background.npy")
-        # np.save(prof_background_path, prof_mean.astype(prof.dtype, copy=False))
-        # logger.info("Saved background profile to `%s`", prof_background_path)
+    split_indices['train'].extend(remaining_indices[:remaining_train])
+    split_indices['valid'].extend(remaining_indices[remaining_train:remaining_train + remaining_valid])
+    split_indices['test'].extend(remaining_indices[remaining_train + remaining_valid:])
 
-        # Compute profile increments and save
-        # np.subtract(prof, prof_mean, out=prof)
-        # prof_increment_path = os.path.join(out_dir_stage, "prof_increment.npy")
-        # np.save(prof_increment_path, prof.astype(prof.dtype, copy=False))
-        # logger.info("Saved profile increments to `%s`", prof_increment_path)
+    # Convert to arrays
+    split_indices = {k: np.array(v, dtype='int64') for k, v in split_indices.items()}
 
-        # Clean up
-        del prof  #, prof_mean
-        # gc.collect()
+    # Log split sizes
+    for split_name, indices in split_indices.items():
+        logger.info(f"  {split_name}: {len(indices)} samples ({100*len(indices)/n_samples:.1f}%)")
 
-        # Coordinates
-        lat_path = os.path.join(in_dir_stage, "lat.npy")
-        lon_path = os.path.join(in_dir_stage, "lon.npy")
-        pressure_path = os.path.join(in_dir_stage, "pressure.npy")
-        if os.path.exists(os.path.join(in_dir_stage, "scans.npy")):
-            scans_path = os.path.join(in_dir_stage, "scans.npy")
-            scans = load_npy(scans_path, dtype=in_precision)
-            lat = load_npy(lat_path, dtype=in_precision)
-            lon = load_npy(lon_path, dtype=in_precision)
-        else:
-            scans_path = os.path.join(in_dir_stage, "scans.txt")
-            scans = load_scans(scans_path, lat=load_npy(lat_path, dtype=in_precision),
-                               dtype=in_precision)
-            lat = load_latlon(lat_path, scans=load_scans(scans_path, dtype=in_precision), dtype=in_precision)
-            lon = load_latlon(lon_path, scans=load_scans(scans_path, dtype=in_precision), dtype=in_precision)
-        pressure = load_npy(pressure_path, dtype=in_precision)
+    # Get all filenames from input
+    filenames = os.listdir(input_path)
 
-        # Filter out profiles if needed
-        if prof_filter is not None:
-            scans = scans[prof_filter]
-            lat = lat[prof_filter]
-            lon = lon[prof_filter]
+    # Save splits
+    for split_name, indices in split_indices.items():
+        split_output_dir = os.path.join(output_path, split_name)
+        os.makedirs(split_output_dir, exist_ok=True)
 
-        # Convert to desired precision
-        if in_precision != out_precision:
-            scans = to_numpy(scans, dtype=out_precision)
-            lat = to_numpy(lat, dtype=out_precision)
-            lon = to_numpy(lon, dtype=out_precision)
-            pressure = to_numpy(pressure, dtype=out_precision)
+        for filename in filenames:
+            input_file = os.path.join(input_path, filename)
+            if not os.path.isfile(input_file):
+                continue
 
-        # Save coordinates in new directory
-        scans_out_path = os.path.join(out_dir_stage, "scans.npy")
-        lat_out_path = os.path.join(out_dir_stage, "lat.npy")
-        lon_out_path = os.path.join(out_dir_stage, "lon.npy")
-        pressure_out_path = os.path.join(out_dir_stage, "pressure.npy")
-        np.save(scans_out_path, scans)
-        np.save(lat_out_path, lat)
-        np.save(lon_out_path, lon)
-        np.save(pressure_out_path, pressure)
-        logger.info("Saved coordinates to `%s`, `%s`, `%s`, `%s`",
-                    scans_out_path, lat_out_path, lon_out_path, pressure_out_path)
-        # Clean up
-        del scans, lat, lon, pressure
-        gc.collect()
+            # Load data
+            data = np.load(input_file)
 
-        # Surface data
-        surf_path = os.path.join(in_dir_stage, "surf.npy")
-        surf = load_npy(surf_path, dtype=in_precision)
-        # Apply mask
-        if prof_filter is not None:
-            surf = surf[prof_filter]
-        # Convert to desired precision
-        if in_precision != out_precision:
-            surf = to_numpy(surf, dtype=out_precision)
-        # Save surface data in new directory
-        surf_out_path = os.path.join(out_dir_stage, "surf.npy")
-        np.save(surf_out_path, surf)
-        logger.info("Saved surface data to `%s`", surf_out_path)
-        # Clean up
-        del surf
-        gc.collect()
+            # Apply split
+            split_data = data[indices]
 
-        # Meta data
-        meta_path = os.path.join(in_dir_stage, "meta.npy")
-        meta = load_npy(meta_path, dtype=in_precision)
-        # Apply mask
-        if prof_filter is not None:
-            meta = meta[prof_filter]
-        # Convert to desired precision
-        if in_precision != out_precision:
-            meta = to_numpy(meta, dtype=out_precision)
-        # Save metadata in new directory
-        meta_out_path = os.path.join(out_dir_stage, "meta.npy")
-        np.save(meta_out_path, meta)
-        logger.info("Saved meta data to `%s`", meta_out_path)
-        # Compute daytime filter and save
-        daytime_mask = daytime_filter(meta).astype(np.bool_, copy=False)
-        daytime_filter_path = os.path.join(out_dir_stage, "daytime_filter.npy")
-        np.save(daytime_filter_path, daytime_mask)
-        logger.info("Saved daytime filter to `%s`", daytime_filter_path)
-        # Clean up
-        del meta, daytime_mask
-        gc.collect()
+            # Save
+            output_file = os.path.join(split_output_dir, filename)
+            np.save(output_file, split_data)
 
-        # Hofx
-        obs_path = os.path.join(in_dir_stage, "obs.npy")
-        obs = load_npy(obs_path, dtype=in_precision)
-        # Apply mask
-        if prof_filter is not None:
-            obs = obs[prof_filter]
-        # Convert to desired precision
-        if in_precision != out_precision:
-            obs = to_numpy(obs, dtype=out_precision)
-        # Save obs data in new directory
-        obs_out_path = os.path.join(out_dir_stage, "obs.npy")
-        np.save(obs_out_path, obs)
-        logger.info("Saved obs data to `%s`", obs_out_path)
-        # Clean up
-        del obs
-        gc.collect()
-        # Hofx (inferences)
-        hofx_path = os.path.join(in_dir_stage, "hofx.npy")
-        if os.path.exists(hofx_path):
-            hofx = load_npy(hofx_path, dtype=in_precision)
-            # Apply mask
-            if prof_filter is not None:
-                hofx = hofx[prof_filter]
-            # Convert to desired precision
-            if in_precision != out_precision:
-                hofx = to_numpy(hofx, dtype=out_precision)
-            # Save hofx data in new directory
-            hofx_out_path = os.path.join(out_dir_stage, "hofx.npy")
-            np.save(hofx_out_path, hofx)
-            logger.info("Saved hofx data to `%s`", hofx_out_path)
-        hofx_predict_v3_path = os.path.join(f'../data_{out_precision}/{stage_name}', "predict_hofx_v3.npy")
-        if os.path.exists(hofx_predict_v3_path):
-            hofx = load_npy(hofx_predict_v3_path, dtype=in_precision)
-            # Apply mask
-            if prof_filter is not None:
-                hofx = hofx[prof_filter]
-            # Convert to desired precision
-            if in_precision != out_precision:
-                hofx = to_numpy(hofx, dtype=out_precision)
-            # Save hofx data in new directory
-            hofx_out_path = os.path.join(out_dir_stage, "predict_hofx_v3.npy")
-            np.save(hofx_out_path, hofx)
-            logger.info("Saved predict_hofx_v3 data to `%s`", hofx_out_path)
-        hofx_predict_v4_path = os.path.join(f'../data_{out_precision}/{stage_name}', "predict_hofx_v4.npy")
-        if os.path.exists(hofx_predict_v4_path):
-            hofx = load_npy(hofx_predict_v4_path, dtype=in_precision)
-            # Apply mask
-            if prof_filter is not None:
-                hofx = hofx[prof_filter]
-            # Convert to desired precision
-            if in_precision != out_precision:
-                hofx = to_numpy(hofx, dtype=out_precision)
-            # Save hofx data in new directory
-            hofx_out_path = os.path.join(out_dir_stage, "predict_hofx_v4.npy")
-            np.save(hofx_out_path, hofx)
-            logger.info("Saved predict_hofx_v4 data to `%s`", hofx_out_path)
-        hofx_predict_v5_path = os.path.join(f'../data_{out_precision}/{stage_name}', "predict_hofx_v5.npy")
-        if os.path.exists(hofx_predict_v5_path):
-            hofx = load_npy(hofx_predict_v5_path, dtype=in_precision)
-            # Apply mask
-            if prof_filter is not None:
-                hofx = hofx[prof_filter]
-            # Convert to desired precision
-            if in_precision != out_precision:
-                hofx = to_numpy(hofx, dtype=out_precision)
-            # Save hofx data in new directory
-            hofx_out_path = os.path.join(out_dir_stage, "predict_hofx_v5.npy")
-            np.save(hofx_out_path, hofx)
-            logger.info("Saved predict_hofx_v5 data to `%s`", hofx_out_path)
-        hofx_predict_v6_path = os.path.join(f'../data_{out_precision}/{stage_name}', "predict_hofx_v6.npy")
-        if os.path.exists(hofx_predict_v6_path):
-            hofx = load_npy(hofx_predict_v6_path, dtype=in_precision)
-            # Apply mask
-            if prof_filter is not None:
-                hofx = hofx[prof_filter]
-            # Convert to desired precision
-            if in_precision != out_precision:
-                hofx = to_numpy(hofx, dtype=out_precision)
-            # Save hofx data in new directory
-            hofx_out_path = os.path.join(out_dir_stage, "predict_hofx_v6.npy")
-            np.save(hofx_out_path, hofx)
-            logger.info("Saved predict_hofx_v6 data to `%s`", hofx_out_path)
-        # End of stage loop
-        del prof_filter
-        gc.collect()
+        logger.info(f"  Saved {split_name} split to {split_output_dir}")
 
-    # Reload all profiles and compute background and increments. Store in each stage directory.
-    prof = [load_npy(os.path.join(out_dir, stage_name, "prof.npy"), dtype=out_precision) for stage_name in ["Train2", "Val2", "Test2"]]
-    prof_mean = background_climatology(np.concatenate(prof, axis=0), keepdims=True)
-    for s, stage in enumerate(["Train", "Val", "Test"]):
-        prof_stage = prof[s]
-        prof_background_path = os.path.join(out_dir, f"{stage}2", "prof_background.npy")
-        np.save(prof_background_path, prof_mean)
-        logger.info("Saved background profile to `%s`", prof_background_path)
-        # Compute profile increments and save
-        np.subtract(prof_stage, prof_mean, out=prof_stage)
-        prof_increment_path = os.path.join(out_dir, f"{stage}2", "prof_increment.npy")
-        np.save(prof_increment_path, prof_stage)
-        logger.info("Saved profile increments to `%s`", prof_increment_path)
-        # Clean up
-        del prof_stage
-        gc.collect()
-    del prof, prof_mean
-    gc.collect()
+    logger.info(f"✅ Reshuffling complete!")
 
-    return
 
-if __name__ == '__main__':
-    """ Recast a given dataset.
+
+def synthetic(input: DictConfig, output: DictConfig) -> None:
+    """ Perform recast, cropping, redistribution of data.
 
         Parameters
         ----------
-        --config_path: str. Directory containing configuration file.
-        --config_name: str. Configuration filename.
-        +experiment: str. Experiment configuration filename to override default configuration.
+        input: DictConfig. Input configuration.
+        output: DictConfig. Output configuration.
 
         Returns
         -------
-        Recasted dataset saved to disk.
+        None.
     """
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-in_dir', type=str, default="../../GOES_ML-main/Data",
-                        help='Path to configuration file containing all model hyperparameters.')
-    parser.add_argument('-in_precision', type=str, default=None,
-                        help='Name of the configuration file containing all model hyperparameters.')
-    parser.add_argument('-out_dir', type=str, default="../data_float64",
-                        help='Name of the experiment that overrides the main hydra configuration.')
-    parser.add_argument('-out_precision', type=str, default="float64",
-                        help='Name of the experiment that overrides the main hydra configuration.')
-    parser.add_argument('-cloud_filter', type=bool, default=False,
-                        help='Flag to print the configuration file contents.')
-    parser.add_argument('-clearsky_filter', type=bool, default=False,
-                        help='Flag to print the configuration file contents.')
-    args = parser.parse_args()
+    # Build dictionary from input data
+    data = {}
+    for key, value in input.data.items():
+        # Load data
+        data[key] = instantiate(value.load)
 
-    main(args.in_dir, args.in_precision, args.out_dir, args.out_precision,
-         args.cloud_filter, args.clearsky_filter)
+    # Build mask
+    mask = np.ones_like(data['lat'], dtype='bool')
+    if hasattr(input, 'mask'):
+        # Initialize masks
+        coverage_mask = np.zeros_like(data['lat'], dtype='bool')
+        spatiotemporal_mask = np.ones_like(data['lat'], dtype='bool')
+        # Spatial extent
+        if hasattr(input.mask, 'spatial_domain'):
+            if hasattr(input.mask.spatial_domain, 'lat_min'):
+                spatiotemporal_mask &= (data['lat'] >= input.mask.spatial_domain.lat_min)
+            if hasattr(input.mask.spatial_domain, 'lat_max'):
+                spatiotemporal_mask &= (data['lat'] <= input.mask.spatial_domain.lat_max)
+            if hasattr(input.mask.spatial_domain, 'lon_min'):
+                spatiotemporal_mask &= (data['lon'] >= input.mask.spatial_domain.lon_min)
+            if hasattr(input.mask.spatial_domain, 'lon_max'):
+                spatiotemporal_mask &= (data['lon'] <= input.mask.spatial_domain.lon_max)
+        # Temporal extent
+        if hasattr(input.mask, 'temporal_window'):
+            if hasattr(input.mask.temporal_window, 'scan_min'):
+                spatiotemporal_mask &= (data['scans'] >= input.mask.temporal_window.scan_min)
+            if hasattr(input.mask.temporal_window, 'scan_max'):
+                spatiotemporal_mask &= (data['scans'] <= input.mask.temporal_window.scan_max)
+        # Update mask
+        mask &= spatiotemporal_mask
+        # Clouds or clear sky
+        if hasattr(input.mask, 'cloud_mask'):
+            if input.mask.cloud_mask is True:
+                coverage_mask &= cloud_mask(data['prof'])
+        if hasattr(input.mask, 'clear_mask'):
+            if input.mask.clear_mask is True:
+                coverage_mask &= clear_mask(data['prof'])
+        # Update mask
+        mask &= coverage_mask
+
+    # Shuffle or maintain distribution
+    if hasattr(input, 'shuffle') and input.shuffle:
+        # TODO: Complete
+        pass
+    else:
+        # Apply mask and convert to right precision
+        data = {key: value[mask].astype(output.dtype) for key, value in data.items()}
+        # Save to disk
+        for key, value in output.data.items():
+            # Save function
+            save_fn = instantiate(value.save)
+            save_fn(data[key])
+
+    return
+
+def recast_data(config: DictConfig) -> None:
+    """Main recasting pipeline."""
+
+
+
+    # Unpack configuration
+    recast_cfg = config.preparation.recast if hasattr(config, 'preparation') else config.recast
+    input_cfg = recast_cfg.input
+    output_cfg = recast_cfg.output
+    filters_cfg = recast_cfg.filters
+    precision = recast_cfg.precision
+    spatial_bounds = recast_cfg.get('spatial_bounds', None)
+    temporal_bounds = recast_cfg.get('temporal_bounds', None)
+    cloud_filter_type = recast_cfg.cloud_filter_type
+    reshuffle_cfg = recast_cfg.get('reshuffle', None)
+
+    logger.info(f"\nInput dir: {input_cfg.path}")
+    logger.info(f"Output dir: {output_cfg.path}")
+    logger.info(f"Output precision: {precision}")
+
+    # Create output directory
+    os.makedirs(output_cfg.path, exist_ok=True)
+
+    # ===== LOAD CORE DATA =====
+    logger.info("\n1️⃣  Loading core data...")
+
+    # Load profiles
+    prof_path = os.path.join(input_cfg.path, input_cfg.files.prof)
+    prof = load_file(prof_path, dtype=precision)
+    logger.info(f"   Profiles shape: {prof.shape}")
+    n_samples = prof.shape[0]
+
+    # Load coordinates
+    lat_path = os.path.join(input_cfg.path, input_cfg.files.lat)
+    lat = load_file(lat_path, dtype=precision)
+
+    lon_path = os.path.join(input_cfg.path, input_cfg.files.lon)
+    lon = load_file(lon_path, dtype=precision)
+
+    logger.info(f"   Latitude shape: {lat.shape}, Longitude shape: {lon.shape}")
+
+    # Load scans (time/scan indices)
+    scans_path = os.path.join(input_cfg.path, input_cfg.files.scans)
+    scans = load_file(scans_path, dtype='int32')
+    logger.info(f"   Scans shape: {scans.shape}, unique scans: {np.unique(scans).size}")
+
+    # Load pressure levels
+    pressure_path = os.path.join(input_cfg.path, input_cfg.files.pressure)
+    pressure = load_file(pressure_path, dtype=precision)
+    logger.info(f"   Pressure shape: {pressure.shape}")
+
+    # Load hofx (optional)
+    hofx = None
+    if hasattr(input_cfg.files, 'hofx') and input_cfg.files.hofx:
+        hofx_path = os.path.join(input_cfg.path, input_cfg.files.hofx)
+        if os.path.exists(hofx_path):
+            hofx = load_file(hofx_path, dtype=precision)
+            logger.info(f"   HOFX shape: {hofx.shape}")
+
+    # ===== CREATE FILTERS =====
+    logger.info("\n2️⃣  Creating filters...")
+
+    # Cloud/clear filter
+    cloud_mask = None
+    if cloud_filter_type == 'auto':
+        cloud_mask = create_cloud_filter(prof)
+        n_cloud = cloud_mask.sum()
+        n_clear = (~cloud_mask).sum()
+        logger.info(f"   Cloud/clear: {n_cloud} cloud, {n_clear} clear")
+
+    # Spatial filter
+    spatial_mask = np.ones(n_samples, dtype=bool)
+    if spatial_bounds is not None:
+        lat_min = spatial_bounds.get('lat_min', -90)
+        lat_max = spatial_bounds.get('lat_max', 90)
+        lon_min = spatial_bounds.get('lon_min', -180)
+        lon_max = spatial_bounds.get('lon_max', 180)
+        spatial_mask &= (lat >= lat_min) & (lat <= lat_max)
+        spatial_mask &= (lon >= lon_min) & (lon <= lon_max)
+        n_spatial = spatial_mask.sum()
+        logger.info(f"   Spatial bounds: {n_spatial} samples in region")
+
+    # Temporal filter
+    temporal_mask = np.ones(n_samples, dtype=bool)
+    if temporal_bounds is not None:
+        scan_min = temporal_bounds.get('scan_min', scans.min())
+        scan_max = temporal_bounds.get('scan_max', scans.max())
+        temporal_mask &= (scans >= scan_min) & (scans <= scan_max)
+        n_temporal = temporal_mask.sum()
+        logger.info(f"   Temporal bounds: {n_temporal} samples in range")
+
+    # ===== APPLY FILTERS =====
+    logger.info("\n3️⃣  Applying filters...")
+
+    only_cloud = filters_cfg.get('only_cloud', False)
+    only_clear = filters_cfg.get('only_clear', False)
+
+    if only_cloud and only_clear:
+        raise ValueError("Cannot filter to both cloud and clear simultaneously")
+
+    # Apply filters to all data
+    prof = apply_filters(prof, cloud_mask, spatial_mask, temporal_mask, only_cloud, only_clear)
+    lat = apply_filters(lat.reshape(-1, 1), cloud_mask, spatial_mask, temporal_mask,
+                       only_cloud, only_clear).flatten()
+    lon = apply_filters(lon.reshape(-1, 1), cloud_mask, spatial_mask, temporal_mask,
+                       only_cloud, only_clear).flatten()
+    scans = apply_filters(scans.reshape(-1, 1), cloud_mask, spatial_mask, temporal_mask,
+                         only_cloud, only_clear).flatten()
+
+    if hofx is not None:
+        hofx = apply_filters(hofx, cloud_mask, spatial_mask, temporal_mask,
+                            only_cloud, only_clear)
+
+    n_final = prof.shape[0]
+    logger.info(f"   Final sample count: {n_final} ({100*n_final/n_samples:.1f}% of original)")
+
+    # ===== COMPUTE DERIVED QUANTITIES =====
+    logger.info("\n4️⃣  Computing derived quantities...")
+
+    # Cloud filter (for output)
+    output_cloud_mask = None
+    if filters_cfg.get('save_cloud_mask', False) and cloud_mask is not None:
+        # Re-apply filtering
+        output_cloud_mask = apply_filters(cloud_mask.reshape(-1, 1), cloud_mask, spatial_mask,
+                                         temporal_mask, only_cloud, only_clear).flatten()
+        logger.info(f"   Cloud mask saved ({output_cloud_mask.sum()} clouds)")
+
+    # Pressure mask (constant levels)
+    pressure_mask = None
+    if filters_cfg.get('compute_pressure_mask', False):
+        # For now, assume pressure is per-level (not per-sample)
+        # This would typically be done from statistics
+        logger.info(f"   Pressure mask: skipped (requires statistics)")
+
+    # ===== SAVE DATA =====
+    logger.info("\n5️⃣  Saving recasted data...")
+
+    # Output file format
+    output_filetype = output_cfg.get('filetype', 'npy')
+
+    # Save profiles
+    prof_out = os.path.join(output_cfg.path, output_cfg.files.get('prof', 'prof.npy'))
+    save_file(prof.astype(precision), prof_out, filetype=output_filetype)
+
+    # Save coordinates
+    lat_out = os.path.join(output_cfg.path, output_cfg.files.get('lat', 'lat.npy'))
+    save_file(lat.astype(precision), lat_out, filetype=output_filetype)
+
+    lon_out = os.path.join(output_cfg.path, output_cfg.files.get('lon', 'lon.npy'))
+    save_file(lon.astype(precision), lon_out, filetype=output_filetype)
+
+    # Save scans
+    scans_out = os.path.join(output_cfg.path, output_cfg.files.get('scans', 'scans.npy'))
+    save_file(scans.astype('int32'), scans_out, filetype='npy')  # scans always int
+
+    # Save pressure
+    pressure_out = os.path.join(output_cfg.path, output_cfg.files.get('pressure', 'pressure.npy'))
+    save_file(pressure.astype(precision), pressure_out, filetype=output_filetype)
+
+    # Save HOFX
+    if hofx is not None:
+        hofx_out = os.path.join(output_cfg.path, output_cfg.files.get('hofx', 'hofx.npy'))
+        save_file(hofx.astype(precision), hofx_out, filetype=output_filetype)
+
+    # Save cloud mask
+    if output_cloud_mask is not None:
+        mask_out = os.path.join(output_cfg.path, 'cloud_mask.npy')
+        save_file(output_cloud_mask.astype('bool'), mask_out, filetype='npy')
+
+    logger.info(f"\n✅ Recasting complete!")
+    logger.info(f"   Input samples: {n_samples}")
+    logger.info(f"   Output samples: {n_final}")
+    logger.info(f"   Output dir: {output_cfg.path}")
+    logger.info("=" * 70)
+
+    # ===== OPTIONAL: RESHUFFLE DATA INTO TRAIN/VALID/TEST =====
+    if reshuffle_cfg is not None and reshuffle_cfg.get('enabled', False):
+        logger.info("\n6️⃣  Reshuffling into train/valid/test splits...")
+
+        split_ratios = reshuffle_cfg.get('split_ratios', {'train': 0.6, 'valid': 0.2, 'test': 0.2})
+        single_scan = reshuffle_cfg.get('single_scan', None)
+        reshuffle_output = reshuffle_cfg.get('output_path', os.path.join(output_cfg.path, 'splits'))
+
+        reshuffle_spatiotemporal(
+            input_path=output_cfg.path,
+            output_path=reshuffle_output,
+            split_ratios=split_ratios,
+            single_scan=single_scan
+        )
+
+
+@hydra.main(version_base=None, config_path=get_config_path(), config_name="default")
+def main(config: DictConfig) -> None:
+
+    # Execute recast
+    if hasattr(config.preparation, 'recast'):
+        for key, config in config.preparation.recast.items():
+            logger.info(f"Performing recast: {key}")
+            instantiate(config)
+
+
+if __name__ == '__main__':
+    main()
+

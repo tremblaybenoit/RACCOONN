@@ -1,20 +1,33 @@
 # Data filters
 filters:
-  # Cloud/clearsky filter
-  cloud:
+  # Pressure mask (to filter out constant pressure levels)
+  pressure_mask:
     # Function
-    _target_: data.filters.generate_filter
+    _target_: src.data.filters.compute_filter
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:
-      # Increment estimates for the profile variables
-      config: ${data.stage.train.vars.cloud_filter.definition}
+      # Call to mask
+      mask:
+        _target_: src.data.filters.pressure_mask
+        # Statistics of the pressure variable to compute the mask
+        stats:
+          _target_: src.data.statistics.read_statistics_var
+          load: ${data.preparation.statistics.data.output.load}
+          key: 'pressure'
+          dtype: ${data.dtype}
+        # Ratio threshold to determine constant pressure levels
+        threshold: 0.005
+
     # What the method produces as output
     output:
       # File path to save/load the covariance matrix
-      path: ${data.stage.train.vars.cloud_filter.load.path}
+      path: ${....dir}/pressure_mask.npy
       # Save function
-      save: ${data.stage.train.vars.cloud_filter.save}
+      save:
+        _target_: numpy.save
+        path: ${..path}
       # Load function
-      load: ${data.stage.train.vars.cloud_filter.load}
-
+      load:
+        _target_: src.data.io.load_npy
+        path: ${..path}

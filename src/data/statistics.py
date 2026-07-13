@@ -1,5 +1,4 @@
 import numpy as np
-import pickle
 import torch
 import hydra
 import os
@@ -14,13 +13,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-# TODO: Determine if used or not
-def read_statistics(path: str, tensor: bool = False, dtype: str = 'float32') -> dict:
+def read_statistics(load: DictConfig, tensor: bool = False, dtype: str = 'float32') -> dict:
     """ Read statistics from a file.
 
         Parameters
         ----------
-        path: str. Path to the file containing statistics.
+        load: DictConfig. Configuration for loading the statistics.
         tensor: bool. If True, returns statistics as torch tensors, otherwise as numpy arrays.
         dtype: str. Data type of the torch tensors (if tensor=True).
 
@@ -30,8 +28,7 @@ def read_statistics(path: str, tensor: bool = False, dtype: str = 'float32') -> 
     """
 
     # Load statistics from file
-    with open(path, 'rb') as file:
-        stats = pickle.load(file)
+    stats = instantiate(load)
 
     # Convert statistics to torch tensors if required
     if tensor:
@@ -42,13 +39,13 @@ def read_statistics(path: str, tensor: bool = False, dtype: str = 'float32') -> 
     return stats
 
 
-def read_statistics_var(path: str, var: str, tensor: bool = False, dtype: str = 'float32') -> dict:
+def read_statistics_var(load: DictConfig, key: str, tensor: bool = False, dtype: str = 'float32') -> dict:
     """ Read statistics of a specific variable from a file.
 
         Parameters
         ----------
-        path: str. Path to the file containing statistics.
-        var: str. Variable to read statistics for.
+        load: DictConfig. Configuration for loading the statistics.
+        key: str. Variable to read statistics for.
         tensor: bool. If True, returns statistics as torch tensors, otherwise as numpy arrays.
         dtype: str. Data type of the torch tensors (if tensor=True).
 
@@ -58,7 +55,7 @@ def read_statistics_var(path: str, var: str, tensor: bool = False, dtype: str = 
     """
 
     # Load statistics from file
-    stats = read_statistics(path, dtype=dtype)[var]
+    stats = read_statistics(load, dtype=dtype)[key]
 
     # Convert statistics to torch tensors if required
     if tensor:
@@ -69,8 +66,8 @@ def read_statistics_var(path: str, var: str, tensor: bool = False, dtype: str = 
         stats = {key: value.astype(getattr(np, dtype)) if isinstance(value, np.ndarray) else value
                  for key, value in stats.items()}
 
-    # If var is hofx, only read the first 10 values
-    if var == 'hofx':
+    # If key is hofx, only read the first 10 values
+    if key == 'hofx':
         stats = {key: value[0:10] for key, value in stats.items()}
 
     # Return statistics for the specified variable

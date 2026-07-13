@@ -42,7 +42,12 @@ stage:
           # Per-variable normalization
           normalization:
             _target_: src.data.transformations.min_max
-
+            _partial_: true
+            stats:
+              _target_: src.data.statistics.read_statistics_var
+              path: ${preparation.statistics.data.output.path}
+              key: 'prof'
+              dtype: ${data.dtype}
   # Validation set
   valid:
     # Path to validation data

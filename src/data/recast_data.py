@@ -101,7 +101,7 @@ def main(in_dir, in_precision, out_dir, out_precision, out_cloud_filter, out_cle
         if timestep is not None:
             mask &= (scans == timestep)
 
-        # Load data, concatenante, filter out, and save
+        # Load data, concatenate, filter out, and save
         for filename in tqdm(filenames):
             print(filename)
 

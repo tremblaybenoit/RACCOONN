@@ -29,7 +29,7 @@ stage:
             stats:
               _target_: src.data.statistics.read_statistics_var
               path: ${preparation.statistics.data.output.path}
-              var: 'lat_slant'
+              key: 'lat_slant'
               dtype: ${data.dtype}
   # Validation set
   valid:

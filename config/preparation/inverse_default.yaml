@@ -1,5 +1,7 @@
 # Configuration to load multiple preparation methods
 defaults:
-  - statistics
-  - covariance
+  - recast          # First: recast raw data to desired format/precision/filtering
+  - statistics      # Then: compute statistics
+  - filters         # Then: compute filters
+  - covariance      # Finally: compute covariance
   - _self_
