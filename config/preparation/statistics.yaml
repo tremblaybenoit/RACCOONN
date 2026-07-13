@@ -6,7 +6,7 @@ statistics:
     _target_: src.data.statistics.compute_statistics
     _recursive_: false  # Do not instantiate nested objects
     # Exclude variables from the statistics computation
-    exclude: [clear_mask', 'cloud_mask', 'daytime_mask', 'pressure_mask', 'prof_prior']
+    exclude: ['clear_mask', 'cloud_mask', 'daytime_mask', 'pressure_mask', 'prof_prior']
     # What the method needs as input
     input: ${data.stage.source.variables}
     # Computation parameters
@@ -24,5 +24,3 @@ statistics:
       load:
         _target_: src.data.io.load_pkl
         path: ${data.statistics.data.output.path}
-
-

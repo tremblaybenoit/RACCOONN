@@ -1,4 +1,3 @@
-from typing import Union
 import numpy as np
 import pickle
 import torch
@@ -15,6 +14,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# TODO: Determine if used or not
 def read_statistics(path: str, tensor: bool = False, dtype: str = 'float32') -> dict:
     """ Read statistics from a file.
 
@@ -151,7 +151,7 @@ def compute_dataset_statistics(
     return runner.compute()
 
 
-def compute_statistics(input: DictConfig, output: DictConfig | None = None, exclude: list[str] = None,
+def compute_statistics(input: DictConfig, output: DictConfig | None = None, exclude: list[str] | None = None,
                        which: list[str] | None = None, batch_size: int = 32, axis: int | tuple | None = 0,
                        num_workers: int = 0) -> dict:
     """ Compute statistics for each variable in the dataset.
@@ -269,24 +269,32 @@ class RunningStats:
         # Determine which metrics require the mean to be computed
         self._needs_mean = bool(self._which & {'mean', 'variance', 'stdev', 'rmse', 'mae', 'mape'})
 
-        # Initialize accumulators
-        self._initialize_accumulators()
+        # Declare all instance attributes with type hints
+        self._n: float | np.ndarray = 0.0
+        self._mean: np.ndarray | None = None
+        self._m2: np.ndarray | None = None
+        self._min: np.ndarray | None = None
+        self._max: np.ndarray | None = None
+        self._sum_sq_err: np.ndarray | None = None
+        self._sum_abs_err: np.ndarray | None = None
+        self._sum_abs_pct_err: np.ndarray | None = None
+
 
     def _initialize_accumulators(self) -> None:
         """ Initialize all accumulators to empty state (float64 scalars/arrays). """
 
         # Count of non-NaN elements
-        self._n: float | np.ndarray = 0.0
+        self._n = 0.0
         # Mean and variance accumulators (Welford's algorithm)
-        self._mean: np.ndarray | None = None
-        self._M2: np.ndarray | None = None
+        self._mean = None
+        self._m2 = None
         # Min/max
-        self._min: np.ndarray | None = None
-        self._max: np.ndarray | None = None
+        self._min = None
+        self._max = None
         # Error-based metrics (accumulated sums, not per-batch scalars)
-        self._sum_sq_err: np.ndarray | None = None
-        self._sum_abs_err: np.ndarray | None = None
-        self._sum_abs_pct_err: np.ndarray | None = None
+        self._sum_sq_err = None
+        self._sum_abs_err = None
+        self._sum_abs_pct_err = None
 
     def reset(self) -> None:
         """ Reset all accumulated state to empty. """
@@ -342,7 +350,7 @@ class RunningStats:
             # For metrics requiring the mean value
             if self._needs_mean:
                 self._mean = np.nanmean(x, axis=axes)
-                self._M2 = np.nansum((x - np.nanmean(x, axis=axes, keepdims=True)) ** 2, axis=axes)
+                self._m2 = np.nansum((x - np.nanmean(x, axis=axes, keepdims=True)) ** 2, axis=axes)
             # Min/max
             if 'min' in self._which:
                 self._min = np.nanmin(x, axis=axes)
@@ -355,12 +363,12 @@ class RunningStats:
             n = n_a + n_b
             safe_n = np.where(n > 0, n, 1.0)
             # For metrics requiring the mean value
-            if self._needs_mean:
+            if self._needs_mean and self._mean is not None:
                 mean_b = np.nanmean(x, axis=axes)
-                M2_b = np.nansum((x - np.nanmean(x, axis=axes, keepdims=True)) ** 2, axis=axes)
+                m2_b = np.nansum((x - np.nanmean(x, axis=axes, keepdims=True)) ** 2, axis=axes)
                 delta = mean_b - self._mean
                 self._mean += delta * n_b / safe_n
-                self._M2 += M2_b + delta ** 2 * n_a * n_b / safe_n
+                self._m2 += m2_b + delta ** 2 * n_a * n_b / safe_n
             # Min/max
             if 'min' in self._which and self._min is not None:
                 self._min = np.minimum(self._min, np.nanmin(x, axis=axes))
@@ -415,8 +423,8 @@ class RunningStats:
             out['max'] = self._max.astype(np_dtype)
         if 'mean' in self._which and self._mean is not None:
             out['mean'] = self._mean.astype(np_dtype)
-        if ('variance' in self._which or 'stdev' in self._which) and self._M2 is not None:
-            var = self._M2 / safe_n
+        if ('variance' in self._which or 'stdev' in self._which) and self._m2 is not None:
+            var = self._m2 / safe_n
             if 'variance' in self._which:
                 out['variance'] = var.astype(np_dtype)
             if 'stdev' in self._which:
