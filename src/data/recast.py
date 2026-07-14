@@ -1,90 +1,21 @@
 import os
 import numpy as np
 import hydra
-from omegaconf import DictConfig, OmegaConf
-from scipy.spatial import ConvexHull
+from omegaconf import DictConfig
+from scipy.spatial import cKDTree
 from tqdm import tqdm
 import gc
 import logging
 from utilities.logic import get_config_path
 from utilities.instantiators import instantiate
-from src.data.filters import clear_mask, cloud_mask
+from src.data.filters import cloud_mask, daytime_mask
 
 
 logger = logging.getLogger(__name__)
 
 
-def load_file(path: str, dtype: str = 'float32', filetype: str | None = None):
-    """Load file with auto-detection of format (npy/txt) if not specified."""
-    if filetype is None:
-        # Auto-detect from extension
-        if path.endswith('.npy'):
-            filetype = 'npy'
-        elif path.endswith(('.txt', '.csv')):
-            filetype = 'txt'
-        else:
-            raise ValueError(f"Cannot auto-detect format for {path}")
-
-    if filetype == 'npy':
-        data = np.load(path)
-    elif filetype == 'txt':
-        data = np.loadtxt(path)
-    else:
-        raise ValueError(f"Unsupported filetype: {filetype}")
-
-    # Convert to desired dtype
-    if data.dtype != dtype:
-        data = data.astype(dtype)
-
-    return data
-
-
-def save_file(data: np.ndarray, path: str, filetype: str = 'npy', **kwargs):
-    """Save file in specified format."""
-    # Ensure directory exists
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-
-    if filetype == 'npy':
-        np.save(path, data)
-    elif filetype == 'txt':
-        np.savetxt(path, data, **kwargs)
-    else:
-        raise ValueError(f"Unsupported filetype: {filetype}")
-
-    logger.info(f"Saved {path}")
-
-
-def apply_filters(data: np.ndarray,
-                  cloud_mask: np.ndarray | None = None,
-                  spatial_mask: np.ndarray | None = None,
-                  temporal_mask: np.ndarray | None = None,
-                  only_cloud: bool = False,
-                  only_clear: bool = False) -> np.ndarray:
-    """Apply combination of cloud/clear, spatial, and temporal filters."""
-
-    combined_mask = np.ones(data.shape[0], dtype=bool)
-
-    # Cloud/clear filtering
-    if cloud_mask is not None:
-        if only_cloud:
-            combined_mask &= cloud_mask.astype(bool)
-        elif only_clear:
-            combined_mask &= ~cloud_mask.astype(bool)
-
-    # Spatial filtering
-    if spatial_mask is not None:
-        combined_mask &= spatial_mask
-
-    # Temporal filtering
-    if temporal_mask is not None:
-        combined_mask &= temporal_mask
-
-    return data[combined_mask]
-
-
-def reshuffle_spatiotemporal(input_path: str, output_path: str,
-                             split_ratios: dict | None = None,
-                             single_scan: int | None = None) -> None:
+def reshuffle_spatiotemporal(data: dict, mask: np.ndarray, ratio: dict | None = None,
+                             seed: int = 42, static: bool = False) -> None:
     """Reshuffle data into train/valid/test splits using spatial boundaries.
 
     Useful for static scenarios (single timestep) to create meaningful train/valid/test
@@ -92,78 +23,74 @@ def reshuffle_spatiotemporal(input_path: str, output_path: str,
 
     Parameters
     ----------
-    input_path: str. Path to recasted data containing prof.npy, lat.npy, lon.npy, etc.
-    output_path: str. Base path where to save new splits (train/, valid/, test/)
-    split_ratios: dict or None. Split proportions {train: 0.6, valid: 0.2, test: 0.2}
-                 Default: {train: 0.6, valid: 0.2, test: 0.2}
-    single_scan: int or None. If specified, extract only this scan before splitting
+
     """
     logger.info(f"Reshuffling data spatiotemporal splits...")
 
     # Default split
-    if split_ratios is None:
-        split_ratios = {'train': 0.6, 'valid': 0.2, 'test': 0.2}
-
+    if ratio is None:
+        ratio = {'train': 0.6, 'valid': 0.2, 'test': 0.2}
     # Validate split ratios
-    total = sum(split_ratios.values())
+    total = sum(ratio.values())
     if abs(total - 1.0) > 1e-6:
         raise ValueError(f"Split ratios must sum to 1.0, got {total}")
 
     # Load coordinate data
-    lat = np.load(os.path.join(input_path, 'lat.npy'))
-    lon = np.load(os.path.join(input_path, 'lon.npy'))
-
-    # Load scans if available
-    scans_path = os.path.join(input_path, 'scans.npy')
-    scans = np.load(scans_path) if os.path.exists(scans_path) else np.arange(len(lat))
-
-    # Filter to single scan if requested
-    if single_scan is not None:
-        mask = scans == single_scan
-        lat = lat[mask]
-        lon = lon[mask]
-        scans = scans[mask]
-        logger.info(f"  Filtered to scan {single_scan}: {len(lat)} samples")
-
-    # Compute spatial boundaries using convex hull
-    n_samples = len(lat)
+    lat = data['lat'][data['spatiotemporal_mask']]
+    lon = data['lon'][data['spatiotemporal_mask']]
+    # Identify neighboring points
     coords = np.column_stack((lat, lon))
+    tree = cKDTree(coords)
+    dist, neigh = tree.query(coords, k=5)  # 5 neighbors + itself
+    neigh = neigh[:, 1:]  # Remove self-neighbor
+    # Perform edge_detection
+    lat_tolerance = 0.75
+    lon_tolerance = 0.75
+    # TODO: Test
+    has_edge = (
+            (lat >= lat.max() - lat_tolerance) |
+            (lat <= lat.min() + lat_tolerance) |
+             (lon >= lon.max() - lon_tolerance) |
+             (lon <= lon.min() + lon_tolerance)
+    )
+    # Load cloud/clear sky mask
+    cloud_mask = data['cloud_mask'][data['spatiotemporal_mask']]
+    clear_mask = ~cloud_mask
+    has_cloud_neighbor = cloud_mask[neigh].any(axis=1)
+    # Identify domain/group edges
+    # TODO: Update to properly handle both cloud or clear cases
+    coords_hull = np.flatnonzero(data['spatiotemporal_mask'])[clear_mask & (has_cloud_neighbor | has_edge)]
+    coords_remaining = np.flatnonzero(data['spatiotemporal_mask'])[clear_mask & ~(has_cloud_neighbor | has_edge)]
 
-    logger.info(f"  Computing convex hull for {n_samples} samples...")
-    hull = ConvexHull(coords)
-    hull_indices = hull.vertices
-    remaining_indices = np.setdiff1d(np.arange(n_samples), hull_indices)
+    # Load scans
+    scans = data['scans'][mask]
+    n_scans = len(np.unique(scans))
+    n_coords = mask.sum()
 
-    logger.info(f"  Boundary points: {len(hull_indices)}, Interior points: {len(remaining_indices)}")
-
-    # Shuffle remaining indices
-    np.random.seed(42)  # For reproducibility
-    np.random.shuffle(remaining_indices)
-
-    # Create splits: give boundary points to training
-    split_indices = {'train': [], 'valid': [], 'test': []}
-    split_indices['train'].extend(hull_indices)
-
-    # Split remaining points according to ratios
-    remaining_train = int(split_ratios['train'] * len(remaining_indices))
-    remaining_valid = int(split_ratios['valid'] * len(remaining_indices))
-
-    split_indices['train'].extend(remaining_indices[:remaining_train])
-    split_indices['valid'].extend(remaining_indices[remaining_train:remaining_train + remaining_valid])
-    split_indices['test'].extend(remaining_indices[remaining_train + remaining_valid:])
-
+    # Stage coordinates: Shuffle and assign to set
+    coords_stage = {'Train2': [], 'Val2': [], 'Test2': []}
+    for scan in range(n_scans):
+        # Shuffle remaining indices
+        np.random.shuffle(coords_remaining)
+        # Assign hull coordinates to training set
+        coords_stage['Train2'].extend(coords_hull + scan * n_coords)
+        coords_stage['Train2'].extend(coords_remaining[0:int(ratio['train'] * len(coords_remaining))])
+        # Assign the rest to the validation and test sets
+        coords_stage['Val2'].extend(coords_remaining[int(ratio['train'] * len(coords_remaining)):
+                                                int((ratio['train'] + ratio['valid']) * len(coords_remaining))])
+        coords_stage['Test2'].extend(coords_remaining[int((ratio['train'] + ratio['valid']) * len(coords_remaining)):])
     # Convert to arrays
-    split_indices = {k: np.array(v, dtype='int64') for k, v in split_indices.items()}
+    coords_stage = {k: np.array(v, dtype='int64') for k, v in coords_stage.items()}
 
     # Log split sizes
-    for split_name, indices in split_indices.items():
+    for split_name, indices in coords_stage.items():
         logger.info(f"  {split_name}: {len(indices)} samples ({100*len(indices)/n_samples:.1f}%)")
 
     # Get all filenames from input
     filenames = os.listdir(input_path)
 
     # Save splits
-    for split_name, indices in split_indices.items():
+    for split_name, indices in coords_stage.items():
         split_output_dir = os.path.join(output_path, split_name)
         os.makedirs(split_output_dir, exist_ok=True)
 
@@ -211,40 +138,62 @@ def synthetic(input: DictConfig, output: DictConfig) -> None:
     mask = np.ones_like(data['lat'], dtype='bool')
     if hasattr(input, 'mask'):
         # Initialize masks
-        coverage_mask = np.zeros_like(data['lat'], dtype='bool')
-        spatiotemporal_mask = np.ones_like(data['lat'], dtype='bool')
+        data['spatiotemporal_mask'] = np.ones_like(data['lat'], dtype='bool')
         # Spatial extent
         if hasattr(input.mask, 'spatial_domain'):
             if hasattr(input.mask.spatial_domain, 'lat_min'):
-                spatiotemporal_mask &= (data['lat'] >= input.mask.spatial_domain.lat_min)
+                lat_min = input.mask.spatial_domain.get('lat_min', -90)
+                data['spatiotemporal_mask'] &= (data['lat'] >= lat_min).astype(bool)
             if hasattr(input.mask.spatial_domain, 'lat_max'):
-                spatiotemporal_mask &= (data['lat'] <= input.mask.spatial_domain.lat_max)
+                lat_max = input.mask.spatial_domain.get('lat_max', 90)
+                data['spatiotemporal_mask'] &= (data['lat'] <= lat_max).astype(bool)
             if hasattr(input.mask.spatial_domain, 'lon_min'):
-                spatiotemporal_mask &= (data['lon'] >= input.mask.spatial_domain.lon_min)
+                lon_min = input.mask.spatial_domain.get('lon_min', -180)
+                data['spatiotemporal_mask'] &= (data['lon'] >= lon_min).astype(bool)
             if hasattr(input.mask.spatial_domain, 'lon_max'):
-                spatiotemporal_mask &= (data['lon'] <= input.mask.spatial_domain.lon_max)
+                lon_max = input.mask.spatial_domain.get('lon_max', 180)
+                data['spatiotemporal_mask'] &= (data['lon'] <= lon_max).astype(bool)
         # Temporal extent
         if hasattr(input.mask, 'temporal_window'):
-            if hasattr(input.mask.temporal_window, 'scan_min'):
-                spatiotemporal_mask &= (data['scans'] >= input.mask.temporal_window.scan_min)
-            if hasattr(input.mask.temporal_window, 'scan_max'):
-                spatiotemporal_mask &= (data['scans'] <= input.mask.temporal_window.scan_max)
+            if hasattr(input.mask.temporal_window, 'scans_min'):
+                scans_min = input.mask.temporal_window.get('scans_min', data['scans'].min())
+                data['spatiotemporal_mask'] &= (data['scans'] >= scans_min).astype(bool)
+            if hasattr(input.mask.temporal_window, 'scans_max'):
+                scans_max = input.mask.temporal_window.get('scans_max', data['scans'].max())
+                data['spatiotemporal_mask'] &= (data['scans'] <= scans_max).astype(bool)
         # Update mask
-        mask &= spatiotemporal_mask
+        mask &= data['spatiotemporal_mask']
         # Clouds or clear sky
+        data['cloud_mask'] = cloud_mask(data['prof'])
+        data['clear_mask'] = ~data['cloud_mask']
         if hasattr(input.mask, 'cloud_mask'):
             if input.mask.cloud_mask is True:
-                coverage_mask &= cloud_mask(data['prof'])
+                mask &= data['cloud_mask']
         if hasattr(input.mask, 'clear_mask'):
             if input.mask.clear_mask is True:
-                coverage_mask &= clear_mask(data['prof'])
-        # Update mask
-        mask &= coverage_mask
+                mask &= data['clear_mask']
+        # Daytime or nighttime
+        data['daytime_mask'] = daytime_mask(data['meta'])
+        data['nighttime_mask'] = ~data['daytime_mask']
+        if hasattr(input.mask, 'daytime_mask'):
+            if input.mask.daytime_mask is True:
+                mask &= data['daytime_mask']
+        if hasattr(input.mask, 'nighttime_mask'):
+            if input.mask.nighttime_mask is True:
+                mask &= data['nighttime_mask']
 
     # Shuffle or maintain distribution
-    if hasattr(input, 'shuffle') and input.shuffle:
-        # TODO: Complete
-        pass
+    if hasattr(input, 'split') and input.split is not None:
+        logger.info("\n  Reshuffling into train/valid/test splits...")
+
+        # Parameters
+        ratio = input.split.get('ratio', {'train': 0.6, 'valid': 0.2, 'test': 0.2})
+        seed = input.split.get('seed', 0)
+        static = input.split.get('static', False)
+        # Update distribution
+        reshuffle_spatiotemporal(
+            data, mask, ratio=ratio, seed=seed, static=static
+        )
     else:
         # Apply mask and convert to right precision
         data = {key: value[mask].astype(output.dtype) for key, value in data.items()}
