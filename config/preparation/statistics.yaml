@@ -15,7 +15,7 @@ statistics:
     # What the method produces as output (pickle file)
     output:
       # Path to statistics file
-      path: src/data/normalization/statistics.pkl
+      path: src/data/statistics/statistics.pkl
       # Saving function
       save:
         _target_: src.data.io.save_pkl

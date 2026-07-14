@@ -7,9 +7,6 @@ from src.data.transformations import identity
 from typing import Literal
 
 
-
-
-
 def save_pkl(path: str, data: dict) -> None:
     """ Save a dictionary as a pickle file.
 
@@ -77,6 +74,23 @@ def load_torch(path: str) -> dict | torch.Tensor:
     """
 
     return torch.load(path)
+
+
+def save_npy(path: str, data: np.ndarray, dtype: str | None = None) -> None:
+    """ Save a numpy array to a .npy file.
+
+        Parameters:
+        path: str. The file path to save the .npy file.
+        data: np.ndarray. The numpy array to be saved.
+        dtype: str, optional. The desired data type of the saved array. Defaults to None.
+
+        Returns:
+        None.
+    """
+
+    if dtype is not None:
+        data = data.astype(dtype)
+    np.save(path, data)
 
 
 def load_npy(path: str, split: np.ndarray | int | slice | None = None, dtype: str | None = None,

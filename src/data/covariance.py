@@ -29,7 +29,7 @@ def obs_error(data: np.ndarray, obs: np.ndarray) -> np.ndarray:
 
 
 def obs_uncertainty(data: np.ndarray) -> np.ndarray:
-    """ Return uncertainy estimation of the radiance data.
+    """ Return uncertainty estimation of the radiance data.
 
         Parameters
         ----------
@@ -71,43 +71,6 @@ def increment(config_true: DictConfig, config_prior: DictConfig) -> np.ndarray:
     # Return increment
     return np.subtract(x_true, x_prior, out=x_true)
 
-
-def regularize_b_matrix_spectral(B: np.ndarray, variance_fraction: float = 0.99, floor_value: float = 1e-3):
-    """
-    Decomposes B, floors tiny eigenvalues or truncates low-variance modes,
-    and returns a symmetric square root matrix W for the CVT transformation.
-
-    Parameters
-    ----------
-    B : np.ndarray. Original covariance matrix. Shape (M, M)
-    variance_fraction : float. Amount of total variance to preserve (e.g., 0.99 = 99%)
-    floor_value : float. Absolute minimum eigenvalue threshold to prevent gradient dampening.
-    """
-    # 1. Compute Eigenvalues (S) and Eigenvectors (V)
-    # Since B is symmetric, np.linalg.eigh is fast and stable
-    eigenvalues, eigenvectors = np.linalg.eigh(B)
-
-    # Sort in descending order
-    idx = np.argsort(eigenvalues)[::-1]
-    eigenvalues = eigenvalues[idx]
-    eigenvectors = eigenvectors[:, idx]
-
-    # 2. Option A: Truncate based on Cumulative Variance
-    # Find where the trailing eigenvalues contribute to less than 1% of the system
-    cum_variance = np.cumsum(eigenvalues) / np.sum(eigenvalues)
-    num_modes_to_keep = np.searchsorted(cum_variance, variance_fraction) + 1
-
-    # 3. Option B: Floor the remaining eigenvalues so they don't crush gradients
-    clipped_eigenvalues = np.copy(eigenvalues)
-    # Set anything past the truncation point (or below absolute threshold) to the floor
-    clipped_eigenvalues[num_modes_to_keep:] = floor_value
-    # clipped_eigenvalues[clipped_eigenvalues < floor_value] = floor_value
-
-    # 4. Construct the Symmetric Square Root Matrix: W = V @ diag(sqrt(eigenvalues)) @ V^T
-    sqrt_lambda = np.diag(np.sqrt(clipped_eigenvalues))
-    W = eigenvectors @ sqrt_lambda @ eigenvectors.T
-
-    return W
 
 
 def prior_from_bounded_perturbations(input: DictConfig, stats: DictConfig, output: DictConfig | None = None,

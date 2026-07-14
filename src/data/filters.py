@@ -25,12 +25,16 @@ def clear_mask(prof: np.ndarray | torch.Tensor, split: np.ndarray | torch.Tensor
         np.ndarray or torch.Tensor. Boolean mask indicating cloudy/clear-sky profiles.
     """
 
-    if isinstance(prof, torch.Tensor):
-        c = (prof[:, 5, :].sum(dim=1) == 0) & (prof[:, 6, :].sum(dim=1) == 0)
-        c = c & (prof[:, 7, :].sum(dim=1) == 0)
+    # Check if data is not already filtered for clear sky
+    if prof.shape[1] > 3:
+        if isinstance(prof, torch.Tensor):
+            c = (prof[:, 5, :].sum(dim=1) == 0) & (prof[:, 6, :].sum(dim=1) == 0)
+            c = c & (prof[:, 7, :].sum(dim=1) == 0)
+        else:
+            c = (prof[:, 5, :].sum(axis=1) == 0) & (prof[:, 6, :].sum(axis=1) == 0)
+            c = c & (prof[:, 7, :].sum(axis=1) == 0)
     else:
-        c = (prof[:, 5, :].sum(axis=1) == 0) & (prof[:, 6, :].sum(axis=1) == 0)
-        c = c & (prof[:, 7, :].sum(axis=1) == 0)
+        c = prof > 0
 
     # Apply split
     if split is not None:
