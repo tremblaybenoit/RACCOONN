@@ -2,10 +2,10 @@ import numpy as np
 from scipy.linalg import block_diag
 import hydra
 from omegaconf import DictConfig
-from src.data.io import load_var, load_var_and_normalize
+from src.data.io import load_variable
 from utilities.instantiators import instantiate
 from utilities.logic import get_config_path
-from utilities.plot import plot_map, save_plot, flexible_gridspec
+from src.evaluation.plot import plot_map, save_plot, flexible_gridspec
 import os
 import logging
 
@@ -45,31 +45,31 @@ def obs_uncertainty(data: np.ndarray) -> np.ndarray:
 
 
 def increment(config_true: DictConfig, config_prior: DictConfig) -> np.ndarray:
-    """ Compute error between ground truth and prior.
+     """ Compute error between ground truth and prior.
 
-        Parameters
-        ----------
-        config_true: DictConfig. Configuration for the ground truth dataset.
-        config_prior: DictConfig. Configuration for the prior dataset.
+         Parameters
+         ----------
+         config_true: DictConfig. Configuration for the ground truth dataset.
+         config_prior: DictConfig. Configuration for the prior dataset.
 
-        Returns
-        -------
-        np.ndarray. Error between ground truth and prior.
-    """
+         Returns
+         -------
+         np.ndarray. Error between ground truth and prior.
+     """
 
-    # Truth - prior
-    x_true = load_var_and_normalize(config_true)
-    x_prior = load_var_and_normalize(config_prior)
+     # Truth - prior
+     x_true = load_variable(config_true, apply_transform=True)
+     x_prior = load_variable(config_prior, apply_transform=True)
 
-    # Check dimensions and add new axis if necessary
-    if x_true.ndim != x_prior.ndim:
-        if x_prior.ndim == x_true.ndim - 1:
-            x_prior = x_prior[np.newaxis, :]
-        else:
-            raise ValueError("The shapes of the true and prior data do not match.")
+     # Check dimensions and add new axis if necessary
+     if x_true.ndim != x_prior.ndim:
+         if x_prior.ndim == x_true.ndim - 1:
+             x_prior = x_prior[np.newaxis, :]
+         else:
+             raise ValueError("The shapes of the true and prior data do not match.")
 
-    # Return increment
-    return np.subtract(x_true, x_prior, out=x_true)
+     # Return increment
+     return np.subtract(x_true, x_prior, out=x_true)
 
 
 
@@ -89,14 +89,14 @@ def prior_from_bounded_perturbations(input: DictConfig, stats: DictConfig, outpu
         None.
     """
     # Load Cholesky matrix
-    cov_cholesky = load_var(input.cholesky)
+    cov_cholesky = load_variable(input.cholesky)
 
     # Load physical base space and original dimensions
-    x_base_phys = load_var(input.prof)
+    x_base_phys = load_variable(input.prof)
     x_dims = x_base_phys.shape
 
     # Load and flatten the standardized/normalized initial state
-    xp_base_std = load_var_and_normalize(input.prof).reshape(x_dims[0], -1)
+    xp_base_std = load_variable(input.prof, apply_transform=True).reshape(x_dims[0], -1)
 
     # Extract physical bounds
     x_stats = instantiate(stats)
@@ -207,7 +207,7 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
     # Begin by loading the data and normalizing it
     logger.info("Loading data...")
     # TODO: Does this make sense?
-    data = load_var_and_normalize(input.data)
+    data = load_variable(input.data, apply_transform=True)
     data_shape = data.shape
     n_samples, n_vars = data_shape[0], data_shape[1]
     # Denominator (computation of the mean)
@@ -226,9 +226,9 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
             # Read coordinates
             if hasattr(input, 'lat') and hasattr(input, 'lon') and hasattr(input, 'scans'):
                 # Read coordinates
-                lat = load_var(input.lat)
-                lon = load_var(input.lon)
-                scans = load_var(input.scans)
+                lat = load_variable(input.lat)
+                lon = load_variable(input.lon)
+                scans = load_variable(input.scans)
 
                 # For clearsky-only or cloud-only datasets, the available coordinates points.
                 # In other words, two consecutive timesteps may not have the same (lat, lon) pairs.

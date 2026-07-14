@@ -4,8 +4,8 @@ import hydra
 from omegaconf import DictConfig
 from utilities.logic import get_config_path
 import os
-from utilities.plot import fig_geostationnary, save_plot
-from data.io import load_var
+from src.evaluation.plot import fig_geostationnary, save_plot
+from src.data.io import load_variable
 from matplotlib.colors import ListedColormap
 
 # Initialize logger
@@ -27,14 +27,14 @@ def main(config: DictConfig) -> None:
 
     # Load variables for training, validation and test sets
     logger.info("Loading coordinates for training, validation and test sets...")
-    lat_train = load_var(config.data.stage.train.vars.lat)
-    lon_train = load_var(config.data.stage.train.vars.lon)
+    lat_train = load_variable(config.data.stage.train.vars.lat)
+    lon_train = load_variable(config.data.stage.train.vars.lon)
     mask_train = np.ones_like(lon_train, dtype=int)*0
-    lat_valid = load_var(config.data.stage.valid.vars.lat)
-    lon_valid = load_var(config.data.stage.valid.vars.lon)
+    lat_valid = load_variable(config.data.stage.valid.vars.lat)
+    lon_valid = load_variable(config.data.stage.valid.vars.lon)
     mask_valid = np.ones_like(lon_valid, dtype=int)*1
-    lat_test = load_var(config.data.stage.test.vars.lat)
-    lon_test = load_var(config.data.stage.test.vars.lon)
+    lat_test = load_variable(config.data.stage.test.vars.lat)
+    lon_test = load_variable(config.data.stage.test.vars.lon)
     mask_test = np.ones_like(lon_test, dtype=int)*2
     lat = np.concatenate([lat_train, lat_valid, lat_test], axis=0)
     lon = np.concatenate([lon_train, lon_valid, lon_test], axis=0)

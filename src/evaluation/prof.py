@@ -4,8 +4,8 @@ import hydra
 from omegaconf import DictConfig
 from utilities.logic import get_config_path
 import os
-from utilities.plot import fig_vertical_profiles, save_plot
-from data.io import load_var, load_var_and_normalize
+from src.evaluation.plot import fig_vertical_profiles, save_plot
+from src.data.io import load_variable
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -28,31 +28,30 @@ def main(config: DictConfig) -> None:
     # Load profiles with different normalization methods
     logger.info("Loading profiles with different normalization methods...")
     config0 = config.data.stage.train.vars.prof
-    prof_train0 = load_var(config0)
+    prof_train0 = load_variable(config0)
     config1 = config.data.stage.train.vars.prof
     config1.normalization._target_ = 'data.transformations.min_max'
     config1.normalization.axis = 1
-    prof_train1 = load_var_and_normalize(config1)
+    prof_train1 = load_variable(config1, apply_transform=True)
     config2 = config.data.stage.train.vars.prof
     config2.normalization._target_ = 'data.transformations.min_max'
     config2.normalization.axis = None
-    prof_train2 = load_var_and_normalize(config2)
+    prof_train2 = load_variable(config2, apply_transform=True)
     config3 = config.data.stage.train.vars.prof
     config3.normalization._target_ = 'data.transformations.mean_stdev'
     config3.normalization.axis = None
-    prof_train3 = load_var_and_normalize(config3)
+    prof_train3 = load_variable(config3, apply_transform=True)
     # Stack profiles and compute statistics
     logger.info("Computing profile statistics...")
     prof = np.concatenate([prof_train0, prof_train1, prof_train2, prof_train3], axis=1)
     prof_mean = np.mean(prof, axis=0)
     prof_stdev = np.std(prof, axis=0)
-    breakpoint()
     prof_types = config.data.stage.test.vars.prof.type
     prof_labels = ([f'No norm. - {prof_label}' for prof_label in prof_types] +
                    [f'Min-Max norm. 1 - {prof_label}' for prof_label in prof_types] +
                    [f'Min-Max norm. N - {prof_label}' for prof_label in prof_types] +
                    [f'Standardized. N - {prof_label}' for prof_label in prof_types])
-    pressure_levels = (10**load_var(config.data.stage.train.vars.pressure))/100.0  # Convert to hPa
+    pressure_levels = (10**load_variable(config.data.stage.train.vars.pressure))/100.0  # Convert to hPa
 
     # Plot profiles
     logger.info("Plotting profiles...")

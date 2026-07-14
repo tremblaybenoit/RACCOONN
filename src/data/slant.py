@@ -1,7 +1,7 @@
 import numpy as np
 import hydra
 from omegaconf import DictConfig
-from data.io import load_var
+from src.data.io import load_variable
 from utilities.instantiators import instantiate
 from utilities.logic import get_config_path
 import logging
@@ -90,13 +90,13 @@ def compute_slant_path(input: DictConfig, output: DictConfig) -> None:
 
     # Load latitude, longitude, pressure levels, sensor azimuth angle, sensor zenith angle, temperature profiles
     logger.info("Loading data...")
-    lat = load_var(input.lat)
-    lon = load_var(input.lon)
-    pressure = load_var(input.pressure)[::-1]  # Inverse order
-    meta = load_var(input.meta)
+    lat = load_variable(input.lat)
+    lon = load_variable(input.lon)
+    pressure = load_variable(input.pressure)[::-1]  # Inverse order
+    meta = load_variable(input.meta)
     azimuth = meta[:, 3]
     zenith = meta[:, 1]
-    temperature = load_var(input.prof)[:, 0][:, ::-1]  # Inverse order to match pressure levels
+    temperature = load_variable(input.prof)[:, 0][:, ::-1]  # Inverse order to match pressure levels
 
     # Compute offset coordinates
     logger.info("Estimating slant path geometry...")

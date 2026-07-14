@@ -2,7 +2,7 @@ import numpy as np
 import logging
 import hydra
 from omegaconf import DictConfig
-from data.statistics import statistics
+from src.data.statistics import statistics
 from utilities.logic import get_config_path
 from utilities.instantiators import instantiate
 from src.evaluation.plot import fig_rmse_bars3, fig_vertical_profiles3, save_plot
@@ -45,15 +45,7 @@ def main(config: DictConfig) -> None:
     stats_hofx = statistics(hofx_pred[:, :10], axis=0, which=['rmse'], target=hofx[:, :10])
     stats_hofx_prior = statistics(hofx_prior[:, :10], axis=0, which=['rmse'], target=hofx[:, :10])
 
-    # Plots
-    logger.info("Plot comparison...")
-    fig2 = fig_rmse_bars3([stats_hofx['rmse'], stats_hofx_prior['rmse']],
-                          x_range=[[0, 2.65]], labels=list(['Prediction', 'Prior']),
-                          title=["(b) Test set - Forward model RMSE"],
-                          # colors=['#ff7f0e', '#2ca02c'])
-                          colors=['#E69F00', '#009E73'])
-    save_plot(fig2, config.paths.run_dir + '/Figure2_rmse_bars2_test.png')
-
+    # Plot parameters
     prof_mean_labels, prof_mean_colors = ['Target', 'Prediction'], ['#56B4E9', '#E69F00']  # ['#1f77b4', '#ff7f0e']
     prof_rmse_labels, prof_rmse_colors = ['Target-Prediction'], ['#E69F00']  # ['#ff7f0e']
     prof_mean_labels.insert(0, 'Prior')
@@ -71,7 +63,7 @@ def main(config: DictConfig) -> None:
                                  y=pressure, y_label='Pressure (hPa)',
                                  x_label=x_labels, color=prof_mean_colors,
                                  title=[f"{prof_label}" for prof_label in prof_labels])
-    save_plot(fig0, config.paths.run_dir + '/Figure0_profile_test.png')
+    save_plot(fig0, config.paths.run_dir + '/fig_test_prof_mean.png')
     prof_labels = ['(f) Air temperature RMSE',
                    '(g) Humidity mixing ratio RMSE',
                    '(h) Ozone mixing ratio RMSE']
@@ -80,7 +72,15 @@ def main(config: DictConfig) -> None:
     fig1 = fig_vertical_profiles3([stats_prior['rmse'], stats_pred['rmse']], prof_rmse_labels, y=pressure, y_label='Pressure (hPa)',
                                  x_label=x_labels, color=prof_rmse_colors,
                                  title=[f"{prof_label}" for prof_label in prof_labels])
-    save_plot(fig1, config.paths.run_dir + '/Figure0_profile_rmse_test.png')
+    save_plot(fig1, config.paths.run_dir + '/fig_test_prof_rmse.png')
+
+    # Forward model radiances
+    logger.info("Plot comparison...")
+    fig2 = fig_rmse_bars3([stats_hofx['rmse'], stats_hofx_prior['rmse']],
+                          x_range=[[0, 2.65]], labels=list(['Prediction', 'Prior']),
+                          title=["(b) Test set - Forward model RMSE"],
+                          colors=['#E69F00', '#009E73'])
+    save_plot(fig2, config.paths.run_dir + '/fig_test_hofx_rmse.png')
 
 if __name__ == '__main__':
     """ Predict using the inverse model.

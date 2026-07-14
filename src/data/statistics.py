@@ -74,7 +74,7 @@ def read_statistics_var(load: DictConfig, key: str, tensor: bool = False, dtype:
     return stats
 
 
-def compute_dataset_statistics(
+def statistics_dataset(
     dataset,
     which: list[str] | None = None,
     axis: int | tuple | None = 0,
@@ -196,7 +196,7 @@ def compute_statistics(input: DictConfig, output: DictConfig | None = None, excl
         dataset = instantiate(var_cfg_modified)
 
         # Compute statistics for this variable
-        stats[var_name] = compute_dataset_statistics(
+        stats[var_name] = statistics_dataset(
             dataset=dataset,
             which=which,
             axis=axis,

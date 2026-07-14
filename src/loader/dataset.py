@@ -160,9 +160,9 @@ class EagerDataset(UnivariateDataset):
 
         # Load and transform data once at initialization
         self.load_cfg = load
-        self.data = self._load()
+        self.data = self.load()
 
-    def _load(self) -> np.ndarray | torch.Tensor:
+    def load(self) -> np.ndarray | torch.Tensor:
         """ Load data from file and apply transformation pipeline.
 
             Returns
@@ -330,6 +330,37 @@ class LazyDataset(UnivariateDataset):
         # Resolve file list at construction time; split is baked-in via Hydra interpolation
         self.files = instantiate(path)
         self.load_fn = instantiate(load)
+        self.data = None
+
+    def load(self) -> np.ndarray | torch.Tensor:
+        """ Load all files and apply transformation pipeline (materializes lazy data).
+
+            Concatenates all files into a single array, applies transformations,
+            and converts to requested output format. Useful for materializing
+            lazy datasets into memory when needed (e.g., for compatibility with
+            eager-only code).
+
+            Returns
+            -------
+            np.ndarray or torch.Tensor. Concatenated transformed data in requested format.
+                - If as_tensor=True: torch.Tensor with shared memory (for multiprocessing).
+                - If as_tensor=False: np.ndarray (contiguous).
+        """
+        # Load all files and concatenate
+        arrays = [np.ascontiguousarray(self.load_fn(path=f)) for f in self.files]
+        arr = np.concatenate(arrays, axis=0)
+
+        # Apply transformations in sequence if pipeline exists
+        if self.pipeline:
+            arr = self._transform(arr)
+
+        # Convert to requested output format
+        if self.as_tensor:
+            # Tensor with shared memory for multiprocessing
+            return array_to_tensor(arr, shared=True)
+        else:
+            # Keep as contiguous numpy array
+            return np.ascontiguousarray(arr)
 
     def __len__(self) -> int:
         """ Return length of the dataset.
@@ -416,36 +447,19 @@ class MultivariateDataset(Dataset):
         # Class inheritance
         super().__init__()
 
-        # Helper function to impose as_tensor on dataset configs per variable
-        def _impose_as_tensor(cfg_dict: DictConfig, as_tensor_value: bool) -> DictConfig:
-            """
-            Override as_tensor in dataset config for each variable.
-
-            For each variable (key), modify its dataset config to set as_tensor.
-            This ensures all sub-datasets respect the parent's as_tensor setting.
-            """
-            modified = OmegaConf.create(cfg_dict)
-            for variable_name in modified.keys():
-                # For this variable, override as_tensor in its dataset config
-                variable_cfg = modified[variable_name]
-                modified[variable_name] = OmegaConf.merge(variable_cfg, {'as_tensor': as_tensor_value})
-            return modified
-
         # Impose as_tensor on input datasets (one per input variable)
-        input_modified = _impose_as_tensor(input, as_tensor)
-        self.input_keys = list(input_modified.keys())
+        self.input_keys = list(input.keys())
         self.input_datasets = {
-            key: instantiate(cfg)
-            for key, cfg in input_modified.items()
+            key: instantiate(cfg, as_tensor=as_tensor)
+            for key, cfg in input.items()
         }
 
         # Impose as_tensor on target datasets if provided (one per target variable)
         self.target_keys = list(target.keys()) if target is not None else None
         if target is not None:
-            target_modified = _impose_as_tensor(target, as_tensor)
             self.target_datasets = {
-                key: instantiate(cfg)
-                for key, cfg in target_modified.items()
+                key: instantiate(cfg, as_tensor=as_tensor)
+                for key, cfg in target.items()
             }
         else:
             self.target_datasets = None
@@ -453,10 +467,9 @@ class MultivariateDataset(Dataset):
         # Impose as_tensor on context datasets if provided (one per context variable)
         self.context_keys = list(context.keys()) if context is not None else None
         if context is not None:
-            context_modified = _impose_as_tensor(context, as_tensor)
             self.context_datasets = {
-                key: instantiate(cfg)
-                for key, cfg in context_modified.items()
+                key: instantiate(cfg, as_tensor=as_tensor)
+                for key, cfg in context.items()
             }
         else:
             self.context_datasets = None
@@ -536,6 +549,7 @@ def select_variables(config: DictConfig, keys: list[str] | str | None = None) ->
                    nested configs, suitable for MultiSatDataset to iterate over.
     """
 
+    # If no key is specified, use all
     if not keys:
         return config
 

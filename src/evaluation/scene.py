@@ -4,8 +4,8 @@ import hydra
 from omegaconf import DictConfig
 from utilities.logic import get_config_path
 import os
-from utilities.plot import fig_geostationnary, save_plot
-from data.io import load_var
+from src.evaluation.plot import fig_geostationnary, save_plot
+from src.data.io import load_variable
 from matplotlib.colors import ListedColormap
 from tqdm import tqdm
 
@@ -28,18 +28,18 @@ def main(config: DictConfig) -> None:
 
     # Load variables for training, validation and test sets
     logger.info("Loading coordinates for training, validation and test sets...")
-    lat_train = load_var(config.data.stage.train.vars.lat)
-    lon_train = load_var(config.data.stage.train.vars.lon)
-    scans_train = load_var(config.data.stage.train.vars.scans)
-    mask_train = load_var(config.data.stage.train.vars.cloud_filter)
-    lat_valid = load_var(config.data.stage.valid.vars.lat)
-    lon_valid = load_var(config.data.stage.valid.vars.lon)
-    scans_valid = load_var(config.data.stage.valid.vars.scans)
-    mask_valid = load_var(config.data.stage.valid.vars.cloud_filter)
-    lat_test = load_var(config.data.stage.test.vars.lat)
-    lon_test = load_var(config.data.stage.test.vars.lon)
-    scans_test = load_var(config.data.stage.test.vars.scans)
-    mask_test = load_var(config.data.stage.test.vars.cloud_filter)
+    lat_train = load_variable(config.data.stage.train.variables.lat)
+    lon_train = load_variable(config.data.stage.train.variables.lon)
+    scans_train = load_variable(config.data.stage.train.variables.scans)
+    mask_train = load_variable(config.data.stage.train.variables.cloud_filter)
+    lat_valid = load_variable(config.data.stage.valid.variables.lat)
+    lon_valid = load_variable(config.data.stage.valid.variables.lon)
+    scans_valid = load_variable(config.data.stage.valid.variables.scans)
+    mask_valid = load_variable(config.data.stage.valid.variables.cloud_filter)
+    lat_test = load_variable(config.data.stage.test.variables.lat)
+    lon_test = load_variable(config.data.stage.test.variables.lon)
+    scans_test = load_variable(config.data.stage.test.variables.scans)
+    mask_test = load_variable(config.data.stage.test.variables.cloud_filter)
     lat = np.concatenate([lat_train, lat_valid, lat_test], axis=0)
     lon = np.concatenate([lon_train, lon_valid, lon_test], axis=0)
     scans = np.concatenate([scans_train, scans_valid, scans_test], axis=0)

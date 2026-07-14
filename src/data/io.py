@@ -2,6 +2,7 @@ import numpy as np
 import pickle
 import torch
 from omegaconf import DictConfig, ListConfig
+from utilities.tensors import array_to_tensor
 from utilities.instantiators import instantiate
 from src.data.transformations import identity
 from typing import Literal
@@ -215,108 +216,54 @@ def load_scans(path: str, lat: np.ndarray | None = None, split: np.ndarray | Non
     return scans
 
 
-def load_var(config: DictConfig, split: np.ndarray | int | slice | None = None) -> np.ndarray:
+def load_variable(config: DictConfig | ListConfig, apply_transform: bool = False,
+                  as_tensor: bool = False) -> np.ndarray | torch.Tensor:
     """ Load variable.
 
         Parameters
         ----------
-        config: DictConfig. Configuration object for the variables.
-        split : np.ndarray, slice. Indices for the specified stage.
+        config: DictConfig or ListConfig. Configuration object for the variable(s).
+        apply_transform: bool. Whether to apply transformations or not.
+        as_tensor: bool. Whether to return a torch.Tensor or numpy array.
 
         Returns
         -------
-        dict. Array containing the loaded variable.
+        np.ndarray or torch.Tensor. Array containing the loaded variable(s).
+            - If as_tensor=True: torch.Tensor
+            - If as_tensor=False: np.ndarray
     """
 
-    # Load and normalize variable
-    data = np.asarray(instantiate(config['load']))
+    # If ListConfig, iterate on each DictConfig and concatenate
+    if isinstance(config, ListConfig):
+        results = [load_variable(c, apply_transform=apply_transform, as_tensor=as_tensor) for c in config]
+        # If tensor
+        if as_tensor:
+            # Ensure all results are tensors before concatenating
+            results = [r if isinstance(r, torch.Tensor) else array_to_tensor(r) for r in results]
+            return torch.cat(results, dim=0)
+        # If numpy array
+        else:
+            # Concatenate
+            return np.concatenate(results, axis=0)
 
-    # If no split and data is already a memmap/ndarray and dtype matches, return directly or asarray
-    if split is None:
-        # prefer returning memmap unchanged; np.asarray won't copy a memmap
-        return np.asarray(data)
+    # If individual DictConfig
+    elif isinstance(config, DictConfig):
 
-    # With split: handle int / slice / fancy indexing convert to array-like only when needed (np.asarray keeps memmap)
-    data = np.asarray(data)
-    if isinstance(split, int):
-        return np.asarray(data[split:split+1].squeeze(0))
-    elif isinstance(split, slice):
-        return data[split]
+        # Instantiate dataset (with optional transformation of the data)
+        if apply_transform:
+            dataset = instantiate(config, as_tensor=as_tensor)
+        else:
+            dataset = instantiate(config, transformations=None, as_tensor=as_tensor)
+
+        # Determine whether the data needs to be lazy loaded or is eager
+        # If a path is provided in the load function, then it's eager
+        if hasattr(config.load, 'path') and dataset.data is not None:
+            return dataset.data
+        # If lazy dataset, materialize the data
+        else:
+            data = dataset.load()
+            return data
+
+    # Otherwise raise error
     else:
-        # Boolean or integer indices: Fancy indexing will produce a copy into a new ndarray
-        if split.dtype == np.bool_:
-            split = np.flatnonzero(split)
-        out_shape = (split.shape[0],) + data.shape[1:]
-        out = np.empty(out_shape, dtype=data.dtype)
-        np.take(data, split, axis=0, out=out)
-        return out
-
-
-def load_var_and_normalize(config: DictConfig, split: np.ndarray | int | slice | None = None) -> np.ndarray:
-    """ Load and normalize variable.
-
-        Parameters
-        ----------
-        config: DictConfig. Configuration object for the variables.
-        split : np.ndarray, slice. Indices for the specified stage.
-
-        Returns
-        -------
-        dict. Array containing the loaded and normalized variable.
-    """
-
-    # Extract normalization function
-    if hasattr(config, 'normalization') and config['normalization'] is not None:
-        f_norm = instantiate(config['normalization'])
-    else:
-        f_norm = identity
-
-    # If no split or split is a slice, load and normalize directly
-    if split is None or isinstance(split, slice) or isinstance(split, int):
-        return f_norm(load_var(config, split=split))
-
-    # If the split is fancy indexing, extract from memory-mapped array
-    if isinstance(split, np.ndarray) and split.dtype == np.bool_:
-        split = np.flatnonzero(split)
-    else:
-        split = np.asarray(split)
-    # Load variable without split (to keep memmap if possible)
-    data = load_var(config, split=None)
-    # Extract efficiently using np.take
-    out_shape = (split.shape[0],) + data.shape[1:]
-    out = np.empty(out_shape, dtype=data.dtype)
-    np.take(data, split, axis=0, out=out)
-    # Normalize and return
-    return f_norm(out)
-# TODO: Verify type
-
-def load_stack(stack: ListConfig) -> np.ndarray:
-    """ Load and stack multiple variables.
-
-        Parameters
-        ----------
-        stack: List[DictConfig]. List of configuration objects for the variables.
-
-        Returns
-        -------
-        np.ndarray. Array containing the loaded and stacked variables.
-    """
-
-    # Load and stack variables along the last axis
-    return np.concatenate([load_var(c) for c in stack], axis=0)
-
-
-def load_stack_and_normalize(stack: ListConfig) -> np.ndarray:
-    """ Load and stack multiple normalized variables.
-
-        Parameters
-        ----------
-        stack: List[DictConfig]. List of configuration objects for the variables.
-
-        Returns
-        -------
-        np.ndarray. Array containing the loaded and stacked normalized variables.
-    """
-
-    # Load and stack variables along the last axis
-    return np.concatenate([load_var_and_normalize(c) for c in stack], axis=0)
+        raise TypeError('Config must be of type DictConfig or ListConfig.')
