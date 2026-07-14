@@ -3,7 +3,7 @@ import torch.nn as nn
 from typing import Callable
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
-from inverse.model.architecture.wrapper import Residual
+from src.model.architecture.wrapper import Residual
 
 
 # ============================================================================
@@ -674,7 +674,7 @@ class MLPModular(nn.Module):
         # ============================
         if hidden_layer is not None:
             self.hidden_layer = instantiate(hidden_layer)
-            
+
             # Update in_features if encoding injection is enabled
             if inject_encoding_hidden and hasattr(self.hidden_layer, 'in_features'):
                 self.hidden_layer.in_features = input_out_dim + self.d_encoding
@@ -688,7 +688,7 @@ class MLPModular(nn.Module):
                     hidden_out_dim = int(hidden_layer.out_features)
                 else:
                     hidden_out_dim = int(self.hidden_layer.in_features)
-                
+
                 # Add residual wrapper with optional projection for dimension mismatch
                 layer_in_dim = input_out_dim + self.d_encoding if inject_encoding_hidden else input_out_dim
                 if layer_in_dim != hidden_out_dim:

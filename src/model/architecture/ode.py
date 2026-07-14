@@ -1,13 +1,9 @@
-"""
-Neural ODE architectures for forward models.
-Provides modular ODE function definitions and integration logic.
-"""
 import torch
 import torch.nn as nn
 from typing import Union
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
-from inverse.model.architecture.mlp import MLPBlocks
+from src.model.architecture.mlp import MLPBlocks
 
 
 class ODEFunc(nn.Module):
@@ -314,6 +310,9 @@ class CRTMNeuralODE(nn.Module):
         """
         super().__init__()
 
+        # Import Scale locally to avoid circular imports
+        from src.model.architecture.activation import Scale
+
         # Dimensions
         self.nprofvars = nprofvars
         self.nsurfvars = nsurfvars
@@ -408,6 +407,4 @@ class CRTMNeuralODE(nn.Module):
         out_std = out_std + self.std_offset
 
         return torch.cat([out, out_std], dim=1)
-
-
 

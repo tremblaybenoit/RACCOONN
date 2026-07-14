@@ -1,2 +1,0 @@
-figure_logger:
-  _target_: forward.model.callback.FigureLogger

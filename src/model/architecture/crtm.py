@@ -1,14 +1,10 @@
-"""
-Modular CRTM (Community Radiative Transfer Model) architectures.
-Refactored to use MLPModular and other building blocks for improved flexibility.
-"""
 import torch
 import torch.nn as nn
 from typing import Union
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
-from forward.model.architecture.activation import Scale
-from inverse.model.architecture.mlp import MLPBlocks, PredictionHead
+from src.model.architecture.activation import Scale
+from src.model.architecture.mlp import MLPBlocks, PredictionHead
 
 
 class CRTMBackbone(nn.Module):

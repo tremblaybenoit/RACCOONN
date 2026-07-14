@@ -1,8 +1,6 @@
 defaults:
   - model_checkpoint
-  - figure_logger
+  - forward_logger
+  - inverse_logger
   - early_stopping
   - _self_
-
-figure_logger:
-  _target_: inverse.model.callback.FigureLogger

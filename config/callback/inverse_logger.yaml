@@ -1,0 +1,7 @@
+inverse_logger:
+  _target_: src.callback.figure.InverseLogger
+  save_every_n_epochs: 100
+  save_on_improvement: true
+  monitor: valid_loss
+  monitor_mode: min
+

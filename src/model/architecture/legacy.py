@@ -1,14 +1,8 @@
-"""
-Architecture definitions for forward models.
-Architectures are separated from the model to allow for easier configuration and reuse.
-Uses modular building blocks adapted from 3DClouds.
-"""
 import numpy as np
 import torch
 import torch.nn as nn
-from omegaconf import DictConfig
-from forward.model.activation import Swish, Scale, Sine
-from inverse.model.architecture.mlp import MLPBlocks, PredictionHead
+from src.model.architecture.activation import Swish, Scale, Sine
+from src.model.architecture.mlp import MLPBlocks, PredictionHead
 
 
 class CRTMArchitecture(nn.Module):
@@ -111,15 +105,19 @@ class CRTMArchitecture(nn.Module):
         x = self.concat(prof, input['surf'], input['meta'])
 
         # Shared feature extraction
-        features = self.backbone(x)
+        features = x
+        for dense, swish, drop in zip(self.hidden_layers, self.swish_layers, self.dropout_layers):
+            features = dense(features)
+            features = swish(features)
+            features = drop(features)
 
         # Mean brightness temperature output
-        out = self.mean_head(features)
+        out = self.out_T(features)
         out = self.bt_output_activation(out)
         out = out * (self.max_T - self.min_T) + self.min_T
 
         # Standard deviation output
-        out_std = self.std_head(features)
+        out_std = self.out_std(features)
         out_std = self.std_output_activation(out_std)
         if self.std_scale is not None:
             out_std = self.std_scale(out_std)
@@ -307,18 +305,23 @@ class CRTMSirenArchitecture(nn.Module):
         x = torch.cat([prof, input['surf'], input['meta']], dim=1)
 
         # Pass through SIREN backbone
-        features = self.backbone(x)
+        features = x
+        for dense, sine, drop in zip(self.hidden_layers, self.sine_layers, self.dropout_layers):
+            features = dense(features)
+            features = sine(features)
+            features = drop(features)
 
         # Mean output scaling
-        out = self.mean_head(features)
+        out = self.out_T(features)
         out = self.bt_output_activation(out)
         out = out * (self.max_T - self.min_T) + self.min_T
 
         # Uncertainty output
-        out_std = self.std_head(features)
+        out_std = self.out_std(features)
         out_std = self.std_output_activation(out_std)
         if self.std_scale is not None:
             out_std = self.std_scale(out_std)
         out_std = out_std + self.std_output_activation_offset
 
         return torch.cat([out, out_std], dim=1)
+
