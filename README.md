@@ -23,11 +23,10 @@ git clone https://github.com/tremblaybenoit/RACCOONN.git
 ```
 RACCOONN is built with [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/) and [Hydra](https://hydra.cc/docs/intro/). 
 
-Create a new conda environment and install pre-requisites from [`environment.yaml`](environment.yaml):
+Create a new conda environment and install pre-requisites by executing the script [`environment.sh`](environment.sh):
 ```bash
-conda create -n raccoonn python=3.10
-conda activate raccoonn
-conda env update -f environment.yaml
+./environment.sh
+conda activate RACCOONN
 ```
 
 # Usage
