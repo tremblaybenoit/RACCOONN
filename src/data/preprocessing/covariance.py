@@ -387,8 +387,8 @@ def main(config: DictConfig) -> None:
     """
 
     # Compute model and observation covariance matrices
-    if hasattr(config.preparation, "covariance"):
-        for dataset, config_covariance in config.preparation.covariance.items():
+    if hasattr(config.preprocessing, "covariance"):
+        for dataset, config_covariance in config.preprocessing.covariance.items():
             if hasattr(config_covariance, '_target_'):
                 logger.info(f"Computing error covariance matrix {dataset}")
                 instantiate(config_covariance)

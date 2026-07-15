@@ -139,7 +139,7 @@ def compute_mask(input: DictConfig, output: DictConfig) -> None:
         -------
         None.
     """
-    # TODO: Make more uniform with other preparation functions
+    # TODO: Make more uniform with other preprocessing functions
 
     # Instantiate mask
     mask = instantiate(input.mask)
@@ -171,8 +171,8 @@ def main(config: DictConfig) -> None:
     """
 
     # Compute filters
-    if hasattr(config.preparation, "filters"):
-        for key, config in config.preparation.filters.items():
+    if hasattr(config.preprocessing, "filters"):
+        for key, config in config.preprocessing.filters.items():
             logger.info(f"Computing mask: {key}")
             instantiate(config)
 

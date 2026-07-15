@@ -1,4 +1,4 @@
-# Configuration to load multiple preparation methods
+# Configuration to load multiple preprocessing methods
 defaults:
   - recast          # First: recast raw data to desired format/precision/filtering
   - statistics      # Then: compute statistics

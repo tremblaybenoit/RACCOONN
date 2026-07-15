@@ -6,7 +6,7 @@ defaults:
   - override /paths: default
   - override /hydra: default
   - override /data: forward_recast
-  - override /preparation: statistics
+  - override /preprocessing: statistics
   - override /loader: forward_default
   - override /model: forward_emulator
   - override /trainer: gpu
@@ -31,8 +31,8 @@ trainer:
   max_epochs: 96  # Number of epochs
   precision: 32  # 32-bit precision
 
-# Preparation configuration
-preparation:
+# Preprocessing configuration
+preprocessing:
   # Statistics computation
   statistics:
     # Output path for statistics
@@ -60,7 +60,7 @@ data:
             # Min/max values for normalization
             stats:
               _target_: data.statistics.read_statistics_var
-              path: ${preparation.statistics.data.output.path}
+              path: ${preprocessing.statistics.data.output.path}
               var: 'prof'
               dtype: ${data.dtype}
             axis: 1

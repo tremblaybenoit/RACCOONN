@@ -6,7 +6,7 @@ defaults:
   - override /paths: default
   - override /hydra: default
   - override /data: inverse_default
-  - override /preparation: inverse_default
+  - override /preprocessing: inverse_default
   - override /loader: default
   - override /model: inverse_default
   - override /trainer: gpu
@@ -46,7 +46,7 @@ data:
               _partial_: true
               stats:
                 _target_: src.data.statistics.read_statistics_var
-                path: ${preparation.statistics.data.output.path}
+                path: ${preprocessing.statistics.data.output.path}
                 var: 'prof'
                 dtype: ${data.dtype}
               axis: 1

@@ -35,7 +35,7 @@ stage:
             _partial_: true
             stats:
               _target_: src.data.statistics.read_statistics_var
-              path: ${preparation.statistics.data.output.path}
+              path: ${preprocessing.statistics.data.output.path}
               key: 'pressure_log'
               dtype: ${data.dtype}
   # Validation set

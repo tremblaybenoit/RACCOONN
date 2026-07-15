@@ -459,9 +459,9 @@ def main(config: DictConfig) -> None:
     None.
     """
 
-    # If statistics is part of the preparation steps:
-    if hasattr(config.preparation, "statistics"):
-        for dataset, config_statistics in config.preparation.statistics.items():
+    # If statistics is part of the preprocessing steps:
+    if hasattr(config.preprocessing, "statistics"):
+        for dataset, config_statistics in config.preprocessing.statistics.items():
             logger.info(f"Computing statistics of {dataset} set")
             _ = instantiate(config_statistics)
 

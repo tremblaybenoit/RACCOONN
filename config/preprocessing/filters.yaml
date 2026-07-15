@@ -9,11 +9,11 @@ filters:
     input:
       # Call to mask
       mask:
-        _target_: src.data.filters.pressure_mask
+        _target_: src.data.preprocessing.filters.pressure_mask
         # Statistics of the pressure variable to compute the mask
         stats:
-          _target_: src.data.statistics.read_statistics_var
-          load: ${data.preparation.statistics.data.output.load}
+          _target_: src.data.preprocessing.statistics.read_statistics_var
+          load: ${data.preprocessing.statistics.data.output.load}
           key: 'pressure'
           dtype: ${data.dtype}
         # Ratio threshold to determine constant pressure levels

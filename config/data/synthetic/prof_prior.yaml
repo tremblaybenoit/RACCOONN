@@ -22,13 +22,13 @@ stage:
                'Snow mass', 'Ozone mixing ratio']
         # Loading function
         load:
-          _target_: src.data.covariance.prior_from_bounded_perturbations
+          _target_: src.data.preprocessing.covariance.prior_from_bounded_perturbations
           stats: ${....prof.transformations.normalization.stats}
           seed: 75
           # What the method needs as input
           input:
             # Cholesky matrix
-            cholesky: ${preparation.covariance.B_uni_stdn_temporal.output.cholesky}
+            cholesky: ${preprocessing.covariance.B_uni_stdn_temporal.output.cholesky}
         # Transformations to apply
         transformations: ${data.stage.train.variables.prof_prior.transformations}
   # Validation set

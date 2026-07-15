@@ -131,8 +131,8 @@ def main(config: DictConfig) -> None:
     """
 
     # Compute latitude and longitude offsets
-    if hasattr(config.preparation, "slant"):
-        for dataset, config_slant in config.preparation.slant.items():
+    if hasattr(config.preprocessing, "slant"):
+        for dataset, config_slant in config.preprocessing.slant.items():
             logger.info(f"Computing slant path offsets of {dataset} set...")
             instantiate(config_slant)
 

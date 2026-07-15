@@ -8,7 +8,7 @@ import gc
 import logging
 from utilities.logic import get_config_path
 from utilities.instantiators import instantiate
-from src.data.filters import cloud_mask, daytime_mask
+from src.data.preprocessing.filters import cloud_mask, daytime_mask
 
 
 logger = logging.getLogger(__name__)
@@ -231,8 +231,8 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
 def main(config: DictConfig) -> None:
 
     # Execute recast
-    if hasattr(config.preparation, 'recast'):
-        for key, config in config.preparation.recast.items():
+    if hasattr(config.preprocessing, 'recast'):
+        for key, config in config.preprocessing.recast.items():
             logger.info(f"Performing recast: {key}")
             instantiate(config)
 

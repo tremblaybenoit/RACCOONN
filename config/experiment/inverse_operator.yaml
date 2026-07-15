@@ -6,7 +6,7 @@ defaults:
   - override /paths: default
   - override /hydra: default
   - override /data: inverse_default
-  - override /preparation: inverse_default
+  - override /preprocessing: inverse_default
   - override /loader: inverse_default
   - override /model: inverse_operator
   - override /trainer: gpu
@@ -31,8 +31,8 @@ trainer:
   max_epochs: 64  # Number of epochs
   precision: 32  # 32-bit precision
 
-# Preparation configuration
-preparation:
+# Preprocessing configuration
+preprocessing:
   # Statistics computation
   statistics:
     # Variables for which to compute statistics
@@ -59,7 +59,7 @@ data:
             _partial_: true
             stats:
               _target_: src.data.statistics.read_statistics_var
-              path: ${preparation.statistics.data.output.path}
+              path: ${preprocessing.statistics.data.output.path}
               var: 'prof'
               dtype: ${data.dtype}
             axis: 1

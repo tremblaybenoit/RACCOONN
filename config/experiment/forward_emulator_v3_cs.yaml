@@ -6,7 +6,7 @@ defaults:
   - override /paths: default
   - override /hydra: default
   - override /data: forward_recast
-  - override /preparation: statistics
+  - override /preprocessing: statistics
   - override /loader: forward_default
   - override /model: forward_emulator
   - override /trainer: gpu
@@ -37,7 +37,7 @@ trainer:
   precision: 32  # 32-bit precision
 
 # Preparation configuration
-preparation:
+preprocessing:
   # Statistics computation
   statistics:
     # Output path for statistics

@@ -17,9 +17,9 @@ stage:
         # Type of data
         type: 'Pressure mask'
         # Path to the pressure mask file
-        path: ${data.preparation.filters.pressure_mask.output.path}
+        path: ${data.preprocessing.filters.pressure_mask.output.path}
         # Loading function
-        load: ${data.preparation.filters.pressure_mask.output.load}
+        load: ${data.preprocessing.filters.pressure_mask.output.load}
   # Training set
   train: ${..source}
   # Validation set

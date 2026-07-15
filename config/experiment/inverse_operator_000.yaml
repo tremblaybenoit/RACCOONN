@@ -6,7 +6,7 @@ defaults:
   - override /paths: default
   - override /hydra: default
   - override /data: inverse_recast
-  - override /preparation: inverse_default
+  - override /preprocessing: inverse_default
   - override /loader: inverse_static
   - override /model: inverse_operator
   - override /trainer: cpu
@@ -40,8 +40,8 @@ callbacks:
   early_stopping:
     patience: 101  # Number of epochs with no improvement after which training will be stopped
 
-# Preparation configuration
-preparation:
+# Preprocessing configuration
+preprocessing:
   # Statistics computation
   statistics:
     # Variables for which to compute statistics

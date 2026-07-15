@@ -3,7 +3,7 @@ recast:
   # Source data
   source:
     # Function
-    _target_: src.data.recast.recast_synthetic
+    _target_: src.data.preprocessing.recast.recast_synthetic
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:

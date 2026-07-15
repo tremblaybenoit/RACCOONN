@@ -15,11 +15,11 @@ stage:
         _target_: src.loader.dataset.EagerDataset
         _recursive_: false
         # Path to the latitude slant data file
-        path: ${preparation.slant.train.output.y.path}
+        path: ${preprocessing.slant.train.output.y.path}
         # Type of data
         type: 'y (km)'
         # Loading function
-        load: ${preparation.slant.train.output.y.load}
+        load: ${preprocessing.slant.train.output.y.load}
         # Transformations to apply
         transformations:
           # Per-variable normalization
@@ -28,7 +28,7 @@ stage:
             _partial_: true
             stats:
               _target_: src.data.statistics.read_statistics_var
-              path: ${preparation.statistics.data.output.path}
+              path: ${preprocessing.statistics.data.output.path}
               key: 'y_slant'
               dtype: ${data.dtype}
   # Validation set
@@ -41,11 +41,11 @@ stage:
         _target_: ${data.stage.train.variables.y_slant._target_}
         _recursive_: false
         # Path to the latitude slant data file
-        path: ${preparation.slant.valid.output.y.path}
+        path: ${preprocessing.slant.valid.output.y.path}
         # Type of data
         type: ${data.stage.train.variables.y_slant.type}
         # Loading function
-        load: ${preparation.slant.valid.output.y.load}
+        load: ${preprocessing.slant.valid.output.y.load}
         # Transformations to apply
         transformations: ${data.stage.train.variables.y_slant.transformations}
   # Test set
@@ -58,11 +58,11 @@ stage:
         _target_: ${data.stage.train.variables.y_slant._target_}
         _recursive_: false
         # Path to the latitude slant data file
-        path: ${preparation.slant.test.output.y.path}
+        path: ${preprocessing.slant.test.output.y.path}
         # Type of data
         type: ${data.stage.train.variables.y_slant.type}
         # Loading function
-        load: ${preparation.slant.test.output.y.load}
+        load: ${preprocessing.slant.test.output.y.load}
         # Transformations to apply
         transformations: ${data.stage.train.variables.y_slant.transformations}
   # Predict set

@@ -37,7 +37,7 @@ Create or edit a configuration file in the [`config/experiment`](config/experime
     - `paths` (from folder [`config/paths`](config/paths)): Directories for data and outputs.
     - `hydra` (from folder [`config/hydra`](config/hydra)): Hydra settings.
     - `data` (from folder [`config/data`](config/data)): Dataset parameters.
-    - `preparation` (from folder [`config/preparation`](config/preparation)): Data preparation steps.
+    - `preprocessing` (from folder [`config/preprocessing`](config/preprocessing)): Data preprocessing steps.
     - `loader` (from folder [`config/loader`](config/loader)): Data loading parameters.
     - `model` (from folder [`config/model`](config/model)): Model architecture and parameters.
     - `architecture` (from folder [`config/architecture`](config/architecture)): Model architecture details.
@@ -63,7 +63,7 @@ flowchart LR
   B --> B1["/paths: default"]
   B --> B2["/hydra: default"]
   B --> B3["/data: inverse_default"]
-  B --> B4["/preparation: inverse_default"]
+  B --> B4["/preprocessing: inverse_default"]
   B --> B5["/loader: default"]
   B --> B6["/model: inverse_default"]
   B --> B7["/architecture: hydra_mlp"]
@@ -107,7 +107,7 @@ flowchart LR
   classDef paths fill:#FFD580,stroke:#888,stroke-width:1px,color:#000;
   classDef hydra fill:#A97FFF,stroke:#888,stroke-width:1px,color:#000;
   classDef data fill:#B0E57C,stroke:#888,stroke-width:1px,color:#000;
-  classDef preparation fill:#FFB347,stroke:#888,stroke-width:1px,color:#000;
+  classDef preprocessing fill:#FFB347,stroke:#888,stroke-width:1px,color:#000;
   classDef loader fill:#FF7F7F,stroke:#888,stroke-width:1px,color:#000;
   classDef model fill:#FFB3B3,stroke:#888,stroke-width:1px,color:#000;
   classDef architecture fill:#FFD4E5,stroke:#888,stroke-width:1px,color:#000;
@@ -124,7 +124,7 @@ flowchart LR
   class B1,C2,C21,C22,C23 paths;
   class B2 hydra;
   class B3,C4,C41 data;
-  class B4 preparation;
+  class B4 preprocessing;
   class B5 loader;
   class B6 model;
   class B7 architecture;

@@ -20,7 +20,7 @@ hydra_config = read_hydra_as_dict(config_path=hydra_config_path, config_name=hyd
                                   overrides=f"+experiment={hydra_experiment}")
 # Data configuration file (from Snakemake config file)
 data_config = hydra_config.get("data", {})
-prep_config = hydra_config.get("preparation", {})
+preprocessing_config = hydra_config.get("preprocessing", {})
 loader_config = hydra_config.get("loader", {}).get("stage", {})
 # Paths configuration file (from Snakemake config file)
 paths_config = hydra_config["paths"]
@@ -32,7 +32,7 @@ checkpoint_config = hydra_config["callbacks"]["model_checkpoint"]
 #########################################################################################################
 
 seen_dependencies = set()
-def find_file_paths(config, exts=('.npy', '.npz', '.pkl', '.txt', '.ckpt', '.csv', '.json'), exclude_keys=None,
+def find_file_paths(config, exts=('.npy', '.npz', '.pkl', '.txt', '.ckpt', '.csv', '.json', '.nc'), exclude_keys=None,
                     track_seen_dependencies=False):
     """ Recursively find all file path strings in a nested config dict/list.
 
@@ -85,8 +85,8 @@ rule data:
         experiment = f"+experiment={hydra_experiment}" if hydra_experiment is not None else ""
     output:
         # Downloaded data
-        data = set([path for stage_config in data_config['stage'].values() for var in stage_config['vars'].values()
-                    for path in find_file_paths(var['load'], exclude_keys='normalization')])
+        data = set([path for stage_config in data_config['stage'].values() for var in stage_config['variables'].values()
+                    for path in find_file_paths(var['load'], exclude_keys='transformations')])
     shell:
         """
         python -m utilities.download \
@@ -94,35 +94,57 @@ rule data:
         {params.experiment}
         """
 
-# Preparation: All steps in prep_config
-for prep_type, step_dict in prep_config.items():
-    # Set module and exclude_keys based on prep_type
-    if prep_type == 'statistics':
-        module_to_run = 'data.statistics'
-        exclude_keys = 'normalization'
-    elif prep_type == 'covariance':
-        module_to_run = 'data.covariance'
-        exclude_keys = None
-    else:
-        continue  # Skip unknown prep types or handle as needed
+# Preparation: Unified handler for all preparation types
+prep_modules = {
+    'recast': 'src.data.preprocessing.recast',
+    'statistics': 'src.data.preprocessing.statistics',
+    'filters': 'src.data.preprocessing.filters',
+    'covariance': 'src.data.preprocessing.covariance',
+    'slant': 'src.data.preprocessing.slant',
+}
 
-    for step, step_config in step_dict.items():
-        rule:
-            name: f"{prep_type}_{step}"
-            input:
-                data = set([path for vars_config in step_config['input'].values()
-                            for path in find_file_paths(vars_config, exclude_keys=exclude_keys, track_seen_dependencies=hydra_dependencies)])
-            params:
-                config_name = hydra_config_name,
-                experiment = f"+experiment={hydra_experiment}" if hydra_experiment is not None else ""
-            output:
-                out = step_config['output']['path']
-            shell:
-                f"""
-                python -m {module_to_run} \
-                --config-name={{params.config_name}} \
-                {{params.experiment}}
-                """
+for prep_type, prep_config_dict in preprocessing_config.items():
+    if prep_type not in prep_modules:
+        continue  # Skip unknown preparation types
+
+    module_to_run = prep_modules[prep_type]
+
+    for step_name, step_config in prep_config_dict.items():
+        if isinstance(step_config, dict) and '_target_' in step_config:
+            # Generic input extraction with special handling for recast
+            input_config = step_config.get('input', {})
+            if 'variables' in input_config:  # recast case
+                input_dict = input_config['variables']
+            else:  # statistics, filters, covariance, slant
+                input_dict = input_config
+
+            # Generic output extraction with multiple fallbacks
+            output_config = step_config.get('output', {})
+            output_path = (
+                output_config.get('dir') or  # recast
+                output_config.get('path') or  # statistics, filters
+                output_config.get('matrix', {}).get('path') or  # covariance
+                output_config.get('lat', {}).get('path') or  # slant
+                f"data/{prep_type}_{step_name}"  # fallback
+            )
+
+            rule:
+                name: f"{prep_type}_{step_name}"
+                input:
+                    data = set([path for var_name, var_config in input_dict.items()
+                                for path in find_file_paths(var_config, exclude_keys='save', track_seen_dependencies=hydra_dependencies)])
+                params:
+                    config_name = hydra_config_name,
+                    experiment = f"+experiment={hydra_experiment}" if hydra_experiment is not None else ""
+                output:
+                    out = output_path
+                shell:
+                    f"""
+                    python -m {module_to_run} \
+                    --config-name={{params.config_name}} \
+                    {{params.experiment}}
+                    """
+
 
 # Training step
 if 'train' in loader_config:
@@ -131,8 +153,8 @@ if 'train' in loader_config:
             # Input coordinates and observations
             data = set([path for stage in ['train', 'valid'] for vars_config in loader_config[stage].values()
                         for path in find_file_paths(vars_config, track_seen_dependencies=hydra_dependencies)]),
-            # Data statistics and other preparation outputs
-            preparation = set([path for step in prep_config for step_config in prep_config[step].values()
+            # Data statistics and other preprocessing outputs
+            preparation = set([path for step in preprocessing_config for step_config in preprocessing_config[step].values()
                                for path in find_file_paths(step_config['output'], track_seen_dependencies=hydra_dependencies)]),
         params:
             # Hydra configuration
@@ -143,7 +165,7 @@ if 'train' in loader_config:
             checkpoint = f"{paths_config['checkpoint_dir']}/{checkpoint_config['filename']}.ckpt"
         shell:
             """
-            python -m inverse.train \
+            python -m src.train \
             --config-name={params.config_name} \
             {params.experiment}
             """
@@ -155,8 +177,8 @@ if 'test' in loader_config:
             # Input coordinates and observations
             data = set([path for path in find_file_paths(loader_config['test'], exclude_keys='results',
                 track_seen_dependencies=hydra_dependencies)]),
-            # Data statistics and other preparation outputs
-            preparation = set([path for step in prep_config for step_config in prep_config[step].values()
+            # Data statistics and other preprocessing outputs
+            preparation = set([path for step in preprocessing_config for step_config in preprocessing_config[step].values()
                                for path in find_file_paths(step_config['output'], track_seen_dependencies=hydra_dependencies)]),
             # Model checkpoint
             checkpoint = f"{paths_config['checkpoint_dir']}/{checkpoint_config['filename']}.ckpt"
@@ -169,7 +191,7 @@ if 'test' in loader_config:
             test_out = [var['load']['path'] for var in loader_config['test']['results'].values()]
         shell:
             """
-            python -m inverse.test \
+            python -m src.test \
             --config-name={params.config_name} \
             {params.experiment}
             """
@@ -192,7 +214,7 @@ if 'predict' in loader_config:
             predict_out = [var['load']['path'] for var in loader_config['predict']['results'].values()]
         shell:
             """
-            python -m inverse.predict \
+            python -m src.predict \
             --config-name={params.config_name} \
             {params.experiment}
             """

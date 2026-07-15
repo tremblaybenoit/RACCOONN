@@ -18,7 +18,7 @@ stage:
         type: 'Cloud mask'
         # Loading function (clear filter is computed, not loaded directly)
         load:
-          _target_: src.data.filters.clear_mask
+          _target_: src.data.preprocessing.filters.clear_mask
           _args_:
             - ${....meta.load}
         # Transformations to apply

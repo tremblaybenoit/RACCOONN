@@ -6,7 +6,7 @@ defaults:
   - override /paths: default
   - override /hydra: default
   - override /data: forward_default
-  - override /preparation: forward_default
+  - override /preprocessing: forward_default
   - override /loader: default
   - override /model: forward_default
   - override /trainer: gpu

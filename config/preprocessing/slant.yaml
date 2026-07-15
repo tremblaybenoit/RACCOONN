@@ -24,12 +24,12 @@ slant:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.slant.train.output.lat.path}
+            - ${preprocessing.slant.train.output.lat.path}
         # Load function
         load:
           _target_: src.data.io.load_npy
           _args_:
-            - ${preparation.slant.train.output.lat.path}
+            - ${preprocessing.slant.train.output.lat.path}
             - ${data.dtype}
       lon:
         # Output path
@@ -39,12 +39,12 @@ slant:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.slant.train.output.lon.path}
+            - ${preprocessing.slant.train.output.lon.path}
         # Load function
         load:
           _target_: src.data.io.load_npy
           _args_:
-            - ${preparation.slant.train.output.lon.path}
+            - ${preprocessing.slant.train.output.lon.path}
             - ${data.dtype}
       z:
         # Output path
@@ -54,12 +54,12 @@ slant:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.slant.train.output.z.path}
+            - ${preprocessing.slant.train.output.z.path}
         # Load function
         load:
           _target_: src.data.io.load_npy
           _args_:
-            - ${preparation.slant.train.output.z.path}
+            - ${preprocessing.slant.train.output.z.path}
             - ${data.dtype}
       x:
         # Output path
@@ -69,12 +69,12 @@ slant:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.slant.train.output.x.path}
+            - ${preprocessing.slant.train.output.x.path}
         # Load function
         load:
           _target_: src.data.io.load_npy
           _args_:
-            - ${preparation.slant.train.output.x.path}
+            - ${preprocessing.slant.train.output.x.path}
             - ${data.dtype}
       y:
         # Output path
@@ -84,12 +84,12 @@ slant:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.slant.train.output.y.path}
+            - ${preprocessing.slant.train.output.y.path}
         # Load function
         load:
           _target_: src.data.io.load_npy
           _args_:
-            - ${preparation.slant.train.output.y.path}
+            - ${preprocessing.slant.train.output.y.path}
             - ${data.dtype}
   # Validation set
   valid:
@@ -115,12 +115,12 @@ slant:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.slant.valid.output.lat.path}
+            - ${preprocessing.slant.valid.output.lat.path}
         # Load function
         load:
           _target_: src.data.io.load_npy
           _args_:
-            - ${preparation.slant.valid.output.lat.path}
+            - ${preprocessing.slant.valid.output.lat.path}
             - ${data.dtype}
       lon:
         # Output path
@@ -130,12 +130,12 @@ slant:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.slant.valid.output.lon.path}
+            - ${preprocessing.slant.valid.output.lon.path}
         # Load function
         load:
           _target_: src.data.io.load_npy
           _args_:
-            - ${preparation.slant.valid.output.lon.path}
+            - ${preprocessing.slant.valid.output.lon.path}
             - ${data.dtype}
       z:
         # Output path
@@ -145,12 +145,12 @@ slant:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.slant.valid.output.z.path}
+            - ${preprocessing.slant.valid.output.z.path}
         # Load function
         load:
           _target_: src.data.io.load_npy
           _args_:
-            - ${preparation.slant.valid.output.z.path}
+            - ${preprocessing.slant.valid.output.z.path}
             - ${data.dtype}
       x:
         # Output path
@@ -160,12 +160,12 @@ slant:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.slant.valid.output.x.path}
+            - ${preprocessing.slant.valid.output.x.path}
         # Load function
         load:
           _target_: src.data.io.load_npy
           _args_:
-            - ${preparation.slant.valid.output.x.path}
+            - ${preprocessing.slant.valid.output.x.path}
             - ${data.dtype}
       y:
         # Output path
@@ -175,12 +175,12 @@ slant:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.slant.valid.output.y.path}
+            - ${preprocessing.slant.valid.output.y.path}
         # Load function
         load:
           _target_: src.data.io.load_npy
           _args_:
-            - ${preparation.slant.valid.output.y.path}
+            - ${preprocessing.slant.valid.output.y.path}
             - ${data.dtype}
   # Test set
   test:
@@ -206,12 +206,12 @@ slant:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.slant.test.output.lat.path}
+            - ${preprocessing.slant.test.output.lat.path}
         # Load function
         load:
           _target_: src.data.io.load_npy
           _args_:
-            - ${preparation.slant.test.output.lat.path}
+            - ${preprocessing.slant.test.output.lat.path}
             - ${data.dtype}
       lon:
         # Output path
@@ -221,12 +221,12 @@ slant:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.slant.test.output.lon.path}
+            - ${preprocessing.slant.test.output.lon.path}
         # Load function
         load:
           _target_: src.data.io.load_npy
           _args_:
-            - ${preparation.slant.test.output.lon.path}
+            - ${preprocessing.slant.test.output.lon.path}
             - ${data.dtype}
       z:
         # Output path
@@ -236,12 +236,12 @@ slant:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.slant.test.output.z.path}
+            - ${preprocessing.slant.test.output.z.path}
         # Load function
         load:
           _target_: src.data.io.load_npy
           _args_:
-            - ${preparation.slant.test.output.z.path}
+            - ${preprocessing.slant.test.output.z.path}
             - ${data.dtype}
       x:
         # Output path
@@ -251,12 +251,12 @@ slant:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.slant.test.output.x.path}
+            - ${preprocessing.slant.test.output.x.path}
         # Load function
         load:
           _target_: src.data.io.load_npy
           _args_:
-            - ${preparation.slant.test.output.x.path}
+            - ${preprocessing.slant.test.output.x.path}
             - ${data.dtype}
       y:
         # Output path
@@ -266,10 +266,10 @@ slant:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.slant.test.output.y.path}
+            - ${preprocessing.slant.test.output.y.path}
         # Load function
         load:
           _target_: src.data.io.load_npy
           _args_:
-            - ${preparation.slant.test.output.y.path}
+            - ${preprocessing.slant.test.output.y.path}
             - ${data.dtype}

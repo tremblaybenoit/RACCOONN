@@ -4,7 +4,7 @@ covariance:
   # Error covariance matrix in model space
   B:
     # Function
-    _target_: src.data.covariance.climatological_matrix
+    _target_: src.data.preprocessing.covariance.climatological_matrix
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:
@@ -46,12 +46,12 @@ covariance:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.covariance.B.output.matrix.path}
+            - ${preprocessing.covariance.B.output.matrix.path}
         # Load function
         load:
           _target_: numpy.load
           _args_:
-            - ${preparation.covariance.B.output.matrix.path}
+            - ${preprocessing.covariance.B.output.matrix.path}
       # Cholesky decomposition of the covariance matrix
       cholesky:
         # File path to save/load the Cholesky decomposition of the covariance matrix
@@ -61,12 +61,12 @@ covariance:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.covariance.B.output.cholesky.path}
+            - ${preprocessing.covariance.B.output.cholesky.path}
         # Load function
         load:
           _target_: numpy.load
           _args_:
-            - ${preparation.covariance.B.output.cholesky.path}
+            - ${preprocessing.covariance.B.output.cholesky.path}
       # Inverse of the covariance matrix
       matrix_inverse:
         # File path to save/load the inverse of the covariance matrix
@@ -76,12 +76,12 @@ covariance:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.covariance.B.output.matrix_inverse.path}
+            - ${preprocessing.covariance.B.output.matrix_inverse.path}
         # Load function
         load:
           _target_: numpy.load
           _args_:
-            - ${preparation.covariance.B.output.matrix_inverse.path}
+            - ${preprocessing.covariance.B.output.matrix_inverse.path}
       # Pseudo-inverse of the covariance matrix
       matrix_pseudo_inverse:
         # Parameters
@@ -95,17 +95,17 @@ covariance:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.covariance.B.output.matrix_pseudo_inverse.path}
+            - ${preprocessing.covariance.B.output.matrix_pseudo_inverse.path}
         # Load function
         load:
           _target_: numpy.load
           _args_:
-            - ${preparation.covariance.B.output.matrix_pseudo_inverse.path}
+            - ${preprocessing.covariance.B.output.matrix_pseudo_inverse.path}
 
   # Error covariance matrix in observation space
   R:
     # Function
-    _target_: src.data.covariance.climatological_matrix
+    _target_: src.data.preprocessing.covariance.climatological_matrix
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:
@@ -162,12 +162,12 @@ covariance:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.covariance.R.output.matrix.path}
+            - ${preprocessing.covariance.R.output.matrix.path}
         # Load function
         load:
           _target_: numpy.load
           _args_:
-            - ${preparation.covariance.R.output.matrix.path}
+            - ${preprocessing.covariance.R.output.matrix.path}
       # Inverse of the covariance matrix
       matrix_inverse:
         # File path to save/load the inverse of the covariance matrix
@@ -177,12 +177,12 @@ covariance:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.covariance.R.output.matrix_inverse.path}
+            - ${preprocessing.covariance.R.output.matrix_inverse.path}
         # Load function
         load:
           _target_: numpy.load
           _args_:
-            - ${preparation.covariance.R.output.matrix_inverse.path}
+            - ${preprocessing.covariance.R.output.matrix_inverse.path}
       # Pseudo-inverse of the covariance matrix
       matrix_pseudo_inverse:
         # Parameters
@@ -196,12 +196,12 @@ covariance:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.covariance.R.output.matrix_pseudo_inverse.path}
+            - ${preprocessing.covariance.R.output.matrix_pseudo_inverse.path}
         # Load function
         load:
           _target_: numpy.load
           _args_:
-            - ${preparation.covariance.R.output.matrix_pseudo_inverse.path}
+            - ${preprocessing.covariance.R.output.matrix_pseudo_inverse.path}
       # Correlation matrix
       correlation:
         # File path to save/load the correlation matrix
@@ -211,12 +211,12 @@ covariance:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.covariance.R.output.correlation.path}
+            - ${preprocessing.covariance.R.output.correlation.path}
         # Load function
         load:
           _target_: numpy.load
           _args_:
-            - ${preparation.covariance.R.output.correlation.path}
+            - ${preprocessing.covariance.R.output.correlation.path}
       # Inverse of the correlation matrix
       correlation_inverse:
         # File path to save/load the inverse of the correlation matrix
@@ -226,12 +226,12 @@ covariance:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.covariance.R.output.correlation_inverse.path}
+            - ${preprocessing.covariance.R.output.correlation_inverse.path}
         # Load function
         load:
           _target_: numpy.load
           _args_:
-            - ${preparation.covariance.R.output.correlation_inverse.path}
+            - ${preprocessing.covariance.R.output.correlation_inverse.path}
       # Pseudo-inverse of the correlation matrix
       correlation_pseudo_inverse:
         # Parameters
@@ -245,9 +245,9 @@ covariance:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preparation.covariance.R.output.correlation_pseudo_inverse.path}
+            - ${preprocessing.covariance.R.output.correlation_pseudo_inverse.path}
         # Load function
         load:
           _target_: numpy.load
           _args_:
-            - ${preparation.covariance.R.output.correlation_pseudo_inverse.path}
+            - ${preprocessing.covariance.R.output.correlation_pseudo_inverse.path}
