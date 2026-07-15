@@ -3,7 +3,7 @@ recast:
   # Training set
   train:
     # Function
-    _target_: src.data.preprocessing.recast.recast_synthetic
+    _target_: src.preprocessing.recast.recast_synthetic
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:
@@ -179,7 +179,7 @@ recast:
   # Validation set
   valid:
     # Function
-    _target_: src.data.preprocessing.recast.recast_synthetic
+    _target_: src.preprocessing.recast.recast_synthetic
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:
@@ -350,7 +350,7 @@ recast:
   # Test set
   test:
     # Function
-    _target_: src.data.preprocessing.recast.recast_synthetic
+    _target_: src.preprocessing.recast.recast_synthetic
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:

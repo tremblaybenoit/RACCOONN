@@ -34,7 +34,7 @@ stage:
             _target_: src.data.transformations.min_max
             _partial_: true
             stats:
-              _target_: src.data.statistics.read_statistics_var
+              _target_: src.preprocessing.statistics.read_statistics_var
               path: ${preprocessing.statistics.data.output.path}
               key: 'lon'
               dtype: ${data.dtype}

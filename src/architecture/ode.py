@@ -3,7 +3,7 @@ import torch.nn as nn
 from typing import Union
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
-from src.model.architecture.mlp import MLPBlocks
+from src.architecture.mlp import MLPBlocks
 
 
 class ODEFunc(nn.Module):
@@ -311,7 +311,7 @@ class CRTMNeuralODE(nn.Module):
         super().__init__()
 
         # Import Scale locally to avoid circular imports
-        from src.model.architecture.activation import Scale
+        from src.architecture.activation import Scale
 
         # Dimensions
         self.nprofvars = nprofvars

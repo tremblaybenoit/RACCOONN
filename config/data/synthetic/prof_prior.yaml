@@ -22,7 +22,7 @@ stage:
                'Snow mass', 'Ozone mixing ratio']
         # Loading function
         load:
-          _target_: src.data.preprocessing.covariance.prior_from_bounded_perturbations
+          _target_: src.preprocessing.covariance.prior_from_bounded_perturbations
           stats: ${....prof.transformations.normalization.stats}
           seed: 75
           # What the method needs as input

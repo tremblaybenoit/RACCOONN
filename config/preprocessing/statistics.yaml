@@ -3,7 +3,7 @@ statistics:
   # Statistics of the training set
   data:
     # Function
-    _target_: src.data.statistics.compute_statistics
+    _target_: src.preprocessing.statistics.compute_statistics
     _recursive_: false  # Do not instantiate nested objects
     # Exclude variables from the statistics computation
     exclude: ['clear_mask', 'cloud_mask', 'daytime_mask', 'pressure_mask', 'prof_prior']

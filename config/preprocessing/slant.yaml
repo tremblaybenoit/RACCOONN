@@ -3,7 +3,7 @@ slant:
   # Training set
   train:
     # Function
-    _target_: src.data.slant.compute_slant_path
+    _target_: src.preprocessing.slant.compute_slant_path
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:

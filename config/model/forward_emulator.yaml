@@ -24,7 +24,7 @@ loss:
 
 # Architecture
 architecture:
-  _target_: src.model.architecture.legacy.CRTMArchitecture
+  _target_: src.architecture.legacy.CRTMArchitecture
   nprofvars:
     _target_: builtins.len
     _args_:

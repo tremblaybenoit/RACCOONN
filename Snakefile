@@ -96,11 +96,11 @@ rule data:
 
 # Preparation: Unified handler for all preparation types
 prep_modules = {
-    'recast': 'src.data.preprocessing.recast',
-    'statistics': 'src.data.preprocessing.statistics',
-    'filters': 'src.data.preprocessing.filters',
-    'covariance': 'src.data.preprocessing.covariance',
-    'slant': 'src.data.preprocessing.slant',
+    'recast': 'src.preprocessing.recast',
+    'statistics': 'src.preprocessing.statistics',
+    'filters': 'src.preprocessing.filters',
+    'covariance': 'src.preprocessing.covariance',
+    'slant': 'src.preprocessing.slant',
 }
 
 for prep_type, prep_config_dict in preprocessing_config.items():

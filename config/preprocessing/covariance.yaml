@@ -4,7 +4,7 @@ covariance:
   # Error covariance matrix in model space
   B:
     # Function
-    _target_: src.data.preprocessing.covariance.climatological_matrix
+    _target_: src.preprocessing.covariance.climatological_matrix
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:
@@ -105,7 +105,7 @@ covariance:
   # Error covariance matrix in observation space
   R:
     # Function
-    _target_: src.data.preprocessing.covariance.climatological_matrix
+    _target_: src.preprocessing.covariance.climatological_matrix
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:

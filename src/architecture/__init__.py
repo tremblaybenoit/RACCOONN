@@ -3,7 +3,7 @@ Unified architecture components for RACCOONN models (forward and inverse).
 Consolidates shared components from both model types.
 """
 # Activation functions
-from src.model.architecture.activation import (
+from src.architecture.activation import (
     Scale,
     Swish,
     SuperLearnableSwish,
@@ -17,7 +17,7 @@ from src.model.architecture.activation import (
 )
 
 # Positional Encoding modules
-from src.model.architecture.encoding import (
+from src.architecture.encoding import (
     IdentityPositionalEncoding,
     RescaledPositionalEncoding,
     GaussianPositionalEncoding,
@@ -25,13 +25,13 @@ from src.model.architecture.encoding import (
 )
 
 # Wrapper modules (residual, concatenate)
-from src.model.architecture.wrapper import (
+from src.architecture.wrapper import (
     Residual,
     Concatenate,
 )
 
 # MLP components
-from src.model.architecture.mlp import (
+from src.architecture.mlp import (
     MLPBlock,
     MLPBlocks,
     PredictionHead,
@@ -47,7 +47,7 @@ from src.model.architecture.mlp import (
 )
 
 # ODE architectures (forward model specific)
-from src.model.architecture.ode import (
+from src.architecture.ode import (
     ODEFunc,
     ConditionalODEFunc,
     PressureConditionalODEFunc,
@@ -56,7 +56,7 @@ from src.model.architecture.ode import (
 )
 
 # CRTM architectures (forward model specific)
-from src.model.architecture.crtm import (
+from src.architecture.crtm import (
     CRTMBackbone,
     CRTMDualHead,
     CRTMModular,
@@ -64,7 +64,7 @@ from src.model.architecture.crtm import (
 )
 
 # Legacy architectures (forward model specific, for backward compatibility)
-from src.model.architecture.legacy import (
+from src.architecture.legacy import (
     CRTMArchitecture,
     CRTMSmoothArchitecture,
     CRTMSirenArchitecture,

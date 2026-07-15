@@ -9,7 +9,7 @@ filters:
     input:
       # Call to mask
       mask:
-        _target_: src.data.preprocessing.filters.pressure_mask
+        _target_: src.preprocessing.filters.pressure_mask
         # Statistics of the pressure variable to compute the mask
         stats:
           _target_: src.data.preprocessing.statistics.read_statistics_var

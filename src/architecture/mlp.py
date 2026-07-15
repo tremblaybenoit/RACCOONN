@@ -3,7 +3,7 @@ import torch.nn as nn
 from typing import Callable
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
-from src.model.architecture.wrapper import Residual
+from src.architecture.wrapper import Residual
 
 
 # ============================================================================

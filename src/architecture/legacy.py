@@ -1,8 +1,8 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from src.model.architecture.activation import Swish, Scale, Sine
-from src.model.architecture.mlp import MLPBlocks, PredictionHead
+from src.architecture.activation import Swish, Scale, Sine
+from src.architecture.mlp import MLPBlocks, PredictionHead
 
 
 class CRTMArchitecture(nn.Module):

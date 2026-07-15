@@ -4,8 +4,8 @@ from omegaconf import DictConfig
 from torch.nn import ModuleList
 from src.data.statistics import statistics, accumulate_statistics
 from src.model.forward import BaseModel
-from src.model.architecture.activation import Sine
-from src.model.architecture.encoding import IdentityPositionalEncoding
+from src.architecture.activation import Sine
+from src.architecture.encoding import IdentityPositionalEncoding
 from utilities.instantiators import instantiate
 from src.data.transformations import mean_stdev, min_max
 import numpy as np

@@ -4,8 +4,8 @@ import torch.nn as nn
 from typing import Union, Any
 from pytorch_lightning import LightningModule
 from src.data.statistics import statistics, accumulate_statistics
-from src.model.architecture.activation import Swish, Scale, Sine
-from src.model.architecture.ode import PressureConditionalODEFunc
+from src.architecture.activation import Swish, Scale, Sine
+from src.architecture.ode import PressureConditionalODEFunc
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
 import gc

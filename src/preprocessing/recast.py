@@ -8,7 +8,7 @@ import gc
 import logging
 from utilities.logic import get_config_path
 from utilities.instantiators import instantiate
-from src.data.preprocessing.filters import cloud_mask, daytime_mask
+from src.preprocessing.filters import cloud_mask, daytime_mask
 
 
 logger = logging.getLogger(__name__)

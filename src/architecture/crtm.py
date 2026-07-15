@@ -3,8 +3,8 @@ import torch.nn as nn
 from typing import Union
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
-from src.model.architecture.activation import Scale
-from src.model.architecture.mlp import MLPBlocks, PredictionHead
+from src.architecture.activation import Scale
+from src.architecture.mlp import MLPBlocks, PredictionHead
 
 
 class CRTMBackbone(nn.Module):
