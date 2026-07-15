@@ -1,5 +1,5 @@
 # Model
-_target_: forward.model.model.CRTMModel
+_target_: src.model.forward.CRTMModel
 _recursive_: false
 
 # Optimizer function and parameters
@@ -20,11 +20,11 @@ scheduler:
 
 # Loss function
 loss:
-  _target_: forward.model.loss.CRPS
+  _target_: src.loss.loss.CRPS
 
 # Architecture
 architecture:
-  _target_: forward.model.architecture.CRTMArchitecture
+  _target_: src.model.architecture.legacy.CRTMArchitecture
   nprofvars:
     _target_: builtins.len
     _args_:

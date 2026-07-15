@@ -8,13 +8,13 @@ The goal is to create an inverse observation operator for the assimilation of ra
 - [Usage](#usage)
   - [Experiment configuration](#experiment-configuration)
   - [Manual execution of individual steps](#manual-execution-of-individual-steps)
-    - [Forward model](#forward-model-eg-experimentforward_emulator)
-    - [Inverse model](#inverse-model-eg-experimentinverse_operator)
+    - [Forward model](#forward-model-eg-experimentforward_default)
+    - [Inverse model](#inverse-model-eg-experimentinverse_default)
   - [Automated workflow (recommended)](#automated-workflow-recommended)
 - [Documentation](#documentation)
 - [References and Acknowledgements](#references-and-acknowledgements)
 
-# Installation
+## Installation
 
 Clone the repository:
 
@@ -29,8 +29,8 @@ Create a new conda environment and install pre-requisites by executing the scrip
 conda activate RACCOONN
 ```
 
-# Usage
-## Experiment configuration
+## Usage
+### Experiment configuration
 Create or edit a configuration file in the [`config/experiment`](config/experiment) folder to set your experiment parameters.
 
 1. Start with the `defaults` section to set the default configurations:
@@ -40,6 +40,10 @@ Create or edit a configuration file in the [`config/experiment`](config/experime
     - `preparation` (from folder [`config/preparation`](config/preparation)): Data preparation steps.
     - `loader` (from folder [`config/loader`](config/loader)): Data loading parameters.
     - `model` (from folder [`config/model`](config/model)): Model architecture and parameters.
+    - `architecture` (from folder [`config/architecture`](config/architecture)): Model architecture details.
+    - `optimizer` (from folder [`config/optimizer`](config/optimizer)): Optimizer parameters.
+    - `scheduler` (from folder [`config/scheduler`](config/scheduler)): Learning rate scheduler parameters.
+    - `loss` (from folder [`config/loss`](config/loss)): Loss function parameters.
     - `trainer` (from folder [`config/trainer`](config/trainer)): Training parameters.
     - `callbacks` (from folder [`config/callbacks`](config/callbacks)): Callbacks during training.
     - `logger` (from folder [`config/logger`](config/logger)): Logging parameters.
@@ -47,26 +51,30 @@ Create or edit a configuration file in the [`config/experiment`](config/experime
 
 **Note**: The order of the `defaults` matters, as later entries can override earlier ones.
 
-**Example**: The following diagram illustrates the structure of [`config/experiment/inverse_operator.yaml`](config/experiment/inverse_operator.yaml). 
+**Example**: The following diagram illustrates the structure of [`config/experiment/inverse_default.yaml`](config/experiment/inverse_default.yaml). 
 It sets the `defaults` and then performs parameter `overrides`.
 ```mermaid
 ---
-title: Structure of the experiment configuration file "config/experiment/inverse_operator.yaml"
+title: Structure of the experiment configuration file "config/experiment/inverse_default.yaml"
 ---
 flowchart LR
-  A["/experiment: inverse_operator"]
+  A["/experiment: inverse_default"]
   A --> B["defaults"]
   B --> B1["/paths: default"]
   B --> B2["/hydra: default"]
   B --> B3["/data: inverse_default"]
   B --> B4["/preparation: inverse_default"]
-  B --> B5["/loader: inverse_default"]
-  B --> B6["/model: inverse_operator"]
-  B --> B7["/trainer: gpu"]
-  B --> B8["/callbacks: default"]
-  B --> B9["/logger: default"]
+  B --> B5["/loader: default"]
+  B --> B6["/model: inverse_default"]
+  B --> B7["/architecture: hydra_mlp"]
+  B --> B8["/optimizer: adam"]
+  B --> B9["/scheduler: plateau"]
+  B --> B10["/loss: var"]
+  B --> B11["/trainer: gpu"]
+  B --> B12["/callbacks: inverse_default"]
+  B --> B13["/logger: default"]
 
-  %% Chaque override pointe vers final_overrides
+  %% Each override points to the final overrides section
   B1 --> C
   B2 --> C
   B3 --> C
@@ -76,6 +84,10 @@ flowchart LR
   B7 --> C
   B8 --> C
   B9 --> C
+  B10 --> C
+  B11 --> C
+  B12 --> C
+  B13 --> C
 
   C["Overrides"]
   C --> C1["task_name"]
@@ -89,7 +101,7 @@ flowchart LR
   C --> C4["/data"]
   C4 --> C41["dtype"]
 
-  %% Couleurs par catégorie (texte blanc ou noir selon le fond)
+  %% Color per config category
   classDef experiment fill:#22313F,stroke:#888,stroke-width:1px,color:#fff;
   classDef final_overrides fill:#22313F,stroke:#888,stroke-width:1px,color:#fff;
   classDef paths fill:#FFD580,stroke:#888,stroke-width:1px,color:#000;
@@ -98,11 +110,15 @@ flowchart LR
   classDef preparation fill:#FFB347,stroke:#888,stroke-width:1px,color:#000;
   classDef loader fill:#FF7F7F,stroke:#888,stroke-width:1px,color:#000;
   classDef model fill:#FFB3B3,stroke:#888,stroke-width:1px,color:#000;
+  classDef architecture fill:#FFD4E5,stroke:#888,stroke-width:1px,color:#000;
+  classDef optimizer fill:#D4E5FF,stroke:#888,stroke-width:1px,color:#000;
+  classDef scheduler fill:#E5FFD4,stroke:#888,stroke-width:1px,color:#000;
+  classDef loss fill:#FFE5D4,stroke:#888,stroke-width:1px,color:#000;
   classDef trainer fill:#80B3FF,stroke:#888,stroke-width:1px,color:#000;
   classDef callbacks fill:#57D9AD,stroke:#888,stroke-width:1px,color:#000;
   classDef logger fill:#D99157,stroke:#888,stroke-width:1px,color:#000;
 
-  %% Assignation des classes
+  %% Assign colors to boxes
   class A,B,C1 experiment;
   class C final_overrides;
   class B1,C2,C21,C22,C23 paths;
@@ -110,67 +126,86 @@ flowchart LR
   class B3,C4,C41 data;
   class B4 preparation;
   class B5 loader;
-  class B6,C5,C51 model;
-  class B7,C3,C31,C32 trainer;
-  class B8 callbacks;
-  class B9 logger;
+  class B6 model;
+  class B7 architecture;
+  class B8 optimizer;
+  class B9 scheduler;
+  class B10 loss;
+  class B11,C3,C31,C32 trainer;
+  class B12 callbacks;
+  class B13 logger;
 ```
 
-## Manual execution of individual steps
+### Manual execution of individual steps
 Each step of the workflow can be run manually using the corresponding Python script and 
 experiment configuration.
 
-### Forward model (e.g., [`experiment=forward_emulator`](config/experiment/forward_emulator.yaml))
+#### Forward model (e.g., [`experiment=forward_default`](config/experiment/forward_default.yaml))
 
 1. Configure directories:
-```bash
-python -m config.setup -overrides "+experiment=forward_emulator"
-```
+
+    ```bash
+    python -m config.setup +experiment=forward_default
+    ```
+
 2. Train the forward model:
-```bash
-python -m forward.train +experiment=forward_emulator
-```
-3. Test and evaluate the forward model:
-```bash
-python -m forward.test +experiment=forward_emulator
-python -m forward.evaluation.validation +experiment=forward_emulator
-```
-4. Predict using the forward model:
-```bash
-python -m forward.predict +experiment=forward_emulator
-```
 
-### Inverse model (e.g., [`experiment=inverse_operator`](config/experiment/inverse_operator.yaml))
+    ```bash
+    python -m src.train +experiment=forward_default
+    ```
+
+3. Test and evaluate the forward model:
+
+    ```bash
+    python -m src.test +experiment=forward_default
+    ```
+
+4. Predict using the forward model:
+
+    ```bash
+    python -m src.predict +experiment=forward_default
+    ```
+
+#### Inverse model (e.g., [`experiment=inverse_default`](config/experiment/inverse_default.yaml))
 
 1. Configure directories:
-```bash
-python -m config.setup -overrides "+experiment=inverse_operator"
-```
+
+    ```bash
+    python -m config.setup +experiment=inverse_default
+    ```
+
 2. Prepare data for the inverse model:
-```bash
-python -m data.statistics +experiment=inverse_operator
-python -m data.covariance +experiment=inverse_operator
-```
-2. Train the inverse model:
-```bash
-python -m inverse.train +experiment=inverse_operator
-```
-3. Test and evaluate the inverse model:
-```bash
-python -m inverse.test +experiment=inverse_operator
-python -m inverse.evaluation.validation +experiment=inverse_operator
-```
-4. Predict using the inverse model:
-```bash
-python -m inverse.predict +experiment=inverse_operator
-```
-## Automated workflow (recommended)
+
+    ```bash
+    python -m src.data.statistics +experiment=inverse_default
+    python -m src.data.covariance +experiment=inverse_default
+    ```
+
+3. Train the inverse model:
+
+    ```bash
+    python -m src.train +experiment=inverse_default
+    ```
+
+4. Test and evaluate the inverse model:
+
+    ```bash
+    python -m src.test +experiment=inverse_default
+    ```
+
+5. Predict using the inverse model:
+
+    ```bash
+    python -m src.predict +experiment=inverse_default
+    ```
+
+### Automated workflow (recommended)
 RACCOONN uses the [Snakemake workflow management system](https://snakemake.readthedocs.io/en/stable/) for reproducibility.
 
-To perform a dry-run (i.e., to check the workflow prior to execution) of the Snakefile rule [`test`](Snakefile) with the [`inverse_operator`](config/experiment/inverse_operator.yaml) experiment configuration:
+To perform a dry-run (i.e., to check the workflow prior to execution) of the Snakefile rule [`test`](Snakefile) with the [`inverse_default`](config/experiment/inverse_default.yaml) experiment configuration:
 
 ```bash
-snakemake --dry-run --verbose test --config hydra-experiment=inverse_operator
+snakemake --dry-run --verbose test --config hydra-experiment=inverse_default
 ```
 
 Remove `--dry-run` to actually run the workflow. 
@@ -178,17 +213,17 @@ Remove `--dry-run` to actually run the workflow.
 To account for missing dependencies, add the `--rerun-incomplete` flag:
 
 ```bash
-snakemake --dry-run --rerun-incomplete --verbose test --config hydra-experiment=inverse_operator
+snakemake --dry-run --rerun-incomplete --verbose test --config hydra-experiment=inverse_default
 ```
 
-To draw a [directed acyclic graph (DAG)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) of the training workflow (e.g., [`inverse/train.mmd`](src/train.mmd) for Snakefile rule [`test`](Snakefile)):
+To draw a [directed acyclic graph (DAG)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) of the training workflow (e.g., [`src/train.mmd`](src/train.mmd) for Snakefile rule [`test`](Snakefile)):
 
 ```bash
-snakemake test --rulegraph mermaid-js --config hydra-experiment=inverse_operator > train.mmd
+snakemake test --rulegraph mermaid-js --config hydra-experiment=inverse_default > train.mmd
 ```
 Replace `--rulegraph` with `--dag` to highlight completed rules with dashed boxes.
 
-**Example**: The following graph shows the workflow for the Snakefile rule [`test`](Snakefile) for experiment [`inverse_operator`](config/experiment/inverse_operator.yaml). 
+**Example**: The following graph shows the workflow for the Snakefile rule [`test`](Snakefile) for experiment [`inverse_default`](config/experiment/inverse_default.yaml). 
 
 ```mermaid
 ---
@@ -222,10 +257,10 @@ flowchart TB
 	id4 --> id5
 ```
 
-# Documentation
+## Documentation
 The RACCOON project documentation is available at https://raccoonn.readthedocs.io/.
 
-# References and Acknowledgements
+## References and Acknowledgements
 - The forward model is a translation from Keras to Pytorch Lightning of an emulator published in the following paper and repository (full credit goes to the original authors): 
   - Paper by Howard et al. (2025): https://www.arxiv.org/abs/2504.16192.
   - Repository: https://zenodo.org/records/13963758.
@@ -236,4 +271,5 @@ The RACCOON project documentation is available at https://raccoonn.readthedocs.i
   - Paper by Jarolim et al. (2025): https://arxiv.org/pdf/2502.13924.
   - Repository: https://github.com/RobertJaro/pinn-me.
 - Inspiration for the use of emulation for retrievals/inversions comes from the following papers:
+  - Paper by Ermis et al. (2025): https://www.climatechange.ai/papers/neurips2025/63
   - Paper by Girtsou et al. (2024): https://neurips.cc/media/PosterPDFs/NeurIPS%202024/100006.png?t=1733082861.1906157.

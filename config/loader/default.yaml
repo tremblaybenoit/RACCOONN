@@ -1,5 +1,5 @@
-# Data loader configuration for forward model training
-_target_: forward.model.loader.Dataloader
+# Data loader configuration for model training
+_target_: src.loader.loader.Dataloader
 _recursive_: false
 batch_size: 32  # Batch size for training
 num_workers: 16  # Number of workers for data loading

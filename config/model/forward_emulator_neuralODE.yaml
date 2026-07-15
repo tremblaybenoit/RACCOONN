@@ -1,5 +1,5 @@
 # Model
-_target_: forward.model.model.CRTMModelFixedODE
+_target_: src.model.forward.CRTMModelFixedODE
 _recursive_: false
 
 # Optimizer function and parameters
