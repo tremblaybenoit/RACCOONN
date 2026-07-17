@@ -2,6 +2,7 @@ from torch.utils.data import Dataset
 from omegaconf import DictConfig, OmegaConf
 from utilities.instantiators import instantiate
 from utilities.tensors import array_to_tensor
+from src.data.transformations import apply_transform
 import os
 import numpy as np
 import torch
@@ -48,58 +49,9 @@ class UnivariateDataset(Dataset):
         # Store output format preference
         self.as_tensor = as_tensor
 
-        # Build transformation pipeline in order
-        self.pipeline = []
-        self.pipeline_inverse = []
-        if transformations is not None:
-            # Add any transformation steps
-            for key in transformations.keys():
-                self.pipeline.append(instantiate(transformations[key]))
-                # Check if transformation has an inverse operation
-                if hasattr(transformations[key], 'inverse_transform'):
-                    # If so, store the transformation but with inverse_transform set to True
-                    cfg = transformations[key].copy()
-                    cfg.inverse_transform = True
-                    self.pipeline_inverse.append(instantiate(cfg))
-        # Reverse the order of the inverse transformations
-        self.pipeline_inverse.reverse()
-
-    def _transform(self, data: np.ndarray | torch.Tensor) -> np.ndarray | torch.Tensor:
-        """ Apply transformation pipeline.
-
-            Parameters
-            ----------
-            data: np.ndarray or torch.Tensor. Input data.
-
-            Returns
-            -------
-            np.ndarray or torch.Tensor. Transformed data.
-        """
-
-        # Apply transformations in sequence
-        for transform in self.pipeline:
-            data = transform(data)
-
-        return data
-
-    def _inverse_transform(self, data: np.ndarray | torch.Tensor) -> np.ndarray | torch.Tensor:
-        """ Apply inverse transformation pipeline.
-
-            Parameters
-            ----------
-            data: np.ndarray or torch.Tensor. Transformed data.
-
-            Returns
-            -------
-            np.ndarray or torch.Tensor. Inverse transformed data.
-        """
-
-        # Apply inverse transformations in sequence
-        for transform in self.pipeline_inverse:
-            data = transform(data)
-
-        return data
-
+        # Create transformation functions using apply_transform
+        self.transform_fn = apply_transform(transformations, inverse_transform=False)
+        self.inverse_transform_fn = apply_transform(transformations, inverse_transform=True)
 
     def __len__(self) -> int:
         """ Return length of the dataset. Must be implemented by subclass.
@@ -174,9 +126,8 @@ class EagerDataset(UnivariateDataset):
         # Load raw data
         arr = instantiate(self.load_cfg)
 
-        # Apply transformations in sequence if pipeline exists
-        if self.pipeline:
-            arr = self._transform(arr)
+        # Apply transformations
+        arr = self.transform_fn(arr)
 
         # Convert to requested output format (only once, at init time)
         if self.as_tensor:
@@ -350,9 +301,8 @@ class LazyDataset(UnivariateDataset):
         arrays = [np.ascontiguousarray(self.load_fn(path=f)) for f in self.files]
         arr = np.concatenate(arrays, axis=0)
 
-        # Apply transformations in sequence if pipeline exists
-        if self.pipeline:
-            arr = self._transform(arr)
+        # Apply transformations
+        arr = self.transform_fn(arr)
 
         # Convert to requested output format
         if self.as_tensor:
@@ -390,9 +340,8 @@ class LazyDataset(UnivariateDataset):
         # Ensure contiguous array
         arr = np.ascontiguousarray(arr)
 
-        # Apply transformations in sequence if pipeline exists
-        if self.pipeline:
-            arr = self._transform(arr)
+        # Apply transformations
+        arr = self.transform_fn(arr)
 
         # Convert to requested output format (per-item, no shared memory for ephemeral tensors)
         if self.as_tensor:

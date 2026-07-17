@@ -72,49 +72,36 @@ class InverseModel(BaseModel):
         else:
             self.forward_model = None
 
-    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor | dict:
-        """ Perform training/validation/test step.
+    def _infer(self, batch: dict) -> dict:
+        """ Build output structure for inverse model.
 
-            Parameters
-            ----------
-            batch: dict. Batch from the training set.
-            batch_nb: int. Index of the batch out of the training set.
-            stage: str. Current operation: "train", "valid", or "test".
+        Performs profile inversion and optionally applies forward model
+        to compute observation consistency (hofx).
 
-            Returns
-            -------
-            Loss value: tensor.
+        Parameters
+        ----------
+        batch : dict
+            Input batch containing 'input', 'context', and other batch data.
+
+        Returns
+        -------
+        dict
+            Dictionary with 'output' key containing {'prof': predictions, 'hofx': forward_model_output or None}.
         """
-
         # Inversion of atmospheric profiles
-        step = {'outputs': {'prof': self.forward(batch['input'])}}
+        step = {'output': {'prof': self.forward(batch['input'])}}
+
         # Forward-modeled observations
         if self.forward_model is not None:
-            step['outputs']['hofx'] = self.forward_model(
+            step['output']['hofx'] = self.forward_model(
                 {
-                    'prof':  step['outputs']['prof'],
+                    'prof': step['output']['prof'],
                     'surf': batch['context']['surf'],
                     'meta': batch['context']['meta']
                 },
             )
         else:
-            step['outputs']['hofx'] = None
-
-        # Compute loss
-        if stage in ('train', 'valid', 'test') and self.loss_func is not None:
-            loss = self.loss_func(step['outputs'], batch['target'])
-            # Track total loss
-            step['loss'] = loss['total']
-            # Detach loss components
-            step[f'{stage}_loss'] = {
-                key: value.detach().cpu().numpy() if isinstance(value, torch.Tensor)
-                else value for key, value in loss.items()
-            }
-        # Detach outputs
-        step['outputs'] = {
-            key: value.detach().cpu().numpy() if isinstance(value, torch.Tensor)
-            else value for key, value in step['outputs'].items()
-        }
+            step['output']['hofx'] = None
 
         return step
 
@@ -1251,43 +1238,6 @@ class PINNverseOperator(BaseModel):
             else:
                 self.metrics['prof_background'+key] = stats_background
 
-    def _logging_prof_white(self, pred: torch.Tensor, target: torch.Tensor, background: torch.Tensor=None) -> None:
-        """ Log profile metrics in "white" space (i.e., without pressure-level filtering).
-
-            Parameters
-            ----------
-            pred: tensor. Predicted profiles.
-            target: tensor. Target profiles.
-            background: tensor. Background profiles.
-
-            Returns
-            -------
-            None.
-        """
-
-        # Log mean profiles and rmse
-        stats_pred = statistics(pred, axis=0, which=['mean', 'stdev', 'rmse', 'mae'], target=target)
-        stats_pred = {k: v.detach() for k, v in stats_pred.items()}
-        stats_target = statistics(target, axis=0, which=['mean', 'stdev'])
-        stats_target = {k: v.detach() for k, v in stats_target.items()}
-        # Check if statistics dictionaries are empty
-        if self.metrics.get('prof_white'):
-            self.metrics['prof_white'] = accumulate_statistics([self.metrics['prof_white'], stats_pred])
-            self.metrics['prof_white_target'] = accumulate_statistics([self.metrics['prof_white_target'], stats_target])
-        else:
-            self.metrics['prof_white'] = stats_pred
-            self.metrics['prof_white_target'] = stats_target
-
-        # Log mean background profiles and rmse if available
-        if background is not None:
-            stats_background = statistics(background, axis=0, which=['mean', 'stdev', 'rmse', 'mae'], target=target)
-            stats_background = {k: v.detach() for k, v in stats_background.items()}
-            # Check if statistics dictionaries are empty
-            if self.metrics.get('prof_white_background'):
-                self.metrics['prof_white_background'] = accumulate_statistics([self.metrics['prof_white_background'], stats_background])
-            else:
-                self.metrics['prof_white_background'] = stats_background
-
     def _logging(self, stage: str, loss: dict, input: dict, target: dict, pred: dict) -> None:
         """ Log training/validation/test metrics.
 
@@ -1321,25 +1271,12 @@ class PINNverseOperator(BaseModel):
             self._logging_hofx(pred['hofx'], target['hofx'], target['cloud_filter'].bool(),
                                target['daytime_filter'].bool())
             self._logging_prof(pred['prof'], target['prof'], background=target.get('prof_background', None))
-            # if 'prof_mean_stdev' in pred and 'prof_target_mean_stdev' in pred:
-            #     self._logging_prof(pred['prof_mean_stdev'], pred['prof_mean_stdev'], background=pred.get('prof_background_mean_stdev', None))
-            # if 'prof_min_max' in pred and 'prof_target_min_ax' in pred:
-            #     self._logging_prof(pred['prof_min_max'], pred['prof_min_max'], background=pred.get('prof_background_min_max', None))
-            if 'prof_white' in pred and 'prof_white' in target:
-                self._logging_prof_white(pred['prof_white'], target['prof_white'], background=target.get('prof_white_background', None))
         # Log L2 norm of model parameters during training
         elif stage == 'train':
             # Compute L2 norm of the model parameters
             with torch.no_grad():
                 l2_norm = sum(p.pow(2).sum() for p in self.parameters()).sqrt().item()
             self.log(f"{stage}_l2_norm", l2_norm, on_epoch=True, prog_bar=False, logger=logger_flag)
-            # If using UncertaintyVarLoss, log the effective weights
-            if hasattr(self.loss_func, 'log_var_obs'):
-                self.log("weight_obs", torch.exp(-self.loss_func.log_var_obs), prog_bar=True, logger=logger_flag)
-            if hasattr(self.loss_func, 'log_var_model'):
-                self.log("weight_model", torch.exp(-self.loss_func.log_var_model), prog_bar=True, logger=logger_flag)
-            if hasattr(self.loss_func, 'alpha'):
-                self.log("weight_alpha", 2.0 - torch.sigmoid(self.loss_func.alpha) * 2.0, prog_bar=True, logger=logger_flag)
 
         # Log learning rate
         if stage == 'train' and self.lr_schedulers() is not None:

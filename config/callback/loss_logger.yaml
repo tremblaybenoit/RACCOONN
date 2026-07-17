@@ -1,0 +1,5 @@
+# Track the loss function per stage (training, validation, testing)
+loss_logger:
+  _target_: src.callback.loss.LossLogger
+  log_per_variable: true
+

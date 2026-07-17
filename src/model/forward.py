@@ -53,41 +53,22 @@ class ForwardModel(BaseModel):
             loss_func=loss_func,
         )
 
-    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor | dict:
-        """ Perform training/validation/test step.
+    def _infer(self, batch: dict) -> dict:
+        """ Build output structure for forward model.
 
-            Parameters
-            ----------
-            batch: dict. Batch from the training set.
-            batch_nb: int. Index of the batch out of the training set.
-            stage: str. Current operation: "train", "valid", or "test".
+        Wraps forward model predictions with 'hofx' (homogenized observed radiance) key.
 
-            Returns
-            -------
-            Loss value: tensor.
+        Parameters
+        ----------
+        batch : dict
+            Input batch containing 'input' and other batch data.
+
+        Returns
+        -------
+        dict
+            Dictionary with 'output' key containing {'hofx': predictions}.
         """
-
-        # Forward-modeled observations
-        step = {'outputs': {'hofx': self.forward(batch['input'])}}
-
-        # Compute loss
-        if stage in ('train', 'valid', 'test') and self.loss_func is not None:
-            loss = self.loss_func(step['outputs'], batch['target'])
-            # Track total loss
-            step['loss'] = loss['total']
-            # Detach loss components
-            step[f'{stage}_loss'] = {
-                key: value.detach().cpu().numpy() if isinstance(value, torch.Tensor)
-                else value for key, value in loss.items()
-            }
-        # Detach outputs
-        step['outputs'] = {
-            key: value.detach().cpu().numpy() if isinstance(value, torch.Tensor)
-            else value for key, value in step['outputs'].items()
-        }
-
-        return step
-
+        return {'output': {'hofx': self.forward(batch['input'])}}
 
 
 class CRTMModel(BaseModel):

@@ -1,5 +1,7 @@
 import numpy as np
 import torch
+from utilities.instantiators import instantiate
+from typing import Callable
 
 
 class NormalizeProfiles:
@@ -510,3 +512,71 @@ def clip(data: np.ndarray | torch.Tensor, stats: dict) -> np.ndarray | torch.Ten
     else:
         raise TypeError("Input data must be a numpy array or a torch tensor.")
 
+
+def apply_transform(transformations: dict | None = None, inverse_transform: bool = False) -> Callable:
+    """
+    Create a transformation function from a transformations config.
+
+    Similar to UnivariateDataset._transform and _inverse_transform, this builds
+    a pipeline of transformations that can be applied to data.
+
+    Parameters
+    ----------
+    transformations : dict, optional
+        Configuration dict with transformation specifications.
+        Each transformation must support the 'inverse_transform' parameter.
+        If None, returns an identity function.
+    inverse_transform : bool, default False
+        If True, applies inverse transformations (unnormalization).
+        If False, applies forward transformations (normalization).
+
+    Returns
+    -------
+    callable
+        A function that takes data and transforms it by applying
+        the transformation pipeline in order (or reverse if inverse_transform=True).
+    """
+
+    if transformations is None:
+        # Return identity function if no transformations
+        return lambda x: x
+
+    # Build transformation pipeline
+    pipeline = []
+    if inverse_transform:
+        # For inverse transform, create all transforms then reverse the order
+        for key in transformations.keys():
+            pipeline.append(instantiate(transformations[key]))
+        pipeline.reverse()
+    else:
+        # For forward transform, apply in order
+        for key in transformations.keys():
+            pipeline.append(instantiate(transformations[key]))
+
+    def transform_function(data: np.ndarray | torch.Tensor) -> np.ndarray | torch.Tensor:
+        """
+        Apply transformation pipeline to data.
+
+        Parameters
+        ----------
+        data : np.ndarray or torch.Tensor
+            Data to transform (normalize or unnormalize).
+
+        Returns
+        -------
+        np.ndarray or torch.Tensor
+            Transformed data.
+        """
+        # Apply transformations in sequence
+        for transform in pipeline:
+            # Set inverse_transform parameter if transform supports it
+            if hasattr(transform, 'inverse_transform'):
+                # If transform object has inverse_transform attribute, use it directly
+                data = transform(data, inverse_transform=inverse_transform)
+            else:
+                # Fallback: just call the transform
+                data = transform(data)
+
+        return data
+
+    return transform_function

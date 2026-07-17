@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from typing import Union, Any
+from typing import Any
 from pytorch_lightning import LightningModule
 from src.preprocessing.statistics import statistics, accumulate_statistics
 from src.architecture.activation import Swish, Scale, Sine
@@ -54,9 +54,22 @@ class BaseModel(LightningModule):
         # Store hyperparameters
         self.save_hyperparameters(ignore=['optimizer', 'lr_scheduler', 'loss_func'])
 
-        # Stage outputs
-        self.output: dict[str, list] = {}
-        self.output_metrics: dict[str, dict] = {}
+    def _infer(self, batch: dict) -> dict:
+        """ Build output structure from forward pass.
+
+        Template method: subclasses can override to customize output structure.
+
+        Parameters
+        ----------
+        batch : dict
+            Input batch containing 'input' and other batch data.
+
+        Returns
+        -------
+        dict
+            Dictionary with 'output' key containing model predictions.
+        """
+        return {'output': self.forward(batch['input'])}
 
     def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor | dict:
         """ Perform training/validation/test step.
@@ -72,12 +85,13 @@ class BaseModel(LightningModule):
             Loss value: tensor.
         """
 
-        # Forward pass
-        step = {'outputs': self.forward(batch['input'])}
+        # Build outputs (customization point for subclasses)
+        step = self._infer(batch)
+
         # Stage-dependent operation: Loss
         if stage in ('train', 'valid', 'test') and self.loss_func is not None:
             # Compute loss
-            loss = self.loss_func(step['outputs'], batch['target'])
+            loss = self.loss_func(step['output'], batch['target'])
             # If dictionary with multiple terms
             if isinstance(loss, dict):
                 # Track total loss
@@ -93,9 +107,9 @@ class BaseModel(LightningModule):
             else:
                 step['loss'] = loss
         # Detach outputs
-        step['outputs'] = {
+        step['output'] = {
             key: value.detach().cpu().numpy() if isinstance(value, torch.Tensor)
-            else value for key, value in step['outputs'].items()
+            else value for key, value in step['output'].items()
         }
 
         return step
@@ -145,24 +159,6 @@ class BaseModel(LightningModule):
 
         return self.base_step(batch, batch_nb, stage='test')
 
-    def on_stage_epoch_end(self):
-        """ Callback to log validation results at the end of each validation epoch.
-
-            Parameters
-            ----------
-            None.
-
-            Returns
-            -------
-            None.
-        """
-
-        # Clear the lists for the next epoch
-        for k in self.output:
-            self.output[k] = []
-        for k in self.output_metrics:
-            self.output_metrics[k] = {}
-
     def on_train_epoch_end(self):
         """ Callback to log training results at the end of each training epoch.
 
@@ -175,56 +171,8 @@ class BaseModel(LightningModule):
             None.
         """
 
-        # Clear the lists for the next epoch
-        self.on_stage_epoch_end()
+        # Clean
         gc.collect()
-
-    def on_validation_epoch_end(self):
-        """ Callback to log validation results at the end of each validation epoch.
-
-            Parameters
-            ----------
-            None.
-
-            Returns
-            -------
-            None.
-        """
-
-        # Clear the lists for the next epoch
-        # self.on_stage_epoch_end()
-        pass
-
-    def on_test_epoch_start(self):
-        """ Perform test epoch start.
-
-            Parameters
-            ----------
-            None.
-
-            Returns
-            -------
-            None.
-        """
-
-        # Empty lists for test results
-        self.on_stage_epoch_end()
-
-    def on_test_epoch_end(self):
-        """ Perform test epoch end.
-
-            Parameters
-            ----------
-            None.
-
-            Returns
-            -------
-            None.
-        """
-
-        # Aggregate test results and convert to numpy array
-        for k in self.output:
-            self.output[k] = np.concatenate(self.output[k], axis=0)  # type: ignore
 
     def configure_optimizers(self) -> dict[str, torch.optim.Optimizer | dict[str, Any]] | None:
         """ Instantiate optimizer.

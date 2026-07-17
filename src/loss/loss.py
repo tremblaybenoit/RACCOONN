@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-import os
 from typing import Callable
 
 
@@ -425,82 +424,6 @@ class Wasserstein2Normal(torch.nn.Module):
         sigma_target = target[:, 10:]
 
         return wasserstein_2_normal(mu_pred, sigma_pred, mu_target, sigma_target)
-
-
-
-class ForwardModel(torch.nn.Module):
-    """ Forward loss module."""
-    def __init__(self, checkpoint_path: str = 'forward/model/checkpoints/model_v3.ckpt',
-                 config_path: str = 'model/forward_emulator.yaml', prof_norm: Callable = None, dtype: str = None):
-        """ Initialize the Forward module.
-
-        Parameters
-        ----------
-        checkpoint_path: str. Path to the checkpoint file for the forward model.
-        config_path: str. Path to the configuration file for the forward model.
-        prof_norm: Callable. Function to apply normalization to profiles before the forward model.
-        dtype: str. Data type to cast the forward model to (e.g., 'float32', 'float64').
-
-        Returns
-        -------
-        None.
-        """
-        super().__init__()
-
-        # Import CRTM forward model
-        try:
-            from src.loss.forward import CRTMForward
-            from utilities.logic import get_config_path
-            # Initialize CRTM forward model
-            checkpoint_path = os.path.abspath(
-                os.path.join(os.path.dirname(__name__), checkpoint_path))
-            config_path = os.path.join(get_config_path(), config_path)
-            forward = CRTMForward(checkpoint_path=checkpoint_path, config_path=config_path)
-        except (ImportError, FileNotFoundError, Exception) as e:
-            print(f"Error loading CRTM forward model: {e}")
-            forward = None
-
-        # Forward operator
-        self.forward_model = forward
-        if dtype:
-            self.forward_model.to(None, dtype=getattr(torch, dtype))
-        # Apply normalization to profiles
-        self.prof_norm = prof_norm
-
-    def to(self, device):
-        """ Move the module to a specified device.
-
-        Parameters
-        ----------
-        device: torch.device. Device to move the module to.
-        """
-        # Assign forward model to the specified device
-        if hasattr(self.forward_model, 'to'):
-            self.forward_model = self.forward_model.to(device)
-        # Assign profile normalization function to the specified device if it has a 'to' method
-        if self.prof_norm is not None and hasattr(self.prof_norm, 'to'):
-            self.prof_norm = self.prof_norm.to(device)
-        return self
-
-    def __call__(self, pred: torch.Tensor, target: dict) -> torch.Tensor:
-        """ Compute loss between a forward-modeled prediction and target.
-
-        Parameters
-        ----------
-        pred: torch.Tensor. Predicted profile tensor.
-        target: dict. Dictionary containing target tensors.
-
-        Returns
-        -------
-        loss: torch.Tensor. Loss between the forward-modeled prediction and the target.
-        """
-
-        # Apply the forward model to the prediction
-        input = {'prof': pred if self.prof_norm is None else self.prof_norm(pred.clone()),
-                 'surf': target['surf'], 'meta': target['meta']}
-        forward_pred = self.forward_model(input)
-
-        return forward_pred
 
 
 class SobolevRegularization(torch.nn.Module):
