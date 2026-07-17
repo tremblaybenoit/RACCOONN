@@ -2,14 +2,121 @@ import torch
 import torch.nn as nn
 from omegaconf import DictConfig
 from torch.nn import ModuleList
-from src.data.statistics import statistics, accumulate_statistics
-from src.model.forward import BaseModel
+from src.preprocessing.statistics import statistics, accumulate_statistics
+from src.model.base import BaseModel
 from src.architecture.activation import Sine
 from src.architecture.encoding import IdentityPositionalEncoding
 from utilities.instantiators import instantiate
 from src.data.transformations import mean_stdev, min_max
 import numpy as np
 import math
+from typing import Callable
+
+
+class InverseModel(BaseModel):
+    """
+    Inverse model for atmospheric retrieval using Physics-Informed Neural Networks.
+
+    This model implements:
+    - Coordinate expansion: expands spatial/atmospheric inputs across pressure levels
+    - Profile transformations: applies physical transformations (e.g., inverse min/max normalization)
+    - Support for different output modes: min_max, mean_stdev, sigmoid
+
+    All metrics collection and logging are delegated to callbacks.
+    The model stores step outputs on self._step_data for callback access.
+    """
+
+    def __init__(
+        self,
+        architecture: DictConfig,
+        optimizer: DictConfig | None = None,
+        lr_scheduler: DictConfig | None = None,
+        loss_func: DictConfig | Callable | None = None,
+        forward_model: DictConfig | Callable | torch.nn.Module | None = None,
+    ) -> None:
+        """
+        Initialize InverseModel.
+
+        Parameters
+        ----------
+        architecture : DictConfig
+            Configuration for the model architecture.
+        optimizer : DictConfig, optional
+            Optimizer configuration
+        lr_scheduler : DictConfig, optional
+            Learning rate scheduler configuration
+        loss_func : DictConfig | Callable, optional
+            Loss function configuration
+        forward_model : DictConfig | Callable | torch.nn.Module, optional
+            Configuration for the forward model used in physics-informed loss computation.
+        """
+
+        # Class inheritance
+        super().__init__(
+            architecture=architecture,
+            optimizer=optimizer,
+            lr_scheduler=lr_scheduler,
+            loss_func=loss_func,
+        )
+
+        # Forward model (observation operator)
+        if forward_model is not None:
+            if isinstance(forward_model, DictConfig):
+                self.forward_model = instantiate(forward_model)
+            elif isinstance(forward_model, torch.nn.Module):
+                self.forward_model = forward_model
+            elif callable(forward_model):
+                self.forward_model = forward_model()
+            else:
+                raise ValueError("forward_model must be a DictConfig, a callable, or a torch.nn.Module.")
+        else:
+            self.forward_model = None
+
+    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor | dict:
+        """ Perform training/validation/test step.
+
+            Parameters
+            ----------
+            batch: dict. Batch from the training set.
+            batch_nb: int. Index of the batch out of the training set.
+            stage: str. Current operation: "train", "valid", or "test".
+
+            Returns
+            -------
+            Loss value: tensor.
+        """
+
+        # Inversion of atmospheric profiles
+        step = {'outputs': {'prof': self.forward(batch['input'])}}
+        # Forward-modeled observations
+        if self.forward_model is not None:
+            step['outputs']['hofx'] = self.forward_model(
+                {
+                    'prof':  step['outputs']['prof'],
+                    'surf': batch['context']['surf'],
+                    'meta': batch['context']['meta']
+                },
+            )
+        else:
+            step['outputs']['hofx'] = None
+
+        # Compute loss
+        if stage in ('train', 'valid', 'test') and self.loss_func is not None:
+            loss = self.loss_func(step['outputs'], batch['target'])
+            # Track total loss
+            step['loss'] = loss['total']
+            # Detach loss components
+            step[f'{stage}_loss'] = {
+                key: value.detach().cpu().numpy() if isinstance(value, torch.Tensor)
+                else value for key, value in loss.items()
+            }
+        # Detach outputs
+        step['outputs'] = {
+            key: value.detach().cpu().numpy() if isinstance(value, torch.Tensor)
+            else value for key, value in step['outputs'].items()
+        }
+
+        return step
 
 
 class KaimingInit(nn.Module):

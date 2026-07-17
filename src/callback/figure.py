@@ -45,6 +45,9 @@ class FigureLogger(Callback):
         self.monitor_mode = monitor_mode
         self.best_monitor = float("inf") if self.monitor_mode == "min" else -float("inf")
 
+        # Tags for figures (set in subclasses)
+        self.tags = []
+
     def _get_monitor_value(self, trainer):
         """Retrieve current value of monitored metric.
 
@@ -187,26 +190,8 @@ class FigureLogger(Callback):
             return
 
         # Build and log figures
-        tags = self._get_tags(model, current_epoch)
-        self._figure_builder(trainer, model, tags, current_epoch)
-        self._figure_buffer(trainer, tags, current_epoch)
-
-    def _get_tags(self, model, current_epoch: int):
-        """Get figure tags. Override in subclasses for specialized behavior.
-
-        Parameters
-        ----------
-        model : pytorch_lightning.LightningModule
-            The model instance
-        current_epoch : int
-            Current epoch number
-
-        Returns
-        -------
-        list of str
-            Tags for figures
-        """
-        return []
+        self._figure_builder(trainer, model, self.tags, current_epoch)
+        self._figure_buffer(trainer, self.tags, current_epoch)
 
 
 class ForwardLogger(FigureLogger):
@@ -215,6 +200,12 @@ class ForwardLogger(FigureLogger):
     Specialized for forward models that predict radiance. Logs RMSE metrics
     in both absolute and normalized forms.
     """
+
+    def __init__(self, save_every_n_epochs: int = 100, save_on_improvement: bool = True,
+                 monitor: str = "valid_loss", monitor_mode: str = "min") -> None:
+        """Initialize ForwardLogger with radiance figure tags."""
+        super().__init__(save_every_n_epochs, save_on_improvement, monitor, monitor_mode)
+        self.tags = ["Valid_RadianceRMSE"]
 
     def _figure_builder(self, trainer, model, tags, current_epoch):
         """Build radiance RMSE figures.
@@ -241,15 +232,6 @@ class ForwardLogger(FigureLogger):
                                        title=[f"Epoch {current_epoch:02d} - Forward model errors",
                                               f"Epoch {current_epoch:02d} - Normalized forward model errors"]))
 
-    def _get_tags(self, model, current_epoch: int):
-        """Get radiance figure tags.
-
-        Returns
-        -------
-        list of str
-            Tags for radiance figures
-        """
-        return ["Valid_RadianceRMSE"]
 
 
 class InverseLogger(FigureLogger):
@@ -261,6 +243,12 @@ class InverseLogger(FigureLogger):
     Note: For inverse models that also want radiance figures, instantiate both
     InverseLogger and ForwardLogger callbacks in config.
     """
+
+    def __init__(self, save_every_n_epochs: int = 100, save_on_improvement: bool = True,
+                 monitor: str = "valid_loss", monitor_mode: str = "min") -> None:
+        """Initialize InverseLogger with profile figure tags."""
+        super().__init__(save_every_n_epochs, save_on_improvement, monitor, monitor_mode)
+        self.tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE"]
 
     def _figure_builder(self, trainer, model, tags, current_epoch):
         """Build profile figures.
@@ -277,7 +265,8 @@ class InverseLogger(FigureLogger):
             Current epoch number
         """
         # Get profile variable labels
-        prof_labels = model.prof_vars if hasattr(model, 'prof_vars') else None
+        # prof_labels = list(model.prof_vars) if hasattr(model, 'prof_vars') else None
+        prof_labels = trainer.datamodule.stage.valid.target.prof.type  # type: ignore
 
         # Get pressure levels (denormalized from datamodule)
         # TODO: Handle different kinds of pressure (update loader as necessary)
@@ -317,22 +306,13 @@ class InverseLogger(FigureLogger):
                                                   x_label='Profile value (no units)',
                                                   color=prof_mean_colors,
                                                   title=[f"Epoch {current_epoch:02d} - {prof_label}"
-                                                         for prof_label in prof_mean_labels]))
+                                                         for prof_label in prof_labels]))
             # Profile RMSE
             self.figs.append(fig_vertical_profiles(prof_rmse, prof_rmse_labels,
                                                   y=pressure_levels, y_label='Pressure (hPa)',
                                                   x_label='Profile value (no units)',
                                                   color=prof_rmse_colors,
                                                   title=[f"Epoch {current_epoch:02d} - {prof_label}"
-                                                         for prof_label in prof_rmse_labels]))
+                                                         for prof_label in prof_labels]))
 
-    def _get_tags(self, model, current_epoch: int):
-        """Get profile figure tags.
-
-        Returns
-        -------
-        list of str
-            Tags for profile figures only
-        """
-        return ["Valid_ProfilesMean", "Valid_ProfilesRMSE"]
 

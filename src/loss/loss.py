@@ -449,7 +449,7 @@ class ForwardModel(torch.nn.Module):
 
         # Import CRTM forward model
         try:
-            from loss.forward import CRTMForward
+            from src.loss.forward import CRTMForward
             from utilities.logic import get_config_path
             # Initialize CRTM forward model
             checkpoint_path = os.path.abspath(

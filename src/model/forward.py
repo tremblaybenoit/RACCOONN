@@ -1,94 +1,59 @@
-import numpy as np
 import torch
 import torch.nn as nn
-from typing import Union, Any
-from pytorch_lightning import LightningModule
-from src.data.statistics import statistics, accumulate_statistics
+from src.preprocessing.statistics import statistics, accumulate_statistics
 from src.architecture.activation import Swish, Scale, Sine
 from src.architecture.ode import PressureConditionalODEFunc
+from src.model.base import BaseModel
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
-import gc
 
 
-class BaseModel(LightningModule):
+
+class ForwardModel(BaseModel):
     """
-    Lightning model for the CRTM emulator (Community Radiative Transfer Model) using PyTorch.
-    This is translation from Keras to Pytorch of the CRTM emulator by Howard et al. (2025).
-    Link: https://zenodo.org/records/13963758.
+    Forward model for radiative transfer emulation (e.g., CRTM).
+
+    This model follows the new modular architecture pattern where:
+    - Architecture is instantiated from config and passed as a module
+    - Loss computation is straightforward (pred, target) -> loss
+    - Metrics collection is delegated to callbacks (not stored in model)
+    - No logging logic in the model itself
+
+    The model stores step outputs (pred, target, input) on self._step_data
+    for callbacks to access and compute metrics.
     """
 
-    def __init__(self, optimizer: DictConfig = None, lr_scheduler: DictConfig = None, loss_func: DictConfig = None):
-        """ Initialize LightningCRTMModel.
+    def __init__(
+        self,
+        architecture: DictConfig,
+        optimizer: DictConfig | None = None,
+        lr_scheduler: DictConfig | None = None,
+        loss_func: DictConfig | None = None,
+    ) -> None:
+        """
+        Initialize ForwardModel.
 
         Parameters
         ----------
-        optimizer: DictConfig. Optimizer for the model.
-        lr_scheduler: DictConfig. Configuration object for the learning rate scheduler (optional).
-        loss_func: DictConfig. Loss function for the model.
-
-        Returns
-        -------
-        None.
+        architecture : DictConfig
+            Configuration for the model architecture.
+        optimizer : DictConfig, optional
+            Optimizer configuration
+        lr_scheduler : DictConfig, optional
+            Learning rate scheduler configuration
+        loss_func : DictConfig, optional
+            Loss function configuration
         """
 
         # Class inheritance
-        super().__init__()
-        # Learning rate scheduler
-        self.lr_scheduler = lr_scheduler
-        # Optimizer initialization
-        self.optimizer = optimizer
-        # Loss function
-        self.loss_func = instantiate(loss_func) if loss_func is not None else None
-        # Store hyperparameters
-        self.save_hyperparameters(ignore=['optimizer', 'lr_scheduler', 'loss_func'])
+        super().__init__(
+            architecture=architecture,
+            optimizer=optimizer,
+            lr_scheduler=lr_scheduler,
+            loss_func=loss_func,
+        )
 
-        # Stage results
-        self.results: dict[str, list] = {'hofx': []}
-        self.metrics: dict[str, dict] = {'hofx': {}, 'hofx_norm': {}}
-
-    def _logging_hofx(self, pred: torch.Tensor, target: torch.Tensor,
-                      cloud_filter: torch.Tensor, daytime_filter: torch.Tensor) -> None:
-        """ Compute and store metrics for hofx predictions.
-
-            Parameters
-            ----------
-            pred: torch.Tensor. Predicted hofx values.
-            target: torch.Tensor. Target hofx values.
-            cloud_filter: torch.Tensor. Cloud filter mask for the batch.
-            daytime_filter: torch.Tensor. Daytime filter mask for the batch.
-
-            Returns
-            -------
-            None.
-        """
-
-        # Create masks
-        mask = {
-            'Clear sky': ~cloud_filter,
-            'Cloudy': cloud_filter,
-            'Day': daytime_filter,
-            'Night': ~daytime_filter
-        }
-
-        # Aggregate metrics per batch and combine with previous batches
-        for key, m in mask.items():
-            # Check is there are samples in the mask
-            if not torch.any(m):
-                continue
-            # Compute and accumulate statistics
-            stats = statistics(pred[m, :10], axis=0, which=['rmse'], target=target[m, :10])
-            stats_norm = statistics(pred[m, :10] / pred[m, 10:], axis=0, which=['rmse'],
-                                    target=target[m, :10] / pred[m, 10:])
-            # Check if the key exists in the metrics dictionary
-            if key not in self.metrics['hofx']:
-                self.metrics['hofx'][key] = stats
-                self.metrics['hofx_norm'][key] = stats_norm
-            else:
-                self.metrics['hofx'][key] = accumulate_statistics([self.metrics['hofx'][key], stats])
-                self.metrics['hofx_norm'][key] = accumulate_statistics([self.metrics['hofx_norm'][key], stats_norm])
-
-    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor:
+    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor | dict:
         """ Perform training/validation/test step.
 
             Parameters
@@ -102,214 +67,27 @@ class BaseModel(LightningModule):
             Loss value: tensor.
         """
 
-        # Forward pass
-        pred = self(batch['input'])
-        weights = torch.tensor([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], device=pred.device)
-        # Compute loss function
-        loss = self.loss_func(pred, batch['target']['hofx']) * weights
+        # Forward-modeled observations
+        step = {'outputs': {'hofx': self.forward(batch['input'])}}
 
-        # Log loss
-        self.log(f"{stage}_loss", loss.mean(), on_epoch=True, prog_bar=True, logger=stage != 'test')
-        # If testing, return predictions in addition to loss
-        if stage == 'test':
-            self.results['hofx'].append(pred.detach().cpu().numpy())
+        # Compute loss
+        if stage in ('train', 'valid', 'test') and self.loss_func is not None:
+            loss = self.loss_func(step['outputs'], batch['target'])
+            # Track total loss
+            step['loss'] = loss['total']
+            # Detach loss components
+            step[f'{stage}_loss'] = {
+                key: value.detach().cpu().numpy() if isinstance(value, torch.Tensor)
+                else value for key, value in loss.items()
+            }
+        # Detach outputs
+        step['outputs'] = {
+            key: value.detach().cpu().numpy() if isinstance(value, torch.Tensor)
+            else value for key, value in step['outputs'].items()
+        }
 
-        # Training stage
-        if stage == 'train':
-            # Log L2 norm of model parameters
-            l2_norm = sum((p ** 2).sum() for p in self.parameters() if p.requires_grad)
-            self.log(f"{stage}_l2_norm", l2_norm, on_epoch=True, prog_bar=False, logger=True)
-        # Validation, test stages
-        else:
-            # Log metrics for hofx
-            self._logging_hofx(pred, batch['target']['hofx'], batch['input']['cloud_filter'].bool(),
-                               batch['input']['daytime_filter'].bool())
+        return step
 
-        return loss.mean()
-
-    def training_step(self, batch: dict, batch_nb: int) -> torch.Tensor:
-        """ Perform training step.
-
-            Parameters
-            ----------
-            batch: dict. Batch from the training set.
-            batch_nb: int. Index of the batch out of the training set.
-
-            Returns
-            -------
-            Loss value: tensor.
-        """
-
-        return self.base_step(batch, batch_nb, stage='train')
-
-    def validation_step(self, batch: dict, batch_nb: int) -> torch.Tensor:
-        """ Perform validation step.
-
-            Parameters
-            ----------
-            batch: tensor. Batch from the validation set.
-            batch_nb: int. Index of the batch out of the validation set.
-
-            Returns
-            -------
-            Loss value: tensor.
-        """
-
-        return self.base_step(batch, batch_nb, stage='valid')
-
-    def test_step(self, batch: dict, batch_nb: int) -> torch.Tensor:
-        """ Perform test step.
-
-            Parameters
-            ----------
-            batch: dict. Batch from the test set.
-            batch_nb: int. Index of the batch out of the test set.
-
-            Returns
-            -------
-            Loss value: tensor.
-        """
-
-        return self.base_step(batch, batch_nb, stage='test')
-
-    def on_stage_epoch_end(self):
-        """ Callback to log validation results at the end of each validation epoch.
-
-            Parameters
-            ----------
-            None.
-
-            Returns
-            -------
-            None.
-        """
-
-        # Clear the lists for the next epoch
-        for k in self.results:
-            self.results[k] = []
-        for k in self.metrics:
-            self.metrics[k] = {}
-
-    def on_train_epoch_end(self):
-        """ Callback to log training results at the end of each training epoch.
-
-            Parameters
-            ----------
-            None.
-
-            Returns
-            -------
-            None.
-        """
-
-        # Clear the lists for the next epoch
-        self.on_stage_epoch_end()
-        gc.collect()
-
-    def on_validation_epoch_end(self):
-        """ Callback to log validation results at the end of each validation epoch.
-
-            Parameters
-            ----------
-            None.
-
-            Returns
-            -------
-            None.
-        """
-
-        # Clear the lists for the next epoch
-        # self.on_stage_epoch_end()
-        pass
-
-    def on_test_epoch_start(self):
-        """ Perform test epoch start.
-
-            Parameters
-            ----------
-            None.
-
-            Returns
-            -------
-            None.
-        """
-
-        # Empty lists for test results
-        self.on_stage_epoch_end()
-
-    def on_test_epoch_end(self):
-        """ Perform test epoch end.
-
-            Parameters
-            ----------
-            None.
-
-            Returns
-            -------
-            None.
-        """
-
-        # Aggregate test results and convert to numpy array
-        for k in self.results:
-            self.results[k] = np.concatenate(self.results[k], axis=0)  # type: ignore
-
-    def configure_optimizers(self) -> Union[dict[str, Union[torch.optim.Optimizer, dict[str, Any]]], None]:
-        """ Instantiate optimizer.
-
-            Parameters
-            ----------
-            None. Target and parameters are passed from self.optmizer_config.
-
-            Returns
-            -------
-            Optimizer instance.
-        """
-
-        # Check if optimizer is defined
-        if self.optimizer is not None:
-
-            # Instantiate optimizer
-            optimizer = instantiate(self.optimizer, params=self.parameters())
-
-            # Check if learning rate scheduler is defined
-            if self.lr_scheduler is not None:
-                # Instantiate learning rate scheduler
-                lr_scheduler = instantiate(self.lr_scheduler, optimizer=optimizer)
-
-                # Check if the learning rate scheduler is specifically reducing on plateau
-                reduce_on_plateau = isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)
-                print('Reduce on plateau:', reduce_on_plateau)
-
-                # Instantiate from config object
-                return {'optimizer': optimizer,
-                        'lr_scheduler': {'scheduler': lr_scheduler,
-                                         'interval': 'epoch',
-                                         'monitor': 'valid_loss',
-                                         'frequency': 1,
-                                         'reduce_on_plateau': reduce_on_plateau,
-                                         }
-                        }
-            return optimizer
-        return None
-
-    def to(self, device, dtype: torch.dtype = None, non_blocking: bool = False) -> 'BaseModel':
-        """ Move the model and loss function to the specified device.
-
-        Parameters
-        ----------
-        device: torch.device. The device to move the model and loss function to.
-        dtype: torch.dtype. The desired data type of the model parameters (optional).
-        non_blocking: bool. If True, and the source is in pinned memory, the
-
-        Returns
-        -------
-        BaseModel. The instance with model and loss function moved to the specified device.
-        """
-
-        super().to(device, dtype=dtype, non_blocking=non_blocking)
-        if hasattr(self.loss, 'to'):
-            self.loss = self.loss.to(device)
-        return self
 
 
 class CRTMModel(BaseModel):
