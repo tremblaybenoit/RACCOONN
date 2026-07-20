@@ -4,11 +4,11 @@ import logging
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import torch
+import numpy as np
 import pytorch_lightning as lightning
 from utilities.logger import TrainerLogger
 from utilities.instantiators import instantiate, instantiate_list
 from utilities.logic import get_config_path
-from src.callback.results import ResultsLogger
 # Force full FP32 matmul on CUDA (disable TF32) for more reproducible numerics
 torch.set_float32_matmul_precision('highest')
 torch.backends.cuda.matmul.allow_tf32 = False
@@ -124,6 +124,61 @@ class Operator:
                 os.makedirs(os.path.dirname(output_path), exist_ok=True)
                 logger.info(f"Created output directory for {var_name}: {os.path.dirname(output_path)}")
 
+    @staticmethod
+    def _accumulate_batch_results(batch_results: list, keys: list | None = None) -> dict:
+        """ Accumulate results from individual batches into concatenated arrays.
+
+            Efficiently accumulates specified keys from batch results with single-pass iteration
+            and recursive concatenation handling nested dict structures.
+
+            Parameters
+            ----------
+            batch_results: list. List of dicts returned by trainer.test() or trainer.predict().
+                           Each dict contains keys like 'output', 'target', 'input', etc.
+            keys: list or None. List of keys to accumulate. If None, defaults to
+                  ['mask', 'latent', 'output'].
+
+            Returns
+            -------
+            dict. Dictionary with accumulated results (numpy arrays concatenated across batches).
+                  Example: {'output': {'hofx': array, 'prof': array}, 'target': array, ...}
+        """
+
+        # Default: Accumulate common keys
+        if keys is None:
+            keys = ['mask', 'latent', 'output']
+
+        # Pre-initialize accumulator for all keys (single-pass efficiency)
+        accumulated = {key: [] for key in keys}
+
+        # Single pass: collect specified keys
+        for batch_result in batch_results:
+            for key in keys:
+                if key in batch_result:
+                    accumulated[key].append(batch_result[key])
+        # Remove empty keys
+        accumulated = {k: v for k, v in accumulated.items() if v}
+
+        # Recursively concatenate nested lists of arrays
+        def concat_recursive(lst):
+            """Recursively concatenate nested lists of arrays or dicts."""
+
+            # If it's a list of dicts, concatenate each key
+            if isinstance(lst[0], dict):
+                result = {}
+                for key in lst[0].keys():
+                    values = [item[key] for item in lst]
+                    result[key] = concat_recursive(values)
+                return result
+            # If it's a list of arrays, concatenate
+            elif isinstance(lst[0], np.ndarray):
+                return np.concatenate(lst)
+            # Otherwise return as-is (scalars, etc.)
+            else:
+                return lst
+
+        return {key: concat_recursive(value) for key, value in accumulated.items()}
+
     def _init_model(self, ckpt_path: str | None = None, strict: bool = False) -> None:
         """ Initialize model, optionally load from checkpoint, and set dtype.
 
@@ -142,7 +197,7 @@ class Operator:
         # Load checkpoint if provided
         if ckpt_path is not None:
             logger.info(f"Loading checkpoint: {ckpt_path}")
-            self.model.load_checkpoint(ckpt_path, strict=strict)
+            self.model.load_ckpt(ckpt_path, strict=strict)
 
         # Set dtype
         dtype_str = self.config.get('data.dtype', 'float32')
@@ -189,9 +244,18 @@ class Operator:
         logger.info("Saving model checkpoint...")
         self.trainer.save_checkpoint(self.ckpt_path, weights_only=False)
 
+        # Save resolved model configuration for downstream use
+        config_model_path = os.path.join(
+            self.config.paths.checkpoint_dir,
+            "model.yaml"
+        )
+        with open(config_model_path, 'w') as f:
+            OmegaConf.save(self.config.model, f)
+        logger.info(f"Saving model configuration...")
+
     def test(self) -> None:
         """ Loads data, callbacks, trainer, and then tests the model.
-            Accesses test results from ResultsLogger callback.
+            Accumulates and saves test results.
 
             Parameters
             ----------
@@ -199,11 +263,11 @@ class Operator:
 
             Returns
             -------
-            None. The test results are stored in ResultsLogger callback.
+            None. Test results are accumulated and saved to files.
         """
 
         # Create output directories for all result variables
-        self._makedirs(self.config.loader.stage.test.results)
+        self._makedirs(self.config.loader.stage.test.output)
 
         # Data loader and trainer setup
         self.setup(stage='test')
@@ -214,29 +278,22 @@ class Operator:
 
         # Evaluate on test set
         logger.info("Running against test set...")
-        _ = self.trainer.test(self.model, self.data_loader)
+        batch_results = self.trainer.test(self.model, self.data_loader)
 
-        # Access results from ResultsLogger callback
-        logger.info("Retrieving test results...")
-        results = {}
-        for callback in self.callbacks:
-            if isinstance(callback, ResultsLogger):
-                results = callback.get_results("test")
-        # If no callback, build manually
+        # Accumulate results from all batches
+        logger.info("Accumulating test results...")
+        batch_results = self._accumulate_batch_results(batch_results)
 
         # Save results to file
         logger.info("Saving results to file...")
-        if hasattr(self.config.loader.stage.test, 'results'):
-            # Loop over all results in the config and save them
-            for result_name, result_config in self.config.loader.stage.test.results.items():
-                if result_name in results and hasattr(result_config, 'save'):
-                    save_function = instantiate(result_config.save)
-                    save_function(results[result_name])
-
+        for result_key, result in batch_results.items():
+            if result_key in self.config.loader.stage.test and hasattr(self.config.loader.stage.test[result_key], 'save'):
+                save_function = instantiate(self.config.loader.stage.test[result_key].save)
+                save_function(result)
 
     def predict(self, loader_config: DictConfig | None = None) -> dict:
         """ Predicts the output of the model on a given dataset.
-            Accesses predictions from ResultsLogger callback.
+            Accumulates and returns predictions.
 
             Parameters
             ----------
@@ -245,14 +302,15 @@ class Operator:
 
             Returns
             -------
-            dict. Predictions and results from the model stored in ResultsLogger callback.
+            dict. Accumulated predictions from the model with structure:
+                  {'output': {'hofx': array, 'prof': array, ...}, ...}
         """
 
         # Create output directories for all result variables
-        self._makedirs(loader_config.stage.test.results if loader_config else self.config.loader.stage.test.results)
+        self._makedirs(loader_config.stage.predict.output)
 
         # Data loader and trainer setup
-        self.setup(stage='pred', loader_config=loader_config)
+        self.setup(stage='predict', loader_config=loader_config)
 
         # Load model from checkpoint if not already loaded
         if self.model is None:
@@ -260,19 +318,13 @@ class Operator:
 
         # Predict on dataset
         logger.info("Predicting on dataset...")
-        _ = self.trainer.predict(self.model, self.data_loader)
+        batch_results = self.trainer.predict(self.model, self.data_loader)
 
-        # Access results from ResultsLogger callback
-        logger.info("Retrieving prediction results...")
-        for callback in self.callbacks:
-            if isinstance(callback, ResultsLogger):
-                results = callback.get_results("pred")
-                logger.info(f"Prediction results collected: {list(results.keys())}")
-                return results
+        # Accumulate results from all batches
+        logger.info("Accumulating prediction results...")
+        batch_results = self._accumulate_batch_results(batch_results)
 
-        # Fallback if no ResultsLogger found
-        logger.warning("No ResultsLogger callback found. Returning empty dict.")
-        return {}
+        return batch_results
 
 
 @hydra.main(version_base=None, config_path=get_config_path(), config_name="default")

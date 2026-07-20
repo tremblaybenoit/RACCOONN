@@ -56,35 +56,35 @@ stage:
       _target_: src.model.loader.select_variables
       config: ${data.stage.context.variables}
       keys: ${data.select_context}
-    results:
-      path: ${paths.run_dir}/test_results.nc
+    output:
+      path: ${paths.run_dir}/test_output.nc
       save:
         _target_: src.data.io.save_xarray
         _partial_: true
         _args_:
-          - ${loader.stage.test.results.path}
+          - ${loader.stage.test.output.path}
       load:
         _target_: src.data.io.load_xarray
         _partial_: true
         _args_:
-          - ${loader.stage.test.results.path}
+          - ${loader.stage.test.output.path}
         lazy: true
   # Prediction stage
   predict:
     _target_: ${loader.stage.train._target_}
     _recursive_: false
     input: ${loader.stage.test.input}
-    results:
-      path: ${paths.run_dir}/predict_results.nc
+    output:
+      path: ${paths.run_dir}/predict_output.nc
       save:
         _target_: src.data.io.save_xarray
         _partial_: true
         _args_:
-          - ${loader.stage.predict.results.path}
+          - ${loader.stage.predict.output.path}
       load:
         _target_: src.data.io.load_xarray
         _partial_: true
         _args_:
-          - ${loader.stage.predict.results.path}
+          - ${loader.stage.predict.output.path}
         lazy: true
 # TODO: Adapt results based on data config

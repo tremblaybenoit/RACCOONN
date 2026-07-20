@@ -2,6 +2,5 @@ defaults:
   - model_checkpoint
   - forward_logger
   - loss_logger
-  - results_logger
   - early_stopping
   - _self_

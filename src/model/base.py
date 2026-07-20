@@ -282,7 +282,7 @@ class BaseModel(LightningModule):
             self.loss_func = self.loss_func.to(device)
         return self
 
-    def load_checkpoint(self, ckpt_path: str, strict: bool = False) -> 'BaseModel':
+    def load_ckpt(self, ckpt_path: str, strict: bool = False, freeze: bool = False) -> 'BaseModel':
         """ Load model weights from a checkpoint file.
 
         Parameters
@@ -290,6 +290,10 @@ class BaseModel(LightningModule):
         ckpt_path: str. Path to the checkpoint file (.ckpt or .pt).
         strict: bool. If True, requires all keys to match. If False, allows
                 missing or extra keys. Default False (useful for test/predict).
+        freeze: bool. If True, sets the model to eval mode after loading.
+                Default False. Set to True for pre-trained models to use running
+                batch norm statistics without accumulating new ones. Note: To prevent
+                weight updates, exclude model from optimizer (gradients still flow).
 
         Returns
         -------
@@ -315,5 +319,10 @@ class BaseModel(LightningModule):
         # Load into model
         self.load_state_dict(state_dict, strict=strict)
         logger.info(f"Checkpoint loaded successfully (strict={strict})")
+
+        # Optionally set to eval mode
+        if freeze:
+            self.eval()
+            logger.info("Model set to eval mode (running batch norm stats, gradients enabled)")
 
         return self

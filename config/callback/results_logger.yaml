@@ -1,6 +1,0 @@
-results_logger:
-  _target_: src.callback.results.ResultsLogger
-  store_targets: true
-  store_inputs: false
-
-
