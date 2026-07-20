@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 from typing import Any
 from pytorch_lightning import LightningModule
@@ -9,6 +8,11 @@ from omegaconf import DictConfig
 from utilities.instantiators import instantiate
 import gc
 from typing import Callable
+import logging
+import os
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 
 class BaseModel(LightningModule):
@@ -54,20 +58,46 @@ class BaseModel(LightningModule):
         # Store hyperparameters
         self.save_hyperparameters(ignore=['optimizer', 'lr_scheduler', 'loss_func'])
 
-    def _infer(self, batch: dict) -> dict:
-        """ Build output structure from forward pass.
+    def forward(self, input_dict: dict) -> torch.Tensor:
+        """ Perform forward pass through architecture.
 
-        Template method: subclasses can override to customize output structure.
+        Converts input dict to tensor and executes raw neural network prediction.
+        Subclasses can override this to customize input assembly (e.g., InverseModel).
+
+        Default behavior: concatenate all values in input_dict along last dimension.
+
+        Parameters
+        ----------
+        input_dict : dict
+            Dictionary of input variables. Each value should be a tensor.
+
+        Returns
+        -------
+        torch.Tensor
+            Predictions from the architecture (tensor).
+        """
+
+        # Concatenate all tensors along last dimension
+        input_tensor = torch.cat(list(input_dict.values()), dim=-1)
+        return self.architecture(input_tensor)
+
+    def _infer(self, batch: dict) -> dict:
+        """ Build output structure from batch.
+
+        Template method for customizing output structure. Receives full batch
+        to enable complex logic (e.g., accessing batch['context'] for InverseModel).
+
+        Subclasses override this to customize the output structure.
 
         Parameters
         ----------
         batch : dict
-            Input batch containing 'input' and other batch data.
+            Full batch dictionary containing 'input', 'target', 'context', etc.
 
         Returns
         -------
         dict
-            Dictionary with 'output' key containing model predictions.
+            Dictionary with 'output' key containing model predictions in desired structure.
         """
         return {'output': self.forward(batch['input'])}
 
@@ -82,10 +112,10 @@ class BaseModel(LightningModule):
 
             Returns
             -------
-            Loss value: tensor.
+            dict. Step output with 'output' key and optional 'loss' keys.
         """
 
-        # Build outputs (customization point for subclasses)
+        # Build structured output (customization point for subclasses via _infer())
         step = self._infer(batch)
 
         # Stage-dependent operation: Loss
@@ -102,7 +132,7 @@ class BaseModel(LightningModule):
                     else value for key, value in loss.items()
                 }
             elif isinstance(loss, torch.Tensor):
-                step['loss'] = loss.mean()
+                step['loss'] = loss.mean()  # type: ignore
                 step[f'{stage}_loss'] = loss.detach().cpu().numpy()
             else:
                 step['loss'] = loss
@@ -158,6 +188,25 @@ class BaseModel(LightningModule):
         """
 
         return self.base_step(batch, batch_nb, stage='test')
+
+    def predict_step(self, batch: dict, batch_idx: int) -> torch.Tensor | dict:
+        """ Perform prediction step.
+
+        Provides a unified interface for prediction that returns the same
+        structure as test_step, enabling callback-based result accumulation
+        (e.g., ResultsLogger).
+
+            Parameters
+            ----------
+            batch: dict. Batch from the prediction set.
+            batch_idx: int. Index of the batch out of the prediction set.
+
+            Returns
+            -------
+            dict. Predictions with structure compatible with callbacks.
+        """
+
+        return self.base_step(batch, batch_idx, stage='predict')
 
     def on_train_epoch_end(self):
         """ Callback to log training results at the end of each training epoch.
@@ -231,4 +280,40 @@ class BaseModel(LightningModule):
         # Move loss function to device
         if hasattr(self.loss_func, 'to'):
             self.loss_func = self.loss_func.to(device)
+        return self
+
+    def load_checkpoint(self, ckpt_path: str, strict: bool = False) -> 'BaseModel':
+        """ Load model weights from a checkpoint file.
+
+        Parameters
+        ----------
+        ckpt_path: str. Path to the checkpoint file (.ckpt or .pt).
+        strict: bool. If True, requires all keys to match. If False, allows
+                missing or extra keys. Default False (useful for test/predict).
+
+        Returns
+        -------
+        BaseModel. The instance with loaded weights (supports method chaining).
+
+        Raises
+        ------
+        FileNotFoundError: If ckpt_path does not exist.
+        RuntimeError: If state_dict loading fails with strict=True.
+        """
+        # Check if checkpoint exists
+        if not os.path.exists(ckpt_path):
+            raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
+
+        logger.info(f"Loading checkpoint from: {ckpt_path}")
+
+        # Load checkpoint from disk
+        checkpoint = torch.load(ckpt_path, map_location='cpu', weights_only=False)
+
+        # Extract state_dict (handle both PyTorch Lightning and raw formats)
+        state_dict = checkpoint.get('state_dict', checkpoint)
+
+        # Load into model
+        self.load_state_dict(state_dict, strict=strict)
+        logger.info(f"Checkpoint loaded successfully (strict={strict})")
+
         return self
