@@ -1,9 +1,6 @@
 import torch
 from typing import Any
 from pytorch_lightning import LightningModule
-from src.preprocessing.statistics import statistics, accumulate_statistics
-from src.architecture.activation import Swish, Scale, Sine
-from src.architecture.ode import PressureConditionalODEFunc
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
 import gc
@@ -20,12 +17,13 @@ class BaseModel(LightningModule):
     Lightning model template.
     """
 
-    def __init__(self, architecture: DictConfig, optimizer: DictConfig | None = None,
+    def __init__(self, ckpt_path: str | DictConfig, architecture: DictConfig, optimizer: DictConfig | None = None,
                  lr_scheduler: DictConfig | None = None, loss_func: DictConfig | Callable | None = None) -> None:
         """ Initialize model.
 
         Parameters
         ----------
+        ckpt_path: str. Path to the checkpoint of the model.
         architecture: DictConfig. Configuration object for the model architecture.
         optimizer: DictConfig. Optimizer for the model.
         lr_scheduler: DictConfig. Configuration object for the learning rate scheduler (optional).
@@ -39,6 +37,8 @@ class BaseModel(LightningModule):
         # Class inheritance
         super().__init__()
 
+        # Checkpoint path
+        self.ckpt_path = instantiate(ckpt_path) if isinstance(ckpt_path, DictConfig) else ckpt_path
         # Model architecture
         self.architecture = instantiate(architecture)
         # Learning rate scheduler
@@ -282,7 +282,7 @@ class BaseModel(LightningModule):
             self.loss_func = self.loss_func.to(device)
         return self
 
-    def load_ckpt(self, ckpt_path: str, strict: bool = False, freeze: bool = False) -> 'BaseModel':
+    def load_ckpt(self, ckpt_path: str | None = None, strict: bool = False, freeze: bool = False) -> 'BaseModel':
         """ Load model weights from a checkpoint file.
 
         Parameters
@@ -304,6 +304,13 @@ class BaseModel(LightningModule):
         FileNotFoundError: If ckpt_path does not exist.
         RuntimeError: If state_dict loading fails with strict=True.
         """
+
+        # Assign checkpoint path (use provided path or fall back to self.ckpt_path)
+        if ckpt_path is None and self.ckpt_path is not None:
+            ckpt_path = self.ckpt_path
+        else:
+            raise ValueError("No checkpoint path provided and self.ckpt_path is not set")
+
         # Check if checkpoint exists
         if not os.path.exists(ckpt_path):
             raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")

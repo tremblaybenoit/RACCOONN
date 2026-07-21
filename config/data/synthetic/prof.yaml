@@ -84,10 +84,13 @@ stage:
          _partial_: true
          _args_:
            - ${..path}
+       # Loading function
        load:
          _target_: src.data.io.load_npy
          path: ${..path}
          dtype: ${data.dtype}
+       # Transformations to apply
+       transformations: ${data.stage.train.variables.prof.transformations}
   # Predict set
   predict:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -121,10 +124,13 @@ stage:
           _partial_: true
           _args_:
             - ${..path}
+        # Loading function
         load:
           _target_: src.data.io.load_npy
           path: ${..path}
           dtype: ${data.dtype}
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.prof.transformations}
   # Source data (complete dataset)
   source:
     # Variable-specific configuration, keyed by variable name for potential multi-variable support.

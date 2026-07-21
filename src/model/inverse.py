@@ -1,14 +1,19 @@
 import torch
-import torch.nn as nn
-from omegaconf import DictConfig
-from torch.nn import ModuleList
+from omegaconf import DictConfig, OmegaConf
 from src.preprocessing.statistics import statistics, accumulate_statistics
 from src.model.base import BaseModel
+from src.model.forward import ForwardModel
 from src.architecture.activation import Sine
 from src.architecture.encoding import IdentityPositionalEncoding
-from utilities.instantiators import instantiate
+from utilities.instantiators import instantiate, resolve_path
+from utilities.logic import get_config_path
 from src.data.transformations import mean_stdev, min_max
 from typing import Callable
+import os
+import logging
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 
 class InverseModel(BaseModel):
@@ -26,17 +31,20 @@ class InverseModel(BaseModel):
 
     def __init__(
         self,
+        ckpt_path: str | DictConfig,
         architecture: DictConfig,
         optimizer: DictConfig | None = None,
         lr_scheduler: DictConfig | None = None,
         loss_func: DictConfig | Callable | None = None,
-        forward_model: DictConfig | Callable | torch.nn.Module | None = None,
+        forward_model: DictConfig | ForwardModel | None = None,
     ) -> None:
         """
         Initialize InverseModel.
 
         Parameters
         ----------
+        ckpt_path: str | DictConfig
+            Path to the checkpoint file or DictConfig containing checkpoint info.
         architecture : DictConfig
             Configuration for the model architecture.
         optimizer : DictConfig, optional
@@ -45,12 +53,14 @@ class InverseModel(BaseModel):
             Learning rate scheduler configuration
         loss_func : DictConfig | Callable, optional
             Loss function configuration
-        forward_model : DictConfig | Callable | torch.nn.Module, optional
+        forward_model : DictConfig | ForwardModel, optional
             Configuration for the forward model used in physics-informed loss computation.
+            If DictConfig, can include 'ckpt_path' key to load pre-trained weights.
         """
 
         # Class inheritance
         super().__init__(
+            ckpt_path=ckpt_path,
             architecture=architecture,
             optimizer=optimizer,
             lr_scheduler=lr_scheduler,
@@ -61,12 +71,13 @@ class InverseModel(BaseModel):
         if forward_model is not None:
             if isinstance(forward_model, DictConfig):
                 self.forward_model = instantiate(forward_model)
-            elif isinstance(forward_model, torch.nn.Module):
+            elif isinstance(forward_model, ForwardModel):
                 self.forward_model = forward_model
-            elif callable(forward_model):
-                self.forward_model = forward_model()
             else:
-                raise ValueError("forward_model must be a DictConfig, a callable, or a torch.nn.Module.")
+                raise ValueError("forward_model must be a DictConfig or a ForwardModel instance.")
+            # Load checkpoint if ckpt_path is provided
+            if hasattr(self.forward_model, 'ckpt_path') and self.forward_model.ckpt_path:
+                self.forward_model.load_ckpt(freeze=True)  # type: ignore
         else:
             self.forward_model = None
 

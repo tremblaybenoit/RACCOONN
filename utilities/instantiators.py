@@ -5,10 +5,33 @@ from pytorch_lightning.loggers import Logger
 from omegaconf import DictConfig
 from functools import partial
 import logging
+import os
 
 
 # Initialize logger
 logger = logging.getLogger(__name__)
+
+
+def resolve_path(path: str, dir: str | None = None) -> str:
+    """ Resolve relative paths to absolute; leave absolute paths unchanged.
+
+        Parameters
+        ----------
+        path: str. The path to resolve.
+        dir: str or None. The base directory to resolve relative paths against.
+
+        Returns
+        -------
+        str. The resolved absolute path.
+    """
+    # If the path is absolute, pass
+    if os.path.isabs(path):
+        return path
+    # If no base directory is specified, resolve relative to the current working directory
+    if dir is None:
+        return str(os.path.abspath(path))
+    # Otherwise, resolve relative to the specified base directory
+    return str(os.path.abspath(os.path.join(dir, path)))
 
 
 def instantiate(config: Any, **kwargs):
