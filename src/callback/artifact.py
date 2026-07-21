@@ -1,8 +1,6 @@
 from pytorch_lightning.callbacks import Callback
 import matplotlib.pyplot as plt
-from utilities.tensors import to_numpy
 from src.evaluation.plot import fig_rmse_bars, fig_vertical_profiles
-from utilities.instantiators import instantiate
 from src.preprocessing.statistics import RunningStats
 import numpy as np
 import torch
@@ -10,12 +8,11 @@ import wandb
 import tempfile
 import os
 import logging
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class FigureLogger(Callback):
+class ArtifactLogger(Callback):
     """Base callback to log figures at the end of each validation epoch.
 
     Uses RunningStats for incremental metric accumulation during validation,
@@ -36,7 +33,7 @@ class FigureLogger(Callback):
         monitor_mode: str = "min"
     ) -> None:
         """
-        Initialize FigureLogger callback.
+        Initialize ArtifactLogger callback.
 
         Parameters
         ----------
@@ -96,6 +93,9 @@ class FigureLogger(Callback):
         """
         Process each validation batch and accumulate metrics using RunningStats.
 
+        Dynamically tracks all variables present in outputs['output'] that have
+        corresponding runners initialized in on_validation_epoch_start().
+
         Parameters
         ----------
         trainer : pytorch_lightning.Trainer
@@ -116,19 +116,22 @@ class FigureLogger(Callback):
         if trainer.sanity_checking:
             return
 
-        # Compute metrics from this batch
-        batch_metrics = self._compute_batch_metrics(
-            outputs=outputs,
-            batch=batch
-        )
+        # Extract predictions and targets
+        predictions = outputs.get('output', {})
+        targets = batch.get('target', {})
 
-        # Update runners with batch metrics
-        for runner_name, metrics_dict in batch_metrics.items():
-            if runner_name in self.runners:
-                self.runners[runner_name].update(
-                    data=metrics_dict['data'],
-                    target=metrics_dict.get('target'),
-                    axis=metrics_dict.get('axis', 0)
+        # Update runners for each variable in predictions that has a runner
+        for var_name in predictions.keys():
+            if var_name in self.runners:
+                # Convert tensor targets to numpy if needed
+                target_data = targets.get(var_name)
+                if isinstance(target_data, torch.Tensor):
+                    target_data = target_data.detach().cpu().numpy()
+
+                self.runners[var_name].update(
+                    data=predictions[var_name],
+                    target=target_data,
+                    axis=0
                 )
 
     def on_validation_epoch_end(self, trainer, pl_module):
@@ -294,42 +297,6 @@ class FigureLogger(Callback):
         if self.figs:
             self._figure_buffer(trainer, self.tags, current_epoch)
 
-    def _compute_batch_metrics(self, outputs: dict, batch: dict) -> dict[str, dict[str, Any]]:
-        """
-        Extract metrics from a single validation batch.
-
-        Subclasses should override to compute specific metrics from batch outputs.
-
-        Parameters
-        ----------
-        outputs : dict
-            Model's validation_step output containing predictions.
-        batch : dict
-            Batch containing inputs, targets, and context.
-
-        Returns
-        -------
-        dict
-            dictionary mapping runner_name → {
-                'data': prediction_tensor,
-                'target': target_tensor (optional),
-                'axis': reduction_axis (optional, default 0)
-            }
-
-        Example (ForwardLogger)
-        -------
-        return {
-            'hofx': {
-                'data': outputs['outputs']['hofx'],       # [batch, channels]
-                'target': batch['target']['hofx'],        # [batch, channels]
-                'axis': 0
-            }
-        }
-        """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} must implement _compute_batch_metrics()"
-        )
-
     def _figure_builder(self, trainer, pl_module):
         """
         Build and create figures from finalized metrics.
@@ -357,7 +324,8 @@ class FigureLogger(Callback):
             f"{self.__class__.__name__} must implement _figure_builder()"
         )
 
-class ForwardLogger(FigureLogger):
+
+class ForwardLogger(ArtifactLogger):
     """
     Callback to log brightness temperature (hofx) metrics for forward models.
 
@@ -412,45 +380,7 @@ class ForwardLogger(FigureLogger):
         # hofx shape: [batch, 20] (10 channels × 2 for mean+stdev)
         self.runners = {
             'hofx': RunningStats(which=self.statistics),
-        }
-
-    def _compute_batch_metrics(self, outputs: dict, batch: dict) -> dict[str, dict[str, Any]]:
-        """
-        Extract hofx metrics from validation batch.
-
-        Parameters
-        ----------
-        outputs : dict
-            Model's validation_step output with predictions (numpy arrays).
-        batch : dict
-            Batch with targets (tensors from DataLoader).
-
-        Returns
-        -------
-        dict
-            Metrics for runners:
-            - 'hofx': predicted vs target brightness temperature
-        """
-        # Extract hofx predictions and targets
-        predictions = outputs.get('output', {})
-        targets = batch.get('target', {})
-
-        hofx_pred = predictions.get('hofx')
-        hofx_target = targets.get('hofx')
-
-        if hofx_pred is None or hofx_target is None:
-            return {}
-
-        # Convert tensor targets to numpy if needed
-        if isinstance(hofx_target, torch.Tensor):
-            hofx_target = hofx_target.detach().cpu().numpy()
-
-        return {
-            'hofx': {
-                'data': hofx_pred,      # [batch, channels] - already numpy
-                'target': hofx_target,  # [batch, channels] - converted to numpy
-                'axis': 0               # Reduce over batch dimension
-            }
+            'hofx_forward': RunningStats(which=self.statistics),
         }
 
     def _figure_builder(self, trainer, pl_module):
@@ -467,17 +397,24 @@ class ForwardLogger(FigureLogger):
         pl_module : pytorch_lightning.LightningModule
             The model instance.
         """
-        if 'hofx' not in self.metrics:
-            logger.warning("No hofx metrics computed for this epoch")
+        # Determine which variable is available
+        hofx_var = None
+        if 'hofx' in self.metrics:
+            hofx_var = 'hofx'
+        elif 'hofx_forward' in self.metrics:
+            hofx_var = 'hofx_forward'
+
+        if hofx_var is None:
+            logger.warning("No hofx or hofx_forward metrics computed for this epoch")
             return
 
-        hofx_stats = self.metrics['hofx']
+        hofx_stats = self.metrics[hofx_var]
 
         # Extract metrics (already numpy arrays from RunningStats.compute())
         rmse = hofx_stats.get('rmse')
 
         if rmse is None:
-            logger.warning("RMSE not computed for hofx metrics")
+            logger.warning(f"RMSE not computed for {hofx_var} metrics")
             return
 
         # Channel labels (typically 10 MW channels)
@@ -486,7 +423,7 @@ class ForwardLogger(FigureLogger):
         channel_labels = [f"Ch_{i}" for i in range(n_channels)]
         try:
             if hasattr(trainer, 'datamodule') and trainer.datamodule is not None:
-                channel_labels = trainer.datamodule.stage.valid.target.hofx.type
+                channel_labels = trainer.datamodule.stage.valid.target.variables.hofx.type
         except Exception as e:
             logger.warning(f"Could not retrieve hofx labels: {e}")
 
@@ -496,12 +433,12 @@ class ForwardLogger(FigureLogger):
                 [rmse],
                 None,
                 labels=channel_labels,
-                title=["hofx RMSE per channel"]
+                title=[f"{hofx_var} RMSE per channel"]
             )
         )
 
 
-class InverseLogger(FigureLogger):
+class InverseLogger(ArtifactLogger):
     """
     Callback to log atmospheric profile metrics for inverse models.
 
@@ -539,6 +476,8 @@ class InverseLogger(FigureLogger):
         self.tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE"]
         # Store pressure levels from first validation batch
         self.pressure_levels = None
+        # Flag to initialize static runners
+        self.runners_static = True
 
     def on_validation_epoch_start(self, trainer, pl_module):
         """
@@ -556,10 +495,15 @@ class InverseLogger(FigureLogger):
         self.runners = {
             'prof': RunningStats(which=self.statistics),
         }
+        # Static runners
+        if self.runners_static:
+            self.runners['prof_target'] = RunningStats(which=self.statistics)
+            self.runners['prof_prior'] = RunningStats(which=self.statistics)
 
     def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
         """
         Process validation batch and extract pressure levels from first batch.
+        Also accumulate prof_prior statistics.
 
         Parameters
         ----------
@@ -589,52 +533,70 @@ class InverseLogger(FigureLogger):
             except Exception as e:
                 logger.warning(f"Could not extract pressure levels from batch: {e}")
 
-        # Call parent's on_validation_batch_end to process metrics
+        # Call parent's on_validation_batch_end to process prof metrics
         super().on_validation_batch_end(trainer, pl_module, outputs, batch, batch_idx, dataloader_idx)
 
-    def _compute_batch_metrics(self, outputs: dict, batch: dict) -> dict[str, dict[str, Any]]:
+        # Separately accumulate prof_prior vs prof_target stats (prior vs truth)
+        # Only compute once as background doesn't change across epochs
+        if self.runners_static:
+            # Target
+            prof_target = batch.get('target', {}).get('prof', None)
+            if prof_target:
+                # Convert tensors to numpy if needed
+                if isinstance(prof_target, torch.Tensor):
+                    prof_target = prof_target.detach().cpu().numpy()
+                # Update metrics
+                self.runners['prof_target'].update(
+                    data=prof_target,
+                    target=prof_target,  # Target vs itself (for mean/stdev computation)
+                    axis=0
+                )
+            # Prior
+            prof_prior = batch.get('target', {}).get('prof_prior', None)
+            if prof_prior:
+                # Convert tensors to numpy if needed
+                if isinstance(prof_prior, torch.Tensor):
+                    prof_prior = prof_prior.detach().cpu().numpy()
+                # Update metrics
+                self.runners['prof_prior'].update(
+                    data=prof_prior,
+                    target=prof_target,  # Compare prior vs truth
+                    axis=0
+                )
+
+    def on_validation_epoch_end(self, trainer, pl_module):
         """
-        Extract profile metrics from validation batch.
+        Finalize metrics at end of validation epoch.
+
+        Computes final statistics from accumulated runners and creates figures.
+        Marks prof_prior as computed after first epoch (background is static).
 
         Parameters
         ----------
-        outputs : dict
-            Model's validation_step output with predictions (numpy arrays).
-        batch : dict
-            Batch with targets (tensors from DataLoader).
-
-        Returns
-        -------
-        dict
-            Metrics for runners:
-            - 'prof': predicted vs target atmospheric profiles
+        trainer : pytorch_lightning.Trainer
+            The trainer instance.
+        pl_module : pytorch_lightning.LightningModule
+            The model instance.
         """
-        # Extract profile predictions and targets
-        predictions = outputs.get('output', {})
-        targets = batch.get('target', {})
-        prof_pred = predictions.get('prof')
-        prof_target = targets.get('prof')
-        if prof_pred is None or prof_target is None:
-            return {}
 
-        # Convert tensor targets to numpy if needed
-        if isinstance(prof_target, torch.Tensor):
-            prof_target = prof_target.detach().cpu().numpy()
+        # Skip if sanity checking
+        if trainer.sanity_checking:
+            return
 
-        return {
-            'prof': {
-                'data': prof_pred,      # [batch, vars, levels] - already numpy
-                'target': prof_target,  # [batch, vars, levels] - converted to numpy
-                'axis': 0               # Reduce over batch dimension
-            }
-        }
+        # Finalize metrics from runners
+        for runner_name, runner in self.runners.items():
+            self.metrics[runner_name] = runner.compute(dtype='float32')
+
+        # Mark prof_prior and prof_target as computed after first epoch (both are static)
+        if self.runners_static:
+            self.runners_static = not self.runners_static
+
+        # Build figures from finalized metrics
+        self._figure_builder(trainer, pl_module)
 
     def _figure_builder(self, trainer, pl_module):
         """
         Build vertical profile figures for atmospheric predictions.
-
-        Creates plots showing mean, standard deviation, and RMSE profiles
-        for each atmospheric variable.
 
         Parameters
         ----------
@@ -649,22 +611,25 @@ class InverseLogger(FigureLogger):
             logger.warning("No profile metrics computed for this epoch")
             return
         prof_stats = self.metrics['prof']
+        prof_prior_stats = self.metrics.get('prof_prior', {})
+        prof_target_stats = self.metrics.get('prof_target', {})
 
         # Extract metrics (already numpy arrays from RunningStats.compute())
         # Shape after reduction: [vars, levels]
         prof_mean = prof_stats.get('mean')
         prof_stdev = prof_stats.get('stdev')
         prof_rmse = prof_stats.get('rmse')
-
-        if prof_mean is None:
-            logger.warning("Mean not computed for profile metrics")
-            return
+        prof_prior_mean = prof_prior_stats.get('mean')
+        prof_prior_stdev = prof_prior_stats.get('stdev')
+        prof_prior_rmse = prof_prior_stats.get('rmse')
+        prof_target_mean = prof_target_stats.get('mean')
+        prof_target_stdev = prof_target_stats.get('stdev')
 
         # Get profile variable labels
         prof_labels = None
         try:
             if hasattr(trainer, 'datamodule') and trainer.datamodule is not None:
-                prof_labels = trainer.datamodule.stage.valid.target.prof.type
+                prof_labels = trainer.datamodule.stage.valid.target.variables.prof.type
         except Exception as e:
             logger.warning(f"Could not retrieve profile labels: {e}")
 
@@ -674,29 +639,69 @@ class InverseLogger(FigureLogger):
             prof_labels = [f"Var_{i}" for i in range(n_vars)]
 
         # Create profile mean figure
-        if prof_mean is not None:
-            self.figs.append(
-                fig_vertical_profiles(
-                    [prof_mean],
-                    labels=['Prediction'],
-                    stdev=prof_stdev,
-                    y=self.pressure_levels,
-                    y_label='Pressure (hPa)',
-                    x_label='Profile value',
-                    title=[f"Mean profile: {label}" for label in prof_labels]
+        if prof_mean is not None or prof_target_mean is not None or prof_prior_mean is not None:
+            data = []
+            stdev = []
+            labels = []
+            colors = []
+            # Target
+            if prof_target_mean is not None:
+                data.append(prof_target_mean)
+                stdev.append(prof_target_stdev)
+                labels.append('Target')
+                colors.append('#56B4E9')
+            # Prior
+            if prof_prior_mean is not None:
+                data.append(prof_prior_mean)
+                stdev.append(prof_prior_stdev)
+                labels.append('Prior')
+                colors.append('#009E73')
+            # Prediction
+            if prof_mean is not None:
+                data.append(prof_mean)
+                stdev.append(prof_stdev)
+                labels.append('Output')
+                colors.append('#E69F00')
+            # Figure
+            if data:
+                self.figs.append(
+                    fig_vertical_profiles(
+                        data,
+                        labels=labels,
+                        colors=colors,
+                        stdev=stdev,
+                        y=self.pressure_levels,
+                        y_label='Pressure (hPa)',
+                        x_label='Profile value',
+                        title=[f"Mean profile: {label}" for label in prof_labels]
+                    )
                 )
-            )
 
-        # Create profile RMSE figure
-        if prof_rmse is not None:
-            self.figs.append(
-                fig_vertical_profiles(
-                    [prof_rmse],
-                    labels=['RMSE'],
-                    y=self.pressure_levels,
-                    y_label='Pressure (hPa)',
-                    x_label='RMSE value',
-                    title=[f"RMSE profile: {label}" for label in prof_labels]
+        # Create RMSE figure comparing prediction and prior vs target
+        if prof_rmse is not None or prof_prior_rmse is not None:
+            data = []
+            labels = []
+            colors = []
+            # Prior
+            if prof_prior_rmse is not None:
+                data.append(prof_prior_rmse)
+                labels.append('Prior-Target')
+                colors.append('#009E73')
+            # Prediction
+            if prof_rmse is not None:
+                data.append(prof_rmse)
+                labels.append('Output-Target')
+                colors.append('#E69F00')
+            # Figure
+            if data:
+                self.figs.append(
+                    fig_vertical_profiles(
+                        data,
+                        labels=labels,
+                        colors=colors,
+                        y=self.pressure_levels,
+                        y_label='Pressure (hPa)',
+                        x_label='RMSE value',
+                        title=[f"RMSE: {label}" for label in prof_labels]
+                    )
                 )
-            )
-

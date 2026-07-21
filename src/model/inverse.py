@@ -150,7 +150,7 @@ class InverseModel(BaseModel):
 
         # Forward-modeled observations (requires batch['context'])
         if self.forward_model is not None and 'context' in batch:
-            output['hofx'] = self.forward_model(
+            output['hofx_forward'] = self.forward_model(
                 {
                     'prof': output['prof'],
                     'surf': batch['context']['surf'],

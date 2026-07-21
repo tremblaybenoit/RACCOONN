@@ -21,9 +21,8 @@ dtype: 'float32'
 
 # Variables to use as input/output
 select_input: ['lat', 'lon', 'scans', 'pressure']
-select_target: ['meta', 'surf', 'hofx_forward', 'prof', 'prof_prior']
-select_context: ['clear_mask', 'cloud_mask', 'daytime_mask', 'pressure_mask']
-# select_context: ['meta', 'surf', 'clear_mask', 'cloud_mask', 'daytime_mask', 'pressure_mask']
+select_target: ['hofx_forward', 'prof', 'prof_prior']
+select_context: ['meta', 'surf', 'clear_mask', 'cloud_mask', 'daytime_mask', 'pressure_mask']
 
 # Split the data into training, validation, and test sets
 stage:
