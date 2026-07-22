@@ -8,8 +8,8 @@ defaults:
   - override /data: inverse_default
   - override /preprocessing: inverse_default
   - override /loader: default
-  - override /architecture: mlp_modular
-  - override /loss: var
+  - override /architecture: inverse_default
+  - override /loss: inverse_default
   - override /optimizer: default
   - override /scheduler: default
   - override /model: inverse_default

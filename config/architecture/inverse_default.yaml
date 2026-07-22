@@ -1,0 +1,3 @@
+# Default architecture
+defaults:
+  - mlp_modular

@@ -8,8 +8,8 @@ defaults:
   - override /data: forward_default
   - override /preprocessing: forward_default
   - override /loader: default
-  - override /architecture: crtm
-  - override /loss: crps
+  - override /architecture: forward_default
+  - override /loss: forward_default
   - override /optimizer: default
   - override /scheduler: default
   - override /model: forward_default
