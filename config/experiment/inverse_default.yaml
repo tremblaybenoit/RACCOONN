@@ -8,10 +8,14 @@ defaults:
   - override /data: inverse_default
   - override /preprocessing: inverse_default
   - override /loader: default
+  - override /architecture: mlp_modular
+  - override /loss: var
+  - override /optimizer: default
+  - override /scheduler: default
   - override /model: inverse_default
-  - override /trainer: gpu
   - override /callbacks: inverse_default
   - override /logger: default
+  - override /trainer: gpu
 
 # All parameters below will be merged with parameters from default configurations set above.
 # This allows you to overwrite only specified parameters

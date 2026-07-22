@@ -5,8 +5,12 @@ defaults:
   - data: inverse_default
   - preprocessing: inverse_default
   - loader: default
+  - architecture: mlp_modular
+  - loss: var
+  - optimizer: default
+  - scheduler: default
   - model: inverse_default
-  - trainer: cpu
   - callbacks: inverse_default
   - logger: default
+  - trainer: cpu
   - _self_

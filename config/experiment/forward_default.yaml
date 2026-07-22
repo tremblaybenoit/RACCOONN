@@ -8,10 +8,14 @@ defaults:
   - override /data: forward_default
   - override /preprocessing: forward_default
   - override /loader: default
+  - override /architecture: crtm
+  - override /loss: crps
+  - override /optimizer: default
+  - override /scheduler: default
   - override /model: forward_default
-  - override /trainer: gpu
   - override /callbacks: forward_default
   - override /logger: default
+  - override /trainer: gpu
 
 # All parameters below will be merged with parameters from default configurations set above.
 # This allows you to overwrite only specified parameters
