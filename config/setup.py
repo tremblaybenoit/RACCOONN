@@ -1,79 +1,47 @@
 import os
+from typing import Optional, Any
 from omegaconf import OmegaConf
 from hydra import initialize, compose
 from hydra.core.hydra_config import HydraConfig
 import argparse
 
 
-def get_key_in_dict(key, dictionary):
-    """
-    Extracts a key from a dictionary.
-
-    Parameters
-    ----------
-    key : str
-        Key to extract.
-    dictionary : dict
-        Dictionary to extract from.
-
-    Returns
-    -------
-    dict
-        Dictionary containing the key.
-    """
-
-    # Check if key is in dictionary
-    if check_key_in_dict(key, dictionary):
-        return dictionary[key]
-    # Raise an error if key is not in dictionary
-    else:
-        raise KeyError(f"Key '{key}' not found in dictionary.")
-
-
-# Check if key is in dictionary
-def check_key_in_dict(key, dictionary):
-    """
-    Check if a key is in a dictionary.
-
-    Parameters
-    ----------
-    key : str
-        Key to check.
-    dictionary : dict
-        Dictionary to check.
-
-    Returns
-    -------
-    bool
-        True if the key is in the dictionary, False otherwise.
-    """
-    return key in dictionary
-
-
-def read_hydra_as_dict(config_path, config_name, version_base=None, overrides=None, return_hydra_config=True,
-                       verbose=False):
+def read_hydra_as_dict(config_path: str,
+                       config_name: str,
+                       version_base: Optional[str | None] = None,
+                       overrides: Optional[str | list[str] | None] = None,
+                       return_hydra_config: bool = True,
+                       verbose: bool = False) -> Any:
     """ Read complete Hydra configuration and return as dictionary.
 
-        Parameters
+         Parameters
         ----------
         config_path: str. Directory containing hydra config file.
         config_name: str. Config filename.
-        version_base: float; default=None. Version number.
-        overrides: str; default=None. Experiment overriding the hydra config file contents.
+        version_base: Optional[str]; default=None. Version number.
+        overrides: Optional[Union[str, List[str]]]; default=None. Experiment overriding the hydra config file contents.
+                   Can be a single string or a list of strings.
         return_hydra_config: bool; default=True. Whether to extract hydra config.
         verbose: bool; default=False. Flag to print config file contents.
 
-        Returns
+         Returns
         -------
-        config_dict: Dictionary containing all configs.
+        Any
+            Dictionary containing all configs.
     """
+
+    # Convert single override to list
+    if isinstance(overrides, str):
+        overrides = [overrides]
+    elif overrides is None:
+        overrides = []
 
     # Manually initialize Hydra and compose the configuration
     with initialize(version_base=version_base, config_path=config_path):
 
-        if overrides is not None:
+        if overrides:
             config = compose(config_name=config_name,
-                             overrides=[overrides],
+                             overrides=overrides,
                              return_hydra_config=return_hydra_config)
         else:
             config = compose(config_name=config_name,
@@ -90,7 +58,7 @@ def read_hydra_as_dict(config_path, config_name, version_base=None, overrides=No
 
         # Resolve paths
         config_dict = OmegaConf.to_container(config, resolve=True)
-        if check_key_in_dict('hydra', config_dict):
+        if config_dict is not None and 'hydra' in config_dict:
             del config_dict['hydra']
 
         # Print contents
@@ -100,20 +68,28 @@ def read_hydra_as_dict(config_path, config_name, version_base=None, overrides=No
         return config_dict
 
 
-def setup_directories_from_hydra(config_path, config_name, overrides=None, verbose=False):
+def setup_directories_from_hydra(config_path: str,
+                                 config_name: str,
+                                 overrides: Optional[str | list[str] | None] = None,
+                                 verbose: bool = False) -> None:
     """
     Reads the Hydra configuration, extracts the paths, and creates the necessary directories.
 
     Parameters
     ----------
-    config_path : str. Path to the Hydra configuration folder.
-    config_name : str. Name of the configuration file.
-    overrides : str, optional. Experiment to override in the configuration.
-    verbose : bool, optional. Prints the configuration if True.
+    config_path : str
+        Path to the Hydra configuration folder.
+    config_name : str
+        Name of the configuration file.
+    overrides : Optional[str | list[str] | None], optional
+        Experiment to override in the configuration.
+        Can be a single string or a list of strings.
+    verbose : bool, optional
+        Prints the configuration if True.
 
     Returns
     -------
-    None.
+    None
     """
 
     # Read Hydra configuration as dictionary
@@ -127,11 +103,11 @@ def setup_directories_from_hydra(config_path, config_name, overrides=None, verbo
     dirs = ['task_dir', 'output_dir', 'checkpoint_dir', 'log_dir', 'run_dir', 'data_dir']
 
     # Create directories based on the paths configuration
-    for dir in dirs:
-        if dir in paths_config:
-            os.makedirs(paths_config[dir], exist_ok=True)
+    for d in dirs:
+        if d in paths_config:
+            os.makedirs(paths_config[d], exist_ok=True)
         else:
-            raise KeyError(f"Directory '{dir}' not found in paths configuration.")
+            raise KeyError(f"Directory '{d}' not found in paths configuration.")
 
     return
 
@@ -141,13 +117,15 @@ if __name__ == "__main__":
 
         Parameters
         ----------
-        config_path: str. Directory containing hydra config file.
-        config_name: str. Config filename.
-        experiment: str; default=None. Experiment overriding the hydra config file contents.
+        config_path: str. Path to the Hydra configuration folder (default: ../config).
+        config_name: str. Name of the configuration file (default: default).
+        overrides: Hydra overrides as positional arguments (e.g., +experiment=inverse_default).
 
-        Returns
-        -------
-        config_as_dict: Dictionary containing all configs.
+        Examples
+        --------
+        python -m config.setup +experiment=inverse_default
+        python -m config.setup -config_path=./config +experiment=forward_default
+        python -m config.setup -verbose +experiment=inverse_default
     """
 
     parser = argparse.ArgumentParser()
@@ -155,11 +133,13 @@ if __name__ == "__main__":
                         help='Path to configuration file containing all model hyperparameters.')
     parser.add_argument('-config_name', type=str, default="default",
                         help='Name of the configuration file containing all model hyperparameters.')
-    parser.add_argument('-overrides', type=str, default=None,
-                        help='Name of the experiment that overrides the main hydra configuration.')
-    parser.add_argument('-verbose', type=bool, default=False,
+    parser.add_argument('-verbose', action='store_true',
                         help='Flag to print the configuration file contents.')
+    parser.add_argument('overrides', nargs='*', default=[],
+                        help='Hydra overrides (e.g., +experiment=inverse_default key=value).')
     args = parser.parse_args()
 
     # Setup directories from Hydra configuration
-    setup_directories_from_hydra(args.config_path, args.config_name, args.overrides, verbose=args.verbose)
+    setup_directories_from_hydra(args.config_path, args.config_name,
+                                 overrides=args.overrides if args.overrides else None,
+                                 verbose=args.verbose)

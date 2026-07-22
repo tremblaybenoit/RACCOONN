@@ -36,17 +36,17 @@ Create or edit a configuration file in the [`config/experiment`](config/experime
 1. Start with the `defaults` section to set the default configurations:
     - `paths` (from folder [`config/paths`](config/paths)): Directories for data and outputs.
     - `hydra` (from folder [`config/hydra`](config/hydra)): Hydra settings.
-    - `data` (from folder [`config/data`](config/data)): Dataset parameters.
-    - `preprocessing` (from folder [`config/preprocessing`](config/preprocessing)): Data preprocessing steps.
-    - `loader` (from folder [`config/loader`](config/loader)): Data loading parameters.
-    - `model` (from folder [`config/model`](config/model)): Model architecture and parameters.
-    - `architecture` (from folder [`config/architecture`](config/architecture)): Model architecture details.
+    - `data` (from folder [`config/data`](config/data)): Dataset parameters (e.g., variables, i/o functions).
+    - `preprocessing` (from folder [`config/preprocessing`](config/preprocessing)): Data preprocessing steps (e.g., statistics).
+    - `loader` (from folder [`config/loader`](config/loader)): Wraps [`config/data`](config/data) into a Pytorch-Lightning-ready data loader.
+    - `model` (from folder [`config/model`](config/model)): Wraps [`config/architecture`](config/architecture), [`config/optimizer`](config/optimizer), [`config/scheduler`](config/scheduler), and [`config/loss`](config/loss) into a complete model.
+    - `architecture` (from folder [`config/architecture`](config/architecture)): Neural network architecture details.
     - `optimizer` (from folder [`config/optimizer`](config/optimizer)): Optimizer parameters.
     - `scheduler` (from folder [`config/scheduler`](config/scheduler)): Learning rate scheduler parameters.
     - `loss` (from folder [`config/loss`](config/loss)): Loss function parameters.
     - `trainer` (from folder [`config/trainer`](config/trainer)): Training parameters.
     - `callbacks` (from folder [`config/callbacks`](config/callbacks)): Callbacks during training.
-    - `logger` (from folder [`config/logger`](config/logger)): Logging parameters.
+    - `logger` (from folder [`config/logger`](config/logger)): Logging parameters during training.
 2. Add `overrides` below the `defaults` to change specific default parameters as needed. 
 
 **Note**: The order of the `defaults` matters, as later entries can override earlier ones.
