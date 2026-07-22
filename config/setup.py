@@ -52,7 +52,7 @@ def check_key_in_dict(key, dictionary):
 
 def read_hydra_as_dict(config_path, config_name, version_base=None, overrides=None, return_hydra_config=True,
                        verbose=False):
-    """ Read complete Hydra configuration and return as dictionnary.
+    """ Read complete Hydra configuration and return as dictionary.
 
         Parameters
         ----------
@@ -65,7 +65,7 @@ def read_hydra_as_dict(config_path, config_name, version_base=None, overrides=No
 
         Returns
         -------
-        config_dict: Dictionnary containing all configs.
+        config_dict: Dictionary containing all configs.
     """
 
     # Manually initialize Hydra and compose the configuration
@@ -147,7 +147,7 @@ if __name__ == "__main__":
 
         Returns
         -------
-        config_as_dict: Dictionnary containing all configs.
+        config_as_dict: Dictionary containing all configs.
     """
 
     parser = argparse.ArgumentParser()

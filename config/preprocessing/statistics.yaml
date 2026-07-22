@@ -3,7 +3,7 @@ statistics:
   # Statistics of the training set
   data:
     # Function
-    _target_: src.preprocessing.statistics.compute_statistics
+    _target_: code.preprocessing.statistics.compute_statistics
     _recursive_: false  # Do not instantiate nested objects
     # Exclude variables from the statistics computation
     exclude: ['clear_mask', 'cloud_mask', 'daytime_mask', 'pressure_mask', 'prof_prior']
@@ -15,12 +15,12 @@ statistics:
     # What the method produces as output (pickle file)
     output:
       # Path to statistics file
-      path: src/data/statistics/statistics.pkl
+      path: code/data/statistics/statistics.pkl
       # Saving function
       save:
-        _target_: src.data.io.save_pkl
+        _target_: code.data.io.save_pkl
         path: ${data.statistics.data.output.path}
       # Loading function
       load:
-        _target_: src.data.io.load_pkl
+        _target_: code.data.io.load_pkl
         path: ${data.statistics.data.output.path}

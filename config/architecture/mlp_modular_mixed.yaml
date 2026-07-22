@@ -1,20 +1,20 @@
 # MLPModular mixing different activation types and initialization strategies
-_target_: inverse.model.architecture.mlp.MLPModular
+_target_: code.architecture.mlp.MLPModular
 _recursive_: false
 
 # Positional encoding
 positional_encoding:
-  _target_: inverse.model.architecture.encoding.RescaledPositionalEncoding
+  _target_: code.architecture.encoding.RescaledPositionalEncoding
   d_input: 4
 
 # Input layer with SIREN activation
 # Note: Automatically uses uniform initialization based on activation
 input_layer:
-  _target_: inverse.model.architecture.mlp.MLPBlock
+  _target_: code.architecture.mlp.MLPBlock
   in_features: null
   out_features: 128
   activation:
-    _target_: inverse.model.architecture.activation.Sine
+    _target_: code.architecture.activation.Sine
     w0: 30.0
   norm_type: none
   dropout_rate: 0.1
@@ -23,7 +23,7 @@ input_layer:
 # Hidden layers - use MLPBlocks to control depth
 # MLPBlocks automatically uses xavier initialization (for GELU)
 hidden_layer:
-  _target_: inverse.model.architecture.mlp.MLPBlocks
+  _target_: code.architecture.mlp.MLPBlocks
   in_features: 128
   out_features: 128
   hidden_features: 256
@@ -39,7 +39,7 @@ hidden_skip: false  # Already has residuals inside MLPBlocks
 # Output layer with Tanh activation for bounded output
 # Automatically uses xavier initialization based on activation
 output_layer:
-  _target_: inverse.model.architecture.mlp.MLPBlock
+  _target_: code.architecture.mlp.MLPBlock
   in_features: 128
   out_features: 127
   activation:

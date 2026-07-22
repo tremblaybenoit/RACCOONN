@@ -3,7 +3,7 @@ recast:
   # Source data
   source:
     # Function
-    _target_: src.preprocessing.recast.recast_synthetic
+    _target_: code.preprocessing.recast.recast_synthetic
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:
@@ -43,11 +43,11 @@ recast:
           load:
             _target_: numpy.concatenate
             _args_:
-              - - _target_: src.data.io.load_npy
+              - - _target_: code.data.io.load_npy
                   path: ${....dir}/Train2/prof.npy
-                - _target_: src.data.io.load_npy
+                - _target_: code.data.io.load_npy
                   path: ${....dir}/Val2/prof.npy
-                - _target_: src.data.io.load_npy
+                - _target_: code.data.io.load_npy
                   path: ${....dir}/Test2/prof.npy
               - 0
         # Latitude
@@ -56,20 +56,20 @@ recast:
           load:
             _target_: numpy.concatenate
             _args_:
-              - - _target_: src.data.io.load_latlon
+              - - _target_: code.data.io.load_latlon
                   path: ${....dir}/Train2/lat.npy
                   scans:
-                    _target_: src.data.io.load_scans
+                    _target_: code.data.io.load_scans
                     path: ${....dir}/Train2/scans.txt
-                - _target_: src.data.io.load_latlon
+                - _target_: code.data.io.load_latlon
                   path: ${....dir}/Val2/lat.npy
                   scans:
-                    _target_: src.data.io.load_scans
+                    _target_: code.data.io.load_scans
                     path: ${....dir}/Val2/scans.txt
-                - _target_: src.data.io.load_latlon
+                - _target_: code.data.io.load_latlon
                   path: ${....dir}/Test2/lat.npy
                   scans:
-                    _target_: src.data.io.load_scans
+                    _target_: code.data.io.load_scans
                     path: ${....dir}/Test2/scans.txt
               - 0
         # Longitude
@@ -78,20 +78,20 @@ recast:
           load:
             _target_: numpy.concatenate
             _args_:
-              - - _target_: src.data.io.load_latlon
+              - - _target_: code.data.io.load_latlon
                   path: ${....dir}/Train2/lon.npy
                   scans:
-                    _target_: src.data.io.load_scans
+                    _target_: code.data.io.load_scans
                     path: ${....dir}/Train2/scans.txt
-                - _target_: src.data.io.load_latlon
+                - _target_: code.data.io.load_latlon
                   path: ${....dir}/Val2/lon.npy
                   scans:
-                    _target_: src.data.io.load_scans
+                    _target_: code.data.io.load_scans
                     path: ${....dir}/Val2/scans.txt
-                - _target_: src.data.io.load_latlon
+                - _target_: code.data.io.load_latlon
                   path: ${....dir}/Test2/lon.npy
                   scans:
-                    _target_: src.data.io.load_scans
+                    _target_: code.data.io.load_scans
                     path: ${....dir}/Test2/scans.txt
               - 0
         scans:
@@ -99,20 +99,20 @@ recast:
           load:
             _target_: numpy.concatenate
             _args_:
-              - - _target_: src.data.io.load_scans
+              - - _target_: code.data.io.load_scans
                   path: ${....dir}/Train2/scans.txt
                   lat:
-                    _target_: src.data.io.load_latlon
+                    _target_: code.data.io.load_latlon
                     path: ${....dir}/Train2/lat.npy
-                - _target_: src.data.io.load_scans
+                - _target_: code.data.io.load_scans
                   path: ${....dir}/Val2/scans.txt
                   lat:
-                    _target_: src.data.io.load_latlon
+                    _target_: code.data.io.load_latlon
                     path: ${....dir}/Val2/lat.npy
-                - _target_: src.data.io.load_scans
+                - _target_: code.data.io.load_scans
                   path: ${....dir}/Test2/scans.txt
                   lat:
-                    _target_: src.data.io.load_latlon
+                    _target_: code.data.io.load_latlon
                     path: ${....dir}/Test2/lat.npy
               - 0
         # Meta data
@@ -121,11 +121,11 @@ recast:
           load:
             _target_: numpy.concatenate
             _args_:
-              - - _target_: src.data.io.load_npy
+              - - _target_: code.data.io.load_npy
                   path: ${....dir}/Train2/meta.npy
-                - _target_: src.data.io.load_npy
+                - _target_: code.data.io.load_npy
                   path: ${....dir}/Val2/meta.npy
-                - _target_: src.data.io.load_npy
+                - _target_: code.data.io.load_npy
                   path: ${....dir}/Test2/meta.npy
               - 0
         # Surface data
@@ -134,11 +134,11 @@ recast:
           load:
             _target_: numpy.concatenate
             _args_:
-              - - _target_: src.data.io.load_npy
+              - - _target_: code.data.io.load_npy
                   path: ${....dir}/Train2/surf.npy
-                - _target_: src.data.io.load_npy
+                - _target_: code.data.io.load_npy
                   path: ${....dir}/Val2/surf.npy
-                - _target_: src.data.io.load_npy
+                - _target_: code.data.io.load_npy
                   path: ${....dir}/Test2/surf.npy
               - 0
         # Observations
@@ -147,11 +147,11 @@ recast:
           load:
             _target_: numpy.concatenate
             _args_:
-              - - _target_: src.data.io.load_npy
+              - - _target_: code.data.io.load_npy
                   path: ${....dir}/Train2/obs.npy
-                - _target_: src.data.io.load_npy
+                - _target_: code.data.io.load_npy
                   path: ${....dir}/Val2/obs.npy
-                - _target_: src.data.io.load_npy
+                - _target_: code.data.io.load_npy
                   path: ${....dir}/Test2/obs.npy
               - 0
         # hofx
@@ -160,18 +160,18 @@ recast:
           load:
             _target_: numpy.concatenate
             _args_:
-              - - _target_: src.data.io.load_npy
+              - - _target_: code.data.io.load_npy
                   path: ${....dir}/Train2/hofx.npy
-                - _target_: src.data.io.load_npy
+                - _target_: code.data.io.load_npy
                   path: ${....dir}/Val2/hofx.npy
-                - _target_: src.data.io.load_npy
+                - _target_: code.data.io.load_npy
                   path: ${....dir}/Test2/hofx.npy
               - 0
         # Pressure
         pressure:
           # Loading function
           load:
-            _target_: src.data.io.load_npy
+            _target_: code.data.io.load_npy
             path: ${....dir}/pressure.npy
     # What the method produces as output
     output:
@@ -189,7 +189,7 @@ recast:
             prof:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.train.variables.prof.path}
                 dtype: ${data.dtype}
@@ -197,7 +197,7 @@ recast:
             lat:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.train.variables.lat.path}
                 dtype: ${data.dtype}
@@ -205,7 +205,7 @@ recast:
             lon:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.train.variables.lon.path}
                 dtype: ${data.dtype}
@@ -213,7 +213,7 @@ recast:
             scans:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.train.variables.scans.path}
                 dtype: ${data.dtype}
@@ -221,7 +221,7 @@ recast:
             meta:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.train.variables.meta.path}
                 dtype: ${data.dtype}
@@ -229,7 +229,7 @@ recast:
             surf:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.train.variables.surf.path}
                 dtype: ${data.dtype}
@@ -237,7 +237,7 @@ recast:
             obs:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.train.variables.obs.path}
                 dtype: ${data.dtype}
@@ -245,7 +245,7 @@ recast:
             hofx:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.train.variables.hofx.path}
                 dtype: ${data.dtype}
@@ -253,7 +253,7 @@ recast:
             pressure:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.train.variables.pressure.path}
                 dtype: ${data.dtype}
@@ -261,7 +261,7 @@ recast:
             cloud_mask:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.train.variables.cloud_mask.path}
                 dtype: bool
@@ -269,7 +269,7 @@ recast:
             daytime_mask:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.train.variables.daytime_mask.path}
                 dtype: bool
@@ -281,7 +281,7 @@ recast:
             prof:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.valid.variables.prof.path}
                 dtype: ${data.dtype}
@@ -289,7 +289,7 @@ recast:
             lat:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.valid.variables.lat.path}
                 dtype: ${data.dtype}
@@ -297,7 +297,7 @@ recast:
             lon:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.valid.variables.lon.path}
                 dtype: ${data.dtype}
@@ -305,7 +305,7 @@ recast:
             scans:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.valid.variables.scans.path}
                 dtype: ${data.dtype}
@@ -313,7 +313,7 @@ recast:
             meta:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.valid.variables.meta.path}
                 dtype: ${data.dtype}
@@ -321,7 +321,7 @@ recast:
             surf:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.valid.variables.surf.path}
                 dtype: ${data.dtype}
@@ -329,7 +329,7 @@ recast:
             obs:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.valid.variables.obs.path}
                 dtype: ${data.dtype}
@@ -337,7 +337,7 @@ recast:
             hofx:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.valid.variables.hofx.path}
                 dtype: ${data.dtype}
@@ -345,7 +345,7 @@ recast:
             pressure:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.valid.variables.pressure.path}
                 dtype: ${data.dtype}
@@ -353,7 +353,7 @@ recast:
             cloud_mask:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.valid.variables.cloud_mask.path}
                 dtype: bool
@@ -361,7 +361,7 @@ recast:
             daytime_mask:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.valid.variables.daytime_mask.path}
                 dtype: bool
@@ -373,7 +373,7 @@ recast:
             prof:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.test.variables.prof.path}
                 dtype: ${data.dtype}
@@ -381,7 +381,7 @@ recast:
             lat:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.test.variables.lat.path}
                 dtype: ${data.dtype}
@@ -389,7 +389,7 @@ recast:
             lon:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.test.variables.lon.path}
                 dtype: ${data.dtype}
@@ -397,7 +397,7 @@ recast:
             scans:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.test.variables.scans.path}
                 dtype: ${data.dtype}
@@ -405,7 +405,7 @@ recast:
             meta:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.test.variables.meta.path}
                 dtype: ${data.dtype}
@@ -413,7 +413,7 @@ recast:
             surf:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.test.variables.surf.path}
                 dtype: ${data.dtype}
@@ -421,7 +421,7 @@ recast:
             obs:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.test.variables.obs.path}
                 dtype: ${data.dtype}
@@ -429,7 +429,7 @@ recast:
             hofx:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.test.variables.hofx.path}
                 dtype: ${data.dtype}
@@ -437,7 +437,7 @@ recast:
             pressure:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.test.variables.pressure.path}
                 dtype: ${data.dtype}
@@ -445,7 +445,7 @@ recast:
             cloud_mask:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.test.variables.cloud_mask.path}
                 dtype: bool
@@ -453,7 +453,7 @@ recast:
             daytime_mask:
               # Save function
               save:
-                _target_: src.data.io.save_npy
+                _target_: code.data.io.save_npy
                 _partial_: true
                 path: ${data.stage.test.variables.daytime_mask.path}
                 dtype: bool

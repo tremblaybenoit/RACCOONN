@@ -1,5 +1,5 @@
 # Model
-_target_: forward.model.model.CRTMModelSiren
+_target_: code.model.forward.CRTMModelSiren
 _recursive_: false
 
 # Optimizer function and parameters

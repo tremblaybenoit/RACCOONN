@@ -1,17 +1,17 @@
 # MLPModular with coordinate injection at hidden and output layers
 # Weight initialization is auto-detected: Xavier for GELU activations
-_target_: inverse.model.architecture.mlp.MLPModular
+_target_: code.architecture.mlp.MLPModular
 _recursive_: false
 
 # Positional encoding
 positional_encoding:
-  _target_: inverse.model.architecture.encoding.RescaledPositionalEncoding
+  _target_: code.architecture.encoding.RescaledPositionalEncoding
   d_input: 4
 
 # Input layer
 # Auto initialization: Xavier (based on GELU activation)
 input_layer:
-  _target_: inverse.model.architecture.mlp.MLPBlock
+  _target_: code.architecture.mlp.MLPBlock
   in_features: null
   out_features: 128
   activation:
@@ -24,7 +24,7 @@ input_layer:
 # Encoding will be concatenated at the input of this layer
 # Auto initialization: Xavier (based on GELU activation)
 hidden_layer:
-  _target_: inverse.model.architecture.mlp.MLPBlocks
+  _target_: code.architecture.mlp.MLPBlocks
   in_features: 128  # Will be adjusted for encoding injection
   out_features: 128
   hidden_features: 128
@@ -43,7 +43,7 @@ inject_encoding_hidden: true  # Inject encoding at hidden layer input
 # Encoding will be concatenated at the input of this layer
 # Auto initialization: Sigmoid uses Xavier
 output_layer:
-  _target_: inverse.model.architecture.mlp.MLPBlock
+  _target_: code.architecture.mlp.MLPBlock
   in_features: 128  # Will be adjusted for encoding injection
   out_features: 127
   activation:

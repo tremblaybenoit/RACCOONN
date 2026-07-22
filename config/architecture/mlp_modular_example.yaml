@@ -2,18 +2,18 @@
 # This is a reference file showing different ways to configure the output layer
 # and weight initialization strategies.
 
-_target_: inverse.model.architecture.mlp.MLPModular
+_target_: code.architecture.mlp.MLPModular
 _recursive_: false
 
 # Positional encoding (optional)
 positional_encoding:
-  _target_: inverse.model.architecture.encoding.RescaledPositionalEncoding
+  _target_: code.architecture.encoding.RescaledPositionalEncoding
   d_input: 4
 
 # Input layer
 # By default, uses auto-selected initialization based on activation function
 input_layer:
-  _target_: inverse.model.architecture.mlp.MLPBlock
+  _target_: code.architecture.mlp.MLPBlock
   in_features: null  # Set by positional encoding
   out_features: 128
   activation:
@@ -23,12 +23,12 @@ input_layer:
   init_func: null  # Set to null for auto-detection (xavier for GELU)
   # Or explicitly set to override:
   # init_func:
-  #   _target_: inverse.model.architecture.mlp.init_weights_he
+  #   _target_: code.architecture.mlp.init_weights_he
 
 # Hidden layer
 # All initialization in MLPBlocks is done per-block using auto-detection
 hidden_layer:
-  _target_: inverse.model.architecture.mlp.MLPBlocks
+  _target_: code.architecture.mlp.MLPBlocks
   in_features: 128
   out_features: 256
   hidden_features: 128
@@ -52,14 +52,14 @@ hidden_layer:
 
 # Option 2: Single PredictionHead (simple linear)
 # output_layer:
-#   _target_: inverse.model.architecture.mlp.PredictionHead
+#   _target_: code.architecture.mlp.PredictionHead
 #   in_features: 256
 #   out_features: 127
 #   n_layers: 1
 
 # Option 3: Single PredictionHead (multi-layer)
 # output_layer:
-#   _target_: inverse.model.architecture.mlp.PredictionHead
+#   _target_: code.architecture.mlp.PredictionHead
 #   in_features: 256
 #   out_features: 127
 #   hidden_features: 128
@@ -70,7 +70,7 @@ hidden_layer:
 
 # Option 4: Multiple PredictionHeads (multi-task learning)
 output_layer:
-  _target_: inverse.model.architecture.mlp.PredictionHeads
+  _target_: code.architecture.mlp.PredictionHeads
   n_heads: 3  # Number of prediction heads
   in_features: 256
   out_features: 127  # Output per head (total output: 127 * 3 = 381)
@@ -82,7 +82,7 @@ output_layer:
 
 # Option 5: Custom MLPBlocks as output
 # output_layer:
-#   _target_: inverse.model.architecture.mlp.MLPBlocks
+#   _target_: code.architecture.mlp.MLPBlocks
 #   in_features: 256
 #   out_features: 127
 #   hidden_features: 128
@@ -114,7 +114,7 @@ output_layer:
 
 # Example: Override auto-detection with custom init
 # input_layer:
-#   _target_: inverse.model.architecture.mlp.MLPBlock
+#   _target_: code.architecture.mlp.MLPBlock
 #   in_features: null
 #   out_features: 128
 #   activation:
@@ -122,7 +122,7 @@ output_layer:
 #   norm_type: layer
 #   dropout_rate: 0.1
 #   init_func:
-#     _target_: inverse.model.architecture.mlp.init_weights_he
+#     _target_: code.architecture.mlp.init_weights_he
 
 # Skip connections
 hidden_skip: false  # MLPBlocks already has internal residuals

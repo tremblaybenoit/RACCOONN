@@ -23,9 +23,9 @@ git clone https://github.com/tremblaybenoit/RACCOONN.git
 ```
 RACCOONN is built with [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/) and [Hydra](https://hydra.cc/docs/intro/). 
 
-Create a new conda environment and install pre-requisites by executing the script [`environment.sh`](environment.sh):
+Create a new conda environment and install pre-requisites by executing the script [`environment.sh`](scripts/environment.sh):
 ```bash
-./environment.sh
+./scripts/environment.sh
 conda activate RACCOONN
 ```
 
@@ -151,19 +151,19 @@ experiment configuration.
 2. Train the forward model:
 
     ```bash
-    python -m src.train +experiment=forward_default
+    python -m code.train +experiment=forward_default
     ```
 
 3. Test and evaluate the forward model:
 
     ```bash
-    python -m src.test +experiment=forward_default
+    python -m code.test +experiment=forward_default
     ```
 
 4. Predict using the forward model:
 
     ```bash
-    python -m src.predict +experiment=forward_default
+    python -m code.predict +experiment=forward_default
     ```
 
 #### Inverse model (e.g., [`experiment=inverse_default`](config/experiment/inverse_default.yaml))
@@ -177,26 +177,26 @@ experiment configuration.
 2. Prepare data for the inverse model:
 
     ```bash
-    python -m src.data.statistics +experiment=inverse_default
-    python -m src.data.covariance +experiment=inverse_default
+    python -m code.data.statistics +experiment=inverse_default
+    python -m code.data.covariance +experiment=inverse_default
     ```
 
 3. Train the inverse model:
 
     ```bash
-    python -m src.train +experiment=inverse_default
+    python -m code.train +experiment=inverse_default
     ```
 
 4. Test and evaluate the inverse model:
 
     ```bash
-    python -m src.test +experiment=inverse_default
+    python -m code.test +experiment=inverse_default
     ```
 
 5. Predict using the inverse model:
 
     ```bash
-    python -m src.predict +experiment=inverse_default
+    python -m code.predict +experiment=inverse_default
     ```
 
 ### Automated workflow (recommended)
@@ -216,7 +216,7 @@ To account for missing dependencies, add the `--rerun-incomplete` flag:
 snakemake --dry-run --rerun-incomplete --verbose test --config hydra-experiment=inverse_default
 ```
 
-To draw a [directed acyclic graph (DAG)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) of the training workflow (e.g., [`src/train.mmd`](src/train.mmd) for Snakefile rule [`test`](Snakefile)):
+To draw a [directed acyclic graph (DAG)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) of the training workflow (e.g., [`code/train.mmd`](code/train.mmd) for Snakefile rule [`test`](Snakefile)):
 
 ```bash
 snakemake test --rulegraph mermaid-js --config hydra-experiment=inverse_default > train.mmd

@@ -1,5 +1,5 @@
 # Model
-_target_: inverse.model.model.InverseEmulator
+_target_: code.model.inverse.InverseModel
 _recursive_: false
 
 # Optimizer function and parameters

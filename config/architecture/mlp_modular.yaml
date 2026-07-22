@@ -1,17 +1,17 @@
 # MLPModular using MLPBlocks as building blocks
 # Weight initialization is auto-detected based on activation function
-_target_: inverse.model.architecture.mlp.MLPModular
+_target_: code.architecture.mlp.MLPModular
 _recursive_: false
 
 # Positional encoding
 positional_encoding:
-  _target_: inverse.model.architecture.encoding.RescaledPositionalEncoding
+  _target_: code.architecture.encoding.RescaledPositionalEncoding
   d_input: 4
 
 # Input layer (single MLPBlock)
 # Auto initialization: Xavier (based on GELU activation)
 input_layer:
-  _target_: inverse.model.architecture.mlp.MLPBlock
+  _target_: code.architecture.mlp.MLPBlock
   in_features: null  # Set by positional encoding output
   out_features: 128
   activation:
@@ -25,7 +25,7 @@ input_layer:
 # Hidden layer (MLPBlock - single block with residual wrapper)
 # Auto initialization: Xavier (based on GELU activation)
 hidden_layer:
-  _target_: inverse.model.architecture.mlp.MLPBlock
+  _target_: code.architecture.mlp.MLPBlock
   in_features: 128
   out_features: 128
   activation:
@@ -41,7 +41,7 @@ hidden_skip: true
 # Single output layer
 # Auto initialization: Sigmoid uses Xavier
 output_layer:
-  _target_: inverse.model.architecture.mlp.MLPBlock
+  _target_: code.architecture.mlp.MLPBlock
   in_features: 128
   out_features: 127
   activation:

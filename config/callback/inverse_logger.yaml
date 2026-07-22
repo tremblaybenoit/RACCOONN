@@ -1,5 +1,5 @@
 inverse_logger:
-  _target_: src.callback.figure.InverseLogger
+  _target_: code.callback.artifact.InverseLogger
   save_every_n_epochs: 100
   save_on_improvement: true
   monitor: valid_loss

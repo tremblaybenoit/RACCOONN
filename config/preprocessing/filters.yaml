@@ -3,16 +3,16 @@ filters:
   # Pressure mask (to filter out constant pressure levels)
   pressure_mask:
     # Function
-    _target_: src.data.filters.compute_filter
+    _target_: code.data.filters.compute_filter
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:
       # Call to mask
       mask:
-        _target_: src.preprocessing.filters.pressure_mask
+        _target_: code.preprocessing.filters.pressure_mask
         # Statistics of the pressure variable to compute the mask
         stats:
-          _target_: src.data.preprocessing.statistics.read_statistics_var
+          _target_: code.data.preprocessing.statistics.read_statistics_var
           load: ${data.preprocessing.statistics.data.output.load}
           key: 'pressure'
           dtype: ${data.dtype}
@@ -29,5 +29,5 @@ filters:
         path: ${..path}
       # Load function
       load:
-        _target_: src.data.io.load_npy
+        _target_: code.data.io.load_npy
         path: ${..path}

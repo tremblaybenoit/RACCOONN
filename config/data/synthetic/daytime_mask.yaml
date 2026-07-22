@@ -12,13 +12,13 @@ stage:
       # Daytime mask
       daytime_mask:
         # Dataset class
-        _target_: src.loader.dataset.EagerDataset
+        _target_: code.loader.dataset.EagerDataset
         _recursive_: false
         # Type of data
         type: 'Daytime mask'
         # Loading function (daytime filter is computed, not loaded directly)
         load:
-          _target_: src.preprocessing.filters.daytime_mask
+          _target_: code.preprocessing.filters.daytime_mask
           _args_:
             - ${....meta.load}
         # Transformations to apply

@@ -1,5 +1,5 @@
 # Model
-_target_: src.model.forward.CRTMModelSmooth
+_target_: code.model.forward.CRTMModelSmooth
 _recursive_: false
 
 # Optimizer function and parameters

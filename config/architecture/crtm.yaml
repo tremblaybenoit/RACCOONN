@@ -1,5 +1,5 @@
 # CRTM Architecture
-_target_: forward.model.architecture.CRTMArchitecture
+_target_: code.architecture.CRTMArchitecture
 _recursive_: false
 
 # Number of input variables

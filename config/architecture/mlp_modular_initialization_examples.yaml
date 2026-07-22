@@ -1,7 +1,7 @@
 # MLPModular Configuration Examples - Weight Initialization Strategies
 # This file demonstrates different weight initialization approaches based on activation functions
 #
-# Available initialization functions in inverse.model.architecture.mlp:
+# Available initialization functions in code.architecture.mlp:
 # - init_weights_default: Xavier uniform
 # - init_weights_xavier: Xavier uniform with configurable gain
 # - init_weights_he: He initialization (for ReLU-like activations)
@@ -10,7 +10,7 @@
 # - init_weights_uniform: Custom uniform initialization
 # - get_init_func: Auto-select based on activation function
 
-_target_: inverse.model.architecture.mlp.MLPModular
+_target_: code.architecture.mlp.MLPModular
 _recursive_: false
 
 # ============================================================================
@@ -21,29 +21,29 @@ _recursive_: false
 positional_encoding: null
 
 input_layer:
-  _target_: inverse.model.architecture.mlp.MLPBlock
+  _target_: code.architecture.mlp.MLPBlock
   in_features: 2
   out_features: 256
   activation:
-    _target_: inverse.model.architecture.activation.Sine
+    _target_: code.architecture.activation.Sine
     w0: 1.0
   norm_type: none
   dropout_rate: 0.0
   # init_func: Auto-selected (uniform) for Sine activation
 
 hidden_layer:
-  _target_: inverse.model.architecture.mlp.MLPBlock
+  _target_: code.architecture.mlp.MLPBlock
   in_features: 256
   out_features: 256
   activation:
-    _target_: inverse.model.architecture.activation.Sine
+    _target_: code.architecture.activation.Sine
     w0: 1.0
   norm_type: none
   dropout_rate: 0.0
   # init_func: Auto-selected (uniform) for Sine activation
 
 output_layer:
-  _target_: inverse.model.architecture.mlp.MLPBlock
+  _target_: code.architecture.mlp.MLPBlock
   in_features: 256
   out_features: 3
   activation:
@@ -57,11 +57,11 @@ output_layer:
 # Auto-detection: GELU activation automatically uses Xavier initialization
 
 # positional_encoding:
-#   _target_: inverse.model.architecture.encoding.RescaledPositionalEncoding
+#   _target_: code.architecture.encoding.RescaledPositionalEncoding
 #   d_input: 4
 #
 # input_layer:
-#   _target_: inverse.model.architecture.mlp.MLPBlock
+#   _target_: code.architecture.mlp.MLPBlock
 #   in_features: null
 #   out_features: 256
 #   activation:
@@ -71,7 +71,7 @@ output_layer:
 #   # init_func: Auto-selected (xavier) for GELU activation
 #
 # hidden_layer:
-#   _target_: inverse.model.architecture.mlp.MLPBlocks
+#   _target_: code.architecture.mlp.MLPBlocks
 #   in_features: 256
 #   out_features: 256
 #   hidden_features: 256
@@ -84,7 +84,7 @@ output_layer:
 #   # init_func: Auto-selected (xavier) for GELU activation
 #
 # output_layer:
-#   _target_: inverse.model.architecture.mlp.MLPBlock
+#   _target_: code.architecture.mlp.MLPBlock
 #   in_features: 256
 #   out_features: 127
 #   activation:
@@ -98,7 +98,7 @@ output_layer:
 # Auto-detection: ReLU automatically uses He initialization
 
 # input_layer:
-#   _target_: inverse.model.architecture.mlp.MLPBlock
+#   _target_: code.architecture.mlp.MLPBlock
 #   in_features: 100
 #   out_features: 256
 #   activation:
@@ -108,7 +108,7 @@ output_layer:
 #   # init_func: Auto-selected (He) for ReLU activation
 #
 # hidden_layer:
-#   _target_: inverse.model.architecture.mlp.MLPBlocks
+#   _target_: code.architecture.mlp.MLPBlocks
 #   in_features: 256
 #   out_features: 256
 #   hidden_features: 256
@@ -121,7 +121,7 @@ output_layer:
 #   # init_func: Auto-selected (He) for ReLU activation
 #
 # output_layer:
-#   _target_: inverse.model.architecture.mlp.MLPBlock
+#   _target_: code.architecture.mlp.MLPBlock
 #   in_features: 256
 #   out_features: 10
 #   activation:
@@ -135,28 +135,28 @@ output_layer:
 # Auto-detection: Swish activation automatically uses He initialization
 
 # input_layer:
-#   _target_: inverse.model.architecture.mlp.MLPBlock
+#   _target_: code.architecture.mlp.MLPBlock
 #   in_features: 50
 #   out_features: 256
 #   activation:
-#     _target_: inverse.model.architecture.activation.Swish
+#     _target_: code.architecture.activation.Swish
 #   norm_type: layer
 #   dropout_rate: 0.1
 #   # init_func: Auto-selected (He) for Swish activation
 #
 # hidden_layer:
-#   _target_: inverse.model.architecture.mlp.MLPBlock
+#   _target_: code.architecture.mlp.MLPBlock
 #   in_features: 256
 #   out_features: 256
 #   activation:
-#     _target_: inverse.model.architecture.activation.Swish
+#     _target_: code.architecture.activation.Swish
 #   norm_type: layer
 #   dropout_rate: 0.1
 #   residual: true
 #   # init_func: Auto-selected (He) for Swish activation
 #
 # output_layer:
-#   _target_: inverse.model.architecture.mlp.MLPBlock
+#   _target_: code.architecture.mlp.MLPBlock
 #   in_features: 256
 #   out_features: 20
 #   activation:
@@ -170,7 +170,7 @@ output_layer:
 # You can explicitly override auto-detection with custom initialization
 
 # input_layer:
-#   _target_: inverse.model.architecture.mlp.MLPBlock
+#   _target_: code.architecture.mlp.MLPBlock
 #   in_features: 100
 #   out_features: 256
 #   activation:
@@ -178,10 +178,10 @@ output_layer:
 #   norm_type: layer
 #   dropout_rate: 0.1
 #   init_func:
-#     _target_: inverse.model.architecture.mlp.init_weights_he
+#     _target_: code.architecture.mlp.init_weights_he
 #
 # hidden_layer:
-#   _target_: inverse.model.architecture.mlp.MLPBlock
+#   _target_: code.architecture.mlp.MLPBlock
 #   in_features: 256
 #   out_features: 256
 #   activation:
@@ -190,10 +190,10 @@ output_layer:
 #   dropout_rate: 0.1
 #   residual: true
 #   init_func:
-#     _target_: inverse.model.architecture.mlp.init_weights_xavier
+#     _target_: code.architecture.mlp.init_weights_xavier
 #
 # output_layer:
-#   _target_: inverse.model.architecture.mlp.MLPBlock
+#   _target_: code.architecture.mlp.MLPBlock
 #   in_features: 256
 #   out_features: 127
 #   activation:
@@ -201,7 +201,7 @@ output_layer:
 #   norm_type: none
 #   dropout_rate: 0.0
 #   init_func:
-#     _target_: inverse.model.architecture.mlp.init_weights_default
+#     _target_: code.architecture.mlp.init_weights_default
 
 # ============================================================================
 # Skip connections and encoding injection (applied to all examples above)

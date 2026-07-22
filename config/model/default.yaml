@@ -1,5 +1,5 @@
 # Forward Model Configuration (refactored to use separate configs)
-_target_: forward.model.model.CRTMModel
+_target_: code.model.forward.ForwardModel
 _recursive_: false
 
 # Optimizer - reference external config

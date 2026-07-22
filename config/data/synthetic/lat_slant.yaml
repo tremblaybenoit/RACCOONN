@@ -12,7 +12,7 @@ stage:
       # Latitude (slant)
       lat_slant:
         # Dataset class
-        _target_: src.loader.dataset.EagerDataset
+        _target_: code.loader.dataset.EagerDataset
         _recursive_: false
         # Path to the latitude slant data file
         path: ${preprocessing.slant.train.output.lat.path}
@@ -24,10 +24,10 @@ stage:
         transformations:
           # Per-variable normalization
           normalization:
-            _target_: src.data.transformations.min_max
+            _target_: code.data.transformations.min_max
             _partial_: true
             stats:
-              _target_: src.preprocessing.statistics.read_statistics_var
+              _target_: code.preprocessing.statistics.read_statistics_var
               path: ${preprocessing.statistics.data.output.path}
               key: 'lat_slant'
               dtype: ${data.dtype}

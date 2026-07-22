@@ -12,7 +12,7 @@ stage:
       # Scans
       scans:
         # Dataset class
-        _target_: src.loader.dataset.EagerDataset
+        _target_: code.loader.dataset.EagerDataset
         _recursive_: false
         # Path to the scans data file
         path: ${....dir}/scans.txt
@@ -20,7 +20,7 @@ stage:
         type: 'Time'
         # Loading function
         load:
-          _target_: src.data.io.load_scans
+          _target_: code.data.io.load_scans
           path: ${..path}
           lat:
             _target_: ${....lat.load._target_}
@@ -31,10 +31,10 @@ stage:
         transformations:
           # Per-variable normalization
           normalization:
-            _target_: src.data.transformations.min_max
+            _target_: code.data.transformations.min_max
             _partial_: true
             stats:
-              _target_: src.preprocessing.statistics.read_statistics_var
+              _target_: code.preprocessing.statistics.read_statistics_var
               path: ${preprocessing.statistics.data.output.path}
               var: 'scans'
               dtype: ${data.dtype}

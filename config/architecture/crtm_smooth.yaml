@@ -1,5 +1,5 @@
 # CRTM Smooth Architecture (with skip connections)
-_target_: forward.model.architecture.CRTMSmoothArchitecture
+_target_: code.architecture.CRTMSmoothArchitecture
 _recursive_: false
 
 # Number of input variables

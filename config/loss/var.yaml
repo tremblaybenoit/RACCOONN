@@ -1,11 +1,5 @@
 # Variational Loss for inverse problems
-_target_: inverse.model.loss.VarLoss
-
-# Forward model to compute the model equivalent of the observations
-forward_model:
-  _target_: inverse.model.loss.ForwardModel
-  dtype: ${data.dtype}
-  prof_norm: null
+_target_: code.loss.loss.VarLoss
 
 # Weights for observation (obs), model, and boundary condition (bcs) errors
 lambda_obs: 0.0
@@ -14,16 +8,16 @@ lambda_bcs: 1.0
 
 # Loss term for observations
 loss_obs:
-  _target_: inverse.model.loss.MSE
+  _target_: code.loss.loss.MSE
 
 # Loss term for model variables
 loss_model:
-  _target_: inverse.model.loss.MSE
+  _target_: code.loss.loss.MSE
 
 # Loss term for boundary conditions
 loss_bcs:
-  _target_: inverse.model.loss.MSE
+  _target_: code.loss.loss.MSE
 
-# Pressure filter: Consider only pressure levels with non-zero variance
-pressure_filter: ${data.pressure_filter.load}
+# Pressure mask: Consider only pressure levels with non-zero variance
+pressure_mask: ${data.pressure_mask.load}
 

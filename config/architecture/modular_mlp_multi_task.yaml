@@ -1,5 +1,5 @@
 # Multi-Task Modular MLP
-_target_: inverse.model.architecture.mlp.ModularMLP
+_target_: code.architecture.mlp.ModularMLP
 _recursive_: false
 
 # Input/output
@@ -8,7 +8,7 @@ out_features: 127  # Per task
 
 # Positional encoding
 positional_encoding:
-  _target_: inverse.model.architecture.encoding.RescaledPositionalEncoding
+  _target_: code.architecture.encoding.RescaledPositionalEncoding
   d_input: 4
 
 # Shared backbone

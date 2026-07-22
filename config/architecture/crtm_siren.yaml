@@ -1,5 +1,5 @@
 # CRTM SIREN Architecture
-_target_: forward.model.architecture.CRTMSirenArchitecture
+_target_: code.architecture.CRTMSirenArchitecture
 _recursive_: false
 
 # Number of input variables

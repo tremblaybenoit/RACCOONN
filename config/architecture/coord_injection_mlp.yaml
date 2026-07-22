@@ -1,12 +1,12 @@
 # Coordinate Injection Architecture Example
 # Injects positional encoding at each layer for improved spatial awareness
 
-_target_: inverse.model.architecture.HydraResidualMLP2
+_target_: code.architecture.mlp.HydraResidualMLP2
 _recursive_: false
 
 # Positional encoding
 positional_encoding:
-  _target_: inverse.model.architecture.encoding.RescaledPositionalEncoding
+  _target_: code.architecture.encoding.RescaledPositionalEncoding
   d_input: 4
 
 # Input layer

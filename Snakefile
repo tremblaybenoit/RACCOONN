@@ -96,11 +96,11 @@ rule data:
 
 # Preparation: Unified handler for all preparation types
 prep_modules = {
-    'recast': 'src.preprocessing.recast',
-    'statistics': 'src.preprocessing.statistics',
-    'filters': 'src.preprocessing.filters',
-    'covariance': 'src.preprocessing.covariance',
-    'slant': 'src.preprocessing.slant',
+    'recast': 'code.preprocessing.recast',
+    'statistics': 'code.preprocessing.statistics',
+    'filters': 'code.preprocessing.filters',
+    'covariance': 'code.preprocessing.covariance',
+    'slant': 'code.preprocessing.slant',
 }
 
 for prep_type, prep_config_dict in preprocessing_config.items():
@@ -165,7 +165,7 @@ if 'train' in loader_config:
             checkpoint = f"{paths_config['checkpoint_dir']}/{checkpoint_config['filename']}.ckpt"
         shell:
             """
-            python -m src.train \
+            python -m code.train \
             --config-name={params.config_name} \
             {params.experiment}
             """
@@ -191,7 +191,7 @@ if 'test' in loader_config:
             test_out = [var['load']['path'] for var in loader_config['test']['results'].values()]
         shell:
             """
-            python -m src.test \
+            python -m code.test \
             --config-name={params.config_name} \
             {params.experiment}
             """
@@ -214,7 +214,7 @@ if 'predict' in loader_config:
             predict_out = [var['load']['path'] for var in loader_config['predict']['results'].values()]
         shell:
             """
-            python -m src.predict \
+            python -m code.predict \
             --config-name={params.config_name} \
             {params.experiment}
             """

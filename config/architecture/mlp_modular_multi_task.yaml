@@ -1,17 +1,17 @@
 # MLPModular with MLPBlocks for multi-layer components and multi-head output
 # Weight initialization is auto-detected: Xavier for GELU activations
-_target_: inverse.model.architecture.mlp.MLPModular
+_target_: code.architecture.mlp.MLPModular
 _recursive_: false
 
 # Positional encoding
 positional_encoding:
-  _target_: inverse.model.architecture.encoding.RescaledPositionalEncoding
+  _target_: code.architecture.encoding.RescaledPositionalEncoding
   d_input: 4
 
 # Input layer (can use MLPBlocks for multi-layer input)
 # Auto initialization: Xavier (based on GELU activation)
 input_layer:
-  _target_: inverse.model.architecture.mlp.MLPBlocks
+  _target_: code.architecture.mlp.MLPBlocks
   in_features: null  # Set by encoding
   out_features: 256
   hidden_features: 128
@@ -25,7 +25,7 @@ input_layer:
 # Hidden layer (MLPBlocks controls depth via n_blocks)
 # Auto initialization: Xavier (based on GELU activation)
 hidden_layer:
-  _target_: inverse.model.architecture.mlp.MLPBlocks
+  _target_: code.architecture.mlp.MLPBlocks
   in_features: 256
   out_features: 256
   hidden_features: 256
@@ -43,7 +43,7 @@ hidden_skip: false
 # Multi-head output using PredictionHeads
 # PredictionHead layers also use auto-initialization
 output_layer:
-  _target_: inverse.model.architecture.mlp.PredictionHeads
+  _target_: code.architecture.mlp.PredictionHeads
   n_heads: 3  # Three prediction heads for multi-task learning
   in_features: 256
   out_features: 127  # Output dimension per head

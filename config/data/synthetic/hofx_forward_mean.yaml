@@ -12,7 +12,7 @@ stage:
       # HOFX (Simulated Observations)
       hofx_forward_mean:
         # Dataset class
-        _target_: src.loader.dataset.EagerDataset
+        _target_: code.loader.dataset.EagerDataset
         _recursive_: false
         # Path to the HOFX (simulated observations) file
         path: ${....dir}/hofx_forward_mean.npy
@@ -23,7 +23,7 @@ stage:
         ]
         # Loading function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           path: ${..path}
           split: ${....split}
           dtype: ${data.dtype}
@@ -31,10 +31,10 @@ stage:
         transformations:
           # Per-variable normalization
           normalization:
-            _target_: src.data.transformations.identity
+            _target_: code.data.transformations.identity
             _partial_: true
             stats:
-              _target_: src.preprocessing.statistics.read_statistics_var
+              _target_: code.preprocessing.statistics.read_statistics_var
               path: ${preprocessing.statistics.data.output.path}
               key: 'hofx'
               dtype: ${data.dtype}
@@ -94,7 +94,7 @@ stage:
             - ${..path}
         # Loading function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           path: ${..path}
           dtype: ${data.dtype}
         # Transformations to apply
@@ -119,7 +119,7 @@ stage:
             - ${..path}
         # Loading function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           path: ${..path}
           dtype: ${data.dtype}
         # Transformations to apply

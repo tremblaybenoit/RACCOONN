@@ -3,7 +3,7 @@ slant:
   # Training set
   train:
     # Function
-    _target_: src.preprocessing.slant.compute_slant_path
+    _target_: code.preprocessing.slant.compute_slant_path
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:
@@ -27,7 +27,7 @@ slant:
             - ${preprocessing.slant.train.output.lat.path}
         # Load function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           _args_:
             - ${preprocessing.slant.train.output.lat.path}
             - ${data.dtype}
@@ -42,7 +42,7 @@ slant:
             - ${preprocessing.slant.train.output.lon.path}
         # Load function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           _args_:
             - ${preprocessing.slant.train.output.lon.path}
             - ${data.dtype}
@@ -57,7 +57,7 @@ slant:
             - ${preprocessing.slant.train.output.z.path}
         # Load function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           _args_:
             - ${preprocessing.slant.train.output.z.path}
             - ${data.dtype}
@@ -72,7 +72,7 @@ slant:
             - ${preprocessing.slant.train.output.x.path}
         # Load function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           _args_:
             - ${preprocessing.slant.train.output.x.path}
             - ${data.dtype}
@@ -87,14 +87,14 @@ slant:
             - ${preprocessing.slant.train.output.y.path}
         # Load function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           _args_:
             - ${preprocessing.slant.train.output.y.path}
             - ${data.dtype}
   # Validation set
   valid:
     # Function
-    _target_: src.data.slant.compute_slant_path
+    _target_: code.data.slant.compute_slant_path
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:
@@ -118,7 +118,7 @@ slant:
             - ${preprocessing.slant.valid.output.lat.path}
         # Load function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           _args_:
             - ${preprocessing.slant.valid.output.lat.path}
             - ${data.dtype}
@@ -133,7 +133,7 @@ slant:
             - ${preprocessing.slant.valid.output.lon.path}
         # Load function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           _args_:
             - ${preprocessing.slant.valid.output.lon.path}
             - ${data.dtype}
@@ -148,7 +148,7 @@ slant:
             - ${preprocessing.slant.valid.output.z.path}
         # Load function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           _args_:
             - ${preprocessing.slant.valid.output.z.path}
             - ${data.dtype}
@@ -163,7 +163,7 @@ slant:
             - ${preprocessing.slant.valid.output.x.path}
         # Load function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           _args_:
             - ${preprocessing.slant.valid.output.x.path}
             - ${data.dtype}
@@ -178,14 +178,14 @@ slant:
             - ${preprocessing.slant.valid.output.y.path}
         # Load function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           _args_:
             - ${preprocessing.slant.valid.output.y.path}
             - ${data.dtype}
   # Test set
   test:
     # Function
-    _target_: src.data.slant.compute_slant_path
+    _target_: code.data.slant.compute_slant_path
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:
@@ -209,7 +209,7 @@ slant:
             - ${preprocessing.slant.test.output.lat.path}
         # Load function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           _args_:
             - ${preprocessing.slant.test.output.lat.path}
             - ${data.dtype}
@@ -224,7 +224,7 @@ slant:
             - ${preprocessing.slant.test.output.lon.path}
         # Load function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           _args_:
             - ${preprocessing.slant.test.output.lon.path}
             - ${data.dtype}
@@ -239,7 +239,7 @@ slant:
             - ${preprocessing.slant.test.output.z.path}
         # Load function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           _args_:
             - ${preprocessing.slant.test.output.z.path}
             - ${data.dtype}
@@ -254,7 +254,7 @@ slant:
             - ${preprocessing.slant.test.output.x.path}
         # Load function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           _args_:
             - ${preprocessing.slant.test.output.x.path}
             - ${data.dtype}
@@ -269,7 +269,7 @@ slant:
             - ${preprocessing.slant.test.output.y.path}
         # Load function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           _args_:
             - ${preprocessing.slant.test.output.y.path}
             - ${data.dtype}

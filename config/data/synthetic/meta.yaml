@@ -12,7 +12,7 @@ stage:
       # Metadata
       meta:
         # Dataset class
-        _target_: src.loader.dataset.EagerDataset
+        _target_: code.loader.dataset.EagerDataset
         _recursive_: false
         # Path to the metadata file
         path: ${....dir}/meta.npy
@@ -20,7 +20,7 @@ stage:
         type: 'Meta data'
         # Loading function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           path: ${..path}
           split: ${....split}
           dtype: ${data.dtype}
@@ -28,7 +28,7 @@ stage:
         transformations:
           # Metadata normalization (sin/cos for angles)
           normalization:
-            _target_: src.data.transformations.NormalizeMeta
+            _target_: code.data.transformations.NormalizeMeta
             settings:
               meta_cos_vars: [ 6 ]
               meta_scale_factor: 180

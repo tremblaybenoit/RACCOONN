@@ -1,5 +1,5 @@
 forward_logger:
-  _target_: src.callback.figure.ForwardLogger
+  _target_: code.callback.artifact.ForwardLogger
   save_every_n_epochs: 100
   save_on_improvement: true
   monitor: valid_loss

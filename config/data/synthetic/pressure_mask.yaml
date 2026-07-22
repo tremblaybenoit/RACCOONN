@@ -12,7 +12,7 @@ stage:
       # Pressure mask
       pressure_mask:
         # Dataset class
-        _target_: src.loader.dataset.ConstantDataset
+        _target_: code.loader.dataset.ConstantDataset
         _recursive_: false
         # Type of data
         type: 'Pressure mask'

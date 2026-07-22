@@ -1,5 +1,5 @@
 # Model
-_target_: src.model.inverse.PINNverseOperator
+_target_: code.model.inverse.PINNverseOperator
 _recursive_: false
 
 # Optimizer function and parameters
@@ -36,28 +36,28 @@ parameters:
 
 # Loss function and parameters
 loss:
-  _target_: src.loss.loss.VarLoss
+  _target_: code.loss.loss.VarLoss
   forward_model:
-    _target_: src.loss.loss.ForwardModel
+    _target_: code.loss.loss.ForwardModel
     dtype: ${data.dtype}
     prof_norm: null
   lambda_obs: 0.
   lambda_model: 1.
   lambda_bcs: 1.
   loss_obs:
-    _target_: src.loss.loss.MSE
+    _target_: code.loss.loss.MSE
   loss_model:
-    _target_: src.loss.loss.MSE
+    _target_: code.loss.loss.MSE
   loss_bcs:
-    _target_: src.loss.loss.MSE
+    _target_: code.loss.loss.MSE
   pressure_filter: ${data.pressure_filter.load}
 
 # Architecture components
 architecture:
-  _target_: src.model.inverse.HydraResidualMLP
+  _target_: code.model.inverse.HydraResidualMLP
   # Positional encoding
   positional_encoding:
-     _target_: src.architecture.encoding.RescaledPositionalEncoding
+     _target_: code.architecture.encoding.RescaledPositionalEncoding
     d_input:
       _target_: numpy.sum
       _args_:
@@ -69,36 +69,36 @@ architecture:
           - ${model.parameters.n_cloud}
   # Input layer
   input_layer:
-    _target_: src.model.inverse.LinearBlock
+    _target_: code.model.inverse.LinearBlock
     in_features: null  # Set by positional encoding
     out_features: 128
     layernorm:
       _target_: torch.nn.Identity
     activation:
-      _target_: src.architecture.activation.Sine
+      _target_: code.architecture.activation.Sine
     dropout_rate: 0.1
     init_func:
-      _target_: src.model.inverse.SirenInit
+      _target_: code.model.inverse.SirenInit
   # Hidden layers
   hidden_n_layers: 2
   hidden_skip: false
   hidden_layer:
-    _target_: src.model.inverse.LinearBlock
+    _target_: code.model.inverse.LinearBlock
     in_features: 128
     out_features: 128
     layernorm:
       _target_: torch.nn.Identity
     activation:
-      _target_: src.architecture.activation.Sine
+      _target_: code.architecture.activation.Sine
     dropout_rate: 0.1
     init_func:
-      _target_: src.model.inverse.SirenInit
+      _target_: code.model.inverse.SirenInit
   # Output layers
   output_skip: false
   output_n_heads: 1
   output_n_layers: 1
   output_layer:
-    _target_: src.model.inverse.LinearBlock
+    _target_: code.model.inverse.LinearBlock
     in_features: 128
     out_features:
       _target_: builtins.int
@@ -114,5 +114,5 @@ architecture:
       _target_: torch.nn.Sigmoid
     dropout_rate: 0.0
     init_func:
-      _target_: src.model.inverse.SirenInit
+      _target_: code.model.inverse.SirenInit
   output_final_layer: null

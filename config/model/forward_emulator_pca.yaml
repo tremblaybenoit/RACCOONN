@@ -1,5 +1,5 @@
 # Model
-_target_: forward.model.model.CRTMModelPCA
+_target_: code.model.forward.CRTMModelPCA
 _recursive_: false
 
 # Optimizer function and parameters

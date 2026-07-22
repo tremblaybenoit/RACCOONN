@@ -12,7 +12,7 @@ stage:
       # Observations
       obs:
         # Dataset class
-        _target_: src.loader.dataset.EagerDataset
+        _target_: code.loader.dataset.EagerDataset
         _recursive_: false
         # Path to the observations file
         path: ${....dir}/obs.npy
@@ -20,7 +20,7 @@ stage:
         type: 'Observations (no units)'
         # Loading function
         load:
-          _target_: src.data.io.load_npy
+          _target_: code.data.io.load_npy
           path: ${..path}
           split: ${....split}
           dtype: ${data.dtype}
@@ -28,10 +28,10 @@ stage:
         transformations:
           # Per-variable normalization
           normalization:
-            _target_: src.data.transformations.identity
+            _target_: code.data.transformations.identity
             _partial_: true
             stats:
-              _target_: src.preprocessing.statistics.read_statistics_var
+              _target_: code.preprocessing.statistics.read_statistics_var
               path: ${preprocessing.statistics.data.output.path}
               key: 'obs'
               dtype: ${data.dtype}
