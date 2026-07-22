@@ -1,7 +1,7 @@
-# RACCOONN: Retrievals of Atmospheric Conditions Computed from Observations by Optimizing a Neural Network. 
-RACCOONN uses deep learning to estimate atmospheric thermodynamic profiles from raw radiance observations. 
-A prior/background state of the atmosphere can be provided. 
-The goal is to create an inverse observation operator for the assimilation of radiances in the form of thermodynamic profiles.
+# RACCOONN: Retrievals of Atmospheric Conditions Computed from Observations by Optimizing a Neural Network 
+RACCOONN leverages deep learning to retrieve atmospheric thermodynamic profiles from satellite radiance observations and an 
+optional prior atmospheric state. 
+RACCOONN aims to function as an inverse observation operator to facilitate the assimilation of radiances directly in profile space.
 
 ## Table of Contents
 - [Installation](#installation)
@@ -34,19 +34,19 @@ conda activate RACCOONN
 Create or edit a configuration file in the [`config/experiment`](config/experiment) folder to set your experiment parameters.
 
 1. Start with the `defaults` section to set the default configurations:
-    - `paths` (from folder [`config/paths`](config/paths)): Directories for data and outputs.
-    - `hydra` (from folder [`config/hydra`](config/hydra)): Hydra settings.
-    - `data` (from folder [`config/data`](config/data)): Dataset parameters (e.g., variables, i/o functions).
-    - `preprocessing` (from folder [`config/preprocessing`](config/preprocessing)): Data preprocessing steps (e.g., statistics).
-    - `loader` (from folder [`config/loader`](config/loader)): Wraps [`config/data`](config/data) into a Pytorch-Lightning-ready data loader.
-    - `model` (from folder [`config/model`](config/model)): Wraps [`config/architecture`](config/architecture), [`config/optimizer`](config/optimizer), [`config/scheduler`](config/scheduler), and [`config/loss`](config/loss) into a complete model.
-    - `architecture` (from folder [`config/architecture`](config/architecture)): Neural network architecture details.
-    - `optimizer` (from folder [`config/optimizer`](config/optimizer)): Optimizer parameters.
-    - `scheduler` (from folder [`config/scheduler`](config/scheduler)): Learning rate scheduler parameters.
-    - `loss` (from folder [`config/loss`](config/loss)): Loss function parameters.
-    - `trainer` (from folder [`config/trainer`](config/trainer)): Training parameters.
-    - `callbacks` (from folder [`config/callbacks`](config/callbacks)): Callbacks during training.
-    - `logger` (from folder [`config/logger`](config/logger)): Logging parameters during training.
+    - `paths` (from directory [`config/paths`](config/paths)): Directories for data and outputs.
+    - `hydra` (from directory [`config/hydra`](config/hydra)): Hydra settings.
+    - `data` (from directory [`config/data`](config/data)): Dataset parameters (e.g., variables, i/o functions).
+    - `preprocessing` (from directory [`config/preprocessing`](config/preprocessing)): Data preprocessing steps (e.g., statistics).
+    - `loader` (from directory [`config/loader`](config/loader)): Wraps `data` into a Pytorch-Lightning-ready data loader.
+    - `model` (from directory [`config/model`](config/model)): Wraps `architecture`, `optimizer`, `scheduler`, and `loss` into a complete model.
+    - `architecture` (from directory [`config/architecture`](config/architecture)): Neural network architecture details.
+    - `optimizer` (from directory [`config/optimizer`](config/optimizer)): Optimizer parameters.
+    - `scheduler` (from directory [`config/scheduler`](config/scheduler)): Learning rate scheduler parameters.
+    - `loss` (from directory [`config/loss`](config/loss)): Loss function parameters.
+    - `trainer` (from directory [`config/trainer`](config/trainer)): Training parameters.
+    - `callbacks` (from directory [`config/callbacks`](config/callbacks)): Callbacks during training.
+    - `logger` (from directory [`config/logger`](config/logger)): Logging parameters during training.
 2. Add `overrides` below the `defaults` to change specific default parameters as needed. 
 
 **Note**: The order of the `defaults` matters, as later entries can override earlier ones.
@@ -66,10 +66,10 @@ flowchart LR
   B --> B4["/preprocessing: inverse_default"]
   B --> B5["/loader: default"]
   B --> B6["/model: inverse_default"]
-  B --> B7["/architecture: hydra_mlp"]
-  B --> B8["/optimizer: adam"]
-  B --> B9["/scheduler: plateau"]
-  B --> B10["/loss: var"]
+  B --> B7["/architecture: inverse_default"]
+  B --> B8["/optimizer: default"]
+  B --> B9["/scheduler: default"]
+  B --> B10["/loss: inverse_default"]
   B --> B11["/trainer: gpu"]
   B --> B12["/callbacks: inverse_default"]
   B --> B13["/logger: default"]
@@ -89,7 +89,7 @@ flowchart LR
   B12 --> C
   B13 --> C
 
-  C["Overrides"]
+  C["overrides"]
   C --> C1["task_name"]
   C --> C2["/paths"]
   C2 --> C21["task_dir"]
@@ -216,10 +216,10 @@ To account for missing dependencies, add the `--rerun-incomplete` flag:
 snakemake --dry-run --rerun-incomplete --verbose test --config hydra-experiment=inverse_default
 ```
 
-To draw a [directed acyclic graph (DAG)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) of the training workflow (e.g., [`code/train.mmd`](code/train.mmd) for Snakefile rule [`test`](Snakefile)):
+To draw a [directed acyclic graph (DAG)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) of the training workflow (e.g., [`code/train_inverse.mmd`](code/train_inverse.mmd) for Snakefile rule [`test`](Snakefile)):
 
 ```bash
-snakemake test --rulegraph mermaid-js --config hydra-experiment=inverse_default > train.mmd
+snakemake test --rulegraph mermaid-js --config hydra-experiment=inverse_default > code/train_inverse.mmd
 ```
 Replace `--rulegraph` with `--dag` to highlight completed rules with dashed boxes.
 
