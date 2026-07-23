@@ -1,6 +1,5 @@
 import torch
 from omegaconf import DictConfig
-from code.preprocessing.statistics import statistics, accumulate_statistics
 from code.model.base import BaseModel
 from code.model.forward import ForwardModel
 from utilities.instantiators import instantiate
@@ -90,8 +89,9 @@ class InverseModel(BaseModel):
         torch.Tensor
             Profile predictions with shape (Batch, n_prof, n_levels).
         """
+
         # Get n_levels from architecture if available, otherwise assume 1
-        n_levels = getattr(self.architecture, 'n_levels', 1)  # TODO: Update
+        n_levels = input_dict['pressure'].shape[-1]
 
         # Vectorized expansion: Create list of tensors all shaped (Batch, n_levels, 1)
         tensors = []

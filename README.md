@@ -1,5 +1,5 @@
 # RACCOONN: Retrievals of Atmospheric Conditions Computed from Observations by Optimizing a Neural Network 
-RACCOONN leverages deep learning to retrieve atmospheric thermodynamic profiles from satellite radiance observations and an 
+RACCOONN leverages deep learning to retrieve atmospheric thermodynamic profiles from radiance observations and an 
 optional prior atmospheric state. 
 RACCOONN aims to function as an inverse observation operator to facilitate the assimilation of radiances directly in profile space.
 
@@ -31,14 +31,14 @@ conda activate RACCOONN
 
 ## Usage
 ### Experiment configuration
-Create or edit a configuration file in the [`config/experiment`](config/experiment) folder to set your experiment parameters.
+Create or edit a configuration file in the [`config/experiment`](config/experiment) directory to set your experiment parameters.
 
 1. Start with the `defaults` section to set the default configurations:
     - `paths` (from directory [`config/paths`](config/paths)): Directories for data and outputs.
     - `hydra` (from directory [`config/hydra`](config/hydra)): Hydra settings.
     - `data` (from directory [`config/data`](config/data)): Dataset parameters (e.g., variables, i/o functions).
     - `preprocessing` (from directory [`config/preprocessing`](config/preprocessing)): Data preprocessing steps (e.g., statistics).
-    - `loader` (from directory [`config/loader`](config/loader)): Wraps `data` into a Pytorch-Lightning-ready data loader.
+    - `loader` (from directory [`config/loader`](config/loader)): Wraps `data` into a PyTorch-Lightning-ready data loader.
     - `model` (from directory [`config/model`](config/model)): Wraps `architecture`, `optimizer`, `scheduler`, and `loss` into a complete model.
     - `architecture` (from directory [`config/architecture`](config/architecture)): Neural network architecture details.
     - `optimizer` (from directory [`config/optimizer`](config/optimizer)): Optimizer parameters.
