@@ -1,7 +1,7 @@
 from torch.utils.data import Dataset
 from omegaconf import DictConfig, OmegaConf
 from utilities.instantiators import instantiate
-from utilities.tensors import array_to_tensor
+from utilities.tensors import to_tensor
 from code.data.transformations import apply_transform
 import os
 import numpy as np
@@ -132,7 +132,7 @@ class EagerDataset(UnivariateDataset):
         # Convert to requested output format (only once, at init time)
         if self.as_tensor:
             # Tensor with shared memory for multiprocessing
-            return array_to_tensor(arr, shared=True)
+            return to_tensor(arr, shared=True)
         else:
             # Keep as contiguous numpy array
             return np.ascontiguousarray(arr)
@@ -307,7 +307,7 @@ class LazyDataset(UnivariateDataset):
         # Convert to requested output format
         if self.as_tensor:
             # Tensor with shared memory for multiprocessing
-            return array_to_tensor(arr, shared=True)
+            return to_tensor(arr, shared=True)
         else:
             # Keep as contiguous numpy array
             return np.ascontiguousarray(arr)
@@ -345,7 +345,7 @@ class LazyDataset(UnivariateDataset):
 
         # Convert to requested output format (per-item, no shared memory for ephemeral tensors)
         if self.as_tensor:
-            return array_to_tensor(arr, shared=False)
+            return to_tensor(arr, shared=False)
         else:
             return arr
 

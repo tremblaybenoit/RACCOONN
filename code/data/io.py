@@ -2,7 +2,7 @@ import numpy as np
 import pickle
 import torch
 from omegaconf import DictConfig, ListConfig
-from utilities.tensors import array_to_tensor
+from utilities.tensors import to_tensor
 from utilities.instantiators import instantiate
 from typing import Literal
 
@@ -238,7 +238,7 @@ def load_variable(config: DictConfig | ListConfig, apply_transform: bool = False
         # If tensor
         if as_tensor:
             # Ensure all results are tensors before concatenating
-            results = [r if isinstance(r, torch.Tensor) else array_to_tensor(r) for r in results]
+            results = [r if isinstance(r, torch.Tensor) else to_tensor(r) for r in results]
             return torch.cat(results, dim=0)
         # If numpy array
         else:

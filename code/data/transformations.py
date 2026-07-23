@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from omegaconf import DictConfig
 from utilities.instantiators import instantiate
 from typing import Callable
 
@@ -513,16 +514,16 @@ def clip(data: np.ndarray | torch.Tensor, stats: dict) -> np.ndarray | torch.Ten
         raise TypeError("Input data must be a numpy array or a torch tensor.")
 
 
-def apply_transform(transformations: dict | None = None, inverse_transform: bool = False) -> Callable:
+def apply_transform(transformations: DictConfig | None = None, inverse_transform: bool = False) -> Callable:
     """
-    Create a transformation function from a transformations config.
+    Create a transformation function from a transformation config.
 
     Similar to UnivariateDataset._transform and _inverse_transform, this builds
     a pipeline of transformations that can be applied to data.
 
     Parameters
     ----------
-    transformations : dict, optional
+    transformations : DictConfig, optional
         Configuration dict with transformation specifications.
         Each transformation must support the 'inverse_transform' parameter.
         If None, returns an identity function.
@@ -537,6 +538,7 @@ def apply_transform(transformations: dict | None = None, inverse_transform: bool
         the transformation pipeline in order (or reverse if inverse_transform=True).
     """
 
+    # If no transformation, skip
     if transformations is None:
         # Return identity function if no transformations
         return lambda x: x

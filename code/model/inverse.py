@@ -135,6 +135,7 @@ class InverseModel(BaseModel):
         dict
             Dictionary containing {'prof': predictions, 'hofx': optional}.
         """
+
         # Inversion of atmospheric profiles
         output = {'prof': self.forward(batch['input'])}
 

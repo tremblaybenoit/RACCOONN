@@ -3,7 +3,7 @@ import numpy as np
 import torch
 
 
-def array_to_tensor(arr: np.ndarray, shared: bool = True) -> torch.Tensor:
+def to_tensor(arr: np.ndarray | torch.Tensor, shared: bool = True) -> torch.Tensor:
     """ Convert numpy array to torch tensor in shared memory.
 
         Centralizes the common logic of converting and sharing memory.
@@ -17,6 +17,13 @@ def array_to_tensor(arr: np.ndarray, shared: bool = True) -> torch.Tensor:
         -------
         torch.Tensor. Tensor in shared memory if requested.
     """
+
+    # If input is already a torch tensor, optionally share memory
+    if isinstance(arr, torch.Tensor):
+        # Enable sharing across processes if requested
+        if shared:
+            arr.share_memory_()
+        return arr
 
     # Convert to contiguous array for efficient memory layout
     arr = np.ascontiguousarray(arr)

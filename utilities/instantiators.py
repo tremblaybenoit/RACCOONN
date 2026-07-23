@@ -67,27 +67,25 @@ def instantiate_list(config_list: DictConfig, obj_type: str, **kwargs) -> List[U
 
     # No objects found
     if not config_list:
-        # log.warning(f"No {obj_type} config found! Skipping...")
+        # logger.warning(f"No {obj_type} config found! Skipping...")
         return config_obj
 
     # Config provided, but in the wrong format
     if not isinstance(config_list, DictConfig):
-        log.error(f"{obj_type} config must be a DictConfig!")
+        logger.error(f"{obj_type} config must be a DictConfig!")
         raise TypeError(f"{obj_type} config must be a DictConfig!")
 
     # If multiple objects are provided
     for _, config in config_list.items():
         # Instantiate individual callbacks
         if isinstance(config, DictConfig) and "_target_" in config:
-            # Log
-            # log.info(f"Instantiating {obj_type} <{config._target_}>")
             # Add to list
             config_obj.append(hydra.utils.instantiate(config, **kwargs))
 
     return config_obj
 
 
-def instantiate_callbacks(callback_config: DictConfig, **kwargs) -> List[Callback]:
+def instantiate_callbacks(callback_config: DictConfig, **kwargs) -> List[Callback | Logger]:
     """ Instantiates callback(s) from config.
 
         Parameters
@@ -102,7 +100,7 @@ def instantiate_callbacks(callback_config: DictConfig, **kwargs) -> List[Callbac
     return instantiate_list(callback_config, "callbacks", **kwargs)
 
 
-def instantiate_loggers(logger_config: DictConfig, **kwargs) -> List[Logger]:
+def instantiate_loggers(logger_config: DictConfig, **kwargs) -> List[Callback | Logger]:
     """ Instantiates logger(s) from config.
 
         Parameters
