@@ -1,5 +1,5 @@
 # Variational Loss for inverse problems
-_target_: code.loss.loss.VarLoss
+_target_: code.loss.variational.VarLoss
 
 # Weights for observation (obs), model, and boundary condition (bcs) errors
 lambda_obs: 0.0
@@ -8,15 +8,15 @@ lambda_bcs: 1.0
 
 # Loss term for observations
 loss_obs:
-  _target_: code.loss.loss.MSE
+  _target_: code.loss.basic.MSE
 
 # Loss term for model variables
 loss_model:
-  _target_: code.loss.loss.MSE
+  _target_: code.loss.basic.MSE
 
 # Loss term for boundary conditions
 loss_bcs:
-  _target_: code.loss.loss.MSE
+  _target_: code.loss.basic.MSE
 
 # Pressure mask: Consider only pressure levels with non-zero variance
 pressure_mask: ${data.pressure_mask.load}

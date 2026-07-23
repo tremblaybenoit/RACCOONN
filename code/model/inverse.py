@@ -1,15 +1,10 @@
 import torch
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 from code.preprocessing.statistics import statistics, accumulate_statistics
 from code.model.base import BaseModel
 from code.model.forward import ForwardModel
-from code.architecture.activation import Sine
-from code.architecture.encoding import IdentityPositionalEncoding
-from utilities.instantiators import instantiate, resolve_path
-from utilities.logic import get_config_path
-from code.data.transformations import mean_stdev, min_max
+from utilities.instantiators import instantiate
 from typing import Callable
-import os
 import logging
 
 # Initialize logger
@@ -18,15 +13,10 @@ logger = logging.getLogger(__name__)
 
 class InverseModel(BaseModel):
     """
-    Inverse model for atmospheric retrieval using Physics-Informed Neural Networks.
+    Inverse model for atmospheric retrievals.
 
     This model implements:
-    - Coordinate expansion: expands spatial/atmospheric inputs across pressure levels
-    - Profile transformations: applies physical transformations (e.g., inverse min/max normalization)
-    - Support for different output modes: min_max, mean_stdev, sigmoid
-
-    All metrics collection and logging are delegated to callbacks.
-    The model stores step outputs on self._step_data for callback access.
+    - Coordinate expansion: expands spatial/atmospheric inputs across pressure levels.
     """
 
     def __init__(
