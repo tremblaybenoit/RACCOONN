@@ -26,7 +26,7 @@ class Operator:
 
             Parameters
             ----------
-            config: Hydra configuration object.
+            config: DictConfig. Hydra configuration object.
 
             Returns
             -------

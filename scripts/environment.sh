@@ -18,20 +18,21 @@ conda update -n base -c defaults conda -y
 
 echo "🔧 Configuring Conda channels..."
 conda config --env --add channels conda-forge
+conda config --env --add channels bioconda
+conda config --env --add channels nvidia
+conda config --env --set channel_priority flexible
 
 echo "📦 Installing data science and core dependencies via Conda..."
 # Grouping these allows Conda to resolve all dependencies safely upfront
 conda install -y \
-    h5py hdf5 \
+    netcdf4 hdf4 pyhdf hdf5 h5py h5netcdf sqlite \
     hydra-core hydra-colorlog \
-    netcdf4 \
-    snakemake \
     sphinx sphinx_rtd_theme \
-    sqlite \
-    tensorboard \
-    wandb \
-    cartopy \
-    lightning
+    tensorboard wandb \
+    cartopy
+
+echo "🧬 Installing Snakemake from Bioconda..."
+conda install -y snakemake -c bioconda
 
 echo "🐍 Installing Python tools and utilities via Pip..."
 pip install lightning mlflow mpl-scatter-density xarray zarr
