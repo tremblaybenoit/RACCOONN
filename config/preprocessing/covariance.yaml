@@ -111,37 +111,17 @@ covariance:
     input:
       # Innovation estimates for the observation variables
       data:
-        load:
-          _target_: code.data.io.load_stack_and_normalize
-          _recursive_: false
-          stack:
-            - ${data.stage.valid.variables.hofx_error}
-            - ${data.stage.test.variables.hofx_error}
-          transformations: null
+        load: ${data.stage.source.variables.hofx_forward_stdev.load}
+        transformations:  null
       # Latitude
       lat:
-        load:
-          _target_: code.data.io.load_stack
-          _recursive_: false
-          stack:
-            - ${data.stage.valid.variables.lat}
-            - ${data.stage.test.variables.lat}
+        load: ${data.stage.source.variables.lat.load}
       # Longitude
       lon:
-        load:
-          _target_: code.data.io.load_stack
-          _recursive_: false
-          stack:
-            - ${data.stage.valid.variables.lon}
-            - ${data.stage.test.variables.lon}
+        load: ${data.stage.source.variables.lon.load}
       # Scans
       scans:
-        load:
-          _target_: code.data.io.load_stack
-          _recursive_: false
-          stack:
-            - ${data.stage.valid.variables.scans}
-            - ${data.stage.test.variables.scans}
+        load: ${data.stage.source.variables.scans.load}
     # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
     scaling_factor: 1.0
     # Regularization parameter to ensure numerical stability

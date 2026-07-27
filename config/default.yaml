@@ -10,7 +10,7 @@ defaults:
   - optimizer: default
   - scheduler: default
   - model: inverse_default
-  - callbacks: inverse_default
+  - callback: inverse_default
   - logger: default
   - trainer: cpu
   - _self_

@@ -1,158 +1,125 @@
 # Format:
-#   stage:
 #   -- source: common configuration for all stages (train/valid/test/predict)
 #   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
 
 # Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
-stage:
-  # Training set
-  train:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Surface variables
-      surf:
-        # Dataset class
-        _target_: code.loader.dataset.EagerDataset
-        _recursive_: false
-        # Path to the surface variables file
-        path: ${....dir}/surf.npy
-        # Surface variable types
-        type: ['Ice area fraction', 'Land area fraction', 'Land type index', 'Leaf area index', 'Soil temperature',
-               'Surface snow area fraction', 'Surface snow thickness', 'Surface ice temperature',
-               'Surface soil temperature', 'Surface sea temperature', 'Surface snow temperature',
-               'Surface eastward wind component', 'Surface northward wind component',
-               'Vegetation area fraction', 'Fraction of condensed water', 'Water area fraction']
-        # Loading function
-        load:
-          _target_: code.data.io.load_npy
-          path: ${..path}
-          split: ${....split}
+
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Surface variables
+    surf:
+      # Dataset class
+      _target_: code.loader.dataset.EagerDataset
+      _recursive_: false
+      # Path to the surface variables file
+      path: ${...dir}/surf.npy
+      # Surface variable types
+      type: ['Ice area fraction', 'Land area fraction', 'Land type index', 'Leaf area index', 'Soil temperature',
+             'Surface snow area fraction', 'Surface snow thickness', 'Surface ice temperature',
+             'Surface soil temperature', 'Surface sea temperature', 'Surface snow temperature',
+             'Surface eastward wind component', 'Surface northward wind component',
+             'Vegetation area fraction', 'Fraction of condensed water', 'Water area fraction']
+      # Loading function
+      load:
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations:
+        # Surface normalization
+        normalization:
+          _target_: code.data.transformations.NormalizeSurface
+          surfmax:
+            _target_: numpy.loadtxt
+            _args_:
+              - data/normalization/surfmax.txt
+          surfmin:
+            _target_: numpy.loadtxt
+            _args_:
+              - data/normalization/surfmin.txt
           dtype: ${data.dtype}
-        # Transformations to apply
-        transformations:
-          # Surface normalization
-          normalization:
-            _target_: code.data.transformations.NormalizeSurface
-            surfmax:
-              _target_: numpy.loadtxt
-              _args_:
-                - data/normalization/surfmax.txt
-            surfmin:
-              _target_: numpy.loadtxt
-              _args_:
-                - data/normalization/surfmin.txt
-            dtype: ${data.dtype}
-  # Validation set
-  valid:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Surface variables
-      surf:
-        # Dataset class
-        _target_: ${data.stage.train.variables.surf._target_}
-        _recursive_: false
-        # Path to the surface variables file
-        path: ${....dir}/surf.npy
-        # Surface variable types
-        type: ${data.stage.train.variables.surf.type}
-        # Loading function
-        load:
-          _target_: ${data.stage.train.variables.surf.load._target_}
-          path: ${..path}
-          split: ${....split}
-          dtype: ${data.dtype}
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.surf.transformations}
-  # Test set
-  test:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Surface variables
-      surf:
-        # Dataset class
-        _target_: ${data.stage.train.variables.surf._target_}
-        _recursive_: false
-        # Path to the surface variables file
-        path: ${....dir}/surf.npy
-        # Surface variable types
-        type: ${data.stage.train.variables.surf.type}
-        # Loading function
-        load:
-          _target_: ${data.stage.train.variables.surf.load._target_}
-          path: ${..path}
-          split: ${....split}
-          dtype: ${data.dtype}
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.surf.transformations}
-    # Results-specific configuration for the test stage
-    results:
-      # Surface variables
-      surf:
-        # Path to the surface variables results file
-        path: ${paths.run_dir}/test_surf.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${..path}
-        load:
-          _target_: code.data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
-  # Predict set
-  predict:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Surface variables
-      surf:
-        # Dataset class
-        _target_: ${data.stage.train.variables.surf._target_}
-        _recursive_: false
-        # Path to the surface variables file
-        path: ${....dir}/surf.npy
-        # Surface variable types
-        type: ${data.stage.train.variables.surf.type}
-        # Loading function
-        load:
-          _target_: ${data.stage.train.variables.surf.load._target_}
-          path: ${..path}
-          split: ${....split}
-          dtype: ${data.dtype}
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.surf.transformations}
-    # Results-specific configuration for the predict stage
-    results:
-      # Surface variables
-      surf:
-        # Path to the surface variables results file
-        path: ${paths.run_dir}/predict_surf.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${..path}
-        load:
-          _target_: code.data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
-  # Source data (complete dataset)
-  source:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Surface variables
-      surf:
-        # Surface variable types
-        type: ${data.stage.train.variables.surf.type}
-        # Loading function
-        load:
-          _target_: numpy.concatenate
-          _args_:
-            - - ${data.stage.train.variables.surf.load}
-              - ${data.stage.valid.variables.surf.load}
-              - ${data.stage.test.variables.surf.load}
-            - 0
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.surf.transformations}
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Surface variables
+    surf:
+      # Dataset class
+      _target_: ${data.stage.train.variables.surf._target_}
+      _recursive_: false
+      # Path to the surface variables file
+      path: ${...dir}/surf.npy
+      # Surface variable types
+      type: ${data.stage.train.variables.surf.type}
+      # Loading function
+      load:
+        _target_: ${data.stage.train.variables.surf.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.surf.transformations}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Surface variables
+    surf:
+      # Dataset class
+      _target_: ${data.stage.train.variables.surf._target_}
+      _recursive_: false
+      # Path to the surface variables file
+      path: ${...dir}/surf.npy
+      # Surface variable types
+      type: ${data.stage.train.variables.surf.type}
+      # Loading function
+      load:
+        _target_: ${data.stage.train.variables.surf.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.surf.transformations}
+# Predict set
+predict:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Surface variables
+    surf:
+      # Dataset class
+      _target_: ${data.stage.train.variables.surf._target_}
+      _recursive_: false
+      # Path to the surface variables file
+      path: ${...dir}/surf.npy
+      # Surface variable types
+      type: ${data.stage.train.variables.surf.type}
+      # Loading function
+      load:
+        _target_: ${data.stage.train.variables.surf.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.surf.transformations}
+# Source data (complete dataset)
+source:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Surface variables
+    surf:
+      # Surface variable types
+      type: ${data.stage.train.variables.surf.type}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${data.stage.train.variables.surf.load}
+            - ${data.stage.valid.variables.surf.load}
+            - ${data.stage.test.variables.surf.load}
+          - 0
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.surf.transformations}
 

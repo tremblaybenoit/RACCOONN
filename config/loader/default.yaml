@@ -19,7 +19,7 @@ stage:
     target:
       _target_: code.model.loader.select_variables
       config: ${data.stage.train.variables}
-      keys: ${data.select_output}
+      keys: ${data.select_target}
     context:
       _target_: code.model.loader.select_variables
       config: ${data.stage.train.variables}
@@ -35,7 +35,7 @@ stage:
     target:
       _target_: code.model.loader.select_variables
       config: ${data.stage.valid.variables}
-      keys: ${data.select_output}
+      keys: ${data.select_target}
     context:
       _target_: code.model.loader.select_variables
       config: ${data.stage.valid.variables}
@@ -51,7 +51,7 @@ stage:
     target:
       _target_: code.model.loader.select_variables
       config: ${data.stage.test.variables}
-      keys: ${data.select_output}
+      keys: ${data.select_target}
     context:
       _target_: code.model.loader.select_variables
       config: ${data.stage.test.variables}
@@ -59,7 +59,7 @@ stage:
     output:
       _target_: code.model.loader.select_variables
       config: ${data.stage.test.results}
-      keys: ${data.select_output}
+      keys: ${data.select_target}
   # Prediction stage
   predict:
     _target_: ${loader.stage.train._target_}
@@ -68,4 +68,4 @@ stage:
     output:
       _target_: code.model.loader.select_variables
       config: ${data.stage.predict.results}
-      keys: ${data.select_output}
+      keys: ${data.select_target}

@@ -1,145 +1,144 @@
 # Format:
-#   stage:
 #   -- source: common configuration for all stages (train/valid/test/predict)
 #   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
 
 # Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
-stage:
-  # Training set
-  train:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # HOFX (Simulated Observations)
-      hofx_forward_stdev:
-        # Dataset class
-        _target_: code.loader.dataset.EagerDataset
-        _recursive_: false
-        # Path to the HOFX (simulated observations) file
-        path: ${....dir}/hofx_forward_stdev.npy
-        # Channels
-        type: [
-          'Channel 7', 'Channel 8', 'Channel 9', 'Channel 10', 'Channel 11', 'Channel 12',
-          'Channel 13', 'Channel 14', 'Channel 15', 'Channel 16'
-        ]
-        # Loading function
-        load:
-          _target_: code.data.io.load_npy
-          path: ${..path}
-          split: ${....split}
-          dtype: ${data.dtype}
-        # Transformations to apply
-        transformations:
-          # Per-variable normalization
-          normalization:
-            _target_: code.data.transformations.identity
-            _partial_: true
-            stats:
-              _target_: code.preprocessing.statistics.read_statistics_var
-              path: ${preprocessing.statistics.data.output.path}
-              key: 'hofx'
-              dtype: ${data.dtype}
-  # Validation set
-  valid:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # HOFX (Simulated Observations)
-      hofx_forward_stdev:
-        # Dataset class
-        _target_: ${data.stage.train.variables.hofx_forward_stdev._target_}
-        _recursive_: false
-        # Path to the HOFX (simulated observations) file
-        path: ${....dir}/hofx_forward_stdev.npy
-        # Channels
-        type: ${data.stage.train.variables.hofx_forward_stdev.type}
-        # Loading function
-        load:
-          _target_: ${data.stage.train.variables.hofx_forward_stdev.load._target_}
-          path: ${..path}
-          split: ${....split}
-          dtype: ${data.dtype}
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.hofx_forward_stdev.transformations}
-  # Test set
-  test:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # HOFX (Simulated Observations)
-      hofx_forward_stdev:
-        # Dataset class
-        _target_: ${data.stage.train.variables.hofx_forward_stdev._target_}
-        _recursive_: false
-        # Path to the HOFX (simulated observations) file
-        path: ${....dir}/hofx_forward_stdev.npy
-        # Channels
-        type: ${data.stage.train.variables.hofx_forward_stdev.type}
-        # Loading function
-        load:
-          _target_: ${data.stage.train.variables.hofx_forward_stdev.load._target_}
-          path: ${..path}
-          split: ${....split}
-          dtype: ${data.dtype}
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.hofx_forward_stdev.transformations}
-    # Results-specific configuration for the test stage
-    results:
-      # HOFX (Simulated Observations)
-      hofx_forward_stdev:
-        # Path to the HOFX results file
-        path: ${paths.run_dir}/test_hofx_forward_stdev.npy
-        # Save function
-        save:
-          _target_: numpy.save
+
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # HOFX (Simulated Observations)
+    hofx_forward_stdev:
+      # Dataset class
+      _target_: code.loader.dataset.EagerDataset
+      _recursive_: false
+      # Path to the HOFX (simulated observations) file
+      path: ${...dir}/hofx_forward.npy
+      # Channels
+      type: [
+        'Channel 7', 'Channel 8', 'Channel 9', 'Channel 10', 'Channel 11', 'Channel 12',
+        'Channel 13', 'Channel 14', 'Channel 15', 'Channel 16'
+      ]
+      # Loading function
+      load:
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations:
+        # Per-variable normalization
+        normalization:
+          _target_: code.data.transformations.identity
           _partial_: true
-          _args_:
-            - ${..path}
-        # Loading function
-        load:
-          _target_: code.data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.hofx_forward_stdev.transformations}
-  # Predict set
-  predict:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # HOFX (Simulated Observations)
-      hofx_forward_stdev: ${data.stage.test.variables.hofx_forward_stdev}
-    # Results-specific configuration for the predict stage
-    results:
-      # HOFX (Simulated Observations)
-      hofx_forward_stdev:
-        # Path to the HOFX results file
-        path: ${paths.run_dir}/predict_hofx_forward_stdev.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${..path}
-        # Loading function
-        load:
-          _target_: code.data.io.load_npy
-          path: ${..path}
-          dtype: ${data.dtype}
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.hofx_forward_stdev.transformations}
-  # Source data (complete dataset)
-  source:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # HOFX (Simulated Observations)
-      hofx_forward_stdev:
-        # Channels
-        type: ${data.stage.train.variables.hofx_forward_stdev.type}
-        # Loading function
-        load:
-          _target_: numpy.concatenate
-          _args_:
-            - - ${data.stage.train.variables.hofx_forward_stdev.load}
-              - ${data.stage.valid.variables.hofx_forward_stdev.load}
-              - ${data.stage.test.variables.hofx_forward_stdev.load}
-            - 0
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.hofx_forward_stdev.transformations}
+          stats:
+            _target_: code.preprocessing.statistics.read_statistics_var
+            path: ${preprocessing.statistics.data.output.path}
+            key: 'hofx'
+            dtype: ${data.dtype}
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # HOFX (Simulated Observations)
+    hofx_forward_stdev:
+      # Dataset class
+      _target_: ${data.stage.train.variables.hofx_forward_stdev._target_}
+      _recursive_: false
+      # Path to the HOFX (simulated observations) file
+      path: ${...dir}/hofx_forward.npy
+      # Channels
+      type: ${data.stage.train.variables.hofx_forward_stdev.type}
+      # Loading function
+      load:
+        _target_: ${data.stage.train.variables.hofx_forward_stdev.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.hofx_forward_stdev.transformations}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # HOFX (Simulated Observations)
+    hofx_forward_stdev:
+      # Dataset class
+      _target_: ${data.stage.train.variables.hofx_forward_stdev._target_}
+      _recursive_: false
+      # Path to the HOFX (simulated observations) file
+      path: ${...dir}/hofx_forward.npy
+      # Channels
+      type: ${data.stage.train.variables.hofx_forward_stdev.type}
+      # Loading function
+      load:
+        _target_: ${data.stage.train.variables.hofx_forward_stdev.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.hofx_forward_stdev.transformations}
+  # Results-specific configuration for the test stage
+  results:
+    # HOFX (Simulated Observations)
+    hofx_forward_stdev:
+      # Path to the HOFX results file
+      path: ${paths.run_dir}/test_hofx_forward_stdev.npy
+      # Save function
+      save:
+        _target_: numpy.save
+        _partial_: true
+        _args_:
+          - ${...path}
+      # Loading function
+      load:
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.hofx_forward_stdev.transformations}
+# Predict set
+predict:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # HOFX (Simulated Observations)
+    hofx_forward_stdev: ${data.stage.test.variables.hofx_forward_stdev}
+  # Results-specific configuration for the predict stage
+  results:
+    # HOFX (Simulated Observations)
+    hofx_forward_stdev:
+      # Path to the HOFX results file
+      path: ${paths.run_dir}/predict_hofx_forward_stdev.npy
+      # Save function
+      save:
+        _target_: numpy.save
+        _partial_: true
+        _args_:
+          - ${...path}
+      # Loading function
+      load:
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.hofx_forward_stdev.transformations}
+# Source data (complete dataset)
+source:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # HOFX (Simulated Observations)
+    hofx_forward_stdev:
+      # Channels
+      type: ${data.stage.train.variables.hofx_forward_stdev.type}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${data.stage.train.variables.hofx_forward_stdev.load}
+            - ${data.stage.valid.variables.hofx_forward_stdev.load}
+            - ${data.stage.test.variables.hofx_forward_stdev.load}
+          - 0
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.hofx_forward_stdev.transformations}
 
