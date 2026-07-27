@@ -21,12 +21,10 @@ train:
       load:
         _target_: numpy.log10
         _args_:
-        - _target_: code.data.units.pa_to_hpa
-          pressure:
-            _target_: code.data.io.load_npy
-            path: ${.....path}
-            split: ${.......split}
-            dtype: ${data.dtype}
+        - _target_: code.data.io.load_npy
+          path: ${....path}
+          split: ${......split}
+          dtype: ${data.dtype}
       # Transformations to apply
       transformations:
         # Per-variable normalization with log transform
@@ -55,12 +53,10 @@ valid:
       load:
         _target_: numpy.log10
         _args_:
-          - _target_: code.data.units.pa_to_hpa
-            pressure:
-              _target_: code.data.io.load_npy
-              path: ${.....path}
-              split: ${.......split}
-              dtype: ${data.dtype}
+        - _target_: code.data.io.load_npy
+          path: ${....path}
+          split: ${......split}
+          dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${data.stage.train.variables.pressure_log.transformations}
 # Test set
@@ -80,12 +76,10 @@ test:
       load:
         _target_: numpy.log10
         _args_:
-          - _target_: code.data.units.pa_to_hpa
-            pressure:
-              _target_: code.data.io.load_npy
-              path: ${.....path}
-              split: ${.......split}
-              dtype: ${data.dtype}
+        - _target_: code.data.io.load_npy
+          path: ${....path}
+          split: ${......split}
+          dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${data.stage.train.variables.pressure_log.transformations}
 # Predict set

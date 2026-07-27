@@ -13,7 +13,7 @@ defaults:
   - override /optimizer: default
   - override /scheduler: default
   - override /model: inverse_default
-  - override /callback: inverse_default
+  - override /callbacks: inverse_default
   - override /logger: default
   - override /trainer: gpu
 

@@ -5,7 +5,7 @@ from scipy.spatial import cKDTree
 import logging
 from utilities.logic import get_config_path
 from utilities.instantiators import instantiate
-from code.preprocessing.filters import cloud_mask, daytime_mask
+from code.preprocessing.filters import cloud_mask, daytime_mask, pressure_mask
 
 
 logger = logging.getLogger(__name__)
@@ -135,6 +135,16 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
         data[key] = instantiate(value.load)
     breakpoint()
 
+    # Compute derived variables
+    # Clouds or clear sky masks
+    data['cloud_mask'] = cloud_mask(data['prof'])
+    data['clear_mask'] = ~data['cloud_mask']
+    # Daytime or nighttime masks
+    data['daytime_mask'] = daytime_mask(data['meta'])
+    data['nighttime_mask'] = ~data['daytime_mask']
+    # Pressure mask
+    # data['pressure_mask'] = pressure_mask(data['prof'])
+
     # Build mask
     mask = np.ones_like(data['lat'], dtype='bool')
     if hasattr(input, 'mask'):
@@ -165,8 +175,6 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
         # Update mask
         mask &= data['spatiotemporal_mask']
         # Clouds or clear sky
-        data['cloud_mask'] = cloud_mask(data['prof'])
-        data['clear_mask'] = ~data['cloud_mask']
         cloud_keep = input.mask.get('cloud_mask', True)
         clear_keep = input.mask.get('clear_mask', True)
         # Clouds only
@@ -178,8 +186,6 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
             # Remove null profiles
             data['prof'] = np.take(data['prof'], [0, 4, 8], axis=1)
         # Daytime or nighttime
-        data['daytime_mask'] = daytime_mask(data['meta'])
-        data['nighttime_mask'] = ~data['daytime_mask']
         daytime_keep = input.mask.get('daytime_mask', True)
         nighttime_keep = input.mask.get('nighttime_mask', True)
         # Daytime only
@@ -213,10 +219,10 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
     else:
         # Apply mask and convert to right precision (pressure is constant, skip masking)
         if hasattr(output, 'dtype'):
-            data = {key: (value[mask] if key != 'pressure' else value).astype(output.dtype)
+            data = {key: (value[mask] if key not in ('pressure', 'pressure_mask') else value).astype(output.dtype)
                     for key, value in data.items()}
         else:
-            data = {key: (value[mask] if key != 'pressure' else value) for key, value in data.items()}
+            data = {key: (value[mask] if key not in ('pressure', 'pressure_mask') else value) for key, value in data.items()}
         # Save to disk
         for key, value in output.data.items():
             # Save function

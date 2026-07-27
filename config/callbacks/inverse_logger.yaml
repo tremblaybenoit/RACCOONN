@@ -1,5 +1,5 @@
-forward_logger:
-  _target_: code.callback.artifact.ForwardLogger
+inverse_logger:
+  _target_: code.callbacks.artifact.InverseLogger
   save_every_n_epochs: 100
   save_on_improvement: true
   monitor: valid_loss

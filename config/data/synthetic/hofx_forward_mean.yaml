@@ -24,7 +24,11 @@ train:
       load:
         _target_: code.data.io.load_npy
         path: ${..path}
-        split: ${....split}
+        split:
+          _target_: numpy.s_
+          _args_:
+            - null
+            - :10
         dtype: ${data.dtype}
       # Transformations to apply
       transformations:
@@ -52,9 +56,9 @@ valid:
       type: ${data.stage.train.variables.hofx_forward_mean.type}
       # Loading function
       load:
-        _target_: ${data.stage.train.variables.hofx_forward_mean.load._target_}
+        _target_: code.data.io.load_npy
         path: ${..path}
-        split: ${....split}
+        split: ${data.stage.train.variables.hofx_forward_mean.load.split}
         dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${data.stage.train.variables.hofx_forward_mean.transformations}
@@ -73,9 +77,9 @@ test:
       type: ${data.stage.train.variables.hofx_forward_mean.type}
       # Loading function
       load:
-        _target_: ${data.stage.train.variables.hofx_forward_mean.load._target_}
+        _target_: code.data.io.load_npy
         path: ${..path}
-        split: ${....split}
+        split: ${data.stage.train.variables.hofx_forward_mean.load.split}
         dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${data.stage.train.variables.hofx_forward_mean.transformations}

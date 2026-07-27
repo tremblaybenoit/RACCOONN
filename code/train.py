@@ -55,14 +55,14 @@ class Operator:
         if self.config.get("seed"):
             lightning.seed_everything(self.config.task_seed, workers=True)
 
-    def setup(self, stage: str = 'train', loader_config: DictConfig | None = None) -> None:
+    def setup(self, stage: str = 'train', config_loader: DictConfig | None = None) -> None:
         """ Setup trainer object.
 
             Parameters
             ----------
             stage: str. Stage of the training process.
                         Options are 'train', 'test', or 'predict'.
-            loader_config: DictConfig or None. Configuration object for the data loader.
+            config_loader: DictConfig or None. Configuration object for the data loader.
                            If None, uses self.config.loader.
 
             Returns
@@ -71,10 +71,10 @@ class Operator:
         """
 
         # Data loader
-        if loader_config is None:
-            loader_config = self.config.loader
+        if config_loader is None:
+            config_loader = self.config.loader
         logger.info("Initializing data loader...")
-        self.loader = instantiate(loader_config)
+        self.loader = instantiate(config_loader)
         # Generate training/validation/test sets
         self.loader.setup(stage=stage)
 
@@ -85,13 +85,13 @@ class Operator:
                 TrainerLogger(self.config.logger).configure()
                 logger.info("Initializing logger(s)...")
                 self.trainer_logger = instantiate_list(self.config.get("logger"), "logger")
-                logger.info("Done with loggers, Initializing callback(s)...")
+                logger.info("Done with loggers, Initializing callbacks(s)...")
         else:
             self.trainer_logger = None
 
         # Callbacks: Initialized for stages train, test
         if self.callbacks is None and stage in ('train', 'test'):
-            logger.info("Initializing callback(s)...")
+            logger.info("Initializing callbacks(s)...")
             self.callbacks = instantiate_list(self.config.get("callbacks"), "callbacks")
 
         # Trainer
@@ -100,7 +100,7 @@ class Operator:
 
     @staticmethod
     def accumulate_batch_results(batch_results: list, keys: list | None = None,
-                                 stage_config: DictConfig | None = None) -> dict:
+                                 config_stage: DictConfig | None = None) -> dict:
         """ Accumulate results from individual batches into concatenated arrays.
 
             Efficiently accumulates specified keys from batch results with single-pass iteration,
@@ -112,7 +112,7 @@ class Operator:
             batch_results: list. List of dicts returned by trainer.test() or trainer.predict().
                            Each dict contains keys like 'output', 'latent', 'mask', etc.
             keys: list or None. List of keys to accumulate. If None, defaults to ['output', 'latent', 'mask'].
-            stage_config: DictConfig or None. Stage-specific loader configuration containing transformations for each key.
+            config_stage: DictConfig or None. Stage-specific loader configuration containing transformations for each key.
 
             Returns
             -------
@@ -157,14 +157,14 @@ class Operator:
         accumulated = {key: concat_recursive(value) for key, value in accumulated.items()}
 
         # Apply inverse transformations to accumulated keys based on stage config
-        if stage_config is not None:
+        if config_stage is not None:
             logger.info(f"Applying inverse transformations...")
 
             # For each accumulated key, check if there's configuration for it
             for acc_key in accumulated.keys():
-                if hasattr(stage_config, acc_key):
+                if hasattr(config_stage, acc_key):
                     # Extract key-specific config
-                    key_config = getattr(stage_config, acc_key)
+                    key_config = getattr(config_stage, acc_key)
                     acc_data = accumulated[acc_key]
 
                     # Handle nested dict structure (e.g., {'hofx': array, 'prof': array})
@@ -284,14 +284,14 @@ class Operator:
 
         # Accumulate results from all batches
         logger.info("Accumulating test results...")
-        stage_config = self.config.loader.stage.test
-        batch_results = self.accumulate_batch_results(batch_results, stage_config=stage_config)
+        config_stage = self.config.loader.stage.test
+        batch_results = self.accumulate_batch_results(batch_results, config_stage=config_stage)
 
         # Save results to file
         logger.info("Saving results to file...")
         for result_key, result_data in batch_results.items():
-            if hasattr(stage_config, result_key):
-                key_config = getattr(stage_config, result_key)
+            if hasattr(config_stage, result_key):
+                key_config = getattr(config_stage, result_key)
 
                 # Handle nested dict structure containing variables
                 if isinstance(result_data, dict):
@@ -310,13 +310,13 @@ class Operator:
                     save_function = instantiate(save_config)
                     save_function(result_data)
 
-    def predict(self, loader_config: DictConfig | None = None) -> dict:
+    def predict(self, config_loader: DictConfig | None = None) -> dict:
         """ Predicts the output of the model on a given dataset.
             Accumulates and returns predictions.
 
             Parameters
             ----------
-            loader_config: DictConfig or None. Configuration object for the data to predict on.
+            config_loader: DictConfig or None. Configuration object for the data to predict on.
                            If None, uses self.config.loader.
 
             Returns
@@ -326,11 +326,11 @@ class Operator:
         """
 
         # Create output directories for all result variables
-        if loader_config is None:
-            loader_config = self.config.loader
+        if config_loader is None:
+            config_loader = self.config.loader
 
         # Data loader and trainer setup
-        self.setup(stage='predict', loader_config=loader_config)
+        self.setup(stage='predict', config_loader=config_loader)
 
         # Load model from checkpoint if not already loaded
         if self.model is None:
@@ -342,7 +342,7 @@ class Operator:
 
         # Accumulate results from all batches
         logger.info("Accumulating prediction results...")
-        batch_results = self.accumulate_batch_results(batch_results, stage_config=loader_config.stage.predict)
+        batch_results = self.accumulate_batch_results(batch_results, config_stage=config_loader.stage.predict)
 
         return batch_results
 

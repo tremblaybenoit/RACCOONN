@@ -1,5 +1,7 @@
+import pytorch_lightning as pl
 from pytorch_lightning.callbacks import Callback
 import torch
+from typing import Any
 
 
 class LossLogger(Callback):
@@ -17,7 +19,7 @@ class LossLogger(Callback):
 
     def __init__(self, log_per_variable: bool = True):
         """
-        Initialize LossLogger callback.
+        Initialize LossLogger callbacks.
 
         Parameters
         ----------
@@ -27,12 +29,15 @@ class LossLogger(Callback):
             loss will be averaged over batch and level (if present) to produce
             per-variable metrics.
         """
+
+        # Class inheritance
         super().__init__()
 
         # Store flag for per-variable logging
         self.log_per_variable = log_per_variable
 
-    def on_train_batch_end(self, trainer, pl_module, outputs: torch.Tensor | dict, batch, batch_idx):
+    def on_train_batch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, outputs: Any,
+                           batch: Any, batch_idx: int) -> None:
         """
         Log training batch losses and training-specific metrics.
 
@@ -52,7 +57,8 @@ class LossLogger(Callback):
         self._log_losses(pl_module, outputs, 'train')
         self._log_train_metrics(pl_module)
 
-    def on_validation_batch_end(self, trainer, pl_module, outputs: torch.Tensor | dict, batch, batch_idx, dataloader_idx=0):
+    def on_validation_batch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, outputs: Any,
+                                batch: Any, batch_idx: int, dataloader_idx=0) -> None:
         """
         Log validation batch losses.
 
@@ -73,7 +79,8 @@ class LossLogger(Callback):
         """
         self._log_losses(pl_module, outputs, 'valid')
 
-    def on_test_batch_end(self, trainer, pl_module, outputs: torch.Tensor | dict, batch, batch_idx, dataloader_idx=0):
+    def on_test_batch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, outputs: Any,
+                          batch: Any, batch_idx: int, dataloader_idx=0) -> None:
         """
         Log test batch losses.
 

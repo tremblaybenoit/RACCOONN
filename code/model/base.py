@@ -193,8 +193,7 @@ class BaseModel(LightningModule):
         """ Perform prediction step.
 
         Provides a unified interface for prediction that returns the same
-        structure as test_step, enabling callback-based result accumulation
-        (e.g., ResultsLogger).
+        structure as test_step.
 
             Parameters
             ----------
@@ -261,7 +260,7 @@ class BaseModel(LightningModule):
             return optimizer
         return None
 
-    def to(self, device, dtype: torch.dtype | None = None, non_blocking: bool = False) -> 'BaseModel':
+    def to(self, device, dtype: torch.dtype | None = None, non_blocking: bool = False):
         """ Move the model and loss function to the specified device.
 
         Parameters

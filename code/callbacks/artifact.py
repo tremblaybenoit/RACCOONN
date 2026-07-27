@@ -1,3 +1,4 @@
+import pytorch_lightning as pl
 from pytorch_lightning.callbacks import Callback
 import matplotlib.pyplot as plt
 from code.evaluation.plot import fig_rmse_bars, fig_vertical_profiles
@@ -8,6 +9,7 @@ import wandb
 import tempfile
 import os
 import logging
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +28,7 @@ class ArtifactLogger(Callback):
 
     def __init__(
         self,
-        statistics: dict[str, list] | None = None,
+        which_statistics: list | None = None,
         save_every_n_epochs: int = 100,
         save_on_improvement: bool = True,
         monitor: str = "valid_loss",
@@ -37,9 +39,9 @@ class ArtifactLogger(Callback):
 
         Parameters
         ----------
-        statistics : dict of str to list, optional
-            dictionary specifying which metrics to compute for each runner.
-            Example: {'hofx': ['mean', 'stdev', 'rmse', 'mae']}
+        which_statistics : list of str, optional
+            List specifying which metrics to compute for each runner.
+            Example: ['mean', 'stdev', 'rmse', 'mae']
             Default: ['mean', 'stdev', 'rmse', 'mae']
         save_every_n_epochs : int, default 100
             Frequency of saving figures in epochs. None or 0 disables epoch-based saving.
@@ -55,7 +57,7 @@ class ArtifactLogger(Callback):
         super().__init__()
 
         # Metric accumulation
-        self.statistics = statistics or ['mean', 'stdev', 'rmse', 'mae']
+        self.which_statistics = which_statistics or ['mean', 'stdev', 'rmse', 'mae']
         self.runners: dict[str, RunningStats] = {}
         self.metrics: dict[str, dict] = {}
 
@@ -72,7 +74,7 @@ class ArtifactLogger(Callback):
         # Tags for figures (set in subclasses)
         self.tags = []
 
-    def on_validation_epoch_start(self, trainer, pl_module):
+    def on_validation_epoch_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
         """
         Initialize fresh RunningStats runners for this validation epoch.
 
@@ -89,7 +91,8 @@ class ArtifactLogger(Callback):
 
         pass
 
-    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
+    def on_validation_batch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, outputs: Any,
+                                batch: Any, batch_idx: int, dataloader_idx=0) -> None:
         """
         Process each validation batch and accumulate metrics using RunningStats.
 
@@ -134,7 +137,7 @@ class ArtifactLogger(Callback):
                     axis=0
                 )
 
-    def on_validation_epoch_end(self, trainer, pl_module):
+    def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
         """
         Finalize metrics at end of validation epoch.
 
@@ -160,7 +163,7 @@ class ArtifactLogger(Callback):
         # Build figures from finalized metrics
         self._figure_builder(trainer, pl_module)
 
-    def _get_monitor_value(self, trainer):
+    def _get_monitor_value(self, trainer: pl.Trainer) -> float | None:
         """
         Retrieve current value of monitored metric.
 
@@ -179,7 +182,7 @@ class ArtifactLogger(Callback):
             val = trainer.callback_metrics.get(self.monitor)
         return float(val) if val is not None else None
 
-    def _figure_saver(self, trainer, current_epoch: int) -> bool:
+    def _figure_saver(self, trainer: pl.Trainer, current_epoch: int) -> bool:
         """
         Determine whether to save figures based on specified conditions.
 
@@ -233,7 +236,7 @@ class ArtifactLogger(Callback):
         return True
 
 
-    def _figure_buffer(self, trainer, tags, current_epoch):
+    def _figure_buffer(self, trainer: pl.Trainer, tags: list[str], current_epoch: int) -> None:
         """
         Add figures to logger at end of validation epoch.
 
@@ -271,7 +274,7 @@ class ArtifactLogger(Callback):
         plt.close('all')
         self.figs.clear()
 
-    def on_train_epoch_end(self, trainer, model):
+    def on_train_epoch_end(self, trainer: pl.Trainer, model: pl.LightningModule) -> None:
         """
         Log figures at end of each training epoch.
 
@@ -337,7 +340,7 @@ class ForwardLogger(ArtifactLogger):
 
     def __init__(
         self,
-        statistics: dict[str, list] | None = None,
+        which_statistics: list | None = None,
         save_every_n_epochs: int = 100,
         save_on_improvement: bool = True,
         monitor: str = "valid_loss",
@@ -348,8 +351,9 @@ class ForwardLogger(ArtifactLogger):
 
         Parameters
         ----------
-        statistics : dict, optional
-            Metrics to compute. Default: ['mean', 'stdev', 'rmse', 'mae']
+        which_statistics : list of str, optional
+            List specifying which metrics to compute for each runner.
+            Example: ['mean', 'stdev', 'rmse', 'mae']
         save_every_n_epochs : int
             Frequency for epoch-based saving.
         save_on_improvement : bool
@@ -361,7 +365,8 @@ class ForwardLogger(ArtifactLogger):
         """
 
         # Class inheritance
-        super().__init__(statistics, save_every_n_epochs, save_on_improvement, monitor, monitor_mode)
+        super().__init__(which_statistics, save_every_n_epochs, save_on_improvement, monitor, monitor_mode)
+
         # Figure tags
         self.tags = ["Valid_RadianceRMSE"]
 
@@ -379,8 +384,8 @@ class ForwardLogger(ArtifactLogger):
         # Create runners for hofx metrics
         # hofx shape: [batch, 20] (10 channels × 2 for mean+stdev)
         self.runners = {
-            'hofx': RunningStats(which=self.statistics),
-            'hofx_forward': RunningStats(which=self.statistics),
+            'hofx': RunningStats(which=self.which_statistics),
+            'hofx_forward': RunningStats(which=self.which_statistics),
         }
 
     def _figure_builder(self, trainer, pl_module):
@@ -450,7 +455,7 @@ class InverseLogger(ArtifactLogger):
 
     def __init__(
         self,
-        statistics: dict[str, list] | None = None,
+        which_statistics: list | None = None,
         save_every_n_epochs: int = 100,
         save_on_improvement: bool = True,
         monitor: str = "valid_loss",
@@ -461,7 +466,7 @@ class InverseLogger(ArtifactLogger):
 
         Parameters
         ----------
-        statistics : dict, optional
+        which_statistics : list | None, optional
             Metrics to compute. Default: ['mean', 'stdev', 'rmse', 'mae']
         save_every_n_epochs : int
             Frequency for epoch-based saving.
@@ -472,14 +477,18 @@ class InverseLogger(ArtifactLogger):
         monitor_mode : str
             Minimize or maximize ('min' or 'max').
         """
-        super().__init__(statistics, save_every_n_epochs, save_on_improvement, monitor, monitor_mode)
+
+        # Class inheritance
+        super().__init__(which_statistics, save_every_n_epochs, save_on_improvement, monitor, monitor_mode)
+
+        # Plot tags
         self.tags = ["Valid_ProfilesMean", "Valid_ProfilesRMSE"]
         # Store pressure levels from first validation batch
         self.pressure_levels = None
         # Flag to initialize static runners
         self.runners_static = True
 
-    def on_validation_epoch_start(self, trainer, pl_module):
+    def on_validation_epoch_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
         """
         Initialize runners for profile metrics.
 
@@ -493,14 +502,15 @@ class InverseLogger(ArtifactLogger):
         # Create runners for profile metrics
         # Profile shape: [batch, vars, levels]
         self.runners = {
-            'prof': RunningStats(which=self.statistics),
+            'prof': RunningStats(which=self.which_statistics),
         }
         # Static runners
         if self.runners_static:
-            self.runners['prof_target'] = RunningStats(which=self.statistics)
-            self.runners['prof_prior'] = RunningStats(which=self.statistics)
+            self.runners['prof_target'] = RunningStats(which=self.which_statistics)
+            self.runners['prof_prior'] = RunningStats(which=self.which_statistics)
 
-    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
+    def on_validation_batch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, outputs: Any,
+                                batch: Any, batch_idx: int, dataloader_idx=0) -> None:
         """
         Process validation batch and extract pressure levels from first batch.
         Also accumulate prof_prior statistics.
@@ -564,7 +574,7 @@ class InverseLogger(ArtifactLogger):
                     axis=0
                 )
 
-    def on_validation_epoch_end(self, trainer, pl_module):
+    def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
         """
         Finalize metrics at end of validation epoch.
 
@@ -594,7 +604,7 @@ class InverseLogger(ArtifactLogger):
         # Build figures from finalized metrics
         self._figure_builder(trainer, pl_module)
 
-    def _figure_builder(self, trainer, pl_module):
+    def _figure_builder(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
         """
         Build vertical profile figures for atmospheric predictions.
 
@@ -642,33 +652,33 @@ class InverseLogger(ArtifactLogger):
         if prof_mean is not None or prof_target_mean is not None or prof_prior_mean is not None:
             data = []
             stdev = []
-            labels = []
-            colors = []
+            label = []
+            color = []
             # Target
             if prof_target_mean is not None:
                 data.append(prof_target_mean)
                 stdev.append(prof_target_stdev)
-                labels.append('Target')
-                colors.append('#56B4E9')
+                label.append('Target')
+                color.append('#56B4E9')
             # Prior
             if prof_prior_mean is not None:
                 data.append(prof_prior_mean)
                 stdev.append(prof_prior_stdev)
-                labels.append('Prior')
-                colors.append('#009E73')
+                label.append('Prior')
+                color.append('#009E73')
             # Prediction
             if prof_mean is not None:
                 data.append(prof_mean)
                 stdev.append(prof_stdev)
-                labels.append('Output')
-                colors.append('#E69F00')
+                label.append('Output')
+                color.append('#E69F00')
             # Figure
             if data:
                 self.figs.append(
                     fig_vertical_profiles(
                         data,
-                        labels=labels,
-                        colors=colors,
+                        label=label,
+                        color=color,
                         stdev=stdev,
                         y=self.pressure_levels,
                         y_label='Pressure (hPa)',
@@ -680,25 +690,25 @@ class InverseLogger(ArtifactLogger):
         # Create RMSE figure comparing prediction and prior vs target
         if prof_rmse is not None or prof_prior_rmse is not None:
             data = []
-            labels = []
-            colors = []
+            label = []
+            color = []
             # Prior
             if prof_prior_rmse is not None:
                 data.append(prof_prior_rmse)
-                labels.append('Prior-Target')
-                colors.append('#009E73')
+                label.append('Prior-Target')
+                color.append('#009E73')
             # Prediction
             if prof_rmse is not None:
                 data.append(prof_rmse)
-                labels.append('Output-Target')
-                colors.append('#E69F00')
+                label.append('Output-Target')
+                color.append('#E69F00')
             # Figure
             if data:
                 self.figs.append(
                     fig_vertical_profiles(
                         data,
-                        labels=labels,
-                        colors=colors,
+                        label=label,
+                        color=color,
                         y=self.pressure_levels,
                         y_label='Pressure (hPa)',
                         x_label='RMSE value',

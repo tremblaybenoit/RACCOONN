@@ -19,12 +19,10 @@ train:
       type: 'Pressure (hPa)'
       # Loading function
       load:
-        _target_: code.data.units.pa_to_hpa
-        pressure:
-          _target_: code.data.io.load_npy
-          path: ${...path}
-          split: ${.....split}
-          dtype: ${data.dtype}
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
       # Transformations to apply
       transformations:
         # Per-variable normalization
@@ -51,12 +49,10 @@ valid:
       type: ${data.stage.train.variables.pressure.type}
       # Loading function
       load:
-        _target_: ${data.stage.train.variables.pressure.load._target_}
-        pressure:
-          _target_: ${data.stage.train.variables.pressure.load.pressure._target_}
-          path: ${...path}
-          split: ${.....split}
-          dtype: ${data.dtype}
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${data.stage.train.variables.pressure.transformations}
 # Test set
@@ -74,12 +70,10 @@ test:
       type: ${data.stage.train.variables.pressure.type}
       # Loading function
       load:
-        _target_: ${data.stage.train.variables.pressure.load._target_}
-        pressure:
-          _target_: ${data.stage.train.variables.pressure.load.pressure._target_}
-          path: ${...path}
-          split: ${.....split}
-          dtype: ${data.dtype}
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${data.stage.train.variables.pressure.transformations}
 # Predict set

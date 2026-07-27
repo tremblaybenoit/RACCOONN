@@ -60,17 +60,17 @@ recast:
                   path: ${.......dir}/Train2/lat.npy
                   scans:
                     _target_: code.data.io.load_scans
-                    path: ${.......dir}/Train2/scans.txt
+                    path: ${........dir}/Train2/scans.txt
                 - _target_: code.data.io.load_latlon
                   path: ${.......dir}/Val2/lat.npy
                   scans:
                     _target_: code.data.io.load_scans
-                    path: ${.......dir}/Val2/scans.txt
+                    path: ${........dir}/Val2/scans.txt
                 - _target_: code.data.io.load_latlon
                   path: ${.......dir}/Test2/lat.npy
                   scans:
                     _target_: code.data.io.load_scans
-                    path: ${.......dir}/Test2/scans.txt
+                    path: ${........dir}/Test2/scans.txt
               - 0
         # Longitude
         lon:
@@ -82,17 +82,17 @@ recast:
                   path: ${.......dir}/Train2/lon.npy
                   scans:
                     _target_: code.data.io.load_scans
-                    path: ${.......dir}/Train2/scans.txt
+                    path: ${........dir}/Train2/scans.txt
                 - _target_: code.data.io.load_latlon
                   path: ${.......dir}/Val2/lon.npy
                   scans:
                     _target_: code.data.io.load_scans
-                    path: ${.......dir}/Val2/scans.txt
+                    path: ${........dir}/Val2/scans.txt
                 - _target_: code.data.io.load_latlon
                   path: ${.......dir}/Test2/lon.npy
                   scans:
                     _target_: code.data.io.load_scans
-                    path: ${.......dir}/Test2/scans.txt
+                    path: ${........dir}/Test2/scans.txt
               - 0
         scans:
           # Loading function
@@ -103,17 +103,17 @@ recast:
                   path: ${.......dir}/Train2/scans.txt
                   lat:
                     _target_: code.data.io.load_latlon
-                    path: ${.......dir}/Train2/lat.npy
+                    path: ${........dir}/Train2/lat.npy
                 - _target_: code.data.io.load_scans
                   path: ${.......dir}/Val2/scans.txt
                   lat:
                     _target_: code.data.io.load_latlon
-                    path: ${.......dir}/Val2/lat.npy
+                    path: ${........dir}/Val2/lat.npy
                 - _target_: code.data.io.load_scans
                   path: ${.......dir}/Test2/scans.txt
                   lat:
                     _target_: code.data.io.load_latlon
-                    path: ${.......dir}/Test2/lat.npy
+                    path: ${........dir}/Test2/lat.npy
               - 0
         # Meta data
         meta:
@@ -174,7 +174,7 @@ recast:
             _target_: code.data.units.pa_to_hpa
             pressure:
               _target_: code.data.io.load_npy
-              path: ${.......dir}/Train2/pressure.npy
+              path: ${.....dir}/Train2/pressure.npy
     # What the method produces as output
     output:
       # Precision
@@ -260,21 +260,21 @@ recast:
                 path: ${data.stage.train.variables.pressure.path}
                 dtype: ${data.dtype}
             # Cloud mask (addition)
-            cloud_mask:
-              # Save function
-              save:
-                _target_: code.data.io.save_npy
-                _partial_: true
-                path: ${data.stage.train.variables.cloud_mask.path}
-                dtype: bool
+            #cloud_mask:
+            #  # Save function
+            #  save:
+            #    _target_: code.data.io.save_npy
+            #    _partial_: true
+            #    path: ${data.stage.train.variables.cloud_mask.path}
+            #    dtype: bool
             # Daytime mask (addition)
-            daytime_mask:
-              # Save function
-              save:
-                _target_: code.data.io.save_npy
-                _partial_: true
-                path: ${data.stage.train.variables.daytime_mask.path}
-                dtype: bool
+            #daytime_mask:
+            #  # Save function
+            #  save:
+            #    _target_: code.data.io.save_npy
+            #    _partial_: true
+            #    path: ${data.stage.train.variables.daytime_mask.path}
+            #    dtype: bool
         # Validation set
         valid:
           # Variables
@@ -352,21 +352,21 @@ recast:
                 path: ${data.stage.valid.variables.pressure.path}
                 dtype: ${data.dtype}
             # Cloud mask (addition)
-            cloud_mask:
-              # Save function
-              save:
-                _target_: code.data.io.save_npy
-                _partial_: true
-                path: ${data.stage.valid.variables.cloud_mask.path}
-                dtype: bool
+            #cloud_mask:
+            #  # Save function
+            #  save:
+            #    _target_: code.data.io.save_npy
+            #    _partial_: true
+            #    path: ${data.stage.valid.variables.cloud_mask.path}
+            #    dtype: bool
             # Daytime mask (addition)
-            daytime_mask:
-              # Save function
-              save:
-                _target_: code.data.io.save_npy
-                _partial_: true
-                path: ${data.stage.valid.variables.daytime_mask.path}
-                dtype: bool
+            #daytime_mask:
+            #  # Save function
+            #  save:
+            #    _target_: code.data.io.save_npy
+            #    _partial_: true
+            #    path: ${data.stage.valid.variables.daytime_mask.path}
+            #    dtype: bool
         # Test set
         test:
           # Variables
@@ -444,18 +444,18 @@ recast:
                 path: ${data.stage.test.variables.pressure.path}
                 dtype: ${data.dtype}
             # Cloud mask (addition)
-            cloud_mask:
-              # Save function
-              save:
-                _target_: code.data.io.save_npy
-                _partial_: true
-                path: ${data.stage.test.variables.cloud_mask.path}
-                dtype: bool
+            # cloud_mask:
+            #   # Save function
+            #   save:
+            #     _target_: code.data.io.save_npy
+            #     _partial_: true
+            #     path: ${data.stage.test.variables.cloud_mask.path}
+            #     dtype: bool
             # Daytime mask (addition)
-            daytime_mask:
-              # Save function
-              save:
-                _target_: code.data.io.save_npy
-                _partial_: true
-                path: ${data.stage.test.variables.daytime_mask.path}
-                dtype: bool
+            # daytime_mask:
+            #   # Save function
+            #   save:
+            #     _target_: code.data.io.save_npy
+            #     _partial_: true
+            #     path: ${data.stage.test.variables.daytime_mask.path}
+            #     dtype: bool
