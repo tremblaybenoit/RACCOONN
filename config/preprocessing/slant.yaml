@@ -8,13 +8,13 @@ slant:
     # What the method needs as input
     input:
       # Coordinates
-      lat: ${data.stage.train.vars.lat}
-      lon: ${data.stage.train.vars.lon}
-      pressure: ${data.stage.train.vars.pressure}
+      lat: ${data.stage.train.variables.lat}
+      lon: ${data.stage.train.variables.lon}
+      pressure: ${data.stage.train.variables.pressure}
       # Meta data
-      meta: ${data.stage.train.vars.meta}
+      meta: ${data.stage.train.variables.meta}
       # Profiles
-      prof: ${data.stage.train.vars.prof}
+      prof: ${data.stage.train.variables.prof}
     output:
       lat:
         # Output path
@@ -99,13 +99,13 @@ slant:
     # What the method needs as input
     input:
       # Coordinates
-      lat: ${data.stage.valid.vars.lat}
-      lon: ${data.stage.valid.vars.lon}
-      pressure: ${data.stage.valid.vars.pressure}
+      lat: ${data.stage.valid.variables.lat}
+      lon: ${data.stage.valid.variables.lon}
+      pressure: ${data.stage.valid.variables.pressure}
       # Meta data
-      meta: ${data.stage.valid.vars.meta}
+      meta: ${data.stage.valid.variables.meta}
       # Profiles
-      prof: ${data.stage.valid.vars.prof}
+      prof: ${data.stage.valid.variables.prof}
     output:
       lat:
         # Output path
@@ -190,13 +190,13 @@ slant:
     # What the method needs as input
     input:
       # Coordinates
-      lat: ${data.stage.test.vars.lat}
-      lon: ${data.stage.test.vars.lon}
-      pressure: ${data.stage.test.vars.pressure}
+      lat: ${data.stage.test.variables.lat}
+      lon: ${data.stage.test.variables.lon}
+      pressure: ${data.stage.test.variables.pressure}
       # Meta data
-      meta: ${data.stage.test.vars.meta}
+      meta: ${data.stage.test.variables.meta}
       # Profiles
-      prof: ${data.stage.test.vars.prof}
+      prof: ${data.stage.test.variables.prof}
     output:
       lat:
         # Output path

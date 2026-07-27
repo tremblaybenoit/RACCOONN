@@ -1,0 +1,14 @@
+defaults:
+  - clear_mask
+  - cloud_mask
+  - daytime_mask
+  - hofx
+  - lat
+  - lon
+  - meta
+  - obs
+  - pressure
+  - pressure_log
+  - prof
+  - scans
+  - surf

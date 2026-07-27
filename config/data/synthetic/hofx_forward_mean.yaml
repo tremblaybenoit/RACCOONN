@@ -22,14 +22,16 @@ train:
       ]
       # Loading function
       load:
-        _target_: code.data.io.load_npy
-        path: ${..path}
-        split:
-          _target_: numpy.s_
-          _args_:
-            - null
-            - :10
-        dtype: ${data.dtype}
+        _target_: operator.getitem
+        _args_:
+          - _target_: code.data.io.load_npy
+            path: ${....path}
+            dtype: ${data.dtype}
+            split: ${......split}
+          - _target_: numpy.s_
+            _args_:
+              - null
+              - :10
       # Transformations to apply
       transformations:
         # Per-variable normalization
@@ -56,10 +58,16 @@ valid:
       type: ${data.stage.train.variables.hofx_forward_mean.type}
       # Loading function
       load:
-        _target_: code.data.io.load_npy
-        path: ${..path}
-        split: ${data.stage.train.variables.hofx_forward_mean.load.split}
-        dtype: ${data.dtype}
+        _target_: operator.getitem
+        _args_:
+          - _target_: code.data.io.load_npy
+            path: ${....path}
+            dtype: ${data.dtype}
+            split: ${......split}
+          - _target_: numpy.s_
+            _args_:
+              - null
+              - :10
       # Transformations to apply
       transformations: ${data.stage.train.variables.hofx_forward_mean.transformations}
 # Test set
@@ -77,10 +85,16 @@ test:
       type: ${data.stage.train.variables.hofx_forward_mean.type}
       # Loading function
       load:
-        _target_: code.data.io.load_npy
-        path: ${..path}
-        split: ${data.stage.train.variables.hofx_forward_mean.load.split}
-        dtype: ${data.dtype}
+        _target_: operator.getitem
+        _args_:
+          - _target_: code.data.io.load_npy
+            path: ${....path}
+            dtype: ${data.dtype}
+            split: ${......split}
+          - _target_: numpy.s_
+            _args_:
+              - null
+              - :10
       # Transformations to apply
       transformations: ${data.stage.train.variables.hofx_forward_mean.transformations}
   # Results-specific configuration for the test stage

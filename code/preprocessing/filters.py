@@ -11,6 +11,83 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def composite_mask(masks: list[np.ndarray]) -> np.ndarray:
+    """ Combine multiple masks into a single composite mask.
+
+        Parameters
+        ----------
+        masks: list of np.ndarray. List of boolean masks to combine.
+
+        Returns
+        -------
+        np.ndarray. Composite boolean mask where True indicates data points that pass all individual masks.
+    """
+
+    # Initialize composite mask with the first mask in the list
+    composite = masks[0].copy()
+
+    # Combine all masks using logical AND
+    for mask in masks[1:]:
+        composite &= mask
+
+    return composite
+
+
+def spatial_mask(lat: np.ndarray | torch.Tensor, lon: np.ndarray | torch.Tensor,
+                 lat_min: float  = -90, lat_max: float = 90, lon_min: float  = -180,
+                 lon_max: float = 180) -> np.ndarray | torch.Tensor:
+    """ Filter out data based on spatial mask.
+
+        Parameters
+        ----------
+        lat: np.ndarray or torch.Tensor. Latitude of input data.
+        lon: np.ndarray or torch.Tensor. Longitude of input data.
+        lat_min: float. Minimum latitude.
+        lat_max: float. Maximum latitude.
+        lon_min: float. Minimum longitude.
+        lon_max: float. Maximum longitude.
+
+        Returns
+        -------
+        np.ndarray or torch.Tensor. Boolean mask indicating data within the specified spatial bounds.
+    """
+
+    # Initialize mask
+    mask = np.ones_like(lat, dtype=bool) if isinstance(lat, np.ndarray) else torch.ones_like(lat, dtype=torch.bool)
+
+    # Apply latitude and longitude bounds
+    mask &= lat >= lat_min
+    mask &= lat <= lat_max
+    mask &= lon >= lon_min
+    mask &= lon <= lon_max
+
+    return mask
+
+
+def temporal_mask(scans: np.ndarray | torch.Tensor, scans_min: float = 0, scans_max: float = 1) -> np.ndarray | torch.Tensor:
+    """ Filter out data based on temporal mask.
+
+        Parameters
+        ----------
+        scans: np.ndarray or torch.Tensor. Input scans.
+        scans_min: float. Minimum scan value.
+        scans_max: float. Maximum scan value.
+
+        Returns
+        -------
+        np.ndarray or torch.Tensor. Boolean mask indicating data within the specified time range.
+    """
+
+    # Initialize mask
+    mask = np.ones_like(scans, dtype=bool) if isinstance(scans, np.ndarray) else torch.ones_like(scans, dtype=torch.bool)
+
+    # Apply temporal bounds
+    mask &= scans >= scans_min
+    mask &= scans <= scans_max
+
+    return mask
+
+
 def clear_mask(prof: np.ndarray | torch.Tensor, split: np.ndarray | torch.Tensor | None = None) \
         -> np.ndarray | torch.Tensor:
     """ Filter out profiles with clear skies.
