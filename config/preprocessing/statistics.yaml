@@ -15,12 +15,12 @@ statistics:
     # What the method produces as output (pickle file)
     output:
       # Path to statistics file
-      path: code/data/statistics/statistics.pkl
+      path: code/data/statistics/synthetic.pkl
       # Saving function
       save:
         _target_: code.data.io.save_pkl
-        path: ${data.statistics.data.output.path}
+        path: ${preprocessing.statistics.data.output.path}
       # Loading function
       load:
         _target_: code.data.io.load_pkl
-        path: ${data.statistics.data.output.path}
+        path: ${preprocessing.statistics.data.output.path}

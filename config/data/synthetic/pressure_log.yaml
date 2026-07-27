@@ -1,111 +1,115 @@
 # Format:
-#   stage:
 #   -- source: common configuration for all stages (train/valid/test/predict)
 #   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
 
 # Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
-stage:
-  # Training set
-  train:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Pressure (log-transformed)
-      pressure_log:
-        # Dataset class
-        _target_: code.loader.dataset.ConstantDataset
-        _recursive_: false
-        # Path to the pressure data file
-        path: ${....dir}/pressure.npy
-        # Type of pressure levels
-        type: 'Log10(pressure)'
-        # Loading function
-        load:
-          _target_: numpy.log10
-          _args_:
+
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Pressure (log-transformed)
+    pressure_log:
+      # Dataset class
+      _target_: code.loader.dataset.ConstantDataset
+      _recursive_: false
+      # Path to the pressure data file
+      path: ${...dir}/pressure.npy
+      # Type of pressure levels
+      type: 'Log10(pressure)'
+      # Loading function
+      load:
+        _target_: numpy.log10
+        _args_:
+        - _target_: code.data.units.pa_to_hpa
+          pressure:
+            _target_: code.data.io.load_npy
+            path: ${.....path}
+            split: ${.......split}
+            dtype: ${data.dtype}
+      # Transformations to apply
+      transformations:
+        # Per-variable normalization with log transform
+        normalization:
+          _target_: code.data.transformations.min_max
+          _partial_: true
+          stats:
+            _target_: code.preprocessing.statistics.read_statistics_var
+            path: ${preprocessing.statistics.data.output.path}
+            key: 'pressure_log'
+            dtype: ${data.dtype}
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Pressure (log-transformed)
+    pressure_log:
+      # Dataset class
+      _target_: ${data.stage.train.variables.pressure_log._target_}
+      _recursive_: false
+      # Path to the pressure data file
+      path: ${...dir}/pressure.npy
+      # Type of pressure levels
+      type: ${data.stage.train.variables.pressure_log.type}
+      # Loading function
+      load:
+        _target_: numpy.log10
+        _args_:
           - _target_: code.data.units.pa_to_hpa
             pressure:
               _target_: code.data.io.load_npy
-              path: ${....path}
+              path: ${.....path}
+              split: ${.......split}
               dtype: ${data.dtype}
-        # Transformations to apply
-        transformations:
-          # Per-variable normalization with log transform
-          normalization:
-            _target_: code.data.transformations.min_max
-            _partial_: true
-            stats:
-              _target_: code.preprocessing.statistics.read_statistics_var
-              path: ${preprocessing.statistics.data.output.path}
-              key: 'pressure_log'
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.pressure_log.transformations}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Pressure (log-transformed)
+    pressure_log:
+      # Dataset class
+      _target_: ${data.stage.train.variables.pressure_log._target_}
+      _recursive_: false
+      # Path to the pressure data file
+      path: ${...dir}/pressure.npy
+      # Type of pressure levels
+      type: ${data.stage.train.variables.pressure_log.type}
+      # Loading function
+      load:
+        _target_: numpy.log10
+        _args_:
+          - _target_: code.data.units.pa_to_hpa
+            pressure:
+              _target_: code.data.io.load_npy
+              path: ${.....path}
+              split: ${.......split}
               dtype: ${data.dtype}
-  # Validation set
-  valid:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Pressure (log-transformed)
-      pressure_log:
-        # Dataset class
-        _target_: ${data.stage.train.variables.pressure_log._target_}
-        _recursive_: false
-        # Path to the pressure data file
-        path: ${....dir}/pressure.npy
-        # Type of pressure levels
-        type: ${data.stage.train.variables.pressure_log.type}
-        # Loading function
-        load:
-          _target_: ${data.stage.train.variables.pressure_log.load._target_}
-          pressure:
-            _target_: ${data.stage.train.variables.pressure_log.load.pressure._target_}
-            path: ${..path}
-            split: ${....split}
-            dtype: ${data.dtype}
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.pressure_log.transformations}
-  # Test set
-  test:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Pressure (log-transformed)
-      pressure_log:
-        # Dataset class
-        _target_: ${data.stage.train.variables.pressure_log._target_}
-        _recursive_: false
-        # Path to the pressure data file
-        path: ${....dir}/pressure.npy
-        # Type of pressure levels
-        type: ${data.stage.train.variables.pressure_log.type}
-        # Loading function
-        load:
-          _target_: ${data.stage.train.variables.pressure_log.load._target_}
-          pressure:
-            _target_: ${data.stage.train.variables.pressure_log.load.pressure._target_}
-            path: ${..path}
-            split: ${....split}
-            dtype: ${data.dtype}
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.pressure_log.transformations}
-  # Predict set
-  predict:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Pressure (log-transformed)
-      pressure_log: ${...test.variables.pressure_log}
-  # Source data (complete dataset)
-  source:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Pressure (log-transformed)
-      pressure_log:
-        # Type of pressure levels
-        type: ${data.stage.train.variables.pressure_log.type}
-        # Loading function
-        load:
-          _target_: numpy.concatenate
-          _args_:
-            - - ${data.stage.train.variables.pressure_log.load}
-              - ${data.stage.valid.variables.pressure_log.load}
-              - ${data.stage.test.variables.pressure_log.load}
-            - 0
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.pressure_log.transformations}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.pressure_log.transformations}
+# Predict set
+predict:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Pressure (log-transformed)
+    pressure_log: ${...test.variables.pressure_log}
+# Source data (complete dataset)
+source:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Pressure (log-transformed)
+    pressure_log:
+      # Type of pressure levels
+      type: ${data.stage.train.variables.pressure_log.type}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${data.stage.train.variables.pressure_log.load}
+            - ${data.stage.valid.variables.pressure_log.load}
+            - ${data.stage.test.variables.pressure_log.load}
+          - 0
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.pressure_log.transformations}
 

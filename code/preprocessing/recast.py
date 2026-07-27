@@ -1,10 +1,7 @@
-import os
 import numpy as np
 import hydra
 from omegaconf import DictConfig
 from scipy.spatial import cKDTree
-from tqdm import tqdm
-import gc
 import logging
 from utilities.logic import get_config_path
 from utilities.instantiators import instantiate
@@ -132,9 +129,11 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
 
     # Build dictionary from input data
     data = {}
+    breakpoint()
     for key, value in input.variables.items():
         # Load data
         data[key] = instantiate(value.load)
+    breakpoint()
 
     # Build mask
     mask = np.ones_like(data['lat'], dtype='bool')
@@ -229,6 +228,17 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
 
 @hydra.main(version_base=None, config_path=get_config_path(), config_name="default")
 def main(config: DictConfig) -> None:
+    """
+    Recast dataset.
+
+    Parameters
+    ----------
+    config: DictConfig. Main hydra configuration file containing all model hyperparameters.
+
+    Returns
+    -------
+    None.
+    """
 
     # Execute recast
     if hasattr(config.preprocessing, 'recast'):
@@ -238,5 +248,18 @@ def main(config: DictConfig) -> None:
 
 
 if __name__ == '__main__':
+    """ Recast dataset.
+
+        Parameters
+        ----------
+        --config_path: str. Directory containing configuration file.
+        --config_name: str. Configuration filename.
+        +experiment: str. Experiment configuration filename to override default configuration.
+
+        Returns
+        -------
+        Dataset in new format, and/or filtered for clouds or clear skies.
+    """
+
     main()
 

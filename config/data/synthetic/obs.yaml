@@ -1,104 +1,103 @@
 # Format:
-#   stage:
 #   -- source: common configuration for all stages (train/valid/test/predict)
 #   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
 
 # Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
-stage:
-  # Training set
-  train:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Observations
-      obs:
-        # Dataset class
-        _target_: code.loader.dataset.EagerDataset
-        _recursive_: false
-        # Path to the observations file
-        path: ${....dir}/obs.npy
-        # Type of data
-        type: 'Observations (no units)'
-        # Loading function
-        load:
-          _target_: code.data.io.load_npy
-          path: ${..path}
-          split: ${....split}
-          dtype: ${data.dtype}
-        # Transformations to apply
-        transformations:
-          # Per-variable normalization
-          normalization:
-            _target_: code.data.transformations.identity
-            _partial_: true
-            stats:
-              _target_: code.preprocessing.statistics.read_statistics_var
-              path: ${preprocessing.statistics.data.output.path}
-              key: 'obs'
-              dtype: ${data.dtype}
-  # Validation set
-  valid:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Observations
-      obs:
-        # Dataset class
-        _target_: ${data.stage.train.variables.obs._target_}
-        _recursive_: false
-        # Path to the observations file
-        path: ${....dir}/obs.npy
-        # Type of data
-        type: ${data.stage.train.variables.obs.type}
-        # Loading function
-        load:
-          _target_: ${data.stage.train.variables.obs.load._target_}
-          path: ${..path}
-          split: ${....split}
-          dtype: ${data.dtype}
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.obs.transformations}
-  # Test set
-  test:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Observations
-      obs:
-        # Dataset class
-        _target_: ${data.stage.train.variables.obs._target_}
-        _recursive_: false
-        # Path to the observations file
-        path: ${....dir}/obs.npy
-        # Type of data
-        type: ${data.stage.train.variables.obs.type}
-        # Loading function
-        load:
-          _target_: ${data.stage.train.variables.obs.load._target_}
-          path: ${..path}
-          split: ${....split}
-          dtype: ${data.dtype}
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.obs.transformations}
-  # Predict set
-  predict:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Observations
-      obs: ${...test.variables.obs}
-  # Source data (complete dataset)
-  source:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Observations
-      obs:
-        # Type of data
-        type: ${data.stage.train.variables.obs.type}
-        # Loading function
-        load:
-          _target_: numpy.concatenate
-          _args_:
-            - - ${data.stage.train.variables.obs.load}
-              - ${data.stage.valid.variables.obs.load}
-              - ${data.stage.test.variables.obs.load}
-            - 0
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.obs.transformations}
+
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Observations
+    obs:
+      # Dataset class
+      _target_: code.loader.dataset.EagerDataset
+      _recursive_: false
+      # Path to the observations file
+      path: ${...dir}/obs.npy
+      # Type of data
+      type: 'Observations (no units)'
+      # Loading function
+      load:
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations:
+        # Per-variable normalization
+        normalization:
+          _target_: code.data.transformations.identity
+          _partial_: true
+          stats:
+            _target_: code.preprocessing.statistics.read_statistics_var
+            path: ${preprocessing.statistics.data.output.path}
+            key: 'obs'
+            dtype: ${data.dtype}
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Observations
+    obs:
+      # Dataset class
+      _target_: ${data.stage.train.variables.obs._target_}
+      _recursive_: false
+      # Path to the observations file
+      path: ${...dir}/obs.npy
+      # Type of data
+      type: ${data.stage.train.variables.obs.type}
+      # Loading function
+      load:
+        _target_: ${data.stage.train.variables.obs.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.obs.transformations}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Observations
+    obs:
+      # Dataset class
+      _target_: ${data.stage.train.variables.obs._target_}
+      _recursive_: false
+      # Path to the observations file
+      path: ${...dir}/obs.npy
+      # Type of data
+      type: ${data.stage.train.variables.obs.type}
+      # Loading function
+      load:
+        _target_: ${data.stage.train.variables.obs.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.obs.transformations}
+# Predict set
+predict:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Observations
+    obs: ${...test.variables.obs}
+# Source data (complete dataset)
+source:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Observations
+    obs:
+      # Type of data
+      type: ${data.stage.train.variables.obs.type}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${data.stage.train.variables.obs.load}
+            - ${data.stage.valid.variables.obs.load}
+            - ${data.stage.test.variables.obs.load}
+          - 0
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.obs.transformations}
 

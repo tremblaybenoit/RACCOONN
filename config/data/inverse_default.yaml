@@ -1,20 +1,24 @@
 defaults:
-  - synthetic/clear_mask
-  - synthetic/cloud_mask
-  - synthetic/daytime_mask
-  - synthetic/hofx
-  - synthetic/hofx_forward
-  - synthetic/lat
-  - synthetic/lon
-  - synthetic/meta
-  - synthetic/obs
-  - synthetic/pressure
-  - synthetic/pressure_log
-  - synthetic/pressure_mask
-  - synthetic/prof
-  - synthetic/prof_prior
-  - synthetic/scans
-  - synthetic/surf
+  - synthetic/clear_mask@stage
+  - synthetic/cloud_mask@stage
+  - synthetic/daytime_mask@stage
+  - synthetic/hofx@stage
+  - synthetic/lat@stage
+  - synthetic/lon@stage
+  - synthetic/meta@stage
+  - synthetic/obs@stage
+  - synthetic/pressure@stage
+  - synthetic/pressure_log@stage
+  - synthetic/prof@stage
+  - synthetic/scans@stage
+  - synthetic/surf@stage
+  - synthetic/hofx_forward@stage
+  - synthetic/hofx_forward_mean@stage
+  - synthetic/hofx_forward_stdev@stage
+  - synthetic/lat@stage
+  - synthetic/lon@stage
+  - synthetic/pressure_mask@stage
+  - synthetic/prof_prior@stage
 
 # dtype
 dtype: 'float32'

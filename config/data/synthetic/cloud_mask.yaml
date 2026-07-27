@@ -1,86 +1,85 @@
 # Format:
-#   stage:
 #   -- source: common configuration for all stages (train/valid/test/predict)
 #   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
 
 # Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
-stage:
-  # Training set
-  train:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Cloud mask
-      cloud_mask:
-        # Dataset class
-        _target_: code.loader.dataset.EagerDataset
-        _recursive_: false
-        # Type of data
-        type: 'Cloud mask'
-        # Loading function (cloud filter is computed, not loaded directly)
-        load:
-          _target_: code.preprocessing.filters.cloud_mask
-          _args_:
-            - ${....meta.load}
-        # Transformations to apply
-        transformations: null
-  # Validation set
-  valid:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Cloud mask
-      cloud_mask:
-        # Dataset class
-        _target_: ${data.stage.train.variables.cloud_mask._target_}
-        _recursive_: false
-        # Type of data
-        type: ${data.stage.train.variables.cloud_mask.type}
-        # Loading function (cloud filter is computed, not loaded directly)
-        load:
-          _target_: ${data.stage.train.variables.cloud_mask.load._target_}
-          _args_:
-            - ${....meta.load}
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.cloud_mask.transformations}
-  # Test set
-  test:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Cloud mask
-      cloud_mask:
-        # Dataset class
-        _target_: ${data.stage.train.variables.cloud_mask._target_}
-        _recursive_: false
-        # Type of data
-        type: ${data.stage.train.variables.cloud_mask.type}
-        # Loading function (cloud filter is computed, not loaded directly)
-        load:
-          _target_: ${data.stage.train.variables.cloud_mask.load._target_}
-          _args_:
-            - ${....meta.load}
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.cloud_mask.transformations}
-  # Predict set
-  predict:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Cloud mask
-      cloud_mask: ${...test.variables.cloud_mask}
-  # Source data (complete dataset)
-  source:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Cloud mask
-      cloud_mask:
-        # Type of data
-        type: ${data.stage.train.variables.cloud_mask.type}
-        # Loading function
-        load:
-          _target_: numpy.concatenate
-          _args_:
-            - - ${data.stage.train.variables.cloud_mask.load}
-              - ${data.stage.valid.variables.cloud_mask.load}
-              - ${data.stage.test.variables.cloud_mask.load}
-            - 0
-        # Transformations to apply
-        transformations: null
+
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Cloud mask
+    cloud_mask:
+      # Dataset class
+      _target_: code.loader.dataset.EagerDataset
+      _recursive_: false
+      # Type of data
+      type: 'Cloud mask'
+      # Loading function (cloud filter is computed, not loaded directly)
+      load:
+        _target_: code.preprocessing.filters.cloud_mask
+        _args_:
+          - ${....meta.load}
+      # Transformations to apply
+      transformations: null
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Cloud mask
+    cloud_mask:
+      # Dataset class
+      _target_: ${data.stage.train.variables.cloud_mask._target_}
+      _recursive_: false
+      # Type of data
+      type: ${data.stage.train.variables.cloud_mask.type}
+      # Loading function (cloud filter is computed, not loaded directly)
+      load:
+        _target_: ${data.stage.train.variables.cloud_mask.load._target_}
+        _args_:
+          - ${....meta.load}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.cloud_mask.transformations}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Cloud mask
+    cloud_mask:
+      # Dataset class
+      _target_: ${data.stage.train.variables.cloud_mask._target_}
+      _recursive_: false
+      # Type of data
+      type: ${data.stage.train.variables.cloud_mask.type}
+      # Loading function (cloud filter is computed, not loaded directly)
+      load:
+        _target_: ${data.stage.train.variables.cloud_mask.load._target_}
+        _args_:
+          - ${....meta.load}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.cloud_mask.transformations}
+# Predict set
+predict:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Cloud mask
+    cloud_mask: ${...test.variables.cloud_mask}
+# Source data (complete dataset)
+source:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Cloud mask
+    cloud_mask:
+      # Type of data
+      type: ${data.stage.train.variables.cloud_mask.type}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${data.stage.train.variables.cloud_mask.load}
+            - ${data.stage.valid.variables.cloud_mask.load}
+            - ${data.stage.test.variables.cloud_mask.load}
+          - 0
+      # Transformations to apply
+      transformations: null
 

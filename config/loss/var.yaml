@@ -19,5 +19,5 @@ loss_bcs:
   _target_: code.loss.basic.MSE
 
 # Pressure mask: Consider only pressure levels with non-zero variance
-pressure_mask: ${data.pressure_mask.load}
+pressure_mask: ${data.stage.source.variables.pressure_mask.load}
 

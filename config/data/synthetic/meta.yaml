@@ -1,104 +1,103 @@
 # Format:
-#   stage:
 #   -- source: common configuration for all stages (train/valid/test/predict)
 #   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
 
 # Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
-stage:
-  # Training set
-  train:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Metadata
-      meta:
-        # Dataset class
-        _target_: code.loader.dataset.EagerDataset
-        _recursive_: false
-        # Path to the metadata file
-        path: ${....dir}/meta.npy
-        # Type of data
-        type: 'Meta data'
-        # Loading function
-        load:
-          _target_: code.data.io.load_npy
-          path: ${..path}
-          split: ${....split}
-          dtype: ${data.dtype}
-        # Transformations to apply
-        transformations:
-          # Metadata normalization (sin/cos for angles)
-          normalization:
-            _target_: code.data.transformations.NormalizeMeta
-            settings:
-              meta_cos_vars: [ 6 ]
-              meta_scale_factor: 180
-              meta_scale_offset: -180
-              meta_scale_vars: [ ]
-              dtype: ${data.dtype}
-  # Validation set
-  valid:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Metadata
-      meta:
-        # Dataset class
-        _target_: ${data.stage.train.variables.meta._target_}
-        _recursive_: false
-        # Path to the metadata file
-        path: ${....dir}/meta.npy
-        # Type of data
-        type: ${data.stage.train.variables.meta.type}
-        # Loading function
-        load:
-          _target_: ${data.stage.train.variables.meta.load._target_}
-          path: ${..path}
-          split: ${....split}
-          dtype: ${data.dtype}
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.meta.transformations}
-  # Test set
-  test:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Metadata
-      meta:
-        # Dataset class
-        _target_: ${data.stage.train.variables.meta._target_}
-        _recursive_: false
-        # Path to the metadata file
-        path: ${....dir}/meta.npy
-        # Type of data
-        type: ${data.stage.train.variables.meta.type}
-        # Loading function
-        load:
-          _target_: ${data.stage.train.variables.meta.load._target_}
-          path: ${..path}
-          split: ${....split}
-          dtype: ${data.dtype}
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.meta.transformations}
-  # Predict set
-  predict:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Metadata
-      meta: ${...test.variables.meta}
-  # Source data (complete dataset)
-  source:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Metadata
-      meta:
-        # Type of data
-        type: ${data.stage.train.variables.meta.type}
-        # Loading function
-        load:
-          _target_: numpy.concatenate
-          _args_:
-            - - ${data.stage.train.variables.meta.load}
-              - ${data.stage.valid.variables.meta.load}
-              - ${data.stage.test.variables.meta.load}
-            - 0
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.meta.transformations}
+
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Metadata
+    meta:
+      # Dataset class
+      _target_: code.loader.dataset.EagerDataset
+      _recursive_: false
+      # Path to the metadata file
+      path: ${...dir}/meta.npy
+      # Type of data
+      type: 'Meta data'
+      # Loading function
+      load:
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations:
+        # Metadata normalization (sin/cos for angles)
+        normalization:
+          _target_: code.data.transformations.NormalizeMeta
+          settings:
+            meta_cos_vars: [ 6 ]
+            meta_scale_factor: 180
+            meta_scale_offset: -180
+            meta_scale_vars: [ ]
+            dtype: ${data.dtype}
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Metadata
+    meta:
+      # Dataset class
+      _target_: ${data.stage.train.variables.meta._target_}
+      _recursive_: false
+      # Path to the metadata file
+      path: ${...dir}/meta.npy
+      # Type of data
+      type: ${data.stage.train.variables.meta.type}
+      # Loading function
+      load:
+        _target_: ${data.stage.train.variables.meta.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.meta.transformations}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Metadata
+    meta:
+      # Dataset class
+      _target_: ${data.stage.train.variables.meta._target_}
+      _recursive_: false
+      # Path to the metadata file
+      path: ${...dir}/meta.npy
+      # Type of data
+      type: ${data.stage.train.variables.meta.type}
+      # Loading function
+      load:
+        _target_: ${data.stage.train.variables.meta.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.meta.transformations}
+# Predict set
+predict:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Metadata
+    meta: ${...test.variables.meta}
+# Source data (complete dataset)
+source:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Metadata
+    meta:
+      # Type of data
+      type: ${data.stage.train.variables.meta.type}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${data.stage.train.variables.meta.load}
+            - ${data.stage.valid.variables.meta.load}
+            - ${data.stage.test.variables.meta.load}
+          - 0
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.meta.transformations}
 

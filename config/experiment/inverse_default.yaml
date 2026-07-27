@@ -13,7 +13,7 @@ defaults:
   - override /optimizer: default
   - override /scheduler: default
   - override /model: inverse_default
-  - override /callbacks: inverse_default
+  - override /callback: inverse_default
   - override /logger: default
   - override /trainer: gpu
 
@@ -27,8 +27,8 @@ task_name: "inverse"  # Experiment
 paths:
   task_dir: "../inverse_outputs"
   run_id: "default"
-  data_dir: ../data_${data.dtype}
-  # checkpoint_dir: "inverse/model/checkpoints"
+  data_dir: ../synthetic_${data.dtype}
+  # checkpoint_dir: "code/model/checkpoints/checkpoint"
 
 # Data configuration
 data:
@@ -61,23 +61,23 @@ data:
         # Atmospheric profiles
         prof:
           # Transformations
-          transformations: ${data.stage.train.vars.prof.transformations}
+          transformations: ${data.stage.train.variables.prof.transformations}
     # Test set
     test:
       # Variables
-      vars:
+      variables:
         # Atmospheric profiles
         prof:
           # Transformations
-          transformations: ${data.stage.train.vars.prof.transformations}
+          transformations: ${data.stage.train.variables.prof.transformations}
     # Prediction set
     predict:
       # Variables
-      vars:
+      variables:
         # Atmospheric profiles
         prof:
           # Transformations
-          transformations: ${data.stage.train.vars.prof.transformations}
+          transformations: ${data.stage.train.variables.prof.transformations}
 
 # Logger configuration
 logger:

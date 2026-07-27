@@ -1,102 +1,105 @@
 # Format:
-#   stage:
 #   -- source: common configuration for all stages (train/valid/test/predict)
 #   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
 
 # Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
-stage:
-  # Training set
-  train:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Atmospheric profiles
-      prof_prior:
-        # Dataset class
-        _target_: code.loader.dataset.EagerDataset
-        _recursive_: false
-        # Path to the atmospheric profiles file
-        path: null
-        # Profile types
-        type: ['Air temperature', 'Cloud ice particle effective radius', 'Cloud water particle effective radius',
-               'Snow particle effective radius', 'Humidity mixing ratio', 'Cloud ice mass', 'Cloud water mass',
-               'Snow mass', 'Ozone mixing ratio']
-        # Loading function
-        load:
-          _target_: code.preprocessing.covariance.prior_from_bounded_perturbations
-          stats: ${....prof.transformations.normalization.stats}
-          seed: 75
-          # What the method needs as input
-          input:
-            # Cholesky matrix
-            cholesky: ${preprocessing.covariance.B_uni_stdn_temporal.output.cholesky}
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.prof_prior.transformations}
-  # Validation set
-  valid:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Atmospheric profiles
-      prof_prior:
-        # Dataset class
-        _target_: ${data.stage.train.variables.prof_prior._target_}
-        _recursive_: false
-        # Path to the atmospheric profiles file
-        path: ${....dir}/prof.npy
-        # Profile types
-        type: ${data.stage.train.variables.prof_prior.type}
-        # Loading function
-        load:
-          _target_: ${data.stage.train.variables.prof_prior.load._target_}
-          path: ${..path}
-          split: ${....split}
-          dtype: ${data.dtype}
-          seed: 48
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.prof_prior.transformations}
-  # Test set
-  test:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Atmospheric profiles
-      prof_prior:
-        # Dataset class
-        _target_: ${data.stage.train.variables.prof_prior._target_}
-        _recursive_: false
-        # Path to the atmospheric profiles file
-        path: ${....dir}/prof.npy
-        # Profile types
-        type: ${data.stage.train.variables.prof_prior.type}
-        # Loading function
-        load:
-          _target_: ${data.stage.train.variables.prof_prior.load._target_}
-          path: ${..path}
-          split: ${....split}
-          dtype: ${data.dtype}
-          seed: 15
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.prof_prior.transformations}
-  # Predict set
-  predict:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Atmospheric profiles
-      prof_prior: ${...test.variables.prof_prior}
-  # Source data (complete dataset)
-  source:
-    # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-    variables:
-      # Atmospheric profiles
-      prof_prior:
-        # Type of the atmospheric profiles
-        type: ${data.stage.train.variables.prof_prior.type}
-        # Loading function
-        load:
-          _target_: numpy.concatenate
-          _args_:
-            - - ${data.stage.train.variables.prof_prior.load}
-              - ${data.stage.valid.variables.prof_prior.load}
-              - ${data.stage.test.variables.prof_prior.load}
-            - 0
-        # Transformations to apply
-        transformations: ${data.stage.train.variables.prof_prior.transformations}
+
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    prof_prior:
+      # Dataset class
+      _target_: code.loader.dataset.EagerDataset
+      _recursive_: false
+      # Path to the atmospheric profiles file
+      path: null
+      # Profile types
+      type: ['Air temperature', 'Cloud ice particle effective radius', 'Cloud water particle effective radius',
+             'Snow particle effective radius', 'Humidity mixing ratio', 'Cloud ice mass', 'Cloud water mass',
+             'Snow mass', 'Ozone mixing ratio']
+      # Loading function
+      load:
+        _target_: code.preprocessing.covariance.prior_from_bounded_perturbations
+        stats: ${...prof.transformations.normalization.stats}
+        seed: 75
+        # What the method needs as input
+        input:
+          # Cholesky matrix
+          cholesky: ${preprocessing.covariance.B.output.cholesky}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.prof.transformations}
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    prof_prior:
+      # Dataset class
+      _target_: ${data.stage.train.variables.prof_prior._target_}
+      _recursive_: false
+      # Path to the atmospheric profiles file
+      path: null
+      # Profile types
+      type: ${data.stage.train.variables.prof_prior.type}
+      # Loading function
+      load:
+        _target_: code.preprocessing.covariance.prior_from_bounded_perturbations
+        stats: ${...prof.transformations.normalization.stats}
+        seed: 48
+        # What the method needs as input
+        input:
+          # Cholesky matrix
+          cholesky: ${preprocessing.covariance.B.output.cholesky}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.prof.transformations}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    prof_prior:
+      # Dataset class
+      _target_: ${data.stage.train.variables.prof_prior._target_}
+      _recursive_: false
+      # Path to the atmospheric profiles file
+      path: null
+      # Profile types
+      type: ${data.stage.train.variables.prof_prior.type}
+      # Loading function
+      load:
+        _target_: code.preprocessing.covariance.prior_from_bounded_perturbations
+        stats: ${...prof.transformations.normalization.stats}
+        seed: 15
+        # What the method needs as input
+        input:
+          # Cholesky matrix
+          cholesky: ${preprocessing.covariance.B.output.cholesky}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.prof.transformations}
+# Predict set
+predict:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    prof_prior: ${...test.variables.prof_prior}
+# Source data (complete dataset)
+source:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    prof_prior:
+      # Type of the atmospheric profiles
+      type: ${data.stage.train.variables.prof_prior.type}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${data.stage.train.variables.prof_prior.load}
+            - ${data.stage.valid.variables.prof_prior.load}
+            - ${data.stage.test.variables.prof_prior.load}
+          - 0
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.prof.transformations}
 

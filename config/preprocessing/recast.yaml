@@ -8,7 +8,7 @@ recast:
     # What the method needs as input
     input:
       # Directory of the source data
-      dir: ../GOES_ML/Train2
+      dir: ../../../../../../../d/Data/JCSDA/GOES_ML/Train2
       # Mask to apply
       mask:
         # Cloud/clear sky
@@ -22,7 +22,7 @@ recast:
           load:
             _target_: code.data.io.load_npy
             _partial_: true
-            path: ${...dir}/prof.npy
+            path: ${....dir}/prof.npy
         # Latitude
         lat:
           # Loading function
@@ -78,8 +78,10 @@ recast:
         pressure:
           # Loading function
           load:
-            _target_: code.data.io.load_npy
-            path: ${....dir}/pressure.npy
+            _target_: code.data.units.pa_to_hpa
+            pressure:
+              _target_: code.data.io.load_npy
+              path: ${.....dir}/pressure.npy
     # What the method produces as output
     output:
       # Precision
@@ -161,21 +163,21 @@ recast:
             path: ${data.stage.train.variables.pressure.path}
             dtype: ${data.dtype}
         # Cloud mask (addition)
-        cloud_mask:
-          # Save function
-          save:
-            _target_: code.data.io.save_npy
-            _partial_: true
-            path: ${data.stage.train.variables.cloud_mask.path}
-            dtype: bool
+        # cloud_mask:
+        #   # Save function
+        #   save:
+        #     _target_: code.data.io.save_npy
+        #     _partial_: true
+        #     path: ${data.stage.train.variables.cloud_mask.path}
+        #     dtype: bool
         # Daytime mask (addition)
-        daytime_mask:
-          # Save function
-          save:
-            _target_: code.data.io.save_npy
-            _partial_: true
-            path: ${data.stage.train.variables.daytime_mask.path}
-            dtype: bool
+        # daytime_mask:
+        #   # Save function
+        #   save:
+        #     _target_: code.data.io.save_npy
+        #     _partial_: true
+        #     path: ${data.stage.train.variables.daytime_mask.path}
+        #     dtype: bool
   # Validation set
   valid:
     # Function
@@ -184,7 +186,7 @@ recast:
     # What the method needs as input
     input:
       # Directory of the source data
-      dir: ../GOES_ML/Val2
+      dir: ../../../../../../../d/Data/JCSDA/GOES_ML/Val2
       # Variables
       variables:
         # Atmospheric profiles
@@ -193,7 +195,7 @@ recast:
           load:
             _target_: code.data.io.load_npy
             _partial_: true
-            path: ${...dir}/prof.npy
+            path: ${....dir}/prof.npy
         # Latitude
         lat:
           # Loading function
@@ -249,8 +251,10 @@ recast:
         pressure:
           # Loading function
           load:
-            _target_: code.data.io.load_npy
-            path: ${....dir}/pressure.npy
+            _target_: code.data.units.pa_to_hpa
+            pressure:
+              _target_: code.data.io.load_npy
+              path: ${.....dir}/pressure.npy
     # What the method produces as output
     output:
       # Precision
@@ -332,21 +336,21 @@ recast:
             path: ${data.stage.valid.variables.pressure.path}
             dtype: ${data.dtype}
         # Cloud mask (addition)
-        cloud_mask:
-          # Save function
-          save:
-            _target_: code.data.io.save_npy
-            _partial_: true
-            path: ${data.stage.valid.variables.cloud_mask.path}
-            dtype: bool
+        # cloud_mask:
+        #   # Save function
+        #   save:
+        #     _target_: code.data.io.save_npy
+        #     _partial_: true
+        #     path: ${data.stage.valid.variables.cloud_mask.path}
+        #     dtype: bool
         # Daytime mask (addition)
-        daytime_mask:
-          # Save function
-          save:
-            _target_: code.data.io.save_npy
-            _partial_: true
-            path: ${data.stage.valid.variables.daytime_mask.path}
-            dtype: bool
+        # daytime_mask:
+        #   # Save function
+        #   save:
+        #     _target_: code.data.io.save_npy
+        #     _partial_: true
+        #     path: ${data.stage.valid.variables.daytime_mask.path}
+        #     dtype: bool
   # Test set
   test:
     # Function
@@ -355,7 +359,7 @@ recast:
     # What the method needs as input
     input:
       # Directory of the source data
-      dir: ../GOES_ML/Test2
+      dir: ../../../../../../../d/Data/JCSDA/GOES_ML/Test2
       # Variables
       variables:
         # Atmospheric profiles
@@ -364,7 +368,7 @@ recast:
           load:
             _target_: code.data.io.load_npy
             _partial_: true
-            path: ${...dir}/prof.npy
+            path: ${....dir}/prof.npy
         # Latitude
         lat:
           # Loading function
@@ -420,8 +424,10 @@ recast:
         pressure:
           # Loading function
           load:
-            _target_: code.data.io.load_npy
-            path: ${....dir}/pressure.npy
+            _target_: code.data.units.pa_to_hpa
+            pressure:
+              _target_: code.data.io.load_npy
+              path: ${.....dir}/pressure.npy
     # What the method produces as output
     output:
       # Precision
@@ -503,18 +509,18 @@ recast:
             path: ${data.stage.test.variables.pressure.path}
             dtype: ${data.dtype}
         # Cloud mask (addition)
-        cloud_mask:
-          # Save function
-          save:
-            _target_: code.data.io.save_npy
-            _partial_: true
-            path: ${data.stage.test.variables.cloud_mask.path}
-            dtype: bool
+        # cloud_mask:
+        #   # Save function
+        #   save:
+        #     _target_: code.data.io.save_npy
+        #     _partial_: true
+        #     path: ${data.stage.test.variables.cloud_mask.path}
+        #     dtype: bool
         # Daytime mask (addition)
-        daytime_mask:
-          # Save function
-          save:
-            _target_: code.data.io.save_npy
-            _partial_: true
-            path: ${data.stage.test.variables.daytime_mask.path}
-            dtype: bool
+        # daytime_mask:
+        #   # Save function
+        #   save:
+        #     _target_: code.data.io.save_npy
+        #     _partial_: true
+        #     path: ${data.stage.test.variables.daytime_mask.path}
+        #     dtype: bool

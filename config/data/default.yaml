@@ -1,21 +1,21 @@
 defaults:
-  - variables/cloud_filter
-  - variables/daytime_filter
-  - variables/hofx
-  - variables/lat
-  - variables/lat_slant
-  - variables/lon
-  - variables/lon_slant
-  - variables/meta
-  - variables/obs
-  - variables/pressure
-  - variables/pressure_log
-  - variables/prof
-  - variables/scans
-  - variables/surf
-  - variables/x_slant
-  - variables/y_slant
-  - variables/z_slant
+  - synthetic/cloud_filter@stage
+  - synthetic/daytime_filter@stage
+  - synthetic/hofx@stage
+  - synthetic/lat@stage
+  - synthetic/lat_slant@stage
+  - synthetic/lon@stage
+  - synthetic/lon_slant@stage
+  - synthetic/meta@stage
+  - synthetic/obs@stage
+  - synthetic/pressure@stage
+  - synthetic/pressure_log@stage
+  - synthetic/prof@stage
+  - synthetic/scans@stage
+  - synthetic/surf@stage
+  - synthetic/x_slant@stage
+  - synthetic/y_slant@stage
+  - synthetic/z_slant@stage
 
 # dtype
 dtype: 'float32'

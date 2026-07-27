@@ -479,7 +479,7 @@ if __name__ == '__main__':
 
         Returns
         -------
-        zarr file containing data statistics.
+        File containing data statistics.
     """
 
     main()

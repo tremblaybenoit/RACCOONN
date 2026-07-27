@@ -1,5 +1,5 @@
-# Forward Model Configuration (refactored to use separate configs)
-_target_: code.model.forward.ForwardModel
+# Inverse Model Configuration (refactored to use separate configs)
+_target_: code.model.inverse.InverseModel
 _recursive_: false
 
 # Optimizer - reference external config

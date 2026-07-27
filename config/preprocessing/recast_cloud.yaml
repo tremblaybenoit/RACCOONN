@@ -34,7 +34,7 @@ recast:
         # Tolerance for edges (degrees)
         tolerance: 0.75
       # Directory of the source data
-      dir: ../GOES_ML
+      dir: ../../../../../../../d/Data/JCSDA/GOES_ML
       # Variables
       variables:
         # Atmospheric profiles
@@ -44,11 +44,11 @@ recast:
             _target_: numpy.concatenate
             _args_:
               - - _target_: code.data.io.load_npy
-                  path: ${....dir}/Train2/prof.npy
+                  path: ${.......dir}/Train2/prof.npy
                 - _target_: code.data.io.load_npy
-                  path: ${....dir}/Val2/prof.npy
+                  path: ${.......dir}/Val2/prof.npy
                 - _target_: code.data.io.load_npy
-                  path: ${....dir}/Test2/prof.npy
+                  path: ${.......dir}/Test2/prof.npy
               - 0
         # Latitude
         lat:
@@ -57,20 +57,20 @@ recast:
             _target_: numpy.concatenate
             _args_:
               - - _target_: code.data.io.load_latlon
-                  path: ${....dir}/Train2/lat.npy
+                  path: ${.......dir}/Train2/lat.npy
                   scans:
                     _target_: code.data.io.load_scans
-                    path: ${....dir}/Train2/scans.txt
+                    path: ${.......dir}/Train2/scans.txt
                 - _target_: code.data.io.load_latlon
-                  path: ${....dir}/Val2/lat.npy
+                  path: ${.......dir}/Val2/lat.npy
                   scans:
                     _target_: code.data.io.load_scans
-                    path: ${....dir}/Val2/scans.txt
+                    path: ${.......dir}/Val2/scans.txt
                 - _target_: code.data.io.load_latlon
-                  path: ${....dir}/Test2/lat.npy
+                  path: ${.......dir}/Test2/lat.npy
                   scans:
                     _target_: code.data.io.load_scans
-                    path: ${....dir}/Test2/scans.txt
+                    path: ${.......dir}/Test2/scans.txt
               - 0
         # Longitude
         lon:
@@ -79,20 +79,20 @@ recast:
             _target_: numpy.concatenate
             _args_:
               - - _target_: code.data.io.load_latlon
-                  path: ${....dir}/Train2/lon.npy
+                  path: ${.......dir}/Train2/lon.npy
                   scans:
                     _target_: code.data.io.load_scans
-                    path: ${....dir}/Train2/scans.txt
+                    path: ${.......dir}/Train2/scans.txt
                 - _target_: code.data.io.load_latlon
-                  path: ${....dir}/Val2/lon.npy
+                  path: ${.......dir}/Val2/lon.npy
                   scans:
                     _target_: code.data.io.load_scans
-                    path: ${....dir}/Val2/scans.txt
+                    path: ${.......dir}/Val2/scans.txt
                 - _target_: code.data.io.load_latlon
-                  path: ${....dir}/Test2/lon.npy
+                  path: ${.......dir}/Test2/lon.npy
                   scans:
                     _target_: code.data.io.load_scans
-                    path: ${....dir}/Test2/scans.txt
+                    path: ${.......dir}/Test2/scans.txt
               - 0
         scans:
           # Loading function
@@ -100,20 +100,20 @@ recast:
             _target_: numpy.concatenate
             _args_:
               - - _target_: code.data.io.load_scans
-                  path: ${....dir}/Train2/scans.txt
+                  path: ${.......dir}/Train2/scans.txt
                   lat:
                     _target_: code.data.io.load_latlon
-                    path: ${....dir}/Train2/lat.npy
+                    path: ${.......dir}/Train2/lat.npy
                 - _target_: code.data.io.load_scans
-                  path: ${....dir}/Val2/scans.txt
+                  path: ${.......dir}/Val2/scans.txt
                   lat:
                     _target_: code.data.io.load_latlon
-                    path: ${....dir}/Val2/lat.npy
+                    path: ${.......dir}/Val2/lat.npy
                 - _target_: code.data.io.load_scans
-                  path: ${....dir}/Test2/scans.txt
+                  path: ${.......dir}/Test2/scans.txt
                   lat:
                     _target_: code.data.io.load_latlon
-                    path: ${....dir}/Test2/lat.npy
+                    path: ${.......dir}/Test2/lat.npy
               - 0
         # Meta data
         meta:
@@ -122,11 +122,11 @@ recast:
             _target_: numpy.concatenate
             _args_:
               - - _target_: code.data.io.load_npy
-                  path: ${....dir}/Train2/meta.npy
+                  path: ${.......dir}/Train2/meta.npy
                 - _target_: code.data.io.load_npy
-                  path: ${....dir}/Val2/meta.npy
+                  path: ${.......dir}/Val2/meta.npy
                 - _target_: code.data.io.load_npy
-                  path: ${....dir}/Test2/meta.npy
+                  path: ${.......dir}/Test2/meta.npy
               - 0
         # Surface data
         surf:
@@ -135,11 +135,11 @@ recast:
             _target_: numpy.concatenate
             _args_:
               - - _target_: code.data.io.load_npy
-                  path: ${....dir}/Train2/surf.npy
+                  path: ${.......dir}/Train2/surf.npy
                 - _target_: code.data.io.load_npy
-                  path: ${....dir}/Val2/surf.npy
+                  path: ${.......dir}/Val2/surf.npy
                 - _target_: code.data.io.load_npy
-                  path: ${....dir}/Test2/surf.npy
+                  path: ${.......dir}/Test2/surf.npy
               - 0
         # Observations
         obs:
@@ -148,11 +148,11 @@ recast:
             _target_: numpy.concatenate
             _args_:
               - - _target_: code.data.io.load_npy
-                  path: ${....dir}/Train2/obs.npy
+                  path: ${.......dir}/Train2/obs.npy
                 - _target_: code.data.io.load_npy
-                  path: ${....dir}/Val2/obs.npy
+                  path: ${.......dir}/Val2/obs.npy
                 - _target_: code.data.io.load_npy
-                  path: ${....dir}/Test2/obs.npy
+                  path: ${.......dir}/Test2/obs.npy
               - 0
         # hofx
         hofx:
@@ -161,18 +161,18 @@ recast:
             _target_: numpy.concatenate
             _args_:
               - - _target_: code.data.io.load_npy
-                  path: ${....dir}/Train2/hofx.npy
+                  path: ${.......dir}/Train2/hofx.npy
                 - _target_: code.data.io.load_npy
-                  path: ${....dir}/Val2/hofx.npy
+                  path: ${.......dir}/Val2/hofx.npy
                 - _target_: code.data.io.load_npy
-                  path: ${....dir}/Test2/hofx.npy
+                  path: ${.......dir}/Test2/hofx.npy
               - 0
         # Pressure
         pressure:
           # Loading function
           load:
             _target_: code.data.io.load_npy
-            path: ${....dir}/pressure.npy
+            path: ${.......dir}/pressure.npy
     # What the method produces as output
     output:
       # Precision

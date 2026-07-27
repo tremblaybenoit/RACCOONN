@@ -13,7 +13,7 @@ filters:
         # Statistics of the pressure variable to compute the mask
         stats:
           _target_: code.data.preprocessing.statistics.read_statistics_var
-          load: ${data.preprocessing.statistics.data.output.load}
+          load: ${preprocessing.statistics.data.output.load}
           key: 'pressure'
           dtype: ${data.dtype}
         # Ratio threshold to determine constant pressure levels
@@ -22,7 +22,7 @@ filters:
     # What the method produces as output
     output:
       # File path to save/load the covariance matrix
-      path: ${....dir}/pressure_mask.npy
+      path: ${paths.data_dir}/pressure_mask.npy
       # Save function
       save:
         _target_: numpy.save
