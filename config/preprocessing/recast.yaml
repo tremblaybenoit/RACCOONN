@@ -12,8 +12,8 @@ recast:
       # Mask to apply
       mask:
         # Cloud/clear sky
-        cloud_mask: true
-        clear_mask: true
+        cloud_mask: false
+        clear_mask: false
       # Variables
       variables:
         # Atmospheric profiles
@@ -21,7 +21,6 @@ recast:
           # Load function
           load:
             _target_: code.data.io.load_npy
-            _partial_: true
             path: ${....dir}/prof.npy
         # Latitude
         lat:
@@ -96,7 +95,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.train.variables.prof.path}
+            _args_:
+              - ${data.stage.train.variables.prof.path}
             dtype: ${data.dtype}
         # Latitude
         lat:
@@ -104,7 +104,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.train.variables.lat.path}
+            _args_:
+              - ${data.stage.train.variables.lat.path}
             dtype: ${data.dtype}
         # Longitude
         lon:
@@ -112,7 +113,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.train.variables.lon.path}
+            _args_:
+              - ${data.stage.train.variables.lon.path}
             dtype: ${data.dtype}
         # Scans
         scans:
@@ -120,7 +122,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.train.variables.scans.path}
+            _args_:
+              - ${data.stage.train.variables.scans.path}
             dtype: ${data.dtype}
         # Meta data
         meta:
@@ -128,7 +131,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.train.variables.meta.path}
+            _args_:
+              - ${data.stage.train.variables.meta.path}
             dtype: ${data.dtype}
         # Surface data
         surf:
@@ -136,7 +140,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.train.variables.surf.path}
+            _args_:
+              - ${data.stage.train.variables.surf.path}
             dtype: ${data.dtype}
         # Observations
         obs:
@@ -144,7 +149,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.train.variables.obs.path}
+            _args_:
+              - ${data.stage.train.variables.obs.path}
             dtype: ${data.dtype}
         # hofx
         hofx:
@@ -152,7 +158,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.train.variables.hofx.path}
+            _args_:
+              - ${data.stage.train.variables.hofx.path}
             dtype: ${data.dtype}
         # Pressure
         pressure:
@@ -160,7 +167,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.train.variables.pressure.path}
+            _args_:
+              - ${data.stage.train.variables.pressure.path}
             dtype: ${data.dtype}
         # Cloud mask (addition)
         # cloud_mask:
@@ -168,7 +176,8 @@ recast:
         #   save:
         #     _target_: code.data.io.save_npy
         #     _partial_: true
-        #     path: ${data.stage.train.variables.cloud_mask.path}
+        #     _args_:
+        #       - ${data.stage.train.variables.cloud_mask.path}
         #     dtype: bool
         # Daytime mask (addition)
         # daytime_mask:
@@ -176,7 +185,8 @@ recast:
         #   save:
         #     _target_: code.data.io.save_npy
         #     _partial_: true
-        #     path: ${data.stage.train.variables.daytime_mask.path}
+        #     _args_:
+        #       - ${data.stage.train.variables.daytime_mask.path}
         #     dtype: bool
   # Validation set
   valid:
@@ -187,6 +197,8 @@ recast:
     input:
       # Directory of the source data
       dir: ../../../../../../../d/Data/JCSDA/GOES_ML/Val2
+      # Mask to apply
+      mask: ${preprocessing.recast.train.input.mask}
       # Variables
       variables:
         # Atmospheric profiles
@@ -194,7 +206,6 @@ recast:
           # Load function
           load:
             _target_: code.data.io.load_npy
-            _partial_: true
             path: ${....dir}/prof.npy
         # Latitude
         lat:
@@ -269,7 +280,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.valid.variables.prof.path}
+            _args_:
+              - ${data.stage.valid.variables.prof.path}
             dtype: ${data.dtype}
         # Latitude
         lat:
@@ -277,7 +289,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.valid.variables.lat.path}
+            _args_:
+              - ${data.stage.valid.variables.lat.path}
             dtype: ${data.dtype}
         # Longitude
         lon:
@@ -285,7 +298,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.valid.variables.lon.path}
+            _args_:
+              - ${data.stage.valid.variables.lon.path}
             dtype: ${data.dtype}
         # Scans
         scans:
@@ -293,7 +307,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.valid.variables.scans.path}
+            _args_:
+              - ${data.stage.valid.variables.scans.path}
             dtype: ${data.dtype}
         # Meta data
         meta:
@@ -301,7 +316,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.valid.variables.meta.path}
+            _args_:
+              - ${data.stage.valid.variables.meta.path}
             dtype: ${data.dtype}
         # Surface data
         surf:
@@ -309,7 +325,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.valid.variables.surf.path}
+            _args_:
+              - ${data.stage.valid.variables.surf.path}
             dtype: ${data.dtype}
         # Observations
         obs:
@@ -317,7 +334,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.valid.variables.obs.path}
+            _args_:
+              - ${data.stage.valid.variables.obs.path}
             dtype: ${data.dtype}
         # hofx
         hofx:
@@ -325,7 +343,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.valid.variables.hofx.path}
+            _args_:
+              - ${data.stage.valid.variables.hofx.path}
             dtype: ${data.dtype}
         # Pressure
         pressure:
@@ -333,7 +352,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.valid.variables.pressure.path}
+            _args_:
+              - ${data.stage.valid.variables.pressure.path}
             dtype: ${data.dtype}
         # Cloud mask (addition)
         # cloud_mask:
@@ -341,7 +361,8 @@ recast:
         #   save:
         #     _target_: code.data.io.save_npy
         #     _partial_: true
-        #     path: ${data.stage.valid.variables.cloud_mask.path}
+        #     _args_:
+        #       - ${data.stage.valid.variables.cloud_mask.path}
         #     dtype: bool
         # Daytime mask (addition)
         # daytime_mask:
@@ -349,7 +370,8 @@ recast:
         #   save:
         #     _target_: code.data.io.save_npy
         #     _partial_: true
-        #     path: ${data.stage.valid.variables.daytime_mask.path}
+        #     _args_:
+        #       - ${data.stage.valid.variables.daytime_mask.path}
         #     dtype: bool
   # Test set
   test:
@@ -360,6 +382,8 @@ recast:
     input:
       # Directory of the source data
       dir: ../../../../../../../d/Data/JCSDA/GOES_ML/Test2
+      # Mask to apply
+      mask: ${preprocessing.recast.train.input.mask}
       # Variables
       variables:
         # Atmospheric profiles
@@ -367,7 +391,6 @@ recast:
           # Load function
           load:
             _target_: code.data.io.load_npy
-            _partial_: true
             path: ${....dir}/prof.npy
         # Latitude
         lat:
@@ -442,7 +465,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.test.variables.prof.path}
+            _args_:
+              - ${data.stage.test.variables.prof.path}
             dtype: ${data.dtype}
         # Latitude
         lat:
@@ -450,7 +474,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.test.variables.lat.path}
+            _args_:
+              - ${data.stage.test.variables.lat.path}
             dtype: ${data.dtype}
         # Longitude
         lon:
@@ -458,7 +483,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.test.variables.lon.path}
+            _args_:
+              - ${data.stage.test.variables.lon.path}
             dtype: ${data.dtype}
         # Scans
         scans:
@@ -466,7 +492,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.test.variables.scans.path}
+            _args_:
+              - ${data.stage.test.variables.scans.path}
             dtype: ${data.dtype}
         # Meta data
         meta:
@@ -474,7 +501,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.test.variables.meta.path}
+            _args_:
+              - ${data.stage.test.variables.meta.path}
             dtype: ${data.dtype}
         # Surface data
         surf:
@@ -482,7 +510,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.test.variables.surf.path}
+            _args_:
+              - ${data.stage.test.variables.surf.path}
             dtype: ${data.dtype}
         # Observations
         obs:
@@ -490,7 +519,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.test.variables.obs.path}
+            _args_:
+              - ${data.stage.test.variables.obs.path}
             dtype: ${data.dtype}
         # hofx
         hofx:
@@ -498,7 +528,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.test.variables.hofx.path}
+            _args_:
+              - ${data.stage.test.variables.hofx.path}
             dtype: ${data.dtype}
         # Pressure
         pressure:
@@ -506,7 +537,8 @@ recast:
           save:
             _target_: code.data.io.save_npy
             _partial_: true
-            path: ${data.stage.test.variables.pressure.path}
+            _args_:
+              - ${data.stage.test.variables.pressure.path}
             dtype: ${data.dtype}
         # Cloud mask (addition)
         # cloud_mask:
@@ -514,7 +546,8 @@ recast:
         #   save:
         #     _target_: code.data.io.save_npy
         #     _partial_: true
-        #     path: ${data.stage.test.variables.cloud_mask.path}
+        #     _args_:
+        #       - ${data.stage.test.variables.cloud_mask.path}
         #     dtype: bool
         # Daytime mask (addition)
         # daytime_mask:
@@ -522,5 +555,6 @@ recast:
         #   save:
         #     _target_: code.data.io.save_npy
         #     _partial_: true
-        #     path: ${data.stage.test.variables.daytime_mask.path}
+        #     _args_:
+        #       - ${data.stage.test.variables.daytime_mask.path}
         #     dtype: bool

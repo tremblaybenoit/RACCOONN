@@ -1,4 +1,4 @@
 defaults:
-  - recast_cloud         # First: recast raw data to desired format/precision/filtering
+  - recast         # First: recast raw data to desired format/precision/filtering
   - statistics
   - _self_

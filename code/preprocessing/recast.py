@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import hydra
 from omegaconf import DictConfig
@@ -129,11 +131,9 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
 
     # Build dictionary from input data
     data = {}
-    breakpoint()
     for key, value in input.variables.items():
         # Load data
         data[key] = instantiate(value.load)
-    breakpoint()
 
     # Compute derived variables
     # Clouds or clear sky masks
@@ -195,6 +195,9 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
         elif nighttime_keep and not daytime_keep:
             mask &= data['nighttime_mask']
 
+    # Create directory for output if it doesn't exist
+    os.makedirs(output.dir, exist_ok=True)
+
     # Shuffle or maintain distribution
     if hasattr(input, 'split') and input.split is not None:
         logger.info("\n  Reshuffling into train/valid/test splits...")
@@ -208,7 +211,7 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
         # Save to disk, acoording to new split
         for stage, coords in split.items():
             # Loop over variables per stage
-            for key, value in output.data.stage[stage].items():
+            for key, value in output.stage[stage].variables.items():
                 # Save function
                 save_fn = instantiate(value.save)
                 # Save data
@@ -224,7 +227,7 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
         else:
             data = {key: (value[mask] if key not in ('pressure', 'pressure_mask') else value) for key, value in data.items()}
         # Save to disk
-        for key, value in output.data.items():
+        for key, value in output.variables.items():
             # Save function
             save_fn = instantiate(value.save)
             save_fn(data[key])
