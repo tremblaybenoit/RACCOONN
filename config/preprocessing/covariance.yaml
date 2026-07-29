@@ -10,19 +10,19 @@ covariance:
     input:
       # Variables to consider for the covariance estimation
       data:
-        load: ${data.stage.source.variables.prof.load}
-        transformations:  ${data.stage.source.variables.prof.transformations}
+        load: ${data.stage.all.variables.prof.load}
+        transformations:  ${data.stage.all.variables.prof.transformations}
       # Latitude
       lat:
-        load: ${data.stage.source.variables.lat.load}
+        load: ${data.stage.all.variables.lat.load}
       # Longitude
       lon:
-        load: ${data.stage.source.variables.lon.load}
+        load: ${data.stage.all.variables.lon.load}
       # Scans
       scans:
-        load: ${data.stage.source.variables.scans.load}
+        load: ${data.stage.all.variables.scans.load}
       # Pressure filter: Consider only pressure levels with non-zero variance
-      pressure_filter: ${data.stage.source.variables.pressure_mask}
+      pressure_filter: ${data.stage.all.variables.pressure_mask}
     # Univariate or multivariate
     univariate: true
     # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
@@ -111,17 +111,17 @@ covariance:
     input:
       # Innovation estimates for the observation variables
       data:
-        load: ${data.stage.source.variables.hofx_forward_stdev.load}
+        load: ${data.stage.all.variables.hofx_forward_stdev.load}
         transformations:  null
       # Latitude
       lat:
-        load: ${data.stage.source.variables.lat.load}
+        load: ${data.stage.all.variables.lat.load}
       # Longitude
       lon:
-        load: ${data.stage.source.variables.lon.load}
+        load: ${data.stage.all.variables.lon.load}
       # Scans
       scans:
-        load: ${data.stage.source.variables.scans.load}
+        load: ${data.stage.all.variables.scans.load}
     # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
     scaling_factor: 1.0
     # Regularization parameter to ensure numerical stability

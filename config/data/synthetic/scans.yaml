@@ -1,6 +1,6 @@
 # Format:
-#   -- source: common configuration for all stages (train/valid/test/predict)
-#   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
 
 # Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
 
@@ -41,20 +41,20 @@ valid:
     # Scans
     scans:
       # Dataset class
-      _target_: ${data.stage.train.variables.scans._target_}
+      _target_: ${....train.variables.scans._target_}
       _recursive_: false
       # Path to the scans data file
       path: ${...dir}/scans.npy
       # Type of scans
-      type: ${data.stage.train.variables.scans.type}
+      type: ${....train.variables.scans.type}
       # Loading function
       load:
-        _target_: code.data.io.load_npy
+        _target_: ${.....train.variables.scans.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.scans.transformations}
+      transformations: ${....train.variables.scans.transformations}
 # Test set
 test:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -62,42 +62,41 @@ test:
     # Scans
     scans:
       # Dataset class
-      _target_: ${data.stage.train.variables.scans._target_}
+      _target_: ${....train.variables.scans._target_}
       _recursive_: false
       # Path to the scans data file
       path: ${...dir}/scans.txt
       # Type of scans
-      type: ${data.stage.train.variables.scans.type}
+      type: ${....train.variables.scans.type}
       # Loading function
       load:
-        _target_: code.data.io.load_npy
+        _target_: ${.....train.variables.scans.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.scans.transformations}
+      transformations: ${....train.variables.scans.transformations}
 # Predict set
 predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Scans
     scans: ${...test.variables.scans}
-# Source data (complete dataset)
-source:
+# All data (complete dataset)
+all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Scans
     scans:
       # Type of scans
-      type: ${data.stage.train.variables.scans.type}
+      type: ${....train.variables.scans.type}
       # Loading function
       load:
         _target_: numpy.concatenate
         _args_:
-          - - ${data.stage.train.variables.scans.load}
-            - ${data.stage.valid.variables.scans.load}
-            - ${data.stage.test.variables.scans.load}
+          - - ${.......train.variables.scans.load}
+            - ${.......valid.variables.scans.load}
+            - ${.......test.variables.scans.load}
           - 0
       # Transformations to apply
-      transformations: ${data.stage.train.variables.scans.transformations}
-
+      transformations: ${....train.variables.scans.transformations}

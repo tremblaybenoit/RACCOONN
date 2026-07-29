@@ -1,5 +1,6 @@
 defaults:
   - synthetic/default@stage
+  - synthetic/default@source
 
 # dtype
 dtype: 'float32'
@@ -8,6 +9,36 @@ dtype: 'float32'
 select_input: ['prof', 'meta', 'surf']
 select_target: ['hofx']
 select_context: ['clear_mask', 'cloud_mask', 'daytime_mask']
+
+# Original data - Split the data into training, validation, and test sets
+source:
+  # Training set
+  train:
+    # Path to training data
+    dir: ../synthetic_float32/Train2
+    # Split
+    split: null
+
+  # Validation set
+  valid:
+    # Path to validation data
+    dir: ../synthetic_float32/Val2
+    # Split
+    split: null
+
+  # Test set
+  test:
+    # Path to test data
+    dir: ../synthetic_float32/Test2
+    # Split
+    split: null
+
+  # Prediction set (NOTE: By default, we use the test set as the prediction set for demonstration purposes)
+  predict:
+    # Path to prediction data
+    dir: ${data.source.test.dir}
+    # Split
+    split: ${data.source.test.split}
 
 # Split the data into training, validation, and test sets
 stage:

@@ -1,6 +1,6 @@
 # Format:
-#   -- source: common configuration for all stages (train/valid/test/predict)
-#   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
 
 # Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
 
@@ -29,7 +29,7 @@ train:
           # Cholesky matrix
           cholesky: ${preprocessing.covariance.B.output.cholesky}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.prof.transformations}
+      transformations: ${..prof.transformations}
 # Validation set
 valid:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -37,23 +37,21 @@ valid:
     # Atmospheric profiles
     prof_prior:
       # Dataset class
-      _target_: ${data.stage.train.variables.prof_prior._target_}
+      _target_: ${....train.variables.prof_prior._target_}
       _recursive_: false
       # Path to the atmospheric profiles file
       path: null
       # Profile types
-      type: ${data.stage.train.variables.prof_prior.type}
+      type: ${....train.variables.prof_prior.type}
       # Loading function
       load:
-        _target_: code.preprocessing.covariance.prior_from_bounded_perturbations
+        _target_: ${.....train.variables.prof_prior.load._target_}
         stats: ${...prof.transformations.normalization.stats}
         seed: 48
         # What the method needs as input
-        input:
-          # Cholesky matrix
-          cholesky: ${preprocessing.covariance.B.output.cholesky}
+        input: ${.....train.variables.prof_prior.load.input}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.prof.transformations}
+      transformations: ${..prof.transformations}
 # Test set
 test:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -61,45 +59,42 @@ test:
     # Atmospheric profiles
     prof_prior:
       # Dataset class
-      _target_: ${data.stage.train.variables.prof_prior._target_}
+      _target_: ${....train.variables.prof_prior._target_}
       _recursive_: false
       # Path to the atmospheric profiles file
       path: null
       # Profile types
-      type: ${data.stage.train.variables.prof_prior.type}
+      type: ${....train.variables.prof_prior.type}
       # Loading function
       load:
-        _target_: code.preprocessing.covariance.prior_from_bounded_perturbations
+        _target_: ${.....train.variables.prof_prior.load._target_}
         stats: ${...prof.transformations.normalization.stats}
         seed: 15
         # What the method needs as input
-        input:
-          # Cholesky matrix
-          cholesky: ${preprocessing.covariance.B.output.cholesky}
+        input: ${.....train.variables.prof_prior.load.input}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.prof.transformations}
+      transformations: ${..prof.transformations}
 # Predict set
 predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Atmospheric profiles
     prof_prior: ${...test.variables.prof_prior}
-# Source data (complete dataset)
-source:
+# All data (complete dataset)
+all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Atmospheric profiles
     prof_prior:
       # Type of the atmospheric profiles
-      type: ${data.stage.train.variables.prof_prior.type}
+      type: ${....train.variables.prof_prior.type}
       # Loading function
       load:
         _target_: numpy.concatenate
         _args_:
-          - - ${data.stage.train.variables.prof_prior.load}
-            - ${data.stage.valid.variables.prof_prior.load}
-            - ${data.stage.test.variables.prof_prior.load}
+          - - ${.......train.variables.prof_prior.load}
+            - ${.......valid.variables.prof_prior.load}
+            - ${.......test.variables.prof_prior.load}
           - 0
       # Transformations to apply
-      transformations: ${data.stage.train.variables.prof.transformations}
-
+      transformations: ${....train.variables.prof_prior.transformations}

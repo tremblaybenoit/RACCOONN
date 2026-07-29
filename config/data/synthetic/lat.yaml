@@ -1,6 +1,6 @@
 # Format:
-#   -- source: common configuration for all stages (train/valid/test/predict)
-#   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
 
 # Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
 
@@ -41,20 +41,20 @@ valid:
     # Latitude
     lat:
       # Dataset class
-      _target_: ${data.stage.train.variables.lat._target_}
+      _target_: ${....train.variables.lat._target_}
       _recursive_: false
       # Path to the latitude data file
       path: ${...dir}/lat.npy
       # Type of data
-      type: ${data.stage.train.variables.lat.type}
+      type: ${....train.variables.lat.type}
       # Loading function
       load:
-        _target_: code.data.io.load_npy
+        _target_: ${.....train.variables.lat.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.lat.transformations}
+      transformations: ${....train.variables.lat.transformations}
 # Test set
 test:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -62,41 +62,41 @@ test:
     # Latitude
     lat:
       # Dataset class
-      _target_: ${data.stage.train.variables.lat._target_}
+      _target_: ${....train.variables.lat._target_}
       _recursive_: false
       # Path to the latitude data file
       path: ${...dir}/lat.npy
       # Type of data
-      type: ${data.stage.train.variables.lat.type}
+      type: ${....train.variables.lat.type}
       # Loading function
       load:
-        _target_: code.data.io.load_npy
+        _target_: ${.....train.variables.lat.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.lat.transformations}
+      transformations: ${....train.variables.lat.transformations}
 # Predict set
 predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Latitude
     lat: ${...test.variables.lat}
-# Source data (complete dataset)
-source:
+# All data (complete dataset)
+all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Latitude
     lat:
       # Type of data
-      type: ${data.stage.train.variables.lat.type}
+      type: ${....train.variables.lat.type}
       # Loading function
       load:
         _target_: numpy.concatenate
         _args_:
-          - - ${data.stage.train.variables.lat.load}
-            - ${data.stage.valid.variables.lat.load}
-            - ${data.stage.test.variables.lat.load}
+          - - ${.......train.variables.lat.load}
+            - ${.......valid.variables.lat.load}
+            - ${.......test.variables.lat.load}
           - 0
       # Transformations to apply
-      transformations: ${data.stage.train.variables.lat.transformations}
+      transformations: ${....train.variables.lat.transformations}

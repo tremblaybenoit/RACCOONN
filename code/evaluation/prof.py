@@ -2,6 +2,7 @@ import numpy as np
 import logging
 import hydra
 from omegaconf import DictConfig
+from utilities.instantiators import instantiate
 from utilities.logic import get_config_path
 import os
 from code.evaluation.plot import fig_vertical_profiles, save_plot
@@ -24,6 +25,15 @@ def main(config: DictConfig) -> None:
         -------
         None.
     """
+
+    key = 'cloud_mask'
+    breakpoint()
+    var_train = instantiate(config.data.stage.train.variables[key].load)
+    var_valid = instantiate(config.data.stage.valid.variables[key].load)
+    var_test = instantiate(config.data.stage.test.variables[key].load)
+    var_predict = instantiate(config.data.stage.predict.variables[key].load)
+    var_all = instantiate(config.data.stage.all.variables[key].load)
+    breakpoint()
 
     # Load profiles with different normalization methods
     logger.info("Loading profiles with different normalization methods...")

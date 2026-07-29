@@ -1,5 +1,10 @@
 defaults:
-  - synthetic/inverse_default@stage
+  - synthetic/default@stage
+  - synthetic/hofx_forward@stage
+  - synthetic/hofx_forward_mean@stage
+  - synthetic/hofx_forward_stdev@stage
+  - synthetic/pressure_mask@stage
+  - synthetic/prof_prior@stage
 
 # dtype
 dtype: 'float32'

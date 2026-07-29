@@ -1,6 +1,6 @@
 # Format:
-#   -- source: common configuration for all stages (train/valid/test/predict)
-#   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
 
 # Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
 
@@ -36,20 +36,20 @@ valid:
     # Atmospheric profiles
     prof:
       # Dataset class
-      _target_: ${data.stage.train.variables.prof._target_}
+      _target_: ${....train.variables.prof._target_}
       _recursive_: false
       # Path to the atmospheric profiles file
       path: ${...dir}/prof.npy
       # Profile types
-      type: ${data.stage.train.variables.prof.type}
+      type: ${....train.variables.prof.type}
       # Loading function
       load:
-        _target_: ${data.stage.train.variables.prof.load._target_}
+        _target_: ${.....train.variables.prof.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.prof.transformations}
+      transformations: ${....train.variables.prof.transformations}
 # Test set
 test:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -57,39 +57,39 @@ test:
     # Atmospheric profiles
     prof:
       # Dataset class
-      _target_: ${data.stage.train.variables.prof._target_}
+      _target_: ${....train.variables.prof._target_}
       _recursive_: false
       # Path to the atmospheric profiles file
       path: ${...dir}/prof.npy
       # Profile types
-      type: ${data.stage.train.variables.prof.type}
+      type: ${....train.variables.prof.type}
       # Loading function
       load:
-        _target_: ${data.stage.train.variables.prof.load._target_}
+        _target_: ${.....train.variables.prof.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.prof.transformations}
+      transformations: ${....train.variables.prof.transformations}
   # Results-specific configuration for the test stage
   results:
     # Atmospheric profiles
     prof:
-     # Path to the atmospheric profiles results file
-     path: ${paths.run_dir}/test_prof.npy
-     # Save function
-     save:
-       _target_: numpy.save
-       _partial_: true
-       _args_:
-         - ${...path}
-     # Loading function
-     load:
-       _target_: code.data.io.load_npy
-       path: ${..path}
-       dtype: ${data.dtype}
-     # Transformations to apply
-     transformations: ${data.stage.train.variables.prof.transformations}
+      # Path to the atmospheric profiles results file
+      path: ${paths.run_dir}/test_prof.npy
+      # Save function
+      save:
+        _target_: numpy.save
+        _partial_: true
+        _args_:
+          - ${...path}
+      # Loading function
+      load:
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${....train.variables.prof.transformations}
 # Predict set
 predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -97,20 +97,20 @@ predict:
     # Atmospheric profiles
     prof:
       # Dataset class
-      _target_: ${data.stage.train.variables.prof._target_}
+      _target_: ${....train.variables.prof._target_}
       _recursive_: false
       # Path to the atmospheric profiles file
       path: ${...dir}/prof.npy
       # Profile types
-      type: ${data.stage.train.variables.prof.type}
+      type: ${....train.variables.prof.type}
       # Loading function
       load:
-        _target_: ${data.stage.train.variables.prof.load._target_}
+        _target_: ${.....train.variables.prof.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.prof.transformations}
+      transformations: ${....train.variables.prof.transformations}
   # Results-specific configuration for the predict stage
   results:
     # Atmospheric profiles
@@ -129,23 +129,22 @@ predict:
         path: ${..path}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.prof.transformations}
-# Source data (complete dataset)
-source:
+      transformations: ${....train.variables.prof.transformations}
+# All data (complete dataset)
+all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Atmospheric profiles
     prof:
       # Type of the atmospheric profiles
-      type: ${data.stage.train.variables.prof.type}
+      type: ${....train.variables.prof.type}
       # Loading function
       load:
         _target_: numpy.concatenate
         _args_:
-          - - ${data.stage.train.variables.prof.load}
-            - ${data.stage.valid.variables.prof.load}
-            - ${data.stage.test.variables.prof.load}
+          - - ${.......train.variables.prof.load}
+            - ${.......valid.variables.prof.load}
+            - ${.......test.variables.prof.load}
           - 0
       # Transformations to apply
-      transformations: ${data.stage.train.variables.prof.transformations}
-
+      transformations: ${....train.variables.prof.transformations}

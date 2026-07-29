@@ -1,6 +1,6 @@
 # Format:
-#   -- source: common configuration for all stages (train/valid/test/predict)
-#   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
 
 # Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
 
@@ -48,20 +48,20 @@ valid:
     # Surface variables
     surf:
       # Dataset class
-      _target_: ${data.stage.train.variables.surf._target_}
+      _target_: ${....train.variables.surf._target_}
       _recursive_: false
       # Path to the surface variables file
       path: ${...dir}/surf.npy
       # Surface variable types
-      type: ${data.stage.train.variables.surf.type}
+      type: ${....train.variables.surf.type}
       # Loading function
       load:
-        _target_: ${data.stage.train.variables.surf.load._target_}
+        _target_: ${.....train.variables.surf.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.surf.transformations}
+      transformations: ${....train.variables.surf.transformations}
 # Test set
 test:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -69,20 +69,20 @@ test:
     # Surface variables
     surf:
       # Dataset class
-      _target_: ${data.stage.train.variables.surf._target_}
+      _target_: ${....train.variables.surf._target_}
       _recursive_: false
       # Path to the surface variables file
       path: ${...dir}/surf.npy
       # Surface variable types
-      type: ${data.stage.train.variables.surf.type}
+      type: ${....train.variables.surf.type}
       # Loading function
       load:
-        _target_: ${data.stage.train.variables.surf.load._target_}
+        _target_: ${.....train.variables.surf.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.surf.transformations}
+      transformations: ${....train.variables.surf.transformations}
 # Predict set
 predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -90,36 +90,35 @@ predict:
     # Surface variables
     surf:
       # Dataset class
-      _target_: ${data.stage.train.variables.surf._target_}
+      _target_: ${....train.variables.surf._target_}
       _recursive_: false
       # Path to the surface variables file
       path: ${...dir}/surf.npy
       # Surface variable types
-      type: ${data.stage.train.variables.surf.type}
+      type: ${....train.variables.surf.type}
       # Loading function
       load:
-        _target_: ${data.stage.train.variables.surf.load._target_}
+        _target_: ${.....train.variables.surf.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.surf.transformations}
-# Source data (complete dataset)
-source:
+      transformations: ${....train.variables.surf.transformations}
+# All data (complete dataset)
+all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Surface variables
     surf:
       # Surface variable types
-      type: ${data.stage.train.variables.surf.type}
+      type: ${....train.variables.surf.type}
       # Loading function
       load:
         _target_: numpy.concatenate
         _args_:
-          - - ${data.stage.train.variables.surf.load}
-            - ${data.stage.valid.variables.surf.load}
-            - ${data.stage.test.variables.surf.load}
+          - - ${.......train.variables.surf.load}
+            - ${.......valid.variables.surf.load}
+            - ${.......test.variables.surf.load}
           - 0
       # Transformations to apply
-      transformations: ${data.stage.train.variables.surf.transformations}
-
+      transformations: ${....train.variables.surf.transformations}

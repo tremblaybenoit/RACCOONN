@@ -1,11 +1,11 @@
 # Format:
-#   -- source: common configuration for all stages (train/valid/test/predict)
-#   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
 
 # Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
 
-# Source data (complete dataset)
-source:
+# All data (complete dataset)
+all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Pressure mask
@@ -24,22 +24,22 @@ train:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Pressure mask
-    pressure_mask: ${...source.variables.pressure_mask}
+    pressure_mask: ${...all.variables.pressure_mask}
 # Validation set
 valid:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Pressure mask
-    pressure_mask: ${...source.variables.pressure_mask}
+    pressure_mask: ${...all.variables.pressure_mask}
 # Test set
 test:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Pressure mask
-    pressure_mask: ${...source.variables.pressure_mask}
+    pressure_mask: ${...all.variables.pressure_mask}
 # Predict set
 predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Pressure mask
-    pressure_mask: ${...source.variables.pressure_mask}
+    pressure_mask: ${...all.variables.pressure_mask}

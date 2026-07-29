@@ -1,6 +1,6 @@
 # Format:
-#   -- source: common configuration for all stages (train/valid/test/predict)
-#   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
 
 # Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
 
@@ -44,20 +44,20 @@ valid:
     # HOFX (Simulated Observations)
     hofx:
       # Dataset class
-      _target_: ${data.stage.train.variables.hofx._target_}
+      _target_: ${....train.variables.hofx._target_}
       _recursive_: false
       # Path to the HOFX (simulated observations) file
       path: ${...dir}/hofx.npy
       # Channels
-      type: ${data.stage.train.variables.hofx.type}
+      type: ${....train.variables.hofx.type}
       # Loading function
       load:
-        _target_: ${data.stage.train.variables.hofx.load._target_}
+        _target_: ${.....train.variables.hofx.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.hofx.transformations}
+      transformations: ${....train.variables.hofx.transformations}
 # Test set
 test:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -65,20 +65,20 @@ test:
     # HOFX (Simulated Observations)
     hofx:
       # Dataset class
-      _target_: ${data.stage.train.variables.hofx._target_}
+      _target_: ${....train.variables.hofx._target_}
       _recursive_: false
       # Path to the HOFX (simulated observations) file
       path: ${...dir}/hofx.npy
       # Channels
-      type: ${data.stage.train.variables.hofx.type}
+      type: ${....train.variables.hofx.type}
       # Loading function
       load:
-        _target_: ${data.stage.train.variables.hofx.load._target_}
+        _target_: ${.....train.variables.hofx.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.hofx.transformations}
+      transformations: ${....train.variables.hofx.transformations}
   # Results-specific configuration for the test stage
   results:
     # HOFX (Simulated Observations)
@@ -97,13 +97,13 @@ test:
         path: ${..path}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.hofx.transformations}
+      transformations: ${....train.variables.hofx.transformations}
 # Predict set
 predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    hofx: ${data.stage.test.variables.hofx}
+    hofx: ${...test.variables.hofx}
   # Results-specific configuration for the predict stage
   results:
     # HOFX (Simulated Observations)
@@ -122,23 +122,22 @@ predict:
         path: ${..path}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.hofx.transformations}
-# Source data (complete dataset)
-source:
+      transformations: ${....train.variables.hofx.transformations}
+# All data (complete dataset)
+all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
     hofx:
       # Channels
-      type: ${data.stage.train.variables.hofx.type}
+      type: ${....train.variables.hofx.type}
       # Loading function
       load:
         _target_: numpy.concatenate
         _args_:
-          - - ${data.stage.train.variables.hofx.load}
-            - ${data.stage.valid.variables.hofx.load}
-            - ${data.stage.test.variables.hofx.load}
+          - - ${.......train.variables.hofx.load}
+            - ${.......valid.variables.hofx.load}
+            - ${.......test.variables.hofx.load}
           - 0
       # Transformations to apply
-      transformations: ${data.stage.train.variables.hofx.transformations}
-
+      transformations: ${....train.variables.hofx.transformations}

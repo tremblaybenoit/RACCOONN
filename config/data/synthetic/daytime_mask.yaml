@@ -1,6 +1,6 @@
 # Format:
-#   -- source: common configuration for all stages (train/valid/test/predict)
-#   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
 
 # Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
 
@@ -29,17 +29,17 @@ valid:
     # Daytime mask
     daytime_mask:
       # Dataset class
-      _target_: ${data.stage.train.variables.daytime_mask._target_}
+      _target_: ${....train.variables.daytime_mask._target_}
       _recursive_: false
       # Type of data
-      type: ${data.stage.train.variables.daytime_mask.type}
+      type: ${....train.variables.daytime_mask.type}
       # Loading function (daytime filter is computed, not loaded directly)
       load:
-        _target_: ${data.stage.train.variables.daytime_mask.load._target_}
+        _target_: ${.....train.variables.daytime_mask.load._target_}
         _args_:
           - ${....meta.load}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.daytime_mask.transformations}
+      transformations: ${....train.variables.daytime_mask.transformations}
 # Test set
 test:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -47,39 +47,38 @@ test:
     # Daytime mask
     daytime_mask:
       # Dataset class
-      _target_: ${data.stage.train.variables.daytime_mask._target_}
+      _target_: ${....train.variables.daytime_mask._target_}
       _recursive_: false
       # Type of data
-      type: ${data.stage.train.variables.daytime_mask.type}
+      type: ${....train.variables.daytime_mask.type}
       # Loading function (daytime filter is computed, not loaded directly)
       load:
-        _target_: ${data.stage.train.variables.daytime_mask.load._target_}
+        _target_: ${.....train.variables.daytime_mask.load._target_}
         _args_:
           - ${....meta.load}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.daytime_mask.transformations}
+      transformations: ${....train.variables.daytime_mask.transformations}
 # Predict set
 predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Daytime mask
     daytime_mask: ${...test.variables.daytime_mask}
-# Source data (complete dataset)
-source:
+# All data (complete dataset)
+all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Daytime mask
     daytime_mask:
       # Type of data
-      type: ${data.stage.train.variables.daytime_mask.type}
+      type: ${....train.variables.daytime_mask.type}
       # Loading function
       load:
         _target_: numpy.concatenate
         _args_:
-          - - ${data.stage.train.variables.daytime_mask.load}
-            - ${data.stage.valid.variables.daytime_mask.load}
-            - ${data.stage.test.variables.daytime_mask.load}
+          - - ${.......train.variables.daytime_mask.load}
+            - ${.......valid.variables.daytime_mask.load}
+            - ${.......test.variables.daytime_mask.load}
           - 0
       # Transformations to apply
       transformations: null
-

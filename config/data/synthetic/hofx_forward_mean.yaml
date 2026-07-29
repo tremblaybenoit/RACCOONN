@@ -1,6 +1,6 @@
 # Format:
-#   -- source: common configuration for all stages (train/valid/test/predict)
-#   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
 
 # Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
 
@@ -141,8 +141,8 @@ predict:
         dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${data.stage.train.variables.hofx_forward_mean.transformations}
-# Source data (complete dataset)
-source:
+# All data (complete dataset)
+all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
@@ -159,4 +159,3 @@ source:
           - 0
       # Transformations to apply
       transformations: ${data.stage.train.variables.hofx_forward_mean.transformations}
-

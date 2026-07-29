@@ -1,6 +1,6 @@
 # Format:
-#   -- source: common configuration for all stages (train/valid/test/predict)
-#   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
 
 # Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
 
@@ -13,12 +13,12 @@ train:
       # Dataset class
       _target_: code.loader.dataset.EagerDataset
       _recursive_: false
-      # Path to the latitude slant data file
-      path: ${preprocessing.slant.train.output.lat.path}
+      # Path to the longitude slant data file
+      path: ${preprocessing.slant.train.output.lon.path}
       # Type of data
       type: 'Longitude (degrees)'
       # Loading function
-      load: ${preprocessing.slant.train.output.lat.load}
+      load: ${preprocessing.slant.train.output.lon.load}
       # Transformations to apply
       transformations:
         # Per-variable normalization
@@ -37,16 +37,16 @@ valid:
     # Longitude (slant)
     lon_slant:
       # Dataset class
-      _target_: ${data.stage.train.variables.lon_slant._target_}
+      _target_: ${....train.variables.lon_slant._target_}
       _recursive_: false
-      # Path to the latitude slant data file
+      # Path to the longitude slant data file
       path: ${preprocessing.slant.valid.output.lon.path}
       # Type of data
-      type: ${data.stage.train.variables.lon_slant.type}
+      type: ${....train.variables.lon_slant.type}
       # Loading function
       load: ${preprocessing.slant.valid.output.lon.load}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.lon_slant.transformations}
+      transformations: ${....train.variables.lon_slant.transformations}
 # Test set
 test:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -54,38 +54,37 @@ test:
     # Longitude (slant)
     lon_slant:
       # Dataset class
-      _target_: ${data.stage.train.variables.lon_slant._target_}
+      _target_: ${....train.variables.lon_slant._target_}
       _recursive_: false
-      # Path to the latitude slant data file
+      # Path to the longitude slant data file
       path: ${preprocessing.slant.test.output.lon.path}
       # Type of data
-      type: ${data.stage.train.variables.lon_slant.type}
+      type: ${....train.variables.lon_slant.type}
       # Loading function
       load: ${preprocessing.slant.test.output.lon.load}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.lon_slant.transformations}
+      transformations: ${....train.variables.lon_slant.transformations}
 # Predict set
 predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Longitude (slant)
-    lon_slant: ${data.stage.test.variables.lon_slant}
-# Source data (complete dataset)
-source:
+    lon_slant: ${...test.variables.lon_slant}
+# All data (complete dataset)
+all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Longitude (slant)
     lon_slant:
       # Type of data
-      type: ${data.stage.train.variables.lon_slant.type}
+      type: ${....train.variables.lon_slant.type}
       # Loading function
       load:
         _target_: numpy.concatenate
         _args_:
-          - - ${data.stage.train.variables.lon_slant.load}
-            - ${data.stage.valid.variables.lon_slant.load}
-            - ${data.stage.test.variables.lon_slant.load}
+          - - ${.......train.variables.lon_slant.load}
+            - ${.......valid.variables.lon_slant.load}
+            - ${.......test.variables.lon_slant.load}
           - 0
       # Transformations to apply
-      transformations: ${data.stage.train.variables.lon_slant.transformations}
-
+      transformations: ${....train.variables.lon_slant.transformations}

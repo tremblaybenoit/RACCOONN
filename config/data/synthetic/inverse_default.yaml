@@ -1,7 +1,0 @@
-defaults:
-  - forward_default
-  - hofx_forward
-  - hofx_forward_mean
-  - hofx_forward_stdev
-  - pressure_mask
-  - prof_prior

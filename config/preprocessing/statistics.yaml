@@ -8,7 +8,7 @@ statistics:
     # Exclude variables from the statistics computation
     exclude: ['clear_mask', 'cloud_mask', 'daytime_mask', 'pressure_mask', 'prof_prior']
     # What the method needs as input
-    input: ${data.stage.source.variables}
+    input: ${data.stage.all.variables}
     # Computation parameters
     batch_size: 32
     num_workers: 4

@@ -1,6 +1,6 @@
 # Format:
-#   -- source: common configuration for all stages (train/valid/test/predict)
-#   -- train/valid/test: stage-specific configuration, inheriting from source and overriding as
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
 
 # Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
 
@@ -41,20 +41,20 @@ valid:
     # Pressure
     pressure:
       # Dataset class
-      _target_: ${data.stage.train.variables.pressure._target_}
+      _target_: ${....train.variables.pressure._target_}
       _recursive_: false
       # Path to the pressure data file
       path: ${...dir}/pressure.npy
       # Type of pressure levels
-      type: ${data.stage.train.variables.pressure.type}
+      type: ${....train.variables.pressure.type}
       # Loading function
       load:
-        _target_: code.data.io.load_npy
+        _target_: ${.....train.variables.pressure.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.pressure.transformations}
+      transformations: ${....train.variables.pressure.transformations}
 # Test set
 test:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -62,42 +62,42 @@ test:
     # Pressure
     pressure:
       # Dataset class
-      _target_: ${data.stage.train.variables.pressure._target_}
+      _target_: ${....train.variables.pressure._target_}
       _recursive_: false
       # Path to the pressure data file
       path: ${...dir}/pressure.npy
       # Type of pressure levels
-      type: ${data.stage.train.variables.pressure.type}
+      type: ${....train.variables.pressure.type}
       # Loading function
       load:
-        _target_: code.data.io.load_npy
+        _target_: ${.....train.variables.pressure.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.pressure.transformations}
+      transformations: ${....train.variables.pressure.transformations}
 # Predict set
 predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Pressure
     pressure: ${...test.variables.pressure}
-# Source data (complete dataset)
-source:
+# All data (complete dataset)
+all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Pressure
     pressure:
       # Type of pressure levels
-      type: ${data.stage.train.variables.pressure.type}
+      type: ${....train.variables.pressure.type}
       # Loading function
       load:
         _target_: numpy.concatenate
         _args_:
-          - - ${data.stage.train.variables.pressure.load}
-            - ${data.stage.valid.variables.pressure.load}
-            - ${data.stage.test.variables.pressure.load}
+          - - ${.......train.variables.pressure.load}
+            - ${.......valid.variables.pressure.load}
+            - ${.......test.variables.pressure.load}
           - 0
       # Transformations to apply
-      transformations: ${data.stage.train.variables.pressure.transformations}
+      transformations: ${....train.variables.pressure.transformations}
 
