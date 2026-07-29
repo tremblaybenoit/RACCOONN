@@ -147,6 +147,9 @@ all:
   variables:
     # HOFX (Simulated Observations)
     hofx_forward_stdev:
+      # Dataset class
+      _target_: ${data.stage.train.variables.hofx_forward_stdev._target_}
+      _recursive_: false
       # Channels
       type: ${data.stage.train.variables.hofx_forward_stdev.type}
       # Loading function

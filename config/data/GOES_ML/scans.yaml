@@ -14,33 +14,19 @@ train:
       _target_: code.loader.dataset.EagerDataset
       _recursive_: false
       # Path to the scans data file
-      path: ${...dir}/scans.npy
+      path: ${...dir}/scans.txt
       # Type of scans
       type: 'Time'
       # Loading function
       load:
-        _target_: code.data.io.load_npy
+        _target_: code.data.io.load_scans
         path: ${..path}
+        lat:
+          _target_: ${....lat.load._target_}
+          path: ${....lat.path}
         split: ${....split}
-        dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: code.data.io.save_npy
-        _partial_: true
-        _args_:
-          - ${....path}
-        dtype: ${data.dtype}
       # Transformations to apply
-      transformations:
-        # Per-variable normalization
-        normalization:
-          _target_: code.data.transformations.min_max
-          _partial_: true
-          stats:
-            _target_: code.preprocessing.statistics.read_statistics_var
-            path: ${preprocessing.statistics.data.output.path}
-            var: 'scans'
-            dtype: ${data.dtype}
+      transformations: null
 # Validation set
 valid:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -51,22 +37,17 @@ valid:
       _target_: ${....train.variables.scans._target_}
       _recursive_: false
       # Path to the scans data file
-      path: ${...dir}/scans.npy
+      path: ${...dir}/scans.txt
       # Type of scans
       type: ${....train.variables.scans.type}
       # Loading function
       load:
         _target_: ${.....train.variables.scans.load._target_}
         path: ${..path}
+        lat:
+          _target_: ${....lat.load._target_}
+          path: ${....lat.path}
         split: ${....split}
-        dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: ${.....train.variables.scans.save._target_}
-        _partial_: true
-        _args_:
-          - ${....path}
-        dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.scans.transformations}
 # Test set
@@ -79,30 +60,19 @@ test:
       _target_: ${....train.variables.scans._target_}
       _recursive_: false
       # Path to the scans data file
-      path: ${...dir}/scans.npy
+      path: ${...dir}/scans.txt
       # Type of scans
       type: ${....train.variables.scans.type}
       # Loading function
       load:
         _target_: ${.....train.variables.scans.load._target_}
         path: ${..path}
+        lat:
+          _target_: ${....lat.load._target_}
+          path: ${....lat.path}
         split: ${....split}
-        dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: ${.....train.variables.scans.save._target_}
-        _partial_: true
-        _args_:
-          - ${....path}
-        dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.scans.transformations}
-# Predict set
-predict:
-  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-  variables:
-    # Scans
-    scans: ${...test.variables.scans}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.

@@ -19,28 +19,14 @@ train:
       type: 'Latitude (degrees)'
       # Loading function
       load:
-        _target_: code.data.io.load_npy
+        _target_: code.data.io.load_latlon
         path: ${..path}
+        scans:
+          _target_: ${....scans.load._target_}
+          path: ${....scans.load.path}
         split: ${....split}
-        dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: code.data.io.save_npy
-        _partial_: true
-        _args_:
-          - ${....path}
-        dtype: ${data.dtype}
       # Transformations to apply
-      transformations:
-        # Per-variable normalization
-        normalization:
-          _target_: code.data.transformations.min_max
-          _partial_: true
-          stats:
-            _target_: code.preprocessing.statistics.read_statistics_var
-            path: ${preprocessing.statistics.data.output.path}
-            key: 'lat'
-            dtype: ${data.dtype}
+      transformations: null
 # Validation set
 valid:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -58,15 +44,10 @@ valid:
       load:
         _target_: ${.....train.variables.lat.load._target_}
         path: ${..path}
+        scans:
+          _target_: ${....scans.load._target_}
+          path: ${....scans.load.path}
         split: ${....split}
-        dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: ${.....train.variables.lat.save._target_}
-        _partial_: true
-        _args_:
-          - ${....path}
-        dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.lat.transformations}
 # Test set
@@ -86,23 +67,12 @@ test:
       load:
         _target_: ${.....train.variables.lat.load._target_}
         path: ${..path}
+        scans:
+          _target_: ${....scans.load._target_}
+          path: ${....scans.load.path}
         split: ${....split}
-        dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: ${.....train.variables.lat.save._target_}
-        _partial_: true
-        _args_:
-          - ${....path}
-        dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.lat.transformations}
-# Predict set
-predict:
-  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-  variables:
-    # Latitude
-    lat: ${...test.variables.lat}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.

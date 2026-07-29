@@ -15,11 +15,21 @@ train:
       _recursive_: false
       # Type of data
       type: 'Cloud mask'
-      # Loading function (cloud filter is computed, not loaded directly)
+      # Path to the cloud mask file
+      path: ${paths.data_dir}/cloud_mask.npy
+      # Loading function
       load:
-        _target_: code.preprocessing.filters.cloud_mask
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        split: ${....split}
+        dtype: bool
+      # Save function
+      save:
+        _target_: code.data.io.save_npy
+        _partial_: true
         _args_:
-          - ${....prof.load}
+          - ${....path}
+        dtype: bool
       # Transformations to apply
       transformations: null
 # Validation set
@@ -33,11 +43,19 @@ valid:
       _recursive_: false
       # Type of data
       type: ${....train.variables.cloud_mask.type}
-      # Loading function (cloud filter is computed, not loaded directly)
+      # Loading function
       load:
         _target_: ${.....train.variables.cloud_mask.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: bool
+      # Save function
+      save:
+        _target_: ${.....train.variables.cloud_mask.save._target_}
+        _partial_: true
         _args_:
-          - ${....prof.load}
+          - ${....path}
+        dtype: bool
       # Transformations to apply
       transformations: ${....train.variables.cloud_mask.transformations}
 # Test set
@@ -51,11 +69,19 @@ test:
       _recursive_: false
       # Type of data
       type: ${....train.variables.cloud_mask.type}
-      # Loading function (cloud filter is computed, not loaded directly)
+      # Loading function
       load:
         _target_: ${.....train.variables.cloud_mask.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: bool
+      # Save function
+      save:
+        _target_: ${.....train.variables.cloud_mask.save._target_}
+        _partial_: true
         _args_:
-          - ${....prof.load}
+          - ${....path}
+        dtype: bool
       # Transformations to apply
       transformations: ${....train.variables.cloud_mask.transformations}
 # Predict set
@@ -68,6 +94,9 @@ predict:
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
+    # Dataset class
+    _target_: ${....train.variables.cloud_mask._target_}
+    _recursive_: false
     # Cloud mask
     cloud_mask:
       # Type of data

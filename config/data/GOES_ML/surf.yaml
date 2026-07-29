@@ -27,13 +27,6 @@ train:
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: code.data.io.save_npy
-        _partial_: true
-        _args_:
-          - ${....path}
-        dtype: ${data.dtype}
       # Transformations to apply
       transformations:
         # Surface normalization
@@ -67,45 +60,10 @@ valid:
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: ${.....train.variables.surf.save._target_}
-        _partial_: true
-        _args_:
-          - ${....path}
-        dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.surf.transformations}
 # Test set
 test:
-  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-  variables:
-    # Surface variables
-    surf:
-      # Dataset class
-      _target_: ${....train.variables.surf._target_}
-      _recursive_: false
-      # Path to the surface variables file
-      path: ${...dir}/surf.npy
-      # Surface variable types
-      type: ${....train.variables.surf.type}
-      # Loading function
-      load:
-        _target_: ${.....train.variables.surf.load._target_}
-        path: ${..path}
-        split: ${....split}
-        dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: ${.....train.variables.surf.save._target_}
-        _partial_: true
-        _args_:
-          - ${....path}
-        dtype: ${data.dtype}
-      # Transformations to apply
-      transformations: ${....train.variables.surf.transformations}
-# Predict set
-predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Surface variables

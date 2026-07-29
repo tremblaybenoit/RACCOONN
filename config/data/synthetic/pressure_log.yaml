@@ -94,6 +94,9 @@ all:
   variables:
     # Pressure (log-transformed)
     pressure_log:
+      # Dataset class
+      _target_: ${....train.variables.pressure_log._target_}
+      _recursive_: false
       # Type of pressure levels
       type: ${....train.variables.pressure_log.type}
       # Loading function

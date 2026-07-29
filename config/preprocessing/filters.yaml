@@ -1,33 +1,43 @@
-# Data filters
 filters:
-  # Pressure mask (to filter out constant pressure levels)
-  pressure_mask:
+  # Cloud mask (training set)
+  cloud_mask_train:
     # Function
-    _target_: code.data.filters.compute_filter
+    _target_: code.preprocessing.filters.compute_mask
     _recursive_: false  # Do not instantiate nested objects
-    # What the method needs as input
+    # Input data (create mask)
     input:
-      # Call to mask
-      mask:
-        _target_: code.preprocessing.filters.pressure_mask
-        # Statistics of the pressure variable to compute the mask
-        stats:
-          _target_: code.data.preprocessing.statistics.read_statistics_var
-          load: ${preprocessing.statistics.data.output.load}
-          key: 'pressure'
-          dtype: ${data.dtype}
-        # Ratio threshold to determine constant pressure levels
-        threshold: 0.005
-
-    # What the method produces as output
+      _target_: code.preprocessing.filters.cloud_mask
+      _args_:
+        - ${data.stage.train.variables.prof.load}
+    # Output data (save mask)
     output:
-      # File path to save/load the covariance matrix
-      path: ${paths.data_dir}/pressure_mask.npy
       # Save function
-      save:
-        _target_: numpy.save
-        path: ${..path}
-      # Load function
-      load:
-        _target_: code.data.io.load_npy
-        path: ${..path}
+      save: ${data.stage.train.variables.cloud_mask.save}
+  # Cloud mask (validation set)
+  cloud_mask_valid:
+    # Function
+    _target_: code.preprocessing.filters.compute_mask
+    _recursive_: false  # Do not instantiate nested objects
+    # Input data (create mask)
+    input:
+      _target_: code.preprocessing.filters.cloud_mask
+      _args_:
+        - ${data.stage.valid.variables.prof.load}
+    # Output data (save mask)
+    output:
+      # Save function
+      save: ${data.stage.valid.variables.cloud_mask.save}
+  # Cloud mask (test set)
+  cloud_mask_test:
+    # Function
+    _target_: code.preprocessing.filters.compute_mask
+    _recursive_: false  # Do not instantiate nested objects
+    # Input data (create mask)
+    input:
+      _target_: code.preprocessing.filters.cloud_mask
+      _args_:
+        - ${data.stage.test.variables.prof.load}
+    # Output data (save mask)
+    output:
+      # Save function
+      save: ${data.stage.test.variables.cloud_mask.save}

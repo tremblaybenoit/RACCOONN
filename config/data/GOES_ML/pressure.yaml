@@ -23,24 +23,8 @@ train:
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: code.data.io.save_npy
-        _partial_: true
-        _args_:
-          - ${....path}
-        dtype: ${data.dtype}
       # Transformations to apply
-      transformations:
-        # Per-variable normalization
-        normalization:
-          _target_: code.data.transformations.min_max
-          _partial_: true
-          stats:
-            _target_: code.preprocessing.statistics.read_statistics_var
-            path: ${preprocessing.statistics.data.output.path}
-            key: 'pressure'
-            dtype: ${data.dtype}
+      transformations: null
 # Validation set
 valid:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -59,13 +43,6 @@ valid:
         _target_: ${.....train.variables.pressure.load._target_}
         path: ${..path}
         split: ${....split}
-        dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: ${.....train.variables.pressure.save._target_}
-        _partial_: true
-        _args_:
-          - ${....path}
         dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.pressure.transformations}
@@ -87,13 +64,6 @@ test:
         _target_: ${.....train.variables.pressure.load._target_}
         path: ${..path}
         split: ${....split}
-        dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: ${.....train.variables.pressure.save._target_}
-        _partial_: true
-        _args_:
-          - ${....path}
         dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.pressure.transformations}

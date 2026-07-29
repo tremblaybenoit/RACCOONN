@@ -16,81 +16,12 @@ slant:
       # Profiles
       prof: ${data.stage.train.variables.prof}
     output:
-      lat:
-        # Output path
-        path: ${data.stage.train.dir}/lat_slant.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${preprocessing.slant.train.output.lat.path}
-        # Load function
-        load:
-          _target_: code.data.io.load_npy
-          _args_:
-            - ${preprocessing.slant.train.output.lat.path}
-            - ${data.dtype}
-      lon:
-        # Output path
-        path: ${data.stage.train.dir}/lon_slant.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${preprocessing.slant.train.output.lon.path}
-        # Load function
-        load:
-          _target_: code.data.io.load_npy
-          _args_:
-            - ${preprocessing.slant.train.output.lon.path}
-            - ${data.dtype}
-      z:
-        # Output path
-        path: ${data.stage.train.dir}/z_slant.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${preprocessing.slant.train.output.z.path}
-        # Load function
-        load:
-          _target_: code.data.io.load_npy
-          _args_:
-            - ${preprocessing.slant.train.output.z.path}
-            - ${data.dtype}
-      x:
-        # Output path
-        path: ${data.stage.train.dir}/x_slant.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${preprocessing.slant.train.output.x.path}
-        # Load function
-        load:
-          _target_: code.data.io.load_npy
-          _args_:
-            - ${preprocessing.slant.train.output.x.path}
-            - ${data.dtype}
-      y:
-        # Output path
-        path: ${data.stage.train.dir}/y_slant.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${preprocessing.slant.train.output.y.path}
-        # Load function
-        load:
-          _target_: code.data.io.load_npy
-          _args_:
-            - ${preprocessing.slant.train.output.y.path}
-            - ${data.dtype}
+      # Coordinates
+      lat: ${data.stage.train.variables.lat_slant}
+      lon: ${data.stage.train.variables.lon_slant}
+      z: ${data.stage.train.variables.z_slant}
+      x: ${data.stage.train.variables.x_slant}
+      y: ${data.stage.train.variables.y_slant}
   # Validation set
   valid:
     # Function
@@ -107,81 +38,12 @@ slant:
       # Profiles
       prof: ${data.stage.valid.variables.prof}
     output:
-      lat:
-        # Output path
-        path: ${data.stage.valid.dir}/lat_slant.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${preprocessing.slant.valid.output.lat.path}
-        # Load function
-        load:
-          _target_: code.data.io.load_npy
-          _args_:
-            - ${preprocessing.slant.valid.output.lat.path}
-            - ${data.dtype}
-      lon:
-        # Output path
-        path: ${data.stage.valid.dir}/lon_slant.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${preprocessing.slant.valid.output.lon.path}
-        # Load function
-        load:
-          _target_: code.data.io.load_npy
-          _args_:
-            - ${preprocessing.slant.valid.output.lon.path}
-            - ${data.dtype}
-      z:
-        # Output path
-        path: ${data.stage.valid.dir}/z_slant.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${preprocessing.slant.valid.output.z.path}
-        # Load function
-        load:
-          _target_: code.data.io.load_npy
-          _args_:
-            - ${preprocessing.slant.valid.output.z.path}
-            - ${data.dtype}
-      x:
-        # Output path
-        path: ${data.stage.valid.dir}/x_slant.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${preprocessing.slant.valid.output.x.path}
-        # Load function
-        load:
-          _target_: code.data.io.load_npy
-          _args_:
-            - ${preprocessing.slant.valid.output.x.path}
-            - ${data.dtype}
-      y:
-        # Output path
-        path: ${data.stage.valid.dir}/y_slant.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${preprocessing.slant.valid.output.y.path}
-        # Load function
-        load:
-          _target_: code.data.io.load_npy
-          _args_:
-            - ${preprocessing.slant.valid.output.y.path}
-            - ${data.dtype}
+      # Coordinates
+      lat: ${data.stage.valid.variables.lat_slant}
+      lon: ${data.stage.valid.variables.lon_slant}
+      z: ${data.stage.valid.variables.z_slant}
+      x: ${data.stage.valid.variables.x_slant}
+      y: ${data.stage.valid.variables.y_slant}
   # Test set
   test:
     # Function
@@ -198,78 +60,9 @@ slant:
       # Profiles
       prof: ${data.stage.test.variables.prof}
     output:
-      lat:
-        # Output path
-        path: ${data.stage.test.dir}/lat_slant.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${preprocessing.slant.test.output.lat.path}
-        # Load function
-        load:
-          _target_: code.data.io.load_npy
-          _args_:
-            - ${preprocessing.slant.test.output.lat.path}
-            - ${data.dtype}
-      lon:
-        # Output path
-        path: ${data.stage.test.dir}/lon_slant.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${preprocessing.slant.test.output.lon.path}
-        # Load function
-        load:
-          _target_: code.data.io.load_npy
-          _args_:
-            - ${preprocessing.slant.test.output.lon.path}
-            - ${data.dtype}
-      z:
-        # Output path
-        path: ${data.stage.test.dir}/z_slant.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${preprocessing.slant.test.output.z.path}
-        # Load function
-        load:
-          _target_: code.data.io.load_npy
-          _args_:
-            - ${preprocessing.slant.test.output.z.path}
-            - ${data.dtype}
-      x:
-        # Output path
-        path: ${data.stage.test.dir}/x_slant.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${preprocessing.slant.test.output.x.path}
-        # Load function
-        load:
-          _target_: code.data.io.load_npy
-          _args_:
-            - ${preprocessing.slant.test.output.x.path}
-            - ${data.dtype}
-      y:
-        # Output path
-        path: ${data.stage.test.dir}/y_slant.npy
-        # Save function
-        save:
-          _target_: numpy.save
-          _partial_: true
-          _args_:
-            - ${preprocessing.slant.test.output.y.path}
-        # Load function
-        load:
-          _target_: code.data.io.load_npy
-          _args_:
-            - ${preprocessing.slant.test.output.y.path}
-            - ${data.dtype}
+      # Coordinates
+      lat: ${data.stage.test.variables.lat_slant}
+      lon: ${data.stage.test.variables.lon_slant}
+      z: ${data.stage.test.variables.z_slant}
+      x: ${data.stage.test.variables.x_slant}
+      y: ${data.stage.test.variables.y_slant}

@@ -129,6 +129,13 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
         None.
     """
 
+    # Variables to recast
+    variables = []
+    for key, value in output.variables.items():
+        # Check if non-derived variable
+        if hasattr(value, 'save'):
+            variables.append(key)
+
     # Build dictionary from input data
     data = {}
     for key, value in input.variables.items():
@@ -142,8 +149,6 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
     # Daytime or nighttime masks
     data['daytime_mask'] = daytime_mask(data['meta'])
     data['nighttime_mask'] = ~data['daytime_mask']
-    # Pressure mask
-    # data['pressure_mask'] = pressure_mask(data['prof'])
 
     # Build mask
     mask = np.ones_like(data['lat'], dtype='bool')

@@ -76,6 +76,9 @@ all:
   variables:
     # Z coordinate (slant)
     z_slant:
+      # Dataset class
+      _target_: ${....train.variables.z_slant._target_}
+      _recursive_: false
       # Type of data
       type: ${....train.variables.z_slant.type}
       # Loading function

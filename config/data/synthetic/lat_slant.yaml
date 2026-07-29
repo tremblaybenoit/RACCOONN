@@ -14,11 +14,22 @@ train:
       _target_: code.loader.dataset.EagerDataset
       _recursive_: false
       # Path to the latitude slant data file
-      path: ${preprocessing.slant.train.output.lat.path}
+      path: ${...dir}/lat_slant.npy
       # Type of data
       type: 'Latitude (degrees)'
       # Loading function
-      load: ${preprocessing.slant.train.output.lat.load}
+      load:
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: code.data.io.save_npy
+        _partial_: true
+        _args_:
+          - ${....path}
+        dtype: ${data.dtype}
       # Transformations to apply
       transformations:
         # Per-variable normalization
@@ -40,11 +51,22 @@ valid:
       _target_: ${....train.variables.lat_slant._target_}
       _recursive_: false
       # Path to the latitude slant data file
-      path: ${preprocessing.slant.valid.output.lat.path}
+      path: ${...dir}/lat_slant.npy
       # Type of data
       type: ${....train.variables.lat_slant.type}
       # Loading function
-      load: ${preprocessing.slant.valid.output.lat.load}
+      load:
+        _target_: ${.....train.variables.lat.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: ${.....train.variables.lat.save._target_}
+        _partial_: true
+        _args_:
+          - ${....path}
+        dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.lat_slant.transformations}
 # Test set
@@ -57,11 +79,22 @@ test:
       _target_: ${....train.variables.lat_slant._target_}
       _recursive_: false
       # Path to the latitude slant data file
-      path: ${preprocessing.slant.test.output.lat.path}
+      path: ${...dir}/lat_slant.npy
       # Type of data
       type: ${data.stage.train.variables.lat_slant.type}
       # Loading function
-      load: ${preprocessing.slant.test.output.lat.load}
+      load:
+        _target_: ${.....train.variables.lat.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: ${.....train.variables.lat.save._target_}
+        _partial_: true
+        _args_:
+          - ${....path}
+        dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.lat_slant.transformations}
 # Predict set
@@ -76,6 +109,9 @@ all:
   variables:
     # Latitude (slant)
     lat_slant:
+      # Dataset class
+      _target_: ${....train.variables.lat_slant._target_}
+      _recursive_: false
       # Type of data
       type: ${....train.variables.lat_slant.type}
       # Loading function

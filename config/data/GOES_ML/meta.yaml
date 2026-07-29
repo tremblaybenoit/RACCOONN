@@ -8,120 +8,99 @@
 train:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
-    # Observations
-    obs:
+    # Metadata
+    meta:
       # Dataset class
       _target_: code.loader.dataset.EagerDataset
       _recursive_: false
-      # Path to the observations file
-      path: ${...dir}/obs.npy
+      # Path to the metadata file
+      path: ${...dir}/meta.npy
       # Type of data
-      type: 'Observations (no units)'
+      type: 'Meta data'
       # Loading function
       load:
         _target_: code.data.io.load_npy
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: code.data.io.save_npy
-        _partial_: true
-        _args_:
-          - ${....path}
-        dtype: ${data.dtype}
       # Transformations to apply
       transformations:
-        # Per-variable normalization
+        # Metadata normalization (sin/cos for angles)
         normalization:
-          _target_: code.data.transformations.identity
-          _partial_: true
-          stats:
-            _target_: code.preprocessing.statistics.read_statistics_var
-            path: ${preprocessing.statistics.data.output.path}
-            key: 'obs'
+          _target_: code.data.transformations.NormalizeMeta
+          settings:
+            meta_cos_vars: [ 6 ]
+            meta_scale_factor: 180
+            meta_scale_offset: -180
+            meta_scale_vars: [ ]
             dtype: ${data.dtype}
 # Validation set
 valid:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
-    # Observations
-    obs:
+    # Metadata
+    meta:
       # Dataset class
-      _target_: ${....train.variables.obs._target_}
+      _target_: ${....train.variables.meta._target_}
       _recursive_: false
-      # Path to the observations file
-      path: ${...dir}/obs.npy
+      # Path to the metadata file
+      path: ${...dir}/meta.npy
       # Type of data
-      type: ${....train.variables.obs.type}
+      type: ${....train.variables.meta.type}
       # Loading function
       load:
-        _target_: ${.....train.variables.obs.load._target_}
+        _target_: ${.....train.variables.meta.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: ${.....train.variables.obs.save._target_}
-        _partial_: true
-        _args_:
-          - ${....path}
-        dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${....train.variables.obs.transformations}
+      transformations: ${....train.variables.meta.transformations}
 # Test set
 test:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
-    # Observations
-    obs:
+    # Metadata
+    meta:
       # Dataset class
-      _target_: ${....train.variables.obs._target_}
+      _target_: ${....train.variables.meta._target_}
       _recursive_: false
-      # Path to the observations file
-      path: ${...dir}/obs.npy
+      # Path to the metadata file
+      path: ${...dir}/meta.npy
       # Type of data
-      type: ${....train.variables.obs.type}
+      type: ${....train.variables.meta.type}
       # Loading function
       load:
-        _target_: ${.....train.variables.obs.load._target_}
+        _target_: ${.....train.variables.meta.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: ${.....train.variables.obs.save._target_}
-        _partial_: true
-        _args_:
-          - ${....path}
-        dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${....train.variables.obs.transformations}
+      transformations: ${....train.variables.meta.transformations}
 # Predict set
 predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
-    # Observations
-    obs: ${...test.variables.obs}
+    # Metadata
+    meta: ${...test.variables.meta}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
-    # Observations
-    obs:
+    # Metadata
+    meta:
       # Dataset class
-      _target_: ${....train.variables.obs._target_}
+      _target_: ${....train.variables.meta._target_}
       _recursive_: false
       # Type of data
-      type: ${....train.variables.obs.type}
+      type: ${....train.variables.meta.type}
       # Loading function
       load:
         _target_: numpy.concatenate
         _args_:
-          - - ${.......train.variables.obs.load}
-            - ${.......valid.variables.obs.load}
-            - ${.......test.variables.obs.load}
+          - - ${.......train.variables.meta.load}
+            - ${.......valid.variables.meta.load}
+            - ${.......test.variables.meta.load}
           - 0
       # Transformations to apply
-      transformations: ${....train.variables.obs.transformations}
+      transformations: ${....train.variables.meta.transformations}
 

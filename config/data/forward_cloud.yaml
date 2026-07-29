@@ -33,13 +33,6 @@ source:
     # Split
     split: null
 
-  # Prediction set (NOTE: By default, we use the test set as the prediction set for demonstration purposes)
-  predict:
-    # Path to prediction data
-    dir: ${data.source.test.dir}
-    # Split
-    split: ${data.source.test.split}
-
 # Split the data into training, validation, and test sets
 stage:
   # Training set

@@ -19,8 +19,8 @@ statistics:
       # Saving function
       save:
         _target_: code.data.io.save_pkl
-        path: ${preprocessing.statistics.data.output.path}
+        path: ${..path}
       # Loading function
       load:
         _target_: code.data.io.load_pkl
-        path: ${preprocessing.statistics.data.output.path}
+        path: ${..path}

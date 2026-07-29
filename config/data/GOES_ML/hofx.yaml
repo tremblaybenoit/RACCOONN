@@ -26,24 +26,8 @@ train:
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: code.data.io.save_npy
-        _partial_: true
-        _args_:
-          - ${....path}
-        dtype: ${data.dtype}
       # Transformations to apply
-      transformations:
-        # Per-variable normalization
-        normalization:
-          _target_: code.data.transformations.identity
-          _partial_: true
-          stats:
-            _target_: code.preprocessing.statistics.read_statistics_var
-            path: ${preprocessing.statistics.data.output.path}
-            key: 'hofx'
-            dtype: ${data.dtype}
+      transformations: null
 # Validation set
 valid:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -62,13 +46,6 @@ valid:
         _target_: ${.....train.variables.hofx.load._target_}
         path: ${..path}
         split: ${....split}
-        dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: ${.....train.variables.hofx.save._target_}
-        _partial_: true
-        _args_:
-          - ${....path}
         dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.hofx.transformations}
@@ -90,57 +67,6 @@ test:
         _target_: ${.....train.variables.hofx.load._target_}
         path: ${..path}
         split: ${....split}
-        dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: ${.....train.variables.hofx.save._target_}
-        _partial_: true
-        _args_:
-          - ${....path}
-        dtype: ${data.dtype}
-      # Transformations to apply
-      transformations: ${....train.variables.hofx.transformations}
-  # Results-specific configuration for the test stage
-  results:
-    # HOFX (Simulated Observations)
-    hofx:
-      # Path to the HOFX results file
-      path: ${paths.run_dir}/test_hofx.npy
-      # Save function
-      save:
-        _target_: numpy.save
-        _partial_: true
-        _args_:
-          - ${...path}
-      # Loading function
-      load:
-        _target_: code.data.io.load_npy
-        path: ${..path}
-        dtype: ${data.dtype}
-      # Transformations to apply
-      transformations: ${....train.variables.hofx.transformations}
-# Predict set
-predict:
-  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-  variables:
-    # HOFX (Simulated Observations)
-    hofx: ${...test.variables.hofx}
-  # Results-specific configuration for the predict stage
-  results:
-    # HOFX (Simulated Observations)
-    hofx:
-      # Path to the HOFX results file
-      path: ${paths.run_dir}/predict_hofx.npy
-      # Save function
-      save:
-        _target_: numpy.save
-        _partial_: true
-        _args_:
-          - ${...path}
-      # Loading function
-      load:
-        _target_: code.data.io.load_npy
-        path: ${..path}
         dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.hofx.transformations}

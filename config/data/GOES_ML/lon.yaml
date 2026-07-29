@@ -19,28 +19,14 @@ train:
       type: 'Longitude (degrees)'
       # Loading function
       load:
-        _target_: code.data.io.load_npy
+        _target_: code.data.io.load_latlon
         path: ${..path}
+        scans:
+          _target_: ${....scans.load._target_}
+          path: ${....scans.load.path}
         split: ${....split}
-        dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: code.data.io.save_npy
-        _partial_: true
-        _args_:
-          - ${....path}
-        dtype: ${data.dtype}
       # Transformations to apply
-      transformations:
-        # Per-variable normalization
-        normalization:
-          _target_: code.data.transformations.min_max
-          _partial_: true
-          stats:
-            _target_: code.preprocessing.statistics.read_statistics_var
-            path: ${preprocessing.statistics.data.output.path}
-            key: 'lon'
-            dtype: ${data.dtype}
+      transformations: null
 # Validation set
 valid:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -56,17 +42,12 @@ valid:
       type: ${....train.variables.lon.type}
       # Loading function
       load:
-        _target_: code.data.io.load_npy
+        _target_: ${.....train.variables.lon.load._target_}
         path: ${..path}
+        scans:
+          _target_: ${....scans.load._target_}
+          path: ${....scans.load.path}
         split: ${....split}
-        dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: ${.....train.variables.lon.save._target_}
-        _partial_: true
-        _args_:
-          - ${....path}
-        dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.lon.transformations}
 # Test set
@@ -84,25 +65,14 @@ test:
       type: ${....train.variables.lon.type}
       # Loading function
       load:
-        _target_: code.data.io.load_npy
+        _target_: ${.....train.variables.lon.load._target_}
         path: ${..path}
+        scans:
+          _target_: ${....scans.load._target_}
+          path: ${....scans.load.path}
         split: ${....split}
-        dtype: ${data.dtype}
-      # Save function
-      save:
-        _target_: ${.....train.variables.lon.save._target_}
-        _partial_: true
-        _args_:
-          - ${....path}
-        dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.lon.transformations}
-# Predict set
-predict:
-  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-  variables:
-    # Longitude
-    lon: ${...test.variables.lon}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.

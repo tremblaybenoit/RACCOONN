@@ -76,6 +76,9 @@ all:
   variables:
     # Longitude (slant)
     lon_slant:
+      # Dataset class
+      _target_: ${....train.variables.lon_slant._target_}
+      _recursive_: false
       # Type of data
       type: ${....train.variables.lon_slant.type}
       # Loading function

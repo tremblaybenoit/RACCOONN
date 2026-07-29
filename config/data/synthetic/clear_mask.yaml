@@ -15,11 +15,11 @@ train:
       _recursive_: false
       # Type of data
       type: 'Clear mask'
-      # Loading function (clear filter is computed, not loaded directly)
+      # Loading function (clear filter is negation of cloud mask)
       load:
-        _target_: code.preprocessing.filters.clear_mask
+        _target_: numpy.logical_not
         _args_:
-          - ${....prof.load}
+          - ${.....cloud_mask.load}
       # Transformations to apply
       transformations: null
 # Validation set
@@ -33,11 +33,11 @@ valid:
       _recursive_: false
       # Type of data
       type: ${....train.variables.clear_mask.type}
-      # Loading function (clear filter is computed, not loaded directly)
+      # Loading function (clear filter is negation of cloud mask)
       load:
         _target_: ${.....train.variables.clear_mask.load._target_}
         _args_:
-          - ${....prof.load}
+          - ${.....cloud_mask.load}
       # Transformations to apply
       transformations: ${....train.variables.clear_mask.transformations}
 # Test set
@@ -51,11 +51,11 @@ test:
       _recursive_: false
       # Type of data
       type: ${....train.variables.clear_mask.type}
-      # Loading function (clear filter is computed, not loaded directly)
+      # Loading function (clear filter is negation of cloud mask)
       load:
         _target_: ${.....train.variables.clear_mask.load._target_}
         _args_:
-          - ${....prof.load}
+          - ${.....cloud_mask.load}
       # Transformations to apply
       transformations: ${....train.variables.clear_mask.transformations}
 # Predict set
@@ -70,6 +70,9 @@ all:
   variables:
     # Clear mask
     clear_mask:
+      # Dataset class
+      _target_: ${....train.variables.clear_mask._target_}
+      _recursive_: false
       # Type of data
       type: ${....train.variables.clear_mask.type}
       # Loading function

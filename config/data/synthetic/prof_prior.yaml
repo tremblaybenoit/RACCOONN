@@ -86,6 +86,9 @@ all:
   variables:
     # Atmospheric profiles
     prof_prior:
+      # Dataset class
+      _target_: ${....train.variables.prof_prior._target_}
+      _recursive_: false
       # Type of the atmospheric profiles
       type: ${....train.variables.prof_prior.type}
       # Loading function

@@ -23,6 +23,13 @@ train:
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: code.data.io.save_npy
+        _partial_: true
+        _args_:
+          - ${....path}
+        dtype: ${data.dtype}
       # Transformations to apply
       transformations:
         # Metadata normalization (sin/cos for angles)
@@ -53,6 +60,13 @@ valid:
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: ${.....train.variables.meta.save._target_}
+        _partial_: true
+        _args_:
+          - ${....path}
+        dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.meta.transformations}
 # Test set
@@ -74,6 +88,13 @@ test:
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: ${.....train.variables.meta.save._target_}
+        _partial_: true
+        _args_:
+          - ${....path}
+        dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.meta.transformations}
 # Predict set
@@ -88,6 +109,9 @@ all:
   variables:
     # Metadata
     meta:
+      # Dataset class
+      _target_: ${....train.variables.meta._target_}
+      _recursive_: false
       # Type of data
       type: ${....train.variables.meta.type}
       # Loading function

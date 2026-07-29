@@ -8,80 +8,80 @@
 train:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
-    # Daytime mask
-    daytime_mask:
+    # Clear mask
+    clear_mask:
       # Dataset class
       _target_: code.loader.dataset.EagerDataset
       _recursive_: false
       # Type of data
-      type: 'Daytime mask'
-      # Loading function (daytime filter is computed, not loaded directly)
+      type: 'Clear mask'
+      # Loading function (clear filter is computed, not loaded directly)
       load:
-        _target_: code.preprocessing.filters.daytime_mask
+        _target_: code.preprocessing.filters.clear_mask
         _args_:
-          - ${....meta.load}
+          - ${....prof.load}
       # Transformations to apply
       transformations: null
 # Validation set
 valid:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
-    # Daytime mask
-    daytime_mask:
+    # Clear mask
+    clear_mask:
       # Dataset class
-      _target_: ${....train.variables.daytime_mask._target_}
+      _target_: ${....train.variables.clear_mask._target_}
       _recursive_: false
       # Type of data
-      type: ${....train.variables.daytime_mask.type}
-      # Loading function (daytime filter is computed, not loaded directly)
+      type: ${....train.variables.clear_mask.type}
+      # Loading function (clear filter is computed, not loaded directly)
       load:
-        _target_: ${.....train.variables.daytime_mask.load._target_}
+        _target_: ${.....train.variables.clear_mask.load._target_}
         _args_:
-          - ${....meta.load}
+          - ${....prof.load}
       # Transformations to apply
-      transformations: ${....train.variables.daytime_mask.transformations}
+      transformations: ${....train.variables.clear_mask.transformations}
 # Test set
 test:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
-    # Daytime mask
-    daytime_mask:
+    # Clear mask
+    clear_mask:
       # Dataset class
-      _target_: ${....train.variables.daytime_mask._target_}
+      _target_: ${....train.variables.clear_mask._target_}
       _recursive_: false
       # Type of data
-      type: ${....train.variables.daytime_mask.type}
-      # Loading function (daytime filter is computed, not loaded directly)
+      type: ${....train.variables.clear_mask.type}
+      # Loading function (clear filter is computed, not loaded directly)
       load:
-        _target_: ${.....train.variables.daytime_mask.load._target_}
+        _target_: ${.....train.variables.clear_mask.load._target_}
         _args_:
-          - ${....meta.load}
+          - ${....prof.load}
       # Transformations to apply
-      transformations: ${....train.variables.daytime_mask.transformations}
+      transformations: ${....train.variables.clear_mask.transformations}
 # Predict set
 predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
-    # Daytime mask
-    daytime_mask: ${...test.variables.daytime_mask}
+    # Clear mask
+    clear_mask: ${...test.variables.clear_mask}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
-    # Daytime mask
-    daytime_mask:
+    # Clear mask
+    clear_mask:
       # Dataset class
-      _target_: ${....train.variables.daytime_mask._target_}
+      _target_: ${....train.variables.clear_mask._target_}
       _recursive_: false
       # Type of data
-      type: ${....train.variables.daytime_mask.type}
+      type: ${....train.variables.clear_mask.type}
       # Loading function
       load:
         _target_: numpy.concatenate
         _args_:
-          - - ${.......train.variables.daytime_mask.load}
-            - ${.......valid.variables.daytime_mask.load}
-            - ${.......test.variables.daytime_mask.load}
+          - - ${.......train.variables.clear_mask.load}
+            - ${.......valid.variables.clear_mask.load}
+            - ${.......test.variables.clear_mask.load}
           - 0
       # Transformations to apply
       transformations: null

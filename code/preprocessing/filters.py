@@ -219,14 +219,14 @@ def compute_mask(input: DictConfig, output: DictConfig) -> None:
     # TODO: Make more uniform with other preprocessing functions
 
     # Instantiate mask
-    mask = instantiate(input.mask)
+    mask = instantiate(input)
 
-    # Create directory if needed
-    if hasattr(output, 'path'):
-        logger.info(f"Saving statistics to file {output.path}.")
-        os.makedirs(os.path.dirname(output.path), exist_ok=True)
     # Save function
     if hasattr(output, 'save'):
+        # Create directory if needed
+        if hasattr(output.save, 'path'):
+            logger.info(f"Saving statistics to file {output.save.path}.")
+            os.makedirs(os.path.dirname(output.save.path), exist_ok=True)
         save_fn = instantiate(output.save)
         save_fn(mask)
 
