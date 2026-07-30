@@ -43,6 +43,9 @@ source:
     # Split
     split: null
 
+  # Prediction set
+  predict: null
+
 # Split the data into training, validation, and test sets
 stage:
   # Training set

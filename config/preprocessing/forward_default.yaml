@@ -1,4 +1,5 @@
 defaults:
   - recast         # First: recast raw data to desired format/precision/filtering
+  - filters
   - statistics
   - _self_

@@ -73,22 +73,6 @@ def get_filenames(
 # RULES
 #########################################################################################################
 
-# Data acquisition rule
-rule:
-    name: "data"
-    params:
-        # Hydra configuration
-        config_name = config_name,
-        experiment = config_experiment
-    output:
-        # Downloaded data
-        results = get_filenames(config_data, exclude_keys={'transformations'})
-    shell:
-        """
-        python -m code.data.download --config-name={params.config_name} {params.experiment}
-        """
-
-
 # Preprocessing rules (dynamic)
 if config_preprocessing:
     # Loop over preprocessing operations

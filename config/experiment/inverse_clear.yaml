@@ -5,8 +5,8 @@
 defaults:
   - override /paths: default
   - override /hydra: default
-  - override /data: inverse_cloud
-  - override /preprocessing: inverse_cloud
+  - override /data: inverse_clear
+  - override /preprocessing: inverse_clear
   - override /loader: default
   - override /architecture: inverse_default
   - override /loss: inverse_default
@@ -27,7 +27,7 @@ task_name: "inverse"  # Experiment
 paths:
   task_dir: "../inverse_outputs"
   run_id: "default"
-  data_dir: ../synthetic_${data.dtype}_cloud
+  data_dir: ../synthetic_${data.dtype}_clear
   # checkpoint_dir: "code/model/checkpoints/checkpoint"
 
 # Data configuration
