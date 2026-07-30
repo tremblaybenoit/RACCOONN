@@ -28,7 +28,7 @@ train:
         _target_: code.data.io.save_npy
         _partial_: true
         _args_:
-          - ${....path}
+          - ${...path}
         dtype: ${data.dtype}
       # Transformations to apply
       transformations:
@@ -56,16 +56,16 @@ valid:
       type: ${....train.variables.lat_slant.type}
       # Loading function
       load:
-        _target_: ${.....train.variables.lat.load._target_}
+        _target_: ${.....train.variables.lat_slant.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Save function
       save:
-        _target_: ${.....train.variables.lat.save._target_}
+        _target_: ${.....train.variables.lat_slant.save._target_}
         _partial_: true
         _args_:
-          - ${....path}
+          - ${...path}
         dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.lat_slant.transformations}
@@ -81,19 +81,19 @@ test:
       # Path to the latitude slant data file
       path: ${...dir}/lat_slant.npy
       # Type of data
-      type: ${data.stage.train.variables.lat_slant.type}
+      type: ${....train.variables.lat_slant.type}
       # Loading function
       load:
-        _target_: ${.....train.variables.lat.load._target_}
+        _target_: ${.....train.variables.lat_slant.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Save function
       save:
-        _target_: ${.....train.variables.lat.save._target_}
+        _target_: ${.....train.variables.lat_slant.save._target_}
         _partial_: true
         _args_:
-          - ${....path}
+          - ${...path}
         dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.lat_slant.transformations}

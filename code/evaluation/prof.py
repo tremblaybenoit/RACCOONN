@@ -7,6 +7,7 @@ from utilities.logic import get_config_path
 import os
 from code.evaluation.plot import fig_vertical_profiles, save_plot
 from code.data.io import load_variable
+from tqdm import tqdm
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -26,7 +27,11 @@ def main(config: DictConfig) -> None:
         None.
     """
 
-    key = 'cloud_mask'
+    keys = ['pressure_log', 'scans', 'surf']
+    stages = ['train', 'valid', 'test', 'predict', 'all']
+    for key in tqdm(keys, desc="Loading variables"):
+        for stage in tqdm(stages, desc="Loading stages"):
+            var = instantiate(config.data.stage[stage].variables[key].load)
     breakpoint()
     var_train = instantiate(config.data.stage.train.variables[key].load)
     var_valid = instantiate(config.data.stage.valid.variables[key].load)

@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import hydra
 from omegaconf import DictConfig
 from code.data.io import load_variable
@@ -111,6 +112,8 @@ def compute_slant_path(input: DictConfig, output: DictConfig) -> None:
     for key, value in coords.items():
         if hasattr(output, key):
             if hasattr(getattr(output, key), 'save'):
+                if hasattr(getattr(output, key), 'path'):
+                    os.makedirs(os.path.dirname(getattr(output, key).path), exist_ok=True)
                 save_func = instantiate(getattr(output, key).save)
                 save_func(value)
 

@@ -541,7 +541,7 @@ def apply_transform(transformations: DictConfig | None = None, inverse_transform
     # If no transformation, skip
     if transformations is None:
         # Return identity function if no transformations
-        return lambda x: x
+        return identity
 
     # Build transformation pipeline
     pipeline = []

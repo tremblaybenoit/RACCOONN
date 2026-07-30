@@ -14,16 +14,27 @@ train:
       _target_: code.loader.dataset.EagerDataset
       _recursive_: false
       # Path to the latitude slant data file
-      path: ${preprocessing.slant.train.output.y.path}
+      path: ${...dir}/y_slant.npy
       # Type of data
       type: 'y (km)'
       # Loading function
-      load: ${preprocessing.slant.train.output.y.load}
+      load:
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: code.data.io.save_npy
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
       # Transformations to apply
       transformations:
         # Per-variable normalization
         normalization:
-          _target_: code.data.transformations.min_may
+          _target_: code.data.transformations.min_max
           _partial_: true
           stats:
             _target_: code.preprocessing.statistics.read_statistics_var
@@ -40,11 +51,22 @@ valid:
       _target_: ${....train.variables.y_slant._target_}
       _recursive_: false
       # Path to the latitude slant data file
-      path: ${preprocessing.slant.valid.output.y.path}
+      path: ${...dir}/y_slant.npy
       # Type of data
       type: ${....train.variables.y_slant.type}
       # Loading function
-      load: ${preprocessing.slant.valid.output.y.load}
+      load:
+        _target_: ${.....train.variables.y_slant.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: ${.....train.variables.y_slant.save._target_}
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.y_slant.transformations}
 # Test set
@@ -57,11 +79,22 @@ test:
       _target_: ${....train.variables.y_slant._target_}
       _recursive_: false
       # Path to the latitude slant data file
-      path: ${preprocessing.slant.test.output.y.path}
+      path: ${...dir}/y_slant.npy
       # Type of data
       type: ${....train.variables.y_slant.type}
       # Loading function
-      load: ${preprocessing.slant.test.output.y.load}
+      load:
+        _target_: ${.....train.variables.y_slant.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: ${.....train.variables.y_slant.save._target_}
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.y_slant.transformations}
 # Predict set
@@ -89,5 +122,5 @@ all:
             - ${.......valid.variables.y_slant.load}
             - ${.......test.variables.y_slant.load}
           - 0
-        # Transformations to apply
-        transformations: ${....train.variables.y_slant.transformations}
+      # Transformations to apply
+      transformations: ${....train.variables.y_slant.transformations}

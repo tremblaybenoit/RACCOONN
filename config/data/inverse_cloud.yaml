@@ -5,12 +5,7 @@ defaults:
   - synthetic/hofx_forward_stdev@stage
   - synthetic/pressure_mask@stage
   - synthetic/prof_prior@stage
-  - synthetic/lat_slant@stage
-  - synthetic/lon_slant@stage
-  - synthetic/x_slant@stage
-  - synthetic/y_slant@stage
-  - synthetic/z_slant@stage
-  - GOES_ML/default@source
+  - synthetic/default@source
 
 # dtype
 dtype: 'float32'
@@ -25,21 +20,21 @@ source:
   # Training set
   train:
     # Path to training data
-    dir: ../../../../../../../d/Data/JCSDA/GOES_ML/Train2
+    dir: ../synthetic_float32/Train2
     # Split
     split: null
 
   # Validation set
   valid:
     # Path to validation data
-    dir: ../../../../../../../d/Data/JCSDA/GOES_ML/Val2
+    dir: ../synthetic_float32/Val2
     # Split
     split: null
 
   # Test set
   test:
     # Path to test data
-    dir: ../../../../../../../d/Data/JCSDA/GOES_ML/Test2
+    dir: ../synthetic_float32/Test2
     # Split
     split: null
 

@@ -19,7 +19,7 @@ train:
       load:
         _target_: numpy.logical_not
         _args_:
-          - ${.....cloud_mask.load}
+          - ${....cloud_mask.load}
       # Transformations to apply
       transformations: null
 # Validation set
@@ -37,7 +37,7 @@ valid:
       load:
         _target_: ${.....train.variables.clear_mask.load._target_}
         _args_:
-          - ${.....cloud_mask.load}
+          - ${....cloud_mask.load}
       # Transformations to apply
       transformations: ${....train.variables.clear_mask.transformations}
 # Test set
@@ -55,7 +55,7 @@ test:
       load:
         _target_: ${.....train.variables.clear_mask.load._target_}
         _args_:
-          - ${.....cloud_mask.load}
+          - ${....cloud_mask.load}
       # Transformations to apply
       transformations: ${....train.variables.clear_mask.transformations}
 # Predict set

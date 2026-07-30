@@ -191,9 +191,7 @@ def compute_statistics(input: DictConfig, output: DictConfig | None = None, excl
         logger.info(f"Computing statistics of variable '{var_name}' ({v + 1}/{len(variables)})...")
 
         # Instantiate the univariate dataset for this variable, force as_tensor=False
-        from omegaconf import OmegaConf
-        var_cfg_modified = OmegaConf.merge(var_config, {'as_tensor': False})
-        dataset = instantiate(var_cfg_modified)
+        dataset = instantiate(var_config, transformations=None, as_tensor=False)
 
         # Compute statistics for this variable
         stats[var_name] = statistics_dataset(
@@ -204,7 +202,7 @@ def compute_statistics(input: DictConfig, output: DictConfig | None = None, excl
             num_workers=num_workers
         )
 
-        logger.info(f"  ✓ Computed {len(stats[var_name])} statistics")
+        logger.info(f"  Computed {len(stats[var_name])} statistics")
 
     logger.info(f"Statistics computed for {len(stats)} variable(s).")
 

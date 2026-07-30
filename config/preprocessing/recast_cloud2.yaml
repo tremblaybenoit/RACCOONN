@@ -18,8 +18,6 @@ recast:
     output:
       # Precision
       dtype: ${data.dtype}
-      # Directory of the recast data
-      dir: ${data.stage.train.dir}
       # Variables
       variables: ${data.stage.train.variables}
   # Validation set
@@ -37,8 +35,6 @@ recast:
     output:
       # Precision
       dtype: ${data.dtype}
-      # Directory of the recast data
-      dir: ${data.stage.valid.dir}
       # Variables
       variables: ${data.stage.valid.variables}
   # Test set
@@ -56,7 +52,5 @@ recast:
     output:
       # Precision
       dtype: ${data.dtype}
-      # Directory of the recast data
-      dir: ${data.stage.test.dir}
       # Variables
       variables: ${data.stage.test.variables}

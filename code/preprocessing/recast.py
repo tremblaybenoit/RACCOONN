@@ -129,34 +129,33 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
         None.
     """
 
-    # Variables to recast
-    variables = []
-    for key, value in output.variables.items():
-        # Check if non-derived variable
-        if hasattr(value, 'save'):
-            variables.append(key)
+    # Variables to recast (only those with save configuration)
+    variables = [key for key, value in output.variables.items() if hasattr(value, 'save')]
+    logger.info(f"Variables to save: {variables}")
 
     # Build dictionary from input data
     data = {}
-    for key, value in input.variables.items():
+    for variable in variables:
         # Load data
-        data[key] = instantiate(value.load)
-
-    # Compute derived variables
-    # Clouds or clear sky masks
-    data['cloud_mask'] = cloud_mask(data['prof'])
-    data['clear_mask'] = ~data['cloud_mask']
-    # Daytime or nighttime masks
-    data['daytime_mask'] = daytime_mask(data['meta'])
-    data['nighttime_mask'] = ~data['daytime_mask']
+        if variable in input.variables:
+            logger.debug(f"Loading variable '{variable}'")
+            data[variable] = instantiate(input.variables[variable].load)
+        else:
+            logger.error(f"Variable '{variable}' not found in input.variables")
 
     # Build mask
-    mask = np.ones_like(data['lat'], dtype='bool')
+    mask = np.ones(data[variables[0]].shape[0], dtype='bool')
     if hasattr(input, 'mask'):
         # Initialize masks
-        data['spatiotemporal_mask'] = np.ones_like(data['lat'], dtype='bool')
+        data['spatiotemporal_mask'] = mask.copy()
         # Spatial extent
         if hasattr(input.mask, 'spatial_domain'):
+            # Load coordinates
+            if 'lat' not in data:
+                data['lat'] = instantiate(input.variables['lat'].load)
+            if 'lon' not in data:
+                data['lon'] = instantiate(input.variables['lon'].load)
+            # Apply mask
             if hasattr(input.mask.spatial_domain, 'lat_min'):
                 lat_min = input.mask.spatial_domain.get('lat_min', -90)
                 data['spatiotemporal_mask'] &= (data['lat'] >= lat_min).astype(bool)
@@ -171,6 +170,9 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
                 data['spatiotemporal_mask'] &= (data['lon'] <= lon_max).astype(bool)
         # Temporal extent
         if hasattr(input.mask, 'temporal_window'):
+            # Load coordinates
+            if 'scans' not in data:
+                data['scans'] = instantiate(input.variables['scans'].load)
             if hasattr(input.mask.temporal_window, 'scans_min'):
                 scans_min = input.mask.temporal_window.get('scans_min', data['scans'].min())
                 data['spatiotemporal_mask'] &= (data['scans'] >= scans_min).astype(bool)
@@ -179,29 +181,44 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
                 data['spatiotemporal_mask'] &= (data['scans'] <= scans_max).astype(bool)
         # Update mask
         mask &= data['spatiotemporal_mask']
+
         # Clouds or clear sky
         cloud_keep = input.mask.get('cloud_mask', True)
         clear_keep = input.mask.get('clear_mask', True)
-        # Clouds only
-        if cloud_keep and not clear_keep:
-            mask &= data['cloud_mask']
-        # Clear sky only
-        elif clear_keep and not cloud_keep:
-            mask &= data['clear_mask']
-            # Remove null profiles
-            data['prof'] = np.take(data['prof'], [0, 4, 8], axis=1)
+        # If there is a mask
+        if cloud_keep != clear_keep:
+            # Clouds or clear sky masks
+            if 'prof' not in data:
+                data['prof'] = instantiate(input.variables['prof'].load)
+            if 'cloud_mask' not in data:
+                data['cloud_mask'] = cloud_mask(data['prof'])
+            data['clear_mask'] = ~data['cloud_mask']
+            # Clouds only
+            if cloud_keep and not clear_keep:
+                mask &= data['cloud_mask']
+            # Clear sky only
+            elif clear_keep and not cloud_keep:
+                mask &= data['clear_mask']
+                # Remove null profiles
+                data['prof'] = np.take(data['prof'], [0, 4, 8], axis=1)
+
         # Daytime or nighttime
         daytime_keep = input.mask.get('daytime_mask', True)
         nighttime_keep = input.mask.get('nighttime_mask', True)
-        # Daytime only
-        if daytime_keep and not nighttime_keep:
-            mask &= data['daytime_mask']
-        # Nighttime only
-        elif nighttime_keep and not daytime_keep:
-            mask &= data['nighttime_mask']
-
-    # Create directory for output if it doesn't exist
-    os.makedirs(output.dir, exist_ok=True)
+        # If there is a mask
+        if daytime_keep != nighttime_keep:
+            # Daytime or nighttime masks
+            if 'meta' not in data:
+                data['meta'] = instantiate(input.variables['meta'].load)
+            if 'daytime_mask' not in data:
+                data['daytime_mask'] = daytime_mask(data['meta'])
+            data['nighttime_mask'] = ~data['daytime_mask']
+            # Daytime only
+            if daytime_keep and not nighttime_keep:
+                mask &= data['daytime_mask']
+            # Nighttime only
+            elif nighttime_keep and not daytime_keep:
+                mask &= data['nighttime_mask']
 
     # Shuffle or maintain distribution
     if hasattr(input, 'split') and input.split is not None:
@@ -216,14 +233,18 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
         # Save to disk, acoording to new split
         for stage, coords in split.items():
             # Loop over variables per stage
-            for key, value in output.stage[stage].variables.items():
+            for variable in variables:
+                logger.info(f"Saving variable '{variable}'")
+                # Create parent directory if needed
+                if hasattr(output.stage[stage].variables[variable], 'path'):
+                    os.makedirs(os.path.dirname(output.stage[stage].variables[variable].path), exist_ok=True)
                 # Save function
-                save_fn = instantiate(value.save)
+                save_fn = instantiate(output.stage[stage].variables[variable].save)
                 # Save data
                 if hasattr(output, 'dtype'):
-                    save_fn(data[key][coords].astype(output.dtype))
+                    save_fn(data[variable][coords].astype(output.dtype))
                 else:
-                    save_fn(data[key][coords])
+                    save_fn(data[variable][coords])
     else:
         # Apply mask and convert to right precision (pressure is constant, skip masking)
         if hasattr(output, 'dtype'):
@@ -232,10 +253,17 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
         else:
             data = {key: (value[mask] if key not in ('pressure', 'pressure_mask') else value) for key, value in data.items()}
         # Save to disk
-        for key, value in output.variables.items():
+        for variable in variables:
+            logger.info(f"Saving variable '{variable}'")
+            # Create parent directory if needed
+            if hasattr(output.variables[variable], 'path'):
+                os.makedirs(os.path.dirname(output.variables[variable].path), exist_ok=True)
             # Save function
-            save_fn = instantiate(value.save)
-            save_fn(data[key])
+            save_fn = instantiate(output.variables[variable].save)
+            if variable in data:
+                save_fn(data[variable])
+            else:
+                logger.warning(f"Variable '{variable}' not found in data dict, skipping save")
 
     return
 

@@ -28,7 +28,7 @@ train:
         _target_: code.data.io.save_npy
         _partial_: true
         _args_:
-          - ${....path}
+          - ${...path}
         dtype: ${data.dtype}
       # Transformations to apply
       transformations:
@@ -65,7 +65,7 @@ valid:
         _target_: ${.....train.variables.lat.save._target_}
         _partial_: true
         _args_:
-          - ${....path}
+          - ${...path}
         dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.lat.transformations}
@@ -93,7 +93,7 @@ test:
         _target_: ${.....train.variables.lat.save._target_}
         _partial_: true
         _args_:
-          - ${....path}
+          - ${...path}
         dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.lat.transformations}

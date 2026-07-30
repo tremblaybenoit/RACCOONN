@@ -29,7 +29,7 @@ valid:
     # Cloud mask
     cloud_mask:
       # Dataset class
-      _target_: ${...train.variables.cloud_mask._target_}
+      _target_: ${....train.variables.cloud_mask._target_}
       _recursive_: false
       # Type of data
       type: ${....train.variables.cloud_mask.type}
@@ -58,12 +58,6 @@ test:
           - ${....prof.load}
       # Transformations to apply
       transformations: ${....train.variables.cloud_mask.transformations}
-# Predict set
-predict:
-  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-  variables:
-    # Cloud mask
-    cloud_mask: ${...test.variables.cloud_mask}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.

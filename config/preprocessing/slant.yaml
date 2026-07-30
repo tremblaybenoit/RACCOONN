@@ -25,7 +25,7 @@ slant:
   # Validation set
   valid:
     # Function
-    _target_: code.data.slant.compute_slant_path
+    _target_: code.preprocessing.slant.compute_slant_path
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:
@@ -47,7 +47,7 @@ slant:
   # Test set
   test:
     # Function
-    _target_: code.data.slant.compute_slant_path
+    _target_: code.preprocessing.slant.compute_slant_path
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
     input:

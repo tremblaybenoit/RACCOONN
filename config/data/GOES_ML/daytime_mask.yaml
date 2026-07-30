@@ -58,12 +58,6 @@ test:
           - ${....meta.load}
       # Transformations to apply
       transformations: ${....train.variables.daytime_mask.transformations}
-# Predict set
-predict:
-  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-  variables:
-    # Daytime mask
-    daytime_mask: ${...test.variables.daytime_mask}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.

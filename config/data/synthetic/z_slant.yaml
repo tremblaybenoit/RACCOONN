@@ -14,11 +14,22 @@ train:
       _target_: code.loader.dataset.EagerDataset
       _recursive_: false
       # Path to the latitude slant data file
-      path: ${preprocessing.slant.train.output.z.path}
+      path: ${...dir}/z_slant.npy
       # Type of data
       type: 'z (km)'
       # Loading function
-      load: ${preprocessing.slant.train.output.z.load}
+      load:
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: code.data.io.save_npy
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
       # Transformations to apply
       transformations:
         # Per-variable normalization
@@ -40,11 +51,22 @@ valid:
       _target_: ${....train.variables.z_slant._target_}
       _recursive_: false
       # Path to the latitude slant data file
-      path: ${preprocessing.slant.valid.output.z.path}
+      path: ${...dir}/z_slant.npy
       # Type of data
       type: ${....train.variables.z_slant.type}
       # Loading function
-      load: ${preprocessing.slant.valid.output.z.load}
+      load:
+        _target_: ${.....train.variables.z_slant.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: ${.....train.variables.z_slant.save._target_}
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.z_slant.transformations}
 # Test set
@@ -57,11 +79,22 @@ test:
       _target_: ${....train.variables.z_slant._target_}
       _recursive_: false
       # Path to the latitude slant data file
-      path: ${preprocessing.slant.valid.output.z.path}
+      path: ${...dir}/z_slant.npy
       # Type of data
       type: ${....train.variables.z_slant.type}
       # Loading function
-      load: ${preprocessing.slant.test.output.z.load}
+      load:
+        _target_: ${.....train.variables.z_slant.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: ${.....train.variables.z_slant.save._target_}
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.z_slant.transformations}
 # Predict set
@@ -91,4 +124,3 @@ all:
           - 0
       # Transformations to apply
       transformations: ${....train.variables.z_slant.transformations}
-
