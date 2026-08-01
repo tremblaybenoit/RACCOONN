@@ -20,7 +20,9 @@ statistics:
       # Saving function
       save:
         _target_: code.data.io.save_pkl
-        path: ${..path}
+        _partial_: true
+        _args_:
+          - ${...path}
       # Loading function
       load:
         _target_: code.data.io.load_pkl

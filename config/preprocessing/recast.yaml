@@ -18,6 +18,10 @@ recast:
         train:
           # Variables
           variables:
+            # Cloud mask
+            cloud_mask: ${data.source.train.variables.cloud_mask}
+            # Daytime mask
+            daytime_mask: ${data.source.train.variables.daytime_mask}
             # hofx
             hofx: ${data.source.train.variables.hofx}
             # Latitude
@@ -28,6 +32,8 @@ recast:
             meta: ${data.source.train.variables.meta}
             # Observations
             obs: ${data.source.train.variables.obs}
+            # Pressure
+            pressure: ${data.source.train.variables.pressure}
             # Atmospheric profiles
             prof: ${data.source.train.variables.prof}
             # Scans
@@ -38,6 +44,10 @@ recast:
         valid:
           # Variables
           variables:
+            # Cloud mask
+            cloud_mask: ${data.source.valid.variables.cloud_mask}
+            # Daytime mask
+            daytime_mask: ${data.source.valid.variables.daytime_mask}
             # hofx
             hofx: ${data.source.valid.variables.hofx}
             # Latitude
@@ -48,6 +58,8 @@ recast:
             meta: ${data.source.valid.variables.meta}
             # Observations
             obs: ${data.source.valid.variables.obs}
+            # Pressure
+            pressure: ${data.source.valid.variables.pressure}
             # Atmospheric profiles
             prof: ${data.source.valid.variables.prof}
             # Scans
@@ -58,6 +70,10 @@ recast:
         test:
           # Variables
           variables:
+            # Cloud mask
+            cloud_mask: ${data.source.test.variables.cloud_mask}
+            # Daytime mask
+            daytime_mask: ${data.source.test.variables.daytime_mask}
             # hofx
             hofx: ${data.source.test.variables.hofx}
             # Latitude
@@ -68,6 +84,8 @@ recast:
             meta: ${data.source.test.variables.meta}
             # Observations
             obs: ${data.source.test.variables.obs}
+            # Pressure
+            pressure: ${data.source.test.variables.pressure}
             # Atmospheric profiles
             prof: ${data.source.test.variables.prof}
             # Scans
@@ -94,6 +112,8 @@ recast:
             meta: ${data.stage.train.variables.meta}
             # Observations
             obs: ${data.stage.train.variables.obs}
+            # Pressure
+            pressure: ${data.stage.train.variables.pressure}
             # Atmospheric profiles
             prof: ${data.stage.train.variables.prof}
             # Scans
@@ -114,6 +134,8 @@ recast:
             meta: ${data.stage.valid.variables.meta}
             # Observations
             obs: ${data.stage.valid.variables.obs}
+            # Pressure
+            pressure: ${data.stage.valid.variables.pressure}
             # Atmospheric profiles
             prof: ${data.stage.valid.variables.prof}
             # Scans
@@ -134,6 +156,8 @@ recast:
             meta: ${data.stage.test.variables.meta}
             # Observations
             obs: ${data.stage.test.variables.obs}
+            # Pressure
+            pressure: ${data.stage.test.variables.pressure}
             # Atmospheric profiles
             prof: ${data.stage.test.variables.prof}
             # Scans
