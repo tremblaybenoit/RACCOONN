@@ -3,6 +3,120 @@ defaults:
   - inverse_default
   - _self_
 
+# Filters
+filters:
+  # Cloud mask (training set)
+  source_cloud_mask_train:
+    # Function
+    _target_: code.preprocessing.filters.compute_mask
+    _recursive_: false  # Do not instantiate nested objects
+    # Input data (create mask)
+    input:
+      _target_: code.preprocessing.filters.cloud_mask
+      _args_:
+        - ${data.source.train.variables.prof.load}
+    # Output data (save mask)
+    output:
+      # Save function
+      save: ${data.source.train.variables.cloud_mask.save}
+  # Cloud mask (validation set)
+  source_cloud_mask_valid:
+    # Function
+    _target_: code.preprocessing.filters.compute_mask
+    _recursive_: false  # Do not instantiate nested objects
+    # Input data (create mask)
+    input:
+      _target_: code.preprocessing.filters.cloud_mask
+      _args_:
+        - ${data.source.valid.variables.prof.load}
+    # Output data (save mask)
+    output:
+      # Save function
+      save: ${data.source.valid.variables.cloud_mask.save}
+  # Cloud mask (test set)
+  source_cloud_mask_test:
+    # Function
+    _target_: code.preprocessing.filters.compute_mask
+    _recursive_: false  # Do not instantiate nested objects
+    # Input data (create mask)
+    input:
+      _target_: code.preprocessing.filters.cloud_mask
+      _args_:
+        - ${data.source.test.variables.prof.load}
+    # Output data (save mask)
+    output:
+      # Save function
+      save: ${data.source.test.variables.cloud_mask.save}
+
+# Compute slant path coordinates
+slant:
+  # Training set
+  source_train:
+    # Function
+    _target_: code.preprocessing.slant.compute_slant_path
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Coordinates
+      lat: ${data.source.train.variables.lat}
+      lon: ${data.source.train.variables.lon}
+      pressure: ${data.source.train.variables.pressure}
+      # Meta data
+      meta: ${data.source.train.variables.meta}
+      # Profiles
+      prof: ${data.source.train.variables.prof}
+    output:
+      # Coordinates
+      lat: ${data.source.train.variables.lat_slant}
+      lon: ${data.source_train.variables.lon_slant}
+      z: ${data.source_train.variables.z_slant}
+      x: ${data.source_train.variables.x_slant}
+      y: ${data.source_train.variables.y_slant}
+  # Validation set
+  source_valid:
+    # Function
+    _target_: code.preprocessing.slant.compute_slant_path
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Coordinates
+      lat: ${data.source.valid.variables.lat}
+      lon: ${data.source.valid.variables.lon}
+      pressure: ${data.source.valid.variables.pressure}
+      # Meta data
+      meta: ${data.source.valid.variables.meta}
+      # Profiles
+      prof: ${data.source.valid.variables.prof}
+    output:
+      # Coordinates
+      lat: ${data.source.valid.variables.lat_slant}
+      lon: ${data.source.valid.variables.lon_slant}
+      z: ${data.source.valid.variables.z_slant}
+      x: ${data.source.valid.variables.x_slant}
+      y: ${data.source.valid.variables.y_slant}
+  # Test set
+  source_test:
+    # Function
+    _target_: code.preprocessing.slant.compute_slant_path
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Coordinates
+      lat: ${data.source.test.variables.lat}
+      lon: ${data.source.test.variables.lon}
+      pressure: ${data.source.test.variables.pressure}
+      # Meta data
+      meta: ${data.source.test.variables.meta}
+      # Profiles
+      prof: ${data.source.test.variables.prof}
+    output:
+      # Coordinates
+      lat: ${data.source.test.variables.lat_slant}
+      lon: ${data.source.test.variables.lon_slant}
+      z: ${data.source.test.variables.z_slant}
+      x: ${data.source.test.variables.x_slant}
+      y: ${data.source.test.variables.y_slant}
+
 # Recast data to new format, spatiotemporal distribution
 recast:
   # Source data
