@@ -11,7 +11,7 @@ statistics:
     # What the method needs as input
     input: ${data.stage.all.variables}
     # Computation parameters
-    batch_size: 32
+    batch_size: 920000
     num_workers: 4
     # What the method produces as output (pickle file)
     output:

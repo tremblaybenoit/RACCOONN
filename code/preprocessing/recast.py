@@ -153,18 +153,15 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
                 # Apply mask
                 if mask is None:
                     mask = np.ones_like(data_stage['lat'], dtype=bool)
-                if hasattr(input.mask.spatial_domain, 'lat_min'):
-                    lat_min = input.mask.spatial_domain.get('lat_min', -90)
-                    mask &= (data_stage['lat'] >= lat_min)
-                if hasattr(input.mask.spatial_domain, 'lat_max'):
-                    lat_max = input.mask.spatial_domain.get('lat_max', 90)
-                    mask &= (data_stage['lat'] <= lat_max)
-                if hasattr(input.mask.spatial_domain, 'lon_min'):
-                    lon_min = input.mask.spatial_domain.get('lon_min', -180)
-                    mask &= (data_stage['lon'] >= lon_min)
-                if hasattr(input.mask.spatial_domain, 'lon_max'):
-                    lon_max = input.mask.spatial_domain.get('lon_max', 180)
-                    mask &= (data_stage['lon'] <= lon_max)
+                # Apply spatial bounds (use defaults if not specified)
+                lat_min = input.mask.spatial_domain.get('lat_min', -90)
+                mask &= (data_stage['lat'] >= lat_min)
+                lat_max = input.mask.spatial_domain.get('lat_max', 90)
+                mask &= (data_stage['lat'] <= lat_max)
+                lon_min = input.mask.spatial_domain.get('lon_min', -180)
+                mask &= (data_stage['lon'] >= lon_min)
+                lon_max = input.mask.spatial_domain.get('lon_max', 180)
+                mask &= (data_stage['lon'] <= lon_max)
             # Temporal extent
             if hasattr(input.mask, 'temporal_window'):
                 logger.info(f"Temporal window mask...")
@@ -174,12 +171,11 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
                 # Apply mask
                 if mask is None:
                     mask = np.ones_like(data_stage['scans'], dtype=bool)
-                if hasattr(input.mask.temporal_window, 'scans_min'):
-                    scans_min = input.mask.temporal_window.get('scans_min', data_stage['scans'].min())
-                    mask &= (data_stage['scans'] >= scans_min)
-                if hasattr(input.mask.temporal_window, 'scans_max'):
-                    scans_max = input.mask.temporal_window.get('scans_max', data_stage['scans'].max())
-                    mask &= (data_stage['scans'] <= scans_max)
+                # Apply temporal bounds (use data min/max if not specified)
+                scans_min = input.mask.temporal_window.get('scans_min', data_stage['scans'].min())
+                mask &= (data_stage['scans'] >= scans_min)
+                scans_max = input.mask.temporal_window.get('scans_max', data_stage['scans'].max())
+                mask &= (data_stage['scans'] <= scans_max)
 
             # Clouds or clear sky
             cloud_keep = input.mask.get('cloud_mask', True)
@@ -234,12 +230,15 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
                 if variable not in data_stage:
                     logger.info(f"Loading variable '{variable}'")
                     data_stage[variable] = instantiate(config_stage.variables[variable].load)
-                    # Apply mask
-                    if variable not in ('pressure', 'pressure_mask') and mask is not None:
-                        data_stage[variable] = data_stage[variable][mask]
-                    # Convert dtype if needed
-                    if hasattr(output, 'dtype'):
-                        data_stage[variable] = data_stage[variable].astype(output.dtype)
+                # Apply mask
+                if variable not in ('pressure', 'pressure_mask') and mask is not None:
+                    data_stage[variable] = data_stage[variable][mask]
+                # If atmospheric profiles and clear sky, extract non-zero profiles
+                if variable == 'prof' and data_stage[variable].shape[1] > 3 and (clear_keep and not cloud_keep):
+                    data_stage[variable] = np.take(data_stage[variable], [0, 4, 8], axis=1)
+                # Convert dtype if needed
+                if hasattr(output, 'dtype'):
+                    data_stage[variable] = data_stage[variable].astype(output.dtype)
                 # Check if variable is in data_all
                 if variable not in data_all:
                     data_all[variable] = data_stage[variable]
@@ -265,7 +264,7 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
                 if variable not in ('pressure', 'pressure_mask') and mask is not None:
                     data_stage[variable] = data_stage[variable][mask]
                 # If atmospheric profiles and clear sky, extract non-zero profiles
-                if variable == 'prof' and (clear_keep and not cloud_keep):
+                if variable == 'prof' and data_stage[variable].shape[1] > 3 and (clear_keep and not cloud_keep):
                     data_stage[variable] = np.take(data_stage[variable], [0, 4, 8], axis=1)
                 # Convert dtype if needed
                 if hasattr(output, 'dtype'):
@@ -291,16 +290,19 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
             if stage in output.stage:
                 logger.info(f"Saving stage: {stage}")
                 for variable, config_variable in output.stage[stage].variables.items():
+                    logger.info(f"  Saving variable: {variable}")
                     if variable in data_all:
                         # Create parent directory
                         if hasattr(config_variable, 'path'):
                             os.makedirs(os.path.dirname(config_variable.path), exist_ok=True)
                         # Save function
                         save_fn = instantiate(config_variable.save)
-                        save_fn(data_all[variable][coords])
-                        logger.debug(f"  Saved {variable}: shape={data_all[variable][coords].shape}")
-                    # Free memory
-                    del data_all[variable][coords]
+                        # Pressure is constant, skip masking, otherwise mask
+                        if variable not in ('pressure', 'pressure_mask'):
+                            save_fn(data_all[variable][coords])
+                        else:
+                            save_fn(data_all[variable])
+                        logger.debug(f"  Saved {variable}: shape={data_all[variable].shape}")
 
     return
 

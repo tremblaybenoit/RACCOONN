@@ -111,7 +111,10 @@ def clear_mask(prof: np.ndarray | torch.Tensor, split: np.ndarray | torch.Tensor
             c = (prof[:, 5, :].sum(axis=1) == 0) & (prof[:, 6, :].sum(axis=1) == 0)
             c = c & (prof[:, 7, :].sum(axis=1) == 0)
     else:
-        c = prof > 0
+        if isinstance(prof, torch.Tensor):
+            c = torch.ones((prof.shape[0],), dtype=torch.bool)
+        else:
+            c = np.ones((prof.shape[0],), dtype=bool)
 
     # Apply split
     if split is not None:

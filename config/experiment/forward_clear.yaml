@@ -5,15 +5,15 @@
 defaults:
   - override /paths: default
   - override /hydra: default
-  - override /data: inverse_default
-  - override /preprocessing: inverse_default
+  - override /data: forward_default
+  - override /preprocessing: forward_default
   - override /loader: default
-  - override /architecture: inverse_default
-  - override /loss: inverse_default
+  - override /architecture: forward_default
+  - override /loss: forward_default
   - override /optimizer: default
   - override /scheduler: default
-  - override /model: inverse_default
-  - override /callbacks: inverse_default
+  - override /model: forward_default
+  - override /callbacks: forward_default
   - override /logger: default
   - override /trainer: gpu
 
@@ -21,14 +21,14 @@ defaults:
 # This allows you to overwrite only specified parameters
 
 # Task name. Note that it determines the output directory path
-task_name: "inverse_clear"  # Experiment
+task_name: "forward_clear"  # Experiment
 
 # Run id (unique identifier for the run)
 paths:
-  task_dir: "../inverse_outputs"
+  task_dir: "../forward_outputs"
   run_id: "default"
   data_dir: ../synthetic_${data.dtype}_clear
-  # checkpoint_dir: "code/model/checkpoints/checkpoint"
+  # checkpoint_dir: "code/model/checkpoints/forward"
 
 # Preprocessing
 preprocessing:
@@ -82,14 +82,18 @@ data:
           transformations:
             # Normalization function and parameters
             normalization:
-              _target_: code.data.transformations.min_max
-              _partial_: true
-              stats:
-                _target_: code.preprocessing.statistics.read_statistics_var
-                path: ${preprocessing.statistics.data.output.path}
-                var: 'prof'
-                dtype: ${data.dtype}
-              axis: 1
+              # Function
+              _target_: code.data.transformations.NormalizeProfiles
+              # Min/max values for normalization
+              profmin:
+                _target_: numpy.loadtxt
+                _args_:
+                  - data/normalization/prof_m.txt
+              profmax:
+                _target_: numpy.loadtxt
+                _args_:
+                  - data/normalization/prof_div.txt
+              dtype: ${data.dtype}
     # Validation set
     valid:
       # Variables
@@ -119,4 +123,4 @@ data:
 logger:
   # MLflow logger
   ports:
-    mlflow: 5002
+    mlflow: 5001

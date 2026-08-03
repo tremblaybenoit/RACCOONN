@@ -5,7 +5,7 @@
 defaults:
   - override /paths: default
   - override /hydra: default
-  - override /data: inverse_cloud
+  - override /data: inverse_default
   - override /preprocessing: inverse_default
   - override /loader: default
   - override /architecture: inverse_default
@@ -21,7 +21,7 @@ defaults:
 # This allows you to overwrite only specified parameters
 
 # Task name. Note that it determines the output directory path
-task_name: "inverse"  # Experiment
+task_name: "inverse_cloud"  # Experiment
 
 # Run id (unique identifier for the run)
 paths:
@@ -41,8 +41,16 @@ preprocessing:
         # Mask to apply
         mask:
           # Cloud/clear sky
-          cloud_mask: false
-          clear_mask: true
+          cloud_mask: true
+          clear_mask: false
+  # Statistics of the dataset
+  statistics:
+    # Statistics of the training set
+    data:
+      # What the method produces as output (pickle file)
+      output:
+        # Path to statistics file
+        path: code/data/statistics/synthetic_cloud.pkl
 
 # Data configuration
 data:

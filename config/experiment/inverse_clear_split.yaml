@@ -6,7 +6,7 @@ defaults:
   - override /paths: default
   - override /hydra: default
   - override /data: inverse_default
-  - override /preprocessing: inverse_default
+  - override /preprocessing: inverse_split
   - override /loader: default
   - override /architecture: inverse_default
   - override /loss: inverse_default
@@ -21,13 +21,13 @@ defaults:
 # This allows you to overwrite only specified parameters
 
 # Task name. Note that it determines the output directory path
-task_name: "inverse_clear"  # Experiment
+task_name: "inverse_clear_split"  # Experiment
 
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
   run_id: "default"
-  data_dir: ../synthetic_${data.dtype}_clear
+  data_dir: ../synthetic_${data.dtype}_clear_split
   # checkpoint_dir: "code/model/checkpoints/checkpoint"
 
 # Preprocessing
@@ -40,6 +40,16 @@ preprocessing:
       input:
         # Mask to apply
         mask:
+          # Spatial domain:
+          spatial_domain:
+            lat_min: -90.0
+            lat_max: 90.0
+            lon_min: -180.0
+            lon_max: 180.0
+          # Temporal domain:
+          temporal_window:
+            scans_min: 117.0
+            scans_max: 118.0
           # Cloud/clear sky
           cloud_mask: false
           clear_mask: true
@@ -61,15 +71,15 @@ data:
     # Training set
     train:
       # Path to the training data
-      dir: ../synthetic_float32/Train2
+      dir: ../synthetic_float32_clear/Train2
     # Validation set
     valid:
       # Path to the validation data
-      dir: ../synthetic_float32/Val2
+      dir: ../synthetic_float32_clear/Val2
     # Test set
     test:
       # Path to the test data
-      dir: ../synthetic_float32/Test2
+      dir: ../synthetic_float32_clear/Test2
   # Split ratios for training, validation, and test sets
   stage:
     # Training set

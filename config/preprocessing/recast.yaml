@@ -9,9 +9,21 @@ recast:
     input:
       # Mask to apply
       mask:
+        # Spatial domain:
+        spatial_domain:
+          lat_min: -90.0
+          lat_max: 90.0
+          lon_min: -180.0
+          lon_max: 180.0
+        # Temporal domain:
+        temporal_window:
+          scans_min: 0.0
+          scans_max: 188.0
         # Cloud/clear sky
         cloud_mask: false
         clear_mask: false
+      # Split
+      split: null
       # Stage splitting
       stage:
         # Training set

@@ -1,24 +1,40 @@
 defaults:
-  - synthetic/cloud_filter@stage
-  - synthetic/daytime_filter@stage
-  - synthetic/hofx@stage
-  - synthetic/lat@stage
-  - synthetic/lat_slant@stage
-  - synthetic/lon@stage
-  - synthetic/lon_slant@stage
-  - synthetic/meta@stage
-  - synthetic/obs@stage
-  - synthetic/pressure@stage
-  - synthetic/pressure_log@stage
-  - synthetic/prof@stage
-  - synthetic/scans@stage
-  - synthetic/surf@stage
-  - synthetic/x_slant@stage
-  - synthetic/y_slant@stage
-  - synthetic/z_slant@stage
+  - synthetic/default@stage
+  - GOES_ML/default@source
 
 # dtype
 dtype: 'float32'
+
+# Variables to use as input/output
+select_input: ['prof', 'meta', 'surf']
+select_target: ['hofx']
+select_context: ['clear_mask', 'cloud_mask', 'daytime_mask']
+
+# Original data - Split the data into training, validation, and test sets
+source:
+  # Training set
+  train:
+    # Path to training data
+    dir: ../../../../../../../d/Data/JCSDA/GOES_ML/Train2
+    # Split
+    split: null
+
+  # Validation set
+  valid:
+    # Path to validation data
+    dir: ../../../../../../../d/Data/JCSDA/GOES_ML/Val2
+    # Split
+    split: null
+
+  # Test set
+  test:
+    # Path to test data
+    dir: ../../../../../../../d/Data/JCSDA/GOES_ML/Test2
+    # Split
+    split: null
+
+  # Prediction set
+  predict: null
 
 # Split the data into training, validation, and test sets
 stage:
@@ -46,6 +62,6 @@ stage:
   # Prediction set (NOTE: By default, we use the test set as the prediction set for demonstration purposes)
   predict:
     # Path to prediction data
-    dir: ${paths.data_dir}/Test2
+    dir: ${data.stage.test.dir}
     # Split
-    split: null
+    split: ${data.stage.test.split}

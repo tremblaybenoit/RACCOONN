@@ -1,0 +1,76 @@
+# Configuration to load multiple preprocessing methods
+defaults:
+  - inverse_default
+  - _self_
+
+# Recast data to new format, spatiotemporal distribution
+recast:
+  # Source data
+  data:
+    # What the method needs as input
+    input:
+      # Split
+      split:
+        # Ratio for split
+        ratio:
+          train: 0.6
+          valid: 0.2
+          test: 0.2
+        # Seed
+        seed: 42
+        # Tolerance for edges (degrees)
+        tolerance: 0.75
+
+# Statistics of the ENTIRE dataset
+statistics:
+  # Statistics of the training set
+  data:
+    # What the method needs as input
+    input: ${data.source.all.variables}
+
+# Error covariance matrices
+covariance:
+
+  # Error covariance matrix in model space
+  B:
+    # Function
+    _target_: code.preprocessing.covariance.climatological_matrix
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Variables to consider for the covariance estimation
+      data:
+        load: ${data.source.all.variables.prof.load}
+        transformations:  ${data.source.all.variables.prof.transformations}
+      # Latitude
+      lat:
+        load: ${data.source.all.variables.lat.load}
+      # Longitude
+      lon:
+        load: ${data.source.all.variables.lon.load}
+      # Scans
+      scans:
+        load: ${data.source.all.variables.scans.load}
+      # Pressure filter: Consider only pressure levels with non-zero variance
+      pressure_filter: ${data.source.all.variables.pressure_mask}
+
+  # Error covariance matrix in observation space
+  R:
+    # Function
+    _target_: code.preprocessing.covariance.climatological_matrix
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Innovation estimates for the observation variables
+      data:
+        load: ${data.source.all.variables.hofx_forward_stdev.load}
+        transformations: null
+      # Latitude
+      lat:
+        load: ${data.source.all.variables.lat.load}
+      # Longitude
+      lon:
+        load: ${data.source.all.variables.lon.load}
+      # Scans
+      scans:
+        load: ${data.source.all.variables.scans.load}

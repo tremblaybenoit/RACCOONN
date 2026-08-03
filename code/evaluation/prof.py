@@ -29,6 +29,7 @@ def main(config: DictConfig) -> None:
 
     keys = ['pressure_log', 'scans', 'surf']
     stages = ['train', 'valid', 'test', 'predict', 'all']
+    breakpoint()
     for key in tqdm(keys, desc="Loading variables"):
         for stage in tqdm(stages, desc="Loading stages"):
             var = instantiate(config.data.stage[stage].variables[key].load)
