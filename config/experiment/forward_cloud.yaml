@@ -34,15 +34,13 @@ paths:
 preprocessing:
   # Recast data to new format, spatiotemporal distribution
   recast:
-    # Source data
-    data:
-      # What the method needs as input
-      input:
-        # Mask to apply
-        mask:
-          # Cloud/clear sky
-          cloud_mask: true
-          clear_mask: false
+    # What the method needs as input
+    input:
+      # Mask to apply
+      mask:
+        # Cloud/clear sky
+        cloud_mask: true
+        clear_mask: false
   # Statistics of the dataset
   statistics:
     # Statistics of the training set

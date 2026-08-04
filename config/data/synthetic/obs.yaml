@@ -38,7 +38,7 @@ train:
           _partial_: true
           stats:
             _target_: code.preprocessing.statistics.read_statistics_var
-            path: ${preprocessing.statistics.data.output.path}
+            path: ${preprocessing.statistics.output.path}
             key: 'obs'
             dtype: ${data.dtype}
 # Validation set

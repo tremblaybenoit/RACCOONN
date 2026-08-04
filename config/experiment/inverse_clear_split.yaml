@@ -34,33 +34,29 @@ paths:
 preprocessing:
   # Recast data to new format, spatiotemporal distribution
   recast:
-    # Source data
-    data:
-      # What the method needs as input
-      input:
-        # Mask to apply
-        mask:
-          # Spatial domain:
-          spatial_domain:
-            lat_min: -90.0
-            lat_max: 90.0
-            lon_min: -180.0
-            lon_max: 180.0
-          # Temporal domain:
-          temporal_window:
-            scans_min: 117.0
-            scans_max: 118.0
-          # Cloud/clear sky
-          cloud_mask: false
-          clear_mask: true
+    # What the method needs as input
+    input:
+      # Mask to apply
+      mask:
+        # Spatial domain:
+        spatial_domain:
+          lat_min: -90.0
+          lat_max: 90.0
+          lon_min: -180.0
+          lon_max: 180.0
+        # Temporal domain:
+        temporal_window:
+          scans_min: 117.0
+          scans_max: 118.0
+        # Cloud/clear sky
+        cloud_mask: false
+        clear_mask: true
   # Statistics of the dataset
   statistics:
-    # Statistics of the training set
-    data:
-      # What the method produces as output (pickle file)
-      output:
-        # Path to statistics file
-        path: code/data/statistics/synthetic_clear.pkl
+    # What the method produces as output (pickle file)
+    output:
+      # Path to statistics file
+      path: code/data/statistics/synthetic_clear.pkl
 
 # Data configuration
 data:
@@ -96,7 +92,7 @@ data:
               _partial_: true
               stats:
                 _target_: code.preprocessing.statistics.read_statistics_var
-                path: ${preprocessing.statistics.data.output.path}
+                path: ${preprocessing.statistics.output.path}
                 var: 'prof'
                 dtype: ${data.dtype}
               axis: 1

@@ -6,7 +6,7 @@ defaults:
 # Masks
 mask:
   # Cloud mask (training set)
-  source_cloud_mask_train:
+  source_cloud_train:
     # Function
     _target_: code.preprocessing.mask.compute_mask
     _recursive_: false  # Do not instantiate nested objects
@@ -20,7 +20,7 @@ mask:
       # Save function
       save: ${data.source.train.variables.cloud_mask.save}
   # Cloud mask (validation set)
-  source_cloud_mask_valid:
+  source_cloud_valid:
     # Function
     _target_: code.preprocessing.mask.compute_mask
     _recursive_: false  # Do not instantiate nested objects
@@ -34,7 +34,7 @@ mask:
       # Save function
       save: ${data.source.valid.variables.cloud_mask.save}
   # Cloud mask (test set)
-  source_cloud_mask_test:
+  source_cloud_test:
     # Function
     _target_: code.preprocessing.mask.compute_mask
     _recursive_: false  # Do not instantiate nested objects
@@ -68,10 +68,10 @@ slant:
     output:
       # Coordinates
       lat: ${data.source.train.variables.lat_slant}
-      lon: ${data.source_train.variables.lon_slant}
-      z: ${data.source_train.variables.z_slant}
-      x: ${data.source_train.variables.x_slant}
-      y: ${data.source_train.variables.y_slant}
+      lon: ${data.source.train.variables.lon_slant}
+      z: ${data.source.train.variables.z_slant}
+      x: ${data.source.train.variables.x_slant}
+      y: ${data.source.train.variables.y_slant}
   # Validation set
   source_valid:
     # Function
@@ -119,28 +119,24 @@ slant:
 
 # Recast data to new format, spatiotemporal distribution
 recast:
-  # Source data
-  data:
-    # What the method needs as input
-    input:
-      # Split
-      split:
-        # Ratio for split
-        ratio:
-          train: 0.6
-          valid: 0.2
-          test: 0.2
-        # Seed
-        seed: 42
-        # Tolerance for edges (degrees)
-        tolerance: 0.75
+  # What the method needs as input
+  input:
+    # Split
+    split:
+      # Ratio for split
+      ratio:
+        train: 0.6
+        valid: 0.2
+        test: 0.2
+      # Seed
+      seed: 42
+      # Tolerance for edges (degrees)
+      tolerance: 0.75
 
 # Statistics of the ENTIRE dataset
 statistics:
-  # Statistics of the training set
-  data:
-    # What the method needs as input
-    input: ${data.source.all.variables}
+  # What the method needs as input
+  input: ${data.source.all.variables}
 
 # Error covariance matrices
 covariance:

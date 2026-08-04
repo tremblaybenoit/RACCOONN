@@ -1,178 +1,176 @@
 # Recast data to new format, spatiotemporal distribution
 recast:
-  # Training set
-  data:
-    # Function
-    _target_: code.preprocessing.recast.recast_synthetic
-    _recursive_: false  # Do not instantiate nested objects
-    # What the method needs as input
-    input:
-      # Mask to apply
-      mask:
-        # Spatial domain:
-        spatial_domain:
-          lat_min: -90.0
-          lat_max: 90.0
-          lon_min: -180.0
-          lon_max: 180.0
-        # Temporal domain:
-        temporal_window:
-          scans_min: 0.0
-          scans_max: 188.0
-        # Cloud/clear sky
-        cloud_mask: false
-        clear_mask: false
-      # Split
-      split: null
-      # Stage splitting
-      stage:
-        # Training set
-        train:
-          # Variables
-          variables:
-            # Cloud mask
-            cloud_mask: ${data.source.train.variables.cloud_mask}
-            # Daytime mask
-            daytime_mask: ${data.source.train.variables.daytime_mask}
-            # hofx
-            hofx: ${data.source.train.variables.hofx}
-            # Latitude
-            lat: ${data.source.train.variables.lat}
-            # Longitude
-            lon: ${data.source.train.variables.lon}
-            # Meta data
-            meta: ${data.source.train.variables.meta}
-            # Observations
-            obs: ${data.source.train.variables.obs}
-            # Pressure
-            pressure: ${data.source.train.variables.pressure}
-            # Atmospheric profiles
-            prof: ${data.source.train.variables.prof}
-            # Scans
-            scans: ${data.source.train.variables.scans}
-            # Surface data
-            surf: ${data.source.train.variables.surf}
-        # Validation set
-        valid:
-          # Variables
-          variables:
-            # Cloud mask
-            cloud_mask: ${data.source.valid.variables.cloud_mask}
-            # Daytime mask
-            daytime_mask: ${data.source.valid.variables.daytime_mask}
-            # hofx
-            hofx: ${data.source.valid.variables.hofx}
-            # Latitude
-            lat: ${data.source.valid.variables.lat}
-            # Longitude
-            lon: ${data.source.valid.variables.lon}
-            # Meta data
-            meta: ${data.source.valid.variables.meta}
-            # Observations
-            obs: ${data.source.valid.variables.obs}
-            # Pressure
-            pressure: ${data.source.valid.variables.pressure}
-            # Atmospheric profiles
-            prof: ${data.source.valid.variables.prof}
-            # Scans
-            scans: ${data.source.valid.variables.scans}
-            # Surface data
-            surf: ${data.source.valid.variables.surf}
-        # Test set
-        test:
-          # Variables
-          variables:
-            # Cloud mask
-            cloud_mask: ${data.source.test.variables.cloud_mask}
-            # Daytime mask
-            daytime_mask: ${data.source.test.variables.daytime_mask}
-            # hofx
-            hofx: ${data.source.test.variables.hofx}
-            # Latitude
-            lat: ${data.source.test.variables.lat}
-            # Longitude
-            lon: ${data.source.test.variables.lon}
-            # Meta data
-            meta: ${data.source.test.variables.meta}
-            # Observations
-            obs: ${data.source.test.variables.obs}
-            # Pressure
-            pressure: ${data.source.test.variables.pressure}
-            # Atmospheric profiles
-            prof: ${data.source.test.variables.prof}
-            # Scans
-            scans: ${data.source.test.variables.scans}
-            # Surface data
-            surf: ${data.source.test.variables.surf}
-    # What the method produces as output
-    output:
-      # Precision
-      dtype: ${data.dtype}
-      # Stage splitting
-      stage:
-        # Training set
-        train:
-          # Variables
-          variables:
-            # hofx
-            hofx: ${data.stage.train.variables.hofx}
-            # Latitude
-            lat: ${data.stage.train.variables.lat}
-            # Longitude
-            lon: ${data.stage.train.variables.lon}
-            # Meta data
-            meta: ${data.stage.train.variables.meta}
-            # Observations
-            obs: ${data.stage.train.variables.obs}
-            # Pressure
-            pressure: ${data.stage.train.variables.pressure}
-            # Atmospheric profiles
-            prof: ${data.stage.train.variables.prof}
-            # Scans
-            scans: ${data.stage.train.variables.scans}
-            # Surface data
-            surf: ${data.stage.train.variables.surf}
-        # Validation set
-        valid:
-          # Variables
-          variables:
-            # hofx
-            hofx: ${data.stage.valid.variables.hofx}
-            # Latitude
-            lat: ${data.stage.valid.variables.lat}
-            # Longitude
-            lon: ${data.stage.valid.variables.lon}
-            # Meta data
-            meta: ${data.stage.valid.variables.meta}
-            # Observations
-            obs: ${data.stage.valid.variables.obs}
-            # Pressure
-            pressure: ${data.stage.valid.variables.pressure}
-            # Atmospheric profiles
-            prof: ${data.stage.valid.variables.prof}
-            # Scans
-            scans: ${data.stage.valid.variables.scans}
-            # Surface data
-            surf: ${data.stage.valid.variables.surf}
-        # Test set
-        test:
-          # Variables
-          variables:
-            # hofx
-            hofx: ${data.stage.test.variables.hofx}
-            # Latitude
-            lat: ${data.stage.test.variables.lat}
-            # Longitude
-            lon: ${data.stage.test.variables.lon}
-            # Meta data
-            meta: ${data.stage.test.variables.meta}
-            # Observations
-            obs: ${data.stage.test.variables.obs}
-            # Pressure
-            pressure: ${data.stage.test.variables.pressure}
-            # Atmospheric profiles
-            prof: ${data.stage.test.variables.prof}
-            # Scans
-            scans: ${data.stage.test.variables.scans}
-            # Surface data
-            surf: ${data.stage.test.variables.surf}
+  # Function
+  _target_: code.preprocessing.recast.recast_synthetic
+  _recursive_: false  # Do not instantiate nested objects
+  # What the method needs as input
+  input:
+    # Mask to apply
+    mask:
+      # Spatial domain:
+      spatial_domain:
+        lat_min: -90.0
+        lat_max: 90.0
+        lon_min: -180.0
+        lon_max: 180.0
+      # Temporal domain:
+      temporal_window:
+        scans_min: 0.0
+        scans_max: 188.0
+      # Cloud/clear sky
+      cloud_mask: false
+      clear_mask: false
+    # Split
+    split: null
+    # Stage splitting
+    stage:
+      # Training set
+      train:
+        # Variables
+        variables:
+          # Cloud mask
+          cloud_mask: ${data.source.train.variables.cloud_mask}
+          # Daytime mask
+          daytime_mask: ${data.source.train.variables.daytime_mask}
+          # hofx
+          hofx: ${data.source.train.variables.hofx}
+          # Latitude
+          lat: ${data.source.train.variables.lat}
+          # Longitude
+          lon: ${data.source.train.variables.lon}
+          # Meta data
+          meta: ${data.source.train.variables.meta}
+          # Observations
+          obs: ${data.source.train.variables.obs}
+          # Pressure
+          pressure: ${data.source.train.variables.pressure}
+          # Atmospheric profiles
+          prof: ${data.source.train.variables.prof}
+          # Scans
+          scans: ${data.source.train.variables.scans}
+          # Surface data
+          surf: ${data.source.train.variables.surf}
+      # Validation set
+      valid:
+        # Variables
+        variables:
+          # Cloud mask
+          cloud_mask: ${data.source.valid.variables.cloud_mask}
+          # Daytime mask
+          daytime_mask: ${data.source.valid.variables.daytime_mask}
+          # hofx
+          hofx: ${data.source.valid.variables.hofx}
+          # Latitude
+          lat: ${data.source.valid.variables.lat}
+          # Longitude
+          lon: ${data.source.valid.variables.lon}
+          # Meta data
+          meta: ${data.source.valid.variables.meta}
+          # Observations
+          obs: ${data.source.valid.variables.obs}
+          # Pressure
+          pressure: ${data.source.valid.variables.pressure}
+          # Atmospheric profiles
+          prof: ${data.source.valid.variables.prof}
+          # Scans
+          scans: ${data.source.valid.variables.scans}
+          # Surface data
+          surf: ${data.source.valid.variables.surf}
+      # Test set
+      test:
+        # Variables
+        variables:
+          # Cloud mask
+          cloud_mask: ${data.source.test.variables.cloud_mask}
+          # Daytime mask
+          daytime_mask: ${data.source.test.variables.daytime_mask}
+          # hofx
+          hofx: ${data.source.test.variables.hofx}
+          # Latitude
+          lat: ${data.source.test.variables.lat}
+          # Longitude
+          lon: ${data.source.test.variables.lon}
+          # Meta data
+          meta: ${data.source.test.variables.meta}
+          # Observations
+          obs: ${data.source.test.variables.obs}
+          # Pressure
+          pressure: ${data.source.test.variables.pressure}
+          # Atmospheric profiles
+          prof: ${data.source.test.variables.prof}
+          # Scans
+          scans: ${data.source.test.variables.scans}
+          # Surface data
+          surf: ${data.source.test.variables.surf}
+  # What the method produces as output
+  output:
+    # Precision
+    dtype: ${data.dtype}
+    # Stage splitting
+    stage:
+      # Training set
+      train:
+        # Variables
+        variables:
+          # hofx
+          hofx: ${data.stage.train.variables.hofx}
+          # Latitude
+          lat: ${data.stage.train.variables.lat}
+          # Longitude
+          lon: ${data.stage.train.variables.lon}
+          # Meta data
+          meta: ${data.stage.train.variables.meta}
+          # Observations
+          obs: ${data.stage.train.variables.obs}
+          # Pressure
+          pressure: ${data.stage.train.variables.pressure}
+          # Atmospheric profiles
+          prof: ${data.stage.train.variables.prof}
+          # Scans
+          scans: ${data.stage.train.variables.scans}
+          # Surface data
+          surf: ${data.stage.train.variables.surf}
+      # Validation set
+      valid:
+        # Variables
+        variables:
+          # hofx
+          hofx: ${data.stage.valid.variables.hofx}
+          # Latitude
+          lat: ${data.stage.valid.variables.lat}
+          # Longitude
+          lon: ${data.stage.valid.variables.lon}
+          # Meta data
+          meta: ${data.stage.valid.variables.meta}
+          # Observations
+          obs: ${data.stage.valid.variables.obs}
+          # Pressure
+          pressure: ${data.stage.valid.variables.pressure}
+          # Atmospheric profiles
+          prof: ${data.stage.valid.variables.prof}
+          # Scans
+          scans: ${data.stage.valid.variables.scans}
+          # Surface data
+          surf: ${data.stage.valid.variables.surf}
+      # Test set
+      test:
+        # Variables
+        variables:
+          # hofx
+          hofx: ${data.stage.test.variables.hofx}
+          # Latitude
+          lat: ${data.stage.test.variables.lat}
+          # Longitude
+          lon: ${data.stage.test.variables.lon}
+          # Meta data
+          meta: ${data.stage.test.variables.meta}
+          # Observations
+          obs: ${data.stage.test.variables.obs}
+          # Pressure
+          pressure: ${data.stage.test.variables.pressure}
+          # Atmospheric profiles
+          prof: ${data.stage.test.variables.prof}
+          # Scans
+          scans: ${data.stage.test.variables.scans}
+          # Surface data
+          surf: ${data.stage.test.variables.surf}

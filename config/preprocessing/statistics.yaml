@@ -1,29 +1,27 @@
 # Statistics of the dataset
 statistics:
-  # Statistics of the training set
-  data:
-    # Function
-    _target_: code.preprocessing.statistics.compute_statistics
-    _recursive_: false  # Do not instantiate nested objects
-    # Exclude variables from the statistics computation
-    exclude: ['clear_mask', 'cloud_mask', 'daytime_mask', 'pressure_mask', 'prof_prior',
-              'hofx_forward', 'hofx_forward_mean', 'hofx_forward_stdev']
-    # What the method needs as input
-    input: ${data.stage.all.variables}
-    # Computation parameters
-    batch_size: 920000
-    num_workers: 4
-    # What the method produces as output (pickle file)
-    output:
-      # Path to statistics file
-      path: code/data/statistics/synthetic.pkl
-      # Saving function
-      save:
-        _target_: code.data.io.save_pkl
-        _partial_: true
-        _args_:
-          - ${...path}
-      # Loading function
-      load:
-        _target_: code.data.io.load_pkl
-        path: ${..path}
+  # Function
+  _target_: code.preprocessing.statistics.compute_statistics
+  _recursive_: false  # Do not instantiate nested objects
+  # Exclude variables from the statistics computation
+  exclude: ['clear_mask', 'cloud_mask', 'daytime_mask', 'pressure_mask', 'prof_prior',
+            'hofx_forward', 'hofx_forward_mean', 'hofx_forward_stdev']
+  # What the method needs as input
+  input: ${data.stage.all.variables}
+  # Computation parameters
+  batch_size: 920000
+  num_workers: 4
+  # What the method produces as output (pickle file)
+  output:
+    # Path to statistics file
+    path: code/data/statistics/synthetic.pkl
+    # Saving function
+    save:
+      _target_: code.data.io.save_pkl
+      _partial_: true
+      _args_:
+        - ${...path}
+    # Loading function
+    load:
+      _target_: code.data.io.load_pkl
+      path: ${..path}
