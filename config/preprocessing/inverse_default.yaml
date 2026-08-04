@@ -3,6 +3,6 @@ defaults:
   - recast          # First: recast raw data to desired format/precision/filtering
   - slant           # Then: compute slant coordinates
   - statistics      # Then: compute statistics
-  - filters         # Then: compute filters
+  - mask            # Then: compute masks
   - covariance      # Finally: compute covariance
   - _self_

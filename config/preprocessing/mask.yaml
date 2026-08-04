@@ -1,12 +1,12 @@
-filters:
+mask:
   # Cloud mask (training set)
-  cloud_mask_train:
+  cloud_train:
     # Function
-    _target_: code.preprocessing.filters.compute_mask
+    _target_: code.preprocessing.mask.compute_mask
     _recursive_: false  # Do not instantiate nested objects
     # Input data (create mask)
     input:
-      _target_: code.preprocessing.filters.cloud_mask
+      _target_: code.preprocessing.mask.cloud_mask
       _args_:
         - ${data.stage.train.variables.prof.load}
     # Output data (save mask)
@@ -14,13 +14,13 @@ filters:
       # Save function
       save: ${data.stage.train.variables.cloud_mask.save}
   # Cloud mask (validation set)
-  cloud_mask_valid:
+  cloud_valid:
     # Function
-    _target_: code.preprocessing.filters.compute_mask
+    _target_: code.preprocessing.mask.compute_mask
     _recursive_: false  # Do not instantiate nested objects
     # Input data (create mask)
     input:
-      _target_: code.preprocessing.filters.cloud_mask
+      _target_: code.preprocessing.mask.cloud_mask
       _args_:
         - ${data.stage.valid.variables.prof.load}
     # Output data (save mask)
@@ -28,13 +28,13 @@ filters:
       # Save function
       save: ${data.stage.valid.variables.cloud_mask.save}
   # Cloud mask (test set)
-  cloud_mask_test:
+  cloud_test:
     # Function
-    _target_: code.preprocessing.filters.compute_mask
+    _target_: code.preprocessing.mask.compute_mask
     _recursive_: false  # Do not instantiate nested objects
     # Input data (create mask)
     input:
-      _target_: code.preprocessing.filters.cloud_mask
+      _target_: code.preprocessing.mask.cloud_mask
       _args_:
         - ${data.stage.test.variables.prof.load}
     # Output data (save mask)
