@@ -514,7 +514,7 @@ def clip(data: np.ndarray | torch.Tensor, stats: dict) -> np.ndarray | torch.Ten
         raise TypeError("Input data must be a numpy array or a torch tensor.")
 
 
-def apply_transform(transformations: DictConfig | None = None, inverse_transform: bool = False) -> Callable:
+def compose_transformations(transformations: DictConfig | None = None, inverse_transform: bool = False) -> Callable:
     """
     Create a transformation function from a transformation config.
 

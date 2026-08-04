@@ -52,11 +52,11 @@ data:
               profmin:
                 _target_: numpy.loadtxt
                 _args_:
-                  - data/normalization/prof_m.txt
+                  - code/data/statistics/prof_m.txt
               profmax:
                 _target_: numpy.loadtxt
                 _args_:
-                  - data/normalization/prof_div.txt
+                  - code/data/statistics/prof_div.txt
               dtype: ${data.dtype}
     # Validation set
     valid:

@@ -6,6 +6,87 @@ from hydra.core.hydra_config import HydraConfig
 import argparse
 
 
+def get_filenames(
+    config: dict[str, Any] | list[Any] | tuple[Any, ...] | str,
+    exts: tuple[str, ...] = ('.npy', '.npz', '.pkl', '.txt', '.ckpt', '.csv', '.json', '.nc'),
+    exclude_keys: set[str] | None = None
+) -> list[str]:
+    """ Recursively find all file path strings in a nested config dict/list.
+
+        Parameters
+        ----------
+        config: dict, list, tuple, or str. The configuration to search.
+        exts: tuple of str. File extensions to look for.
+        exclude_keys: set of str. Keys to exclude from the search.
+
+        Returns
+        -------
+        list of str: Sorted list of unique file paths found in the configuration.
+    """
+
+    # Initialize exclude_keys if not provided
+    if exclude_keys is None:
+        exclude_keys = set()
+
+    # Helper function for recursive search (accumulate in set to avoid duplicates)
+    def _recursively_find(obj: Any, exts: tuple[str, ...], exclude_keys: set[str], paths: set[str]) -> None:
+        """ Recursively search for file paths in the given object.
+
+            Parameters
+            ----------
+            obj: Any. The object to search (can be dict, list, tuple, or str).
+            exts: tuple of str. File extensions to look for.
+            exclude_keys: set of str. Keys to exclude from the search.
+            paths: set of str. Accumulator for found file paths.
+
+            Returns
+            -------
+            None.
+        """
+
+        # Parse dictionary
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if k not in exclude_keys:
+                    _recursively_find(v, exts, exclude_keys, paths)
+        # Parse list/tuple
+        elif isinstance(obj, (list, tuple)):
+            for item in obj:
+                _recursively_find(item, exts, exclude_keys, paths)
+        # Parse string
+        elif isinstance(obj, str):
+            # Use tuple endswith
+            if obj.endswith(exts):
+                paths.add(obj)  # Set automatically prevents duplicates
+
+    # Accumulate in set (no duplicates), sort once at the end
+    paths = set()
+    _recursively_find(config, exts, exclude_keys, paths)
+    return sorted(paths)
+
+
+def get_directories(file_paths: list[str]) -> list[str]:
+    """ Extract unique parent directories from a list of file paths.
+
+        Parameters
+        ----------
+        file_paths: list[str]. List of file paths (output from get_filenames).
+
+        Returns
+        -------
+        list[str]: Sorted list of unique parent directories.
+    """
+    directories = set()
+    for file_path in file_paths:
+        # Get parent directory
+        dir_path = os.path.dirname(file_path)
+        # Only add if not empty (file_path was not already a directory)
+        if dir_path:
+            directories.add(dir_path)
+
+    return sorted(directories)
+
+
 def read_hydra_as_dict(config_path: str,
                        config_name: str,
                        version_base: Optional[str | None] = None,
@@ -99,6 +180,8 @@ def setup_directories_from_hydra(config_path: str,
         overrides=overrides,
         verbose=verbose
     )
+
+    # Create paths from paths_config
     paths_config = hydra_config['paths']
     dirs = ['task_dir', 'output_dir', 'checkpoint_dir', 'log_dir', 'run_dir', 'data_dir']
 
@@ -108,6 +191,12 @@ def setup_directories_from_hydra(config_path: str,
             os.makedirs(paths_config[d], exist_ok=True)
         else:
             raise KeyError(f"Directory '{d}' not found in paths configuration.")
+
+    # Extract and create directories from config file paths
+    # config_filenames = get_filenames(hydra_config)
+    # config_directories = get_directories(config_filenames)
+    # for d in config_directories:
+    #     os.makedirs(d, exist_ok=True)
 
     return
 

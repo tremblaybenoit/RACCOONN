@@ -2,6 +2,9 @@
 _target_: code.model.inverse.InverseModel
 _recursive_: false
 
+# Checkpoint path for saving and loading model weights
+ckpt_path: ${paths.checkpoint_dir}/${callbacks.model_checkpoint.filename}.ckpt
+
 # Optimizer - reference external config
 optimizer: ${optimizer}
 

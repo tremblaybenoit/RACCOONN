@@ -35,6 +35,8 @@ covariance:
     recenter: true
     # Type of recentering:
     mean_type: 'temporal'
+    # Apply data transformations to the input data before computing the covariance matrix
+    apply_transform: true
     # What the method produces as output
     output:
       # Covariance matrix
@@ -131,6 +133,8 @@ covariance:
     # Recentering
     recenter: true
     mean_type: 'temporal'
+    # Apply data transformations to the input data before computing the covariance matrix
+    apply_transform: true
     # What the method produces as output
     output:
       # Covariance matrix

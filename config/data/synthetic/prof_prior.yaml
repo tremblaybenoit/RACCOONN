@@ -22,12 +22,21 @@ train:
       # Loading function
       load:
         _target_: code.preprocessing.covariance.prior_from_bounded_perturbations
-        stats: ${...prof.transformations.normalization.stats}
-        seed: 75
         # What the method needs as input
         input:
+          # Atmospheric profiles
+          prof: ${....prof}
           # Cholesky matrix
           cholesky: ${preprocessing.covariance.B.output.cholesky}
+          # Statistics for lower/upper bounds
+          stats:
+            _target_: code.preprocessing.statistics.read_statistics_var
+            path: ${preprocessing.statistics.data.output.path}
+            var: 'prof'
+            dtype: ${data.dtype}
+        # Parameters
+        seed: 75
+        apply_transform: ${preprocessing.covariance.B.apply_transform}
       # Transformations to apply
       transformations: ${..prof.transformations}
 # Validation set
@@ -46,10 +55,17 @@ valid:
       # Loading function
       load:
         _target_: ${.....train.variables.prof_prior.load._target_}
-        stats: ${...prof.transformations.normalization.stats}
-        seed: 48
         # What the method needs as input
-        input: ${.....train.variables.prof_prior.load.input}
+        input:
+          # Atmospheric profiles
+          prof: ${....prof}
+          # Cholesky matrix
+          cholesky: ${......train.variables.prof_prior.load.input.cholesky}
+          # Statistics for lower/upper bounds
+          stats: ${......train.variables.prof_prior.load.input.stats}
+        # Parameters
+        seed: 48
+        apply_transform: ${.....train.variables.prof_prior.load.apply_transform}
       # Transformations to apply
       transformations: ${..prof.transformations}
 # Test set
@@ -68,10 +84,17 @@ test:
       # Loading function
       load:
         _target_: ${.....train.variables.prof_prior.load._target_}
-        stats: ${...prof.transformations.normalization.stats}
-        seed: 15
         # What the method needs as input
-        input: ${.....train.variables.prof_prior.load.input}
+        input:
+          # Atmospheric profiles
+          prof: ${....prof}
+          # Cholesky matrix
+          cholesky: ${......train.variables.prof_prior.load.input.cholesky}
+          # Statistics for lower/upper bounds
+          stats: ${......train.variables.prof_prior.load.input.stats}
+        # Parameters
+        seed: 15
+        apply_transform: ${.....train.variables.prof_prior.load.apply_transform}
       # Transformations to apply
       transformations: ${..prof.transformations}
 # Predict set

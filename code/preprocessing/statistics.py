@@ -160,7 +160,7 @@ def compute_statistics(input: DictConfig, output: DictConfig | None = None, excl
         Parameters
         ----------
         input : DictConfig. Dataset config mapping variable names to dataset configs.
-                Structure: {var_name: {_target_: ..., load: {...}, ...}}
+                Structure: {variable_name: {_target_: ..., load: {...}, ...}}
                 Each variable's config should be instantiable as a univariate dataset.
         output : DictConfig or None. Output config with 'path' field for saving stats.
         exclude : list[str] or None. Variable names to skip (e.g., masks, flags).
@@ -187,14 +187,14 @@ def compute_statistics(input: DictConfig, output: DictConfig | None = None, excl
 
     # Loop through each variable
     stats = {}
-    for v, (var_name, var_config) in enumerate(variables.items()):
-        logger.info(f"Computing statistics of variable '{var_name}' ({v + 1}/{len(variables)})...")
+    for v, (variable_name, variable_config) in enumerate(variables.items()):
+        logger.info(f"Computing statistics of variable '{variable_name}' ({v + 1}/{len(variables)})...")
 
         # Instantiate the univariate dataset for this variable, force as_tensor=False
-        dataset = instantiate(var_config, transformations=None, as_tensor=False)
+        dataset = instantiate(variable_config, transformations=None, as_tensor=False)
 
         # Compute statistics for this variable
-        stats[var_name] = statistics_dataset(
+        stats[variable_name] = statistics_dataset(
             dataset=dataset,
             which=which,
             axis=axis,
@@ -202,7 +202,7 @@ def compute_statistics(input: DictConfig, output: DictConfig | None = None, excl
             num_workers=num_workers
         )
 
-        logger.info(f"  Computed {len(stats[var_name])} statistics")
+        logger.info(f"  Computed {len(stats[variable_name])} statistics")
 
     logger.info(f"Statistics computed for {len(stats)} variable(s).")
 

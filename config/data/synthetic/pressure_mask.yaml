@@ -15,8 +15,6 @@ all:
       _recursive_: false
       # Type of data
       type: 'Pressure mask'
-      # Path to the pressure mask file
-      path: ${paths.data_dir}/pressure_mask.npy
       # Loading function
       load:
         _target_: code.preprocessing.filters.pressure_mask

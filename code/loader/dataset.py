@@ -2,7 +2,7 @@ from torch.utils.data import Dataset
 from omegaconf import DictConfig, OmegaConf
 from utilities.instantiators import instantiate
 from utilities.tensors import to_tensor
-from code.data.transformations import apply_transform
+from code.data.transformations import compose_transformations
 import os
 import numpy as np
 import torch
@@ -49,9 +49,9 @@ class UnivariateDataset(Dataset):
         # Store output format preference
         self.as_tensor = as_tensor
 
-        # Create transformation functions using apply_transform
-        self.transform_fn = apply_transform(transformations, inverse_transform=False)
-        self.inverse_transform_fn = apply_transform(transformations, inverse_transform=True)
+        # Create transformation functions using transform
+        self.transform_fn = compose_transformations(transformations, inverse_transform=False)
+        self.inverse_transform_fn = compose_transformations(transformations, inverse_transform=True)
 
     def __len__(self) -> int:
         """ Return length of the dataset. Must be implemented by subclass.

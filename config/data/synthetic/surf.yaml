@@ -42,11 +42,11 @@ train:
           surfmax:
             _target_: numpy.loadtxt
             _args_:
-              - data/normalization/surfmax.txt
+              - code/data/statistics/surfmax.txt
           surfmin:
             _target_: numpy.loadtxt
             _args_:
-              - data/normalization/surfmin.txt
+              - code/data/statistics/surfmin.txt
           dtype: ${data.dtype}
 # Validation set
 valid:

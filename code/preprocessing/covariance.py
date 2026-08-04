@@ -3,6 +3,7 @@ from scipy.linalg import block_diag
 import hydra
 from omegaconf import DictConfig
 from code.data.io import load_variable
+from code.data.transformations import compose_transformations, identity
 from utilities.instantiators import instantiate
 from utilities.logic import get_config_path
 from code.evaluation.plot import plot_map, save_plot, flexible_gridspec
@@ -13,76 +14,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def obs_error(data: np.ndarray, obs: np.ndarray) -> np.ndarray:
-    """ Return innovation of the radiance data.
-
-        Parameters
-        ----------
-        data: np.ndarray. Radiances of shape (n_samples, n_channels).
-        obs:
-
-        Returns
-        -------
-        np.ndarray. Solution.
-    """
-    return data[:, :10]-obs[:, :10]
-
-
-def obs_uncertainty(data: np.ndarray) -> np.ndarray:
-    """ Return uncertainty estimation of the radiance data.
-
-        Parameters
-        ----------
-        data: np.ndarray. Radiances of shape (n_samples, n_channels).
-
-        Returns
-        -------
-        np.ndarray. Spatiotemporal standard deviation of the dataset.
-    """
-
-    # Return the standard deviation (last 10 values)
-    return data[:, 10:]
-
-
-def increment(config_true: DictConfig, config_prior: DictConfig) -> np.ndarray:
-     """ Compute error between ground truth and prior.
-
-         Parameters
-         ----------
-         config_true: DictConfig. Configuration for the ground truth dataset.
-         config_prior: DictConfig. Configuration for the prior dataset.
-
-         Returns
-         -------
-         np.ndarray. Error between ground truth and prior.
-     """
-
-     # Truth - prior
-     x_true = load_variable(config_true, apply_transform=True)
-     x_prior = load_variable(config_prior, apply_transform=True)
-
-     # Check dimensions and add new axis if necessary
-     if x_true.ndim != x_prior.ndim:
-         if x_prior.ndim == x_true.ndim - 1:
-             x_prior = x_prior[np.newaxis, :]
-         else:
-             raise ValueError("The shapes of the true and prior data do not match.")
-
-     # Return increment
-     return np.subtract(x_true, x_prior, out=x_true)
-
-
-
-def prior_from_bounded_perturbations(input: DictConfig, stats: DictConfig, output: DictConfig | None = None,
-                                     seed: int | None = None) -> np.ndarray | None:
+def prior_from_bounded_perturbations(input: DictConfig, output: DictConfig | None = None,
+                                     seed: int | None = None, apply_transform: bool = True) -> np.ndarray | None:
     """ Compute the prior from the model error covariance matrix and perturbations.
 
         Parameters
         ----------
         input: DictConfig. Main hydra configuration file containing all model hyperparameters.
-        stats: DictConfig. Variable statistics to compute upper/lower bounds.
         output: DictConfig. Output configuration.
         seed: int. Seed to ensure reproducibility.
+        apply_transform: bool. If True, apply normalization transform to the data before computing covariance.
+
 
         Returns
         -------
@@ -91,84 +33,83 @@ def prior_from_bounded_perturbations(input: DictConfig, stats: DictConfig, outpu
     # Load Cholesky matrix
     cov_cholesky = load_variable(input.cholesky)
 
-    # Load physical base space and original dimensions
-    x_base_phys = load_variable(input.prof)
-    x_dims = x_base_phys.shape
-
-    # Load and flatten the standardized/normalized initial state
-    xp_base_std = load_variable(input.prof, apply_transform=True).reshape(x_dims[0], -1)
+    # Load true state (with transformations applied) and original dimensions
+    x_true_transformed = load_variable(input.prof, apply_transform=apply_transform)
+    if apply_transform and input.prof.get('transformations', None) is not None:
+        inverse_transform_fn = compose_transformations(input.prof.transformations, inverse_transform=True)
+    else:
+        inverse_transform_fn = identity
+    x_dims = x_true_transformed.shape
+    # Initialize prior in physical space
+    x_prior_physical = np.zeros_like(x_true_transformed)
+    # Flatten truth
+    x_true_transformed = x_true_transformed.reshape(x_dims[0], -1)
 
     # Extract physical bounds
-    x_stats = instantiate(stats)
-    x_min, x_max = x_stats['min'], x_stats['max']
+    x_stats = instantiate(input.stats)
+    x_min_physical, x_max_physical = x_stats['min'], x_stats['max']
+    del x_stats
 
     # Initialize independent random number generator
     rng = np.random.default_rng(seed)
 
-    # Track array for our verified physical outputs
-    final_x_phys = np.zeros_like(x_base_phys)
+    # Track which profile row indices still need to be perturbed to fit within physical boundaries
+    # At the beginning, assume that all do
+    indices_to_perturb = np.arange(x_dims[0])
 
-    # Track which profile row indices still violate physical boundaries
-    invalid_indices = np.arange(x_dims[0])
+    # Apply the pressure filter if configured
+    pressure_mask = None
+    if input.get('pressure_mask', None) is not None:
+        pressure_mask = instantiate(input.pressure_mask.load)
+        if x_dims[1] != pressure_mask.shape[0]:
+            pressure_mask = np.take(pressure_mask, [0, 4, 8], axis=0)
 
     # Safety configuration to prevent infinite loops in tough regimes
     max_iterations = 200
     iteration = 0
-
-    logger.info(f"Starting rejection sampling loop for {x_dims[0]} samples...")
-
-    while len(invalid_indices) > 0 and iteration < max_iterations:
-        n_to_resample = len(invalid_indices)
+    logger.info(f"Starting perturbation sampling loop for {x_dims[0]} samples...")
+    while len(indices_to_perturb) > 0 and iteration < max_iterations:
+        # Number of points to perturb
+        n_to_resample = len(indices_to_perturb)
         logger.info(f"Iteration {iteration}: Processing/Resampling {n_to_resample} profiles...")
 
-        # 1. Generate perturbations ONLY for the remaining invalid profiles
+        # Generate perturbations ONLY for the remaining invalid profiles
         p = rng.normal(0, 1, size=(cov_cholesky.shape[1], n_to_resample))
-        dx = (cov_cholesky @ p).T
+        dx_transformed = (cov_cholesky @ p).T
 
-        # 2. Extract the baseline standardized states for these specific invalid profiles
-        xp_current = xp_base_std[invalid_indices].copy()
-
-        # 3. Apply the pressure filter if configured
-        if hasattr(input, 'pressure_filter') and input.pressure_filter is not None:
-            pressure_filter = instantiate(input.pressure_filter.load)
-            if x_dims[1] != pressure_filter.shape[0]:
-                pressure_filter = np.take(pressure_filter, [0, 4, 8], axis=0)
-
-            xp_current[:, np.flatnonzero(pressure_filter)] += dx
+        # Compute (transformed) prior at the perturbed locations, accounting for the pressure filter
+        x_prior_transformed = x_true_transformed[indices_to_perturb]
+        if pressure_mask is not None:
+            x_prior_transformed[:, np.flatnonzero(pressure_mask)] += dx_transformed
         else:
-            xp_current += dx
+            x_prior_transformed += dx_transformed
+        # Reshape prior to true dimensions
+        x_prior_transformed = x_prior_transformed.reshape(n_to_resample, x_dims[1], x_dims[2])
 
-        # 4. Safely reshape the current batch to 3D for physical transformation
-        xp_current_3d = xp_current.reshape(n_to_resample, x_dims[1], x_dims[2])
+        # Transform back to physical space
+        x_prior_physical_samples = inverse_transform_fn(x_prior_transformed)
 
-        # 5. Transform back to physical space
-        if hasattr(input.prof, 'normalization') and input.prof.normalization is not None:
-            norm_func = instantiate(input.prof.normalization, inverse_transform=True)
-            x_phys_candidate = norm_func(xp_current_3d)
-        else:
-            x_phys_candidate = xp_current_3d
-
-        # 6. Check boundaries across ALL variables and levels for this sub-batch
+        # Check boundaries across ALL variables and levels for this sub-batch
         # Evaluates to a boolean array of shape: (n_to_resample, n_vars, n_levels)
-        out_of_bounds = (x_phys_candidate < x_min) | (x_phys_candidate > x_max)
+        out_of_bounds = (x_prior_physical_samples < x_min_physical) | (x_prior_physical_samples > x_max_physical)
 
         # Collapse dimensions to find which specific profiles failed anywhere in their column
         profile_failed = np.any(out_of_bounds, axis=(1, 2))
         profile_passed = ~profile_failed
 
-        # 7. For the profiles that passed, lock them into the final output array
+        # For the profiles that passed, lock them into the final output array
         if np.any(profile_passed):
-            passed_global_indices = invalid_indices[profile_passed]
-            final_x_phys[passed_global_indices] = x_phys_candidate[profile_passed]
+            passed_global_indices = indices_to_perturb[profile_passed]
+            x_prior_physical[passed_global_indices] = x_prior_physical_samples[profile_passed]
 
-        # 8. Filter down our invalid pointer list to only contain the persistent failures
-        invalid_indices = invalid_indices[profile_failed]
+        # Filter down our invalid pointer list to only contain the persistent failures
+        indices_to_perturb = indices_to_perturb[profile_failed]
         iteration += 1
 
     # Loop termination checks
-    if len(invalid_indices) > 0:
+    if len(indices_to_perturb) > 0:
         raise ValueError(
-            f"Rejection sampling failed to converge for {len(invalid_indices)} "
+            f"Rejection sampling failed to converge for {len(indices_to_perturb)} "
             f"profiles within {max_iterations} iterations. The physical boundaries "
             f"might be too narrow for the specified covariance matrix variance."
         )
@@ -177,15 +118,15 @@ def prior_from_bounded_perturbations(input: DictConfig, stats: DictConfig, outpu
     if output is not None and hasattr(output, 'save'):
         logger.info(f"Saving validated prior to {output.path}...")
         save_func = instantiate(output.save)
-        save_func(final_x_phys)
+        save_func(x_prior_physical)
         return None
     else:
-        return final_x_phys
+        return x_prior_physical
 
 
 def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor: float = 1.0,
                           regularization_factor: float = 1.0, plot_flag: bool=True, recenter: bool=False,
-                          univariate: bool = False, mean_type: str='spatiotemporal') -> None:
+                          univariate: bool = False, mean_type: str='spatiotemporal', apply_transform: bool=True) -> None:
     """ Compute climatological covariance matrix of a given dataset.
 
         Parameters
@@ -198,6 +139,7 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
         recenter: bool. If True, recenter by removing the mean.
         univariate: bool. If True, compute univariate covariance matrix.
         mean_type: str. Type of mean to compute ('spatiotemporal' or 'temporal').
+        apply_transform: bool. If True, apply normalization transform to the data before computing covariance.
 
         Returns
         -------
@@ -206,8 +148,7 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
 
     # Begin by loading the data and normalizing it
     logger.info("Loading data...")
-    # TODO: Does this make sense?
-    data = load_variable(input.data, apply_transform=True)
+    data = load_variable(input.data, apply_transform=apply_transform)
     data_shape = data.shape
     n_samples, n_vars = data_shape[0], data_shape[1]
     # Denominator (computation of the mean)
@@ -224,16 +165,14 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
         # Compute temporal mean (but maintain coordinate dependency)
         elif mean_type == 'temporal':
             # Read coordinates
-            if hasattr(input, 'lat') and hasattr(input, 'lon') and hasattr(input, 'scans'):
+            if hasattr(input, 'lat') and hasattr(input, 'lon'):
                 # Read coordinates
                 lat = load_variable(input.lat)
                 lon = load_variable(input.lon)
-                scans = load_variable(input.scans)
 
                 # For clearsky-only or cloud-only datasets, the available coordinates points.
                 # In other words, two consecutive timesteps may not have the same (lat, lon) pairs.
-                # To compute the temporal mean at every available (lat, lon) point, we...
-
+                # To compute the temporal mean at every available (lat, lon) point,
                 # Identify unique coordinate pairs and their mapping
                 # coords shape: (n_samples, 2)
                 coords = np.column_stack((lat, lon))
@@ -248,20 +187,19 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
                 data = data.reshape(n_samples, -1)
                 n_features = data.shape[1]
 
-                # Vectorized Accumulation (Split-Apply-Combine in NumPy)
-                # 1. Allocate a destination array for the sums of each unique coordinate
+                # Allocate a destination array for the sums of each unique coordinate
                 group_sums = np.zeros((n_unique_coords, n_features), dtype=data.dtype)
 
-                # 2. np.add.at performs unbuffered in-place addition for repeating indices
+                # np.add.at performs unbuffered in-place addition for repeating indices
                 np.add.at(group_sums, inverse_indices, data)
 
-                # 3. Count how many times each unique coordinate appears across all timesteps
+                # Count how many times each unique coordinate appears across all timesteps
                 group_counts = np.bincount(inverse_indices)[:, None]  # Shape: (n_unique_coords, 1)
 
-                # 4. Compute the local temporal mean for each unique coordinate
+                # Compute the local temporal mean for each unique coordinate
                 group_means = group_sums / group_counts  # Shape: (n_unique_coords, n_features)
 
-                # 5. # Compute anomalies (truth - climatological mean)
+                # Compute anomalies (truth - climatological mean)
                 data -= group_means[inverse_indices]  # Shape: (n_samples, n_features)
                 # Broadcast the means back out to match the original sample layout
                 data = data.reshape(data_shape)
@@ -323,7 +261,7 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
     # Apply regularization
     if regularization_factor > 0:
         logger.info("Applying regularization factor...")
-        cov['matrix'] += regularization_factor * np.mean(np.diag(cov['matrix'])) * np.eye(cov['matrix'].shape[0])
+        cov['matrix'] += regularization_factor * float(np.mean(np.diag(cov['matrix']))) * np.eye(cov['matrix'].shape[0])
     # Compute correlation matrix
     if hasattr(output, 'correlation'):
         std = np.sqrt(np.diag(cov['matrix']))

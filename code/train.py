@@ -9,7 +9,7 @@ import pytorch_lightning as lightning
 from utilities.logger import TrainerLogger
 from utilities.instantiators import instantiate, instantiate_list
 from utilities.logic import get_config_path
-from code.data.transformations import apply_transform
+from code.data.transformations import compose_transformations
 # Force full FP32 matmul on CUDA (disable TF32) for more reproducible numerics
 torch.set_float32_matmul_precision('highest')
 torch.backends.cuda.matmul.allow_tf32 = False
@@ -175,13 +175,13 @@ class Operator:
                                 var_transforms = key_config[var_name].transformations
                                 if var_transforms is not None:
                                     # Apply inverse transformation
-                                    transform_fn = apply_transform(var_transforms, inverse_transform=True)
+                                    transform_fn = compose_transformations(var_transforms, inverse_transform=True)
                                     accumulated[acc_key][var_name] = transform_fn(var_data)
                     # Handle flat array structure (single variable)
                     elif hasattr(key_config, 'transformations'):
                         var_transforms = key_config.transformations
                         if var_transforms is not None:
-                            transform_fn = apply_transform(var_transforms, inverse_transform=True)
+                            transform_fn = compose_transformations(var_transforms, inverse_transform=True)
                             accumulated[acc_key] = transform_fn(acc_data)
 
         return accumulated
