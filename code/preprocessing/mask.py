@@ -250,11 +250,17 @@ def main(config: DictConfig) -> None:
         None.
     """
 
-    # Compute filters
-    if hasattr(config.preprocessing, "filters"):
-        for key, config in config.preprocessing.filters.items():
-            logger.info(f"Computing mask: {key}")
-            instantiate(config)
+    # Compute masks
+    if hasattr(config.preprocessing, "mask"):
+        # If single operation, execute
+        if hasattr(config.preprocessing.mask, "_target_"):
+            logger.info(f"Computing mask...")
+            instantiate(config.preprocessing.mask)
+        # Execute individual operations
+        else:
+            for key, config in config.preprocessing.mask.items():
+                logger.info(f"Computing mask: {key}")
+                instantiate(config)
 
     return
 

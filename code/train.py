@@ -258,6 +258,12 @@ class Operator:
             OmegaConf.save(self.config.model, f)
         logger.info(f"Saving model configuration...")
 
+        # Save resolved experiment configuration for downstream use
+        config_experiment_path = os.path.join(self.config.paths.checkpoint_dir, "experiment.yaml")
+        with open(config_experiment_path, 'w') as f:
+            OmegaConf.save(self.config, f)
+        logger.info(f"Saving experiment configuration...")
+
     def test(self) -> None:
         """ Loads data, callbacks, trainer, and then tests the model.
             Accumulates and saves test results.

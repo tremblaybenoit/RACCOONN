@@ -144,7 +144,13 @@ def apply_colorbar(ax, plot, font_size: float=13, label: str='Density', label_pa
         if ticks is not None:
             tick_values = np.linspace(vmin, vmax, ticks)
             cbar.set_ticks(tick_values)
-            cbar.ax.set_xticklabels([f"{v:.2f}" for v in tick_values]) if ticklabels is None else cbar.ax.set_xticklabels(ticklabels)
+            if ticklabels is None:
+                cbar.ax.set_xticklabels([f"{v:.2f}" for v in tick_values])
+            else:
+                # Ensure we have the correct number of labels for the ticks
+                if len(ticklabels) != len(tick_values):
+                    raise ValueError(f"Number of ticklabels ({len(ticklabels)}) must match number of ticks ({len(tick_values)})")
+                cbar.ax.set_xticklabels(ticklabels)
         # Customize ticks
         cbar.ax.tick_params(axis='x', direction=tickdir, labelsize=font_size, width=tickw, length=tickl,
                             bottom=(side=='bottom'), top=(side=='top'))
@@ -177,7 +183,13 @@ def apply_colorbar(ax, plot, font_size: float=13, label: str='Density', label_pa
         if ticks is not None:
             tick_values = np.linspace(vmin, vmax, ticks)
             cbar.set_ticks(tick_values)
-            cbar.ax.set_yticklabels([f"{v:.2f}" for v in tick_values]) if ticklabels is None else cbar.ax.set_yticklabels(ticklabels)
+            if ticklabels is None:
+                cbar.ax.set_yticklabels([f"{v:.2f}" for v in tick_values])
+            else:
+                # Ensure we have the correct number of labels for the ticks
+                if len(ticklabels) != len(tick_values):
+                    raise ValueError(f"Number of ticklabels ({len(ticklabels)}) must match number of ticks ({len(tick_values)})")
+                cbar.ax.set_yticklabels(ticklabels)
         # Customize ticks
         cbar.ax.tick_params(axis='y', direction=tickdir, labelsize=font_size, width=tickw, length=tickl,
                             left=(side=='left'), right=(side=='right'))
@@ -231,7 +243,7 @@ def compute_min_max(data: np.ndarray, symmetric: bool=False) -> tuple[float, flo
         max_val = np.nanmax([abs(min_val), abs(max_val)])
         min_val = -max_val
 
-    # Ensure min and max are noth both zeroes
+    # Ensure min and max are not both zero
     if min_val == 0 and max_val == 0:
         min_val, max_val = -1.0, 1.0
 
@@ -1425,7 +1437,7 @@ def fig_errs_by_channel(target: np.ndarray, pred: np.ndarray, ref: np.ndarray=No
 
 def geostationnary_map(fig, ax, lat, lon, c, c_min, c_max, font_size=13, title='Scatterplot', title_pad=1.005,
                        marker='.', markersize=0.25, cb_label='Value', cb_cmap=None, cb_pad=0.0125, cb_tickw=1,
-                       cb_tickl=2.5, cb_font=12, cb_dir='out', cb_rot=270, cb_labelpad=15.5, cb_side='right', cb_size=0.025,
+                       cb_tickl=2.5, cb_font=12, cb_dir='out', cb_rot=0, cb_labelpad=15.5, cb_side='right', cb_size=0.025,
                        cb_ticks=5, cb_ticklabels=None):
     """ Create a scatterplot with optional density projection.
 
@@ -1498,7 +1510,7 @@ def geostationnary_map(fig, ax, lat, lon, c, c_min, c_max, font_size=13, title='
     ax.set_title(title, fontsize=font_size, y=title_pad)
     # Set legend
     apply_colorbar(ax, scat, font_size=cb_font, label=cb_label, label_pad=cb_labelpad, orientation='horizontal',
-                   rotation=cb_rot, side='bottom', size=cb_size, pad=0.3, vmin=c_min, vmax=c_max,
+                   rotation=cb_rot, side='bottom', size=cb_size, pad=0.075, vmin=c_min, vmax=c_max,
                    ticks=cb_ticks, tickw=cb_tickw, tickl=cb_tickl, tickdir=cb_dir, ticklabels=cb_ticklabels)
 
 
@@ -1740,117 +1752,6 @@ def fig_scatterplots(target: Union[list, np.ndarray], pred: Union[list, np.ndarr
                 title=title, fit=False, labels=labels,
                 x_label=x_label, y_label=y_label)
 
-    return fig
-
-
-
-
-def compute_normalized_density(lat_data: np.ndarray, lon_data: np.ndarray,
-                               lat_min: float, lat_max: float,
-                               lon_min: float, lon_max: float,
-                               bins: int = 50):
-    """
-    Computes the normalized 2D histogram (PDF).
-    Uses the provided global min/max range for consistent binning across all datasets.
-    """
-
-    H, lat_edges, lon_edges = np.histogram2d(
-        lat_data, lon_data, bins=bins,
-        range=[[lat_min, lat_max], [lon_min, lon_max]], density=False)
-
-    # H_norm is the normalized density (PDF) since density=True was used in np.histogram2d
-    H_norm = H  #/ H.sum()
-
-    # Store the edges for plotting extent [lon_min, lon_max, lat_min, lat_max]
-    extent = [lon_edges[0], lon_edges[-1], lat_edges[0], lat_edges[-1]]
-
-    # Transpose H_norm for correct image display (Lon=X, Lat=Y)
-    return H_norm.T, extent
-
-# --- Figure Generation ---
-def fig_coordinate_distributions(lat_train: np.ndarray, lon_train: np.ndarray,
-                                 lat_val: np.ndarray, lon_val: np.ndarray) -> plt.Figure:
-    """
-    Generates a figure with 3 panels: Training Density, Validation Density, and Density Difference.
-    """
-
-    # --- 1. Compute Global Extent ---
-    # This ensures all histograms are binned identically for accurate comparison
-    lat_min = min(lat_train.min(), lat_val.min())
-    lat_max = max(lat_train.max(), lat_val.max())
-    lon_min = min(lon_train.min(), lon_val.min())
-    lon_max = max(lon_train.max(), lon_val.max())
-
-    # Use a high number of bins (e.g., 100) for a KDE-like, smooth visual comparison
-    N_BINS = 100
-
-    # --- 2. Compute Densities ---
-    # Pass the calculated global min/max to ensure all plots align
-    density_train, extent= compute_normalized_density(
-        lat_train, lon_train, lat_min=lat_min, lat_max=lat_max, lon_min=lon_min, lon_max=lon_max, bins=N_BINS)
-    density_val, _ = compute_normalized_density(
-        lat_val, lon_val, lat_min=lat_min, lat_max=lat_max, lon_min=lon_min, lon_max=lon_max, bins=N_BINS)
-
-    density_diff = density_train - density_val
-
-    # --- 3. Determine Plot Ranges ---
-    # For density plots (panels a & b), use the global max density for visual fairness
-    vmax_density = max(density_train.max(), density_val.max())
-    vmin_density = 0
-
-    # For difference plot (panel c), use symmetric range
-    vmax_diff = np.abs(density_diff).max()
-
-    # --- 4. Define Figure Layout ---
-    n_rows, n_cols = 1, 3
-    cell_w = 4.0
-    cell_h = 4.0
-
-    cell_widths = [cell_w] * n_cols
-    cell_heights = [cell_h] * n_rows
-    # Adjust padding for better visualization and colorbar placement
-    lefts = [0.75] + [0.3] * (n_cols - 1)  # More space on the left for the first Y-label
-    rights = [1.0] * n_cols
-    bottoms = [0.75] * n_rows
-    tops = [0.5] * n_rows
-
-    fig, get_axes = flexible_gridspec(cell_widths, cell_heights, lefts, rights, bottoms, tops)
-
-    # List of images and titles
-    images = [density_train, density_val, density_diff]
-    titles = [r'(a) Training Density ($\mathcal{D}_{train}$)', r'(b) Validation Density ($\mathcal{D}_{val}$)',
-              r'(c) Density Difference ($\mathcal{D}_{train} - \mathcal{D}_{val}$)']
-
-    # --- 5. Plotting Loop ---
-    for i, (img, title) in enumerate(zip(images, titles)):
-        ax = get_axes(0, i)
-
-        # Determine plot parameters based on index
-        if i < 2:  # Density plots (a and b)
-            img_range = (vmin_density, vmax_density)
-            cb_cmap = 'plasma'
-            cb_label = 'Normalized Density (PDF)'
-        else:  # Difference plot (c)
-            img_range = (-vmax_diff, vmax_diff)
-            cb_cmap = 'RdBu_r'
-            cb_label = 'Density Difference'
-
-        # Set axis labels visibility
-        y_label = 'Latitude (degrees)' if i == 0 else ''
-        x_label = 'Longitude (degrees)'
-
-        # Use plot_map to render the density
-        plot_map(
-            ax, img, title=title,
-            img_range=img_range, cb_cmap=cb_cmap, cb_label=cb_label,
-            img_labels=(y_label, x_label),
-            cb_rot=270, cb_side='right'
-        )
-        # Set extent manually in plot_map for correct geographical coordinates
-        # ax.set_xlim(extent[0], extent[1])
-        # ax.set_ylim(extent[2], extent[3])
-
-    # fig.tight_layout() # Cannot use tight_layout with fig.add_axes/flexible_gridspec
     return fig
 
 

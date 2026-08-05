@@ -17,7 +17,7 @@ train:
       type: 'Cloud mask'
       # Loading function (cloud filter is computed, not loaded directly)
       load:
-        _target_: code.preprocessing.filters.cloud_mask
+        _target_: code.preprocessing.mask.cloud_mask
         _args_:
           - ${....prof.load}
       # Transformations to apply

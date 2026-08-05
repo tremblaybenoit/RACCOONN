@@ -17,7 +17,7 @@ train:
       type: 'Clear mask'
       # Loading function (clear filter is computed, not loaded directly)
       load:
-        _target_: code.preprocessing.filters.clear_mask
+        _target_: code.preprocessing.mask.clear_mask
         _args_:
           - ${....prof.load}
       # Transformations to apply

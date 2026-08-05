@@ -459,9 +459,15 @@ def main(config: DictConfig) -> None:
 
     # If statistics is part of the preprocessing steps:
     if hasattr(config.preprocessing, "statistics"):
-        for dataset, config_statistics in config.preprocessing.statistics.items():
-            logger.info(f"Computing statistics of {dataset} set")
-            _ = instantiate(config_statistics)
+        # If single operation, execute
+        if hasattr(config.preprocessing.statistics, "_target_"):
+            logger.info(f"Computing statistics...")
+            _ = instantiate(config.preprocessing.statistics)
+        # Execute individual operations
+        else:
+            for dataset, config_statistics in config.preprocessing.statistics.items():
+                logger.info(f"Computing statistics of {dataset} set")
+                _ = instantiate(config_statistics)
 
     return
 

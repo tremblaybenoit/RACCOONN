@@ -47,7 +47,7 @@ preprocessing:
         # Temporal domain:
         temporal_window:
           scans_min: 117.0
-          scans_max: 118.0
+          scans_max: 117.0
         # Cloud/clear sky
         cloud_mask: false
         clear_mask: true

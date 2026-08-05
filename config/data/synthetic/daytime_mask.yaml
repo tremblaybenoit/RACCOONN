@@ -17,7 +17,7 @@ train:
       type: 'Daytime mask'
       # Loading function (daytime filter is computed, not loaded directly)
       load:
-        _target_: code.preprocessing.filters.daytime_mask
+        _target_: code.preprocessing.mask.daytime_mask
         _args_:
           - ${....meta.load}
       # Transformations to apply

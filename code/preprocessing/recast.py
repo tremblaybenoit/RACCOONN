@@ -323,9 +323,15 @@ def main(config: DictConfig) -> None:
 
     # Execute recast
     if hasattr(config.preprocessing, 'recast'):
-        for key, config in config.preprocessing.recast.items():
-            logger.info(f"Performing recast: {key}")
-            instantiate(config)
+        # If single operation, execute
+        if hasattr(config.preprocessing.recast, "_target_"):
+            logger.info(f"Performing recast...")
+            instantiate(config.preprocessing.recast)
+        # Execute individual operations
+        else:
+            for key, config in config.preprocessing.recast.items():
+                logger.info(f"Performing recast: {key}")
+                instantiate(config)
 
 
 if __name__ == '__main__':
