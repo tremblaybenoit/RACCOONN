@@ -15,7 +15,11 @@ class IdentityPositionalEncoding(nn.Module):
         -------
         None.
         """
+
+        # Class inheritance
         super().__init__()
+
+        # Output dimensions
         self.d_output = d_input
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -68,7 +72,10 @@ class GaussianPositionalEncoding(nn.Module):
         -------
         None.
         """
+
+        # Class inheritance
         super().__init__()
+
         # Initialize frequencies
         self.register_buffer("frequencies", torch.randn(num_freqs, d_input)*sigma)
         self.num_freqs= num_freqs
@@ -125,7 +132,7 @@ class MultiScaleGaussianEncoding(nn.Module):
         None.
         """
 
-        # Initialize parent class
+        # Class inheritance
         super().__init__()
 
         # Set default sigmas if not provided
@@ -133,11 +140,11 @@ class MultiScaleGaussianEncoding(nn.Module):
             sigma_per_dim = [1.0] * d_input
         sigmas = torch.tensor(sigma_per_dim, dtype=torch.float32)
 
-        # 1. Identify which dimensions want encoding (sigma > 0)
+        # Identify which dimensions want encoding (sigma > 0)
         self.register_buffer("encoding_mask", sigmas > 0)
         self.d_encoded = int(self.encoding_mask.sum().item())
 
-        # 2. Only generate frequencies for those specific dimensions
+        # Only generate frequencies for those specific dimensions
         if self.d_encoded > 0:
             # Filter sigmas to only active dimensions: (1, d_encoded)
             active_sigmas = sigmas[self.encoding_mask.bool()].unsqueeze(0)
@@ -149,9 +156,8 @@ class MultiScaleGaussianEncoding(nn.Module):
         else:
             self.frequencies = None
 
-        self.num_freqs = num_freqs
         # Output = [All original dims] + [2 * num_freqs * active dims]
-        self.d_output = d_input + (self.num_freqs * 2 * self.d_encoded)
+        self.d_output = d_input + (num_freqs * 2 * self.d_encoded)
 
     def forward(
             self,
@@ -171,17 +177,17 @@ class MultiScaleGaussianEncoding(nn.Module):
         # Start with the scaled original input (Normalized to [-1, 1])
         out_parts = [x * 2.0 - 1.0]
 
+        # If frequencies were generated for some dimensions
         if self.frequencies is not None:
             # Select only the columns of x that need encoding
             x_to_encode = x[:, self.encoding_mask.bool()]  # (B, d_encoded)
 
             # Project: (B, 1, d_encoded) * (num_freqs, d_encoded) -> (B, num_freqs, d_encoded)
-            # Broadcasting works automatically here if we unsqueeze correctly
             proj = x_to_encode.unsqueeze(1) * self.frequencies * (2.0 * torch.pi)
 
             # Flatten frequencies: (B, num_freqs * d_encoded)
             proj_flat = proj.reshape(x.shape[0], -1)
-
+            # Apply sin/cos projection
             out_parts.append(torch.sin(proj_flat))
             out_parts.append(torch.cos(proj_flat))
 

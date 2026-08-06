@@ -2,7 +2,6 @@ from code.model.base import BaseModel
 from omegaconf import DictConfig
 
 
-
 class ForwardModel(BaseModel):
     """
     Forward model for radiative transfer emulation (e.g., CRTM).

@@ -17,6 +17,8 @@ train:
       path: ${...dir}/pressure.npy
       # Type of pressure levels
       type: 'Pressure (hPa)'
+      # Number of variables
+      n: 127
       # Loading function
       load:
         _target_: code.data.io.load_npy
@@ -38,6 +40,8 @@ valid:
       path: ${...dir}/pressure.npy
       # Type of pressure levels
       type: ${....train.variables.pressure.type}
+      # Number of variables
+      n: ${....train.variables.pressure.n}
       # Loading function
       load:
         _target_: ${.....train.variables.pressure.load._target_}
@@ -59,6 +63,8 @@ test:
       path: ${...dir}/pressure.npy
       # Type of pressure levels
       type: ${....train.variables.pressure.type}
+      # Number of variables
+      n: ${....train.variables.pressure.n}
       # Loading function
       load:
         _target_: ${.....train.variables.pressure.load._target_}
@@ -67,12 +73,6 @@ test:
         dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.pressure.transformations}
-# Predict set
-predict:
-  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-  variables:
-    # Pressure
-    pressure: ${...test.variables.pressure}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -84,6 +84,8 @@ all:
       _recursive_: false
       # Type of pressure levels
       type: ${....train.variables.pressure.type}
+      # Number of variables
+      n: ${....train.variables.pressure.n}
       # Loading function
       load:
         _target_: numpy.concatenate

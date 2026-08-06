@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from typing import Callable
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig, OmegaConf
 from utilities.instantiators import instantiate
 from code.architecture.wrapper import Residual
 
@@ -212,7 +212,7 @@ class MLPBlock(nn.Module):
         self,
         in_features: int,
         out_features: int,
-        activation: DictConfig | nn.Module | None = None,
+        activation: DictConfig | None = None,
         norm_type: str | None = None,
         dropout_rate: float = 0.0,
         residual: bool = False,
@@ -227,9 +227,9 @@ class MLPBlock(nn.Module):
             Input feature dimension.
         out_features : int
             Output feature dimension.
-        activation : DictConfig or nn.Module or None, default=None
-            Activation function. If None, defaults to GELU.
-            Can be a DictConfig with '_target_' for lazy instantiation.
+        activation : DictConfig or None, default=None
+            Activation function as a DictConfig with '_target_'. If None, defaults to GELU.
+            Always pass DictConfig to ensure independent activation instances across blocks.
         norm_type : str or None, default=None
             Normalization type applied after the linear layer.
             Options: 'layer' (LayerNorm), 'batch' (BatchNorm1d), 'none' (Identity).
@@ -243,21 +243,18 @@ class MLPBlock(nn.Module):
             If None, auto-selected based on activation function.
             If DictConfig, instantiated automatically.
         """
+
+        # Class inheritance
         super().__init__()
 
-        # ============================
         # Resolve Activation Function
-        # ============================
         if activation is None:
             act = nn.GELU()
-        elif isinstance(activation, DictConfig):
-            act = instantiate(activation)
         else:
-            act = activation
+            # activation must be DictConfig - instantiate to ensure independence
+            act = instantiate(activation)
 
-        # ============================
         # Resolve Normalization Layer
-        # ============================
         if norm_type == 'layer':
             norm = nn.LayerNorm(out_features)
         elif norm_type == 'batch':
@@ -267,15 +264,11 @@ class MLPBlock(nn.Module):
         else:
             raise ValueError(f"Unknown norm_type '{norm_type}'. Choose 'layer', 'batch', or 'none'.")
 
-        # ============================
         # Create Basic Layers
-        # ============================
         linear = nn.Linear(in_features, out_features)
         drop = nn.Dropout(dropout_rate)
 
-        # ============================
         # Weight Initialization
-        # ============================
         if init_func is not None:
             # Custom initialization function provided
             if isinstance(init_func, DictConfig):
@@ -288,9 +281,7 @@ class MLPBlock(nn.Module):
             auto_init = get_init_func(activation)
             auto_init(linear)
 
-        # ============================
         # Build Block Sequence
-        # ============================
         if residual:
             # Residual path: linear -> norm -> dropout
             # Activation applied after residual addition
@@ -334,8 +325,8 @@ class MLPBlocks(nn.Module):
         out_features: int,
         hidden_features: int | None = None,
         n_blocks: int = 1,
-        activation: DictConfig | nn.Module | None = None,
-        final_activation: DictConfig | nn.Module | None = None,
+        activation: DictConfig | None = None,
+        final_activation: DictConfig | None = None,
         norm_type: str | None = None,
         final_norm_type: str | None = None,
         dropout_rate: float = 0.0,
@@ -357,12 +348,13 @@ class MLPBlocks(nn.Module):
             Defaults to in_features if None.
         n_blocks : int, default=1
             Total number of stacked linear blocks. At least 1.
-        activation : DictConfig or nn.Module or None, default=None
-            Intermediate activation function. Defaults to GELU if None.
+        activation : DictConfig or None, default=None
+            Intermediate activation function as DictConfig. Defaults to GELU if None.
+            Always pass DictConfig to ensure independent activation instances.
             Applied to intermediate blocks.
-        final_activation : DictConfig or nn.Module or None, default=None
-            Activation for the final block. Falls back to activation if None.
-            Pass nn.Identity() to suppress activation on the final block.
+        final_activation : DictConfig or None, default=None
+            Activation for the final block as DictConfig. Falls back to activation if None.
+            Pass nn.Identity as DictConfig to suppress activation on the final block.
         norm_type : str or None, default=None
             Intermediate normalization type.
             Options: 'layer', 'batch', 'none'.
@@ -378,6 +370,8 @@ class MLPBlocks(nn.Module):
             Weight initialization function for all blocks.
             If None, auto-selected based on activation per block.
         """
+
+        # Class inheritance
         super().__init__()
 
         # Store output dimension for external access
@@ -413,7 +407,7 @@ class MLPBlocks(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Forward pass through the sequential MLP block chain.
+        Forward pass through the sequential MLP chain of blocks.
 
         Parameters
         ----------
@@ -433,7 +427,7 @@ class PredictionHead(nn.Module):
     Single prediction head for outputting predictions.
 
     Can be a simple linear layer (n_layers=1) or a more complex MLP (n_layers>1).
-    Typically used as the output layer of a neural network.
+    Optionally applies post-processing (denormalization, transformations, etc.).
     """
 
     def __init__(
@@ -442,8 +436,9 @@ class PredictionHead(nn.Module):
         out_features: int,
         hidden_features: int | None = None,
         n_layers: int = 1,
-        activation: DictConfig | nn.Module | None = None,
+        activation: DictConfig | None = None,
         dropout_rate: float = 0.0,
+        post_process: DictConfig | Callable | None = None,
     ) -> None:
         """
         Initialize a prediction head.
@@ -459,11 +454,18 @@ class PredictionHead(nn.Module):
         n_layers : int, default=1
             Number of layers in the head. If 1, a simple linear layer.
             If > 1, uses MLPBlocks for multi-layer processing.
-        activation : DictConfig or nn.Module or None, default=None
-            Activation function (applied to intermediate layers, not final).
+        activation : DictConfig or None, default=None
+            Activation function as DictConfig. Applied to intermediate layers, not final.
+            Always pass DictConfig to ensure independent activation instances.
         dropout_rate : float, default=0.0
             Dropout probability for intermediate layers.
+        post_process : DictConfig | Callable, optional
+            Post-processing function applied after forward pass.
+            Can be compose_transformations, custom denormalization, etc.
+            If DictConfig, instantiated via instantiate().
         """
+
+        # Class inheritance
         super().__init__()
         self.out_features = out_features
 
@@ -479,10 +481,19 @@ class PredictionHead(nn.Module):
                 hidden_features=hidden_features or in_features,
                 n_blocks=n_layers,
                 activation=activation,
-                final_activation=nn.Identity(),
+                final_activation=OmegaConf.create({'_target_': 'torch.nn.Identity'}),
                 dropout_rate=dropout_rate,
                 final_dropout_rate=0.0,
             )
+
+        # Post-processing function (denormalization, transformations, etc.)
+        if post_process is not None:
+            if isinstance(post_process, DictConfig):
+                self.post_process = instantiate(post_process)
+            else:
+                self.post_process = post_process
+        else:
+            self.post_process = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -497,65 +508,109 @@ class PredictionHead(nn.Module):
         -------
         torch.Tensor
             Output tensor of shape (..., out_features).
+            If post_process is configured, applied after head output.
         """
-        return self.head(x)
+
+        # Forward model
+        x = self.head(x)
+        # Apply postprocessing
+        if self.post_process is not None:
+            x = self.post_process(x)
+        return x
 
 
-class PredictionHeads(nn.Module):
+class HeterogeneousPredictionHeads(nn.Module):
     """
-    Multiple prediction heads with identical architectures.
+    Multiple prediction heads with heterogeneous (per-head) configurations.
 
-    Creates n_heads identical PredictionHead modules for multi-task learning.
-    Outputs from all heads are concatenated along the feature dimension.
+    Each head can have different architectures, activations, layers, dropout rates, etc.
+
+    Can be initialized in two ways:
+    1. Via `heads` (ListConfig of DictConfigs) - configs are instantiated into heads
+    2. Via `heads` (pre-constructed nn.ModuleList) - heads are used directly
+
+    This design allows both declarative config-driven initialization and programmatic
+    construction. Outputs from all heads are concatenated along the feature dimension.
     """
 
     def __init__(
         self,
-        n_heads: int,
-        in_features: int,
-        out_features: int,
-        hidden_features: int | None = None,
-        n_layers: int = 1,
-        activation: DictConfig | nn.Module | None = None,
-        dropout_rate: float = 0.0,
+        heads: ListConfig | nn.ModuleList,
+        in_features: int | None = None,
     ) -> None:
         """
-        Initialize multiple prediction heads.
+        Initialize heterogeneous prediction heads.
 
         Parameters
         ----------
-        n_heads : int
-            Number of prediction heads to create.
-        in_features : int
+        heads : ListConfig[DictConfig] | nn.ModuleList
+            Either:
+            - ListConfig of DictConfigs, one per head. Each DictConfig should contain:
+              - out_features : int
+                  Output feature dimension for this head.
+              - hidden_features : int, optional
+                  Hidden layer dimension (if n_layers > 1).
+              - n_layers : int, default=1
+                  Number of layers in this head.
+              - activation : DictConfig or None, optional
+                  Activation function as DictConfig. Always pass DictConfig to ensure
+                  independent activation instances across heads.
+              - dropout_rate : float, default=0.0
+                  Dropout probability for this head.
+              - post_process : DictConfig | Callable, optional
+                  Post-processing function (e.g., denormalization, transformations).
+              Requires `in_features` parameter.
+            - Pre-constructed nn.ModuleList of prediction heads to use directly.
+              No need for `in_features` in this case.
+        in_features : int, optional
             Input feature dimension (shared by all heads).
-        out_features : int
-            Output feature dimension per head.
-        hidden_features : int or None, default=None
-            Hidden layer dimension (if n_layers > 1).
-        n_layers : int, default=1
-            Number of layers in each head.
-        activation : DictConfig or nn.Module or None, default=None
-            Activation function for intermediate layers in each head.
-        dropout_rate : float, default=0.0
-            Dropout probability for each head.
+            Required only if `heads` is a ListConfig.
         """
-        super().__init__()
-        self.n_heads = n_heads
-        # Total output dimension is sum of all head outputs
-        self.out_features = out_features * n_heads
 
-        # Create n_heads identical prediction heads
-        self.heads = nn.ModuleList([
-            PredictionHead(
-                in_features=in_features,
-                out_features=out_features,
-                hidden_features=hidden_features,
-                n_layers=n_layers,
-                activation=activation,
-                dropout_rate=dropout_rate,
+        # Class inheritance
+        super().__init__()
+
+        # Handle ListConfig (config-driven initialization)
+        if isinstance(heads, ListConfig):
+            # Number of input features
+            if in_features is None:
+                raise ValueError("in_features must be provided when heads is a ListConfig")
+            self.in_features = in_features
+
+            # Create heads with individual configurations
+            self.heads = nn.ModuleList()
+            for i, head_cfg in enumerate(heads):
+                # Extract configuration with defaults
+                out_features = head_cfg.get('out_features', 1)
+                hidden_features = head_cfg.get('hidden_features', None)
+                n_layers = head_cfg.get('n_layers', 1)
+                activation = head_cfg.get('activation', None)
+                dropout_rate = head_cfg.get('dropout_rate', 0.0)
+                post_process = head_cfg.get('post_process', None)
+
+                # Create individual head
+                head = PredictionHead(
+                    in_features=in_features,
+                    out_features=out_features,
+                    hidden_features=hidden_features,
+                    n_layers=n_layers,
+                    activation=activation,
+                    dropout_rate=dropout_rate,
+                    post_process=post_process,
+                )
+                self.heads.append(head)
+
+        # Handle nn.ModuleList (pre-constructed heads)
+        elif isinstance(heads, nn.ModuleList):
+            self.heads = heads
+
+        else:
+            raise TypeError(
+                f"heads must be ListConfig or nn.ModuleList, got {type(heads)}"
             )
-            for _ in range(n_heads)
-        ])
+
+        # Calculate total output dimension from heads
+        self.out_features = sum(head.out_features for head in self.heads)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -569,10 +624,78 @@ class PredictionHeads(nn.Module):
         Returns
         -------
         torch.Tensor
-            Concatenated output from all heads, shape (..., out_features * n_heads).
+            Concatenated output from all heads, shape (..., out_features_total).
+            where out_features_total is the sum of all head output dimensions.
         """
         outputs = [head(x) for head in self.heads]
         return torch.cat(outputs, dim=-1)
+
+
+class HomogeneousPredictionHeads(HeterogeneousPredictionHeads):
+    """
+    Multiple prediction heads with identical architectures.
+
+    Creates n_heads identical PredictionHead modules for multitask learning.
+    Outputs from all heads are concatenated along the feature dimension.
+
+    This is a special case of HeterogeneousPredictionHeads where all heads have
+    the same configuration. This class provides a simpler API for this common case.
+
+    Inherits from HeterogeneousPredictionHeads and passes pre-constructed heads
+    to the parent instead of configs, avoiding unnecessary config interpretation.
+    """
+
+    def __init__(
+        self,
+        n_heads: int,
+        in_features: int,
+        out_features: int,
+        hidden_features: int | None = None,
+        n_layers: int = 1,
+        activation: DictConfig | None = None,
+        dropout_rate: float = 0.0,
+        post_process: DictConfig | Callable | None = None,
+    ) -> None:
+        """
+        Initialize multiple identical prediction heads.
+
+        Parameters
+        ----------
+        n_heads : int
+            Number of prediction heads to create.
+        in_features : int
+            Input feature dimension (shared by all heads).
+        out_features : int
+            Output feature dimension per head.
+        hidden_features : int or None, default=None
+            Hidden layer dimension (if n_layers > 1).
+        n_layers : int, default=1
+            Number of layers in each head.
+        activation : DictConfig or None, default=None
+            Activation function as DictConfig for intermediate layers in each head.
+            Always pass DictConfig to ensure independent activation instances.
+        dropout_rate : float, default=0.0
+            Dropout probability for each head.
+        post_process : DictConfig | Callable, optional
+            Post-processing function applied after each head (e.g., denormalization).
+        """
+
+        # Create n_heads identical prediction heads directly
+        heads = nn.ModuleList([
+            PredictionHead(
+                in_features=in_features,
+                out_features=out_features,
+                hidden_features=hidden_features,
+                n_layers=n_layers,
+                activation=activation,
+                dropout_rate=dropout_rate,
+                post_process=post_process,
+            )
+            for _ in range(n_heads)
+        ])
+
+        # Pass pre-constructed heads to parent
+        super().__init__(heads=heads)
 
 
 class MLPModular(nn.Module):
@@ -619,7 +742,7 @@ class MLPModular(nn.Module):
         output_layer : DictConfig or nn.Module or None, default=None
             Output layer for predictions. Can be:
             - PredictionHead: single prediction head
-            - PredictionHeads: multiple heads for multi-task learning
+            - PredictionHeads: multiple heads for multitask learning
             - nn.Linear: simple linear layer
             - Any nn.Module for custom output
         hidden_skip : bool, default=False
@@ -636,14 +759,17 @@ class MLPModular(nn.Module):
             Whether to concatenate positional encoding to output_layer input.
             Allows encoding information to directly influence output predictions.
         """
+
+        # Class inheritance
         super().__init__()
 
-        # ============================
         # Positional Encoding
-        # ============================
-        if positional_encoding is not None:
+        if isinstance(positional_encoding, DictConfig):
             self.positional_encoding = instantiate(positional_encoding)
             self.d_encoding = self.positional_encoding.d_output
+        elif isinstance(positional_encoding, nn.Module):
+            self.positional_encoding = positional_encoding
+            self.d_encoding = getattr(positional_encoding, 'd_output', 1)
         else:
             self.positional_encoding = nn.Identity()
             self.d_encoding = 0
@@ -652,10 +778,13 @@ class MLPModular(nn.Module):
         self.inject_encoding_hidden = inject_encoding_hidden
         self.inject_encoding_output = inject_encoding_output
 
-        # ============================
         # Input Layer
-        # ============================
-        self.input_layer = instantiate(input_layer) if input_layer is not None else nn.Identity()
+        if isinstance(input_layer, DictConfig):
+            self.input_layer = instantiate(input_layer)
+        elif isinstance(input_layer, nn.Module):
+            self.input_layer = input_layer
+        else:
+            self.input_layer = nn.Identity()
 
         # Determine input_layer output dimension for subsequent layers
         if hasattr(self.input_layer, 'out_features'):
@@ -669,9 +798,7 @@ class MLPModular(nn.Module):
             else:
                 raise ValueError("Unable to determine output dimension of input_layer.")
 
-        # ============================
         # Hidden Layer
-        # ============================
         if hidden_layer is not None:
             self.hidden_layer = instantiate(hidden_layer)
 
@@ -705,13 +832,12 @@ class MLPModular(nn.Module):
                     current_dim = hidden_layer.out_features
                 else:
                     current_dim = input_out_dim
+        # Nothing; identity layer
         else:
             self.hidden_layer = nn.Identity()
             current_dim = input_out_dim
 
-        # ============================
         # Output Layer Input Dimension
-        # ============================
         self.output_skip = output_skip
         if output_skip:
             # Concatenate hidden output with input output
@@ -723,9 +849,7 @@ class MLPModular(nn.Module):
         if inject_encoding_output:
             output_in_dim += self.d_encoding
 
-        # ============================
         # Output Layer
-        # ============================
         if output_layer is not None:
             self.output_layer = instantiate(output_layer) if isinstance(output_layer, DictConfig) else output_layer
             # Update input dimension if layer supports it
@@ -758,28 +882,21 @@ class MLPModular(nn.Module):
         torch.Tensor
             Output tensor from output_layer.
         """
-        # ============================
+
         # Positional Encoding
-        # ============================
         x_enc = self.positional_encoding(x)
 
-        # ============================
         # Input Layer
-        # ============================
         x_input = self.input_layer(x_enc)
 
-        # ============================
         # Hidden Layer
-        # ============================
         if self.inject_encoding_hidden:
             # Concatenate encoding to hidden layer input
             x_hidden = self.hidden_layer(torch.cat([x_input, x_enc], dim=-1))
         else:
             x_hidden = self.hidden_layer(x_input)
 
-        # ============================
         # Prepare Output Layer Input
-        # ============================
         if self.output_skip:
             # Concatenate hidden and input features
             x_out = torch.cat([x_hidden, x_input], dim=-1)
@@ -790,8 +907,6 @@ class MLPModular(nn.Module):
         if self.inject_encoding_output:
             x_out = torch.cat([x_out, x_enc], dim=-1)
 
-        # ============================
         # Output Layer
-        # ============================
         return self.output_layer(x_out)
 

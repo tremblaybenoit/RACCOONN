@@ -253,6 +253,12 @@ class Operator:
         self.trainer.save_checkpoint(self.model.ckpt_path, weights_only=False)
 
         # Save resolved model configuration for downstream use
+        config_architecture_path = os.path.join(self.config.paths.checkpoint_dir, "architecture.yaml")
+        with open(config_architecture_path, 'w') as f:
+            OmegaConf.save(self.config.model.architecture, f)
+        logger.info(f"Saving model architecture configuration...")
+
+        # Save resolved model configuration for downstream use
         config_model_path = os.path.join(self.config.paths.checkpoint_dir, "model.yaml")
         with open(config_model_path, 'w') as f:
             OmegaConf.save(self.config.model, f)

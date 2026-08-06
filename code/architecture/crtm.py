@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from typing import Union
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
 from code.architecture.activation import Scale
@@ -18,7 +17,7 @@ class CRTMBackbone(nn.Module):
         in_features: int,
         hidden_features: int = 512,
         n_layers: int = 3,
-        activation: Union[DictConfig, nn.Module] = None,
+        activation: DictConfig | nn.Module | None = None,
         dropout_rate: float = 0.0,
     ):
         """
@@ -134,13 +133,13 @@ class CRTMModular(nn.Module):
         nsurfvars: int,
         nmetavars: int,
         nlevels: int,
-        backbone: Union[DictConfig, nn.Module] = None,
-        output_head: Union[DictConfig, nn.Module] = None,
+        backbone: DictConfig | nn.Module | None = None,
+        output_head: DictConfig | nn.Module | None = None,
         # Default backbone parameters
         nnodes_bt: int = 512,
         nhidden_bt: int = 3,
         dropout_rate: float = 0.0,
-        activation: Union[DictConfig, nn.Module] = None,
+        activation: DictConfig | nn.Module | None = None,
         # Default output parameters
         bt_norm_max: float = 355.0,
         bt_norm_min: float = 180.0,
@@ -253,7 +252,7 @@ class CRTMSkipConnection(nn.Module):
         nnodes_bt: int = 512,
         nhidden_bt: int = 3,
         dropout_rate: float = 0.0,
-        activation: Union[DictConfig, nn.Module] = None,
+        activation: DictConfig | nn.Module | None = None,
         bt_norm_max: float = 355.0,
         bt_norm_min: float = 180.0,
         std_output_activation_offset: float = 0.001,

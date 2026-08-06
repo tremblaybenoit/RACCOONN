@@ -20,6 +20,11 @@ train:
         'Channel 7', 'Channel 8', 'Channel 9', 'Channel 10', 'Channel 11', 'Channel 12',
         'Channel 13', 'Channel 14', 'Channel 15', 'Channel 16'
       ]
+      # Number of variables
+      n:
+        _target_: builtins.len
+        _args_:
+          - ${...type}
       # Loading function
       load:
         _target_: code.data.io.load_npy
@@ -41,6 +46,8 @@ valid:
       path: ${...dir}/hofx.npy
       # Channels
       type: ${....train.variables.hofx.type}
+      # Number of variables
+      n: ${....train.variables.hofx.n}
       # Loading function
       load:
         _target_: ${.....train.variables.hofx.load._target_}
@@ -62,6 +69,8 @@ test:
       path: ${...dir}/hofx.npy
       # Channels
       type: ${....train.variables.hofx.type}
+      # Number of variables
+      n: ${....train.variables.hofx.n}
       # Loading function
       load:
         _target_: ${.....train.variables.hofx.load._target_}
@@ -81,6 +90,8 @@ all:
       _recursive_: false
       # Channels
       type: ${....train.variables.hofx.type}
+      # Number of variables
+      n: ${....train.variables.hofx.n}
       # Loading function
       load:
         _target_: numpy.concatenate

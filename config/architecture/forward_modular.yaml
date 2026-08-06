@@ -1,0 +1,74 @@
+_target_: code.architecture.mlp.MLPModular
+_recursive_: false
+
+# No positional encoding
+positional_encoding: null
+
+# Input layer: single MLPBlock
+input_layer:
+  _target_: code.architecture.mlp.MLPBlock
+  in_features: # Total input features (profiles + surface + meta)
+    _target_: builtins.sum
+    _args_:
+      - _target_: operator.mul
+        _args_:
+          - ${data.stage.train.variables.prof.n}
+          - ${data.stage.train.variables.pressure.n}
+      - ${data.stage.train.variables.surf.n}
+      - ${data.stage.train.variables.meta.n}
+  out_features: ${..hidden_layer.in_features}
+  activation:
+    _target_: torch.nn.GELU
+  norm_type: none
+  dropout_rate: 0.0
+  residual: false
+
+# Hidden layer:
+hidden_layer:
+  _target_: code.architecture.mlp.MLPBlocks
+  in_features: ${.hidden_features}
+  out_features: ${.hidden_features}
+  hidden_features: 512
+  n_blocks: 3
+  activation: ${..input_layer.activation}
+  norm_type: none
+  dropout_rate: 0.0
+  residual: false
+
+# Output layer: heterogeneous dual heads (mean and std)
+output_layer:
+  _target_: code.architecture.mlp.HeterogenousPredictionHeads
+  in_features: ${..hidden_layer.out_features}
+  heads:
+    # Head 1: Mean brightness temperature [0,1] -> denormalized to physical range
+    - out_features: ${data.stage.train.variables.hofx.n}
+      n_layers: 1  # Just linear, no hidden layers
+      activation:
+        _target_: torch.nn.Sigmoid
+      post_process:
+        _target_: code.data.transformations.min_max
+        stats:
+          min: 180
+          max: 355
+        value: ${data.bt_norm_min}  # min_T
+        inverse_transform: true
+
+    # Head 2: Std uncertainty with Softplus and learnable scaling
+    - out_features: ${data.stage.train.variables.hofx.n}
+      n_layers: 1  # Just linear, no hidden layers
+      activation:
+        _target_: torch.nn.Softplus
+      post_process:
+        _target_: torch.nn.Sequential
+        _args_:
+          - _target_: code.architecture.layer.ScaleLayer
+            scale: 1.0
+            learnable: true
+          - _target_: code.architecture.layer.OffsetLayer
+            offset: 0.001
+
+# Skip connections
+hidden_skip: false
+output_skip: false
+inject_encoding_hidden: false
+inject_encoding_output: false

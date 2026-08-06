@@ -17,6 +17,8 @@ train:
       path: ${...dir}/pressure.npy
       # Type of pressure levels
       type: 'Log10(pressure)'
+      # Number of variables
+      n: 127
       # Loading function
       load:
         _target_: numpy.log10
@@ -49,6 +51,8 @@ valid:
       path: ${...dir}/pressure.npy
       # Type of pressure levels
       type: ${....train.variables.pressure_log.type}
+      # Number of variables
+      n: ${....train.variables.pressure_log.n}
       # Loading function
       load:
         _target_: numpy.log10
@@ -72,6 +76,8 @@ test:
       path: ${...dir}/pressure.npy
       # Type of pressure levels
       type: ${....train.variables.pressure_log.type}
+      # Number of variables
+      n: ${....train.variables.pressure_log.n}
       # Loading function
       load:
         _target_: numpy.log10
@@ -99,6 +105,8 @@ all:
       _recursive_: false
       # Type of pressure levels
       type: ${....train.variables.pressure_log.type}
+      # Number of variables
+      n: ${....train.variables.pressure_log.n}
       # Loading function
       load:
         _target_: numpy.concatenate

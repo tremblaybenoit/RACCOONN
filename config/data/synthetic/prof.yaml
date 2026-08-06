@@ -19,6 +19,11 @@ train:
       type: ['Air temperature', 'Cloud ice particle effective radius', 'Cloud water particle effective radius',
              'Snow particle effective radius', 'Humidity mixing ratio', 'Cloud ice mass', 'Cloud water mass',
              'Snow mass', 'Ozone mixing ratio']
+      # Number of variables
+      n:
+        _target_: builtins.len
+        _args_:
+          - ${...type}
       # Loading function
       load:
         _target_: code.data.io.load_npy
@@ -49,6 +54,8 @@ valid:
       path: ${...dir}/prof.npy
       # Profile types
       type: ${....train.variables.prof.type}
+      # Number of variables
+      n: ${....train.variables.prof.n}
       # Loading function
       load:
         _target_: ${.....train.variables.prof.load._target_}
@@ -77,6 +84,8 @@ test:
       path: ${...dir}/prof.npy
       # Profile types
       type: ${....train.variables.prof.type}
+      # Number of variables
+      n: ${....train.variables.prof.n}
       # Loading function
       load:
         _target_: ${.....train.variables.prof.load._target_}
@@ -124,6 +133,8 @@ predict:
       path: ${...dir}/prof.npy
       # Profile types
       type: ${....train.variables.prof.type}
+      # Number of variables
+      n: ${....train.variables.prof.n}
       # Loading function
       load:
         _target_: ${.....train.variables.prof.load._target_}
@@ -162,6 +173,8 @@ all:
       _recursive_: false
       # Type of the atmospheric profiles
       type: ${....train.variables.prof.type}
+      # Number of variables
+      n: ${....train.variables.prof.n}
       # Loading function
       load:
         _target_: numpy.concatenate

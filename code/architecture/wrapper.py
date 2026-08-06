@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from typing import Union
 
 
 class Residual(nn.Module):
@@ -8,7 +7,7 @@ class Residual(nn.Module):
 
     def __init__(
         self,
-        module: Union[nn.Module, nn.ModuleList],
+        module: nn.Module | nn.ModuleList,
         projection: nn.Module | None = None,
     ) -> None:
         """
@@ -21,7 +20,11 @@ class Residual(nn.Module):
                      (e.g., a linear layer to match dimensions).
                      Defaults to nn.Identity.
         """
+
+        # Class inheritance
         super().__init__()
+
+        # Store block and projection
         self.module = module
         self.projection = projection if projection is not None else nn.Identity()
 
@@ -52,7 +55,7 @@ class Concatenate(nn.Module):
 
     def __init__(
         self,
-        module: Union[nn.Module, nn.ModuleList],
+        module: nn.Module | nn.ModuleList,
         projection: nn.Module | None = None,
         dim: int = -1,
     ) -> None:
@@ -67,7 +70,11 @@ class Concatenate(nn.Module):
         dim : int. Dimension along which to concatenate. Default is -1
               (feature dim for MLPs).
         """
+
+        # Class inheritance
         super().__init__()
+
+        # Store block, projection, and concatenation dimension
         self.module = module
         self.projection = projection if projection is not None else nn.Identity()
         self.dim = dim

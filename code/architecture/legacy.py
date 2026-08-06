@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 from code.architecture.activation import Swish, Scale, Sine
-from code.architecture.mlp import MLPBlocks, PredictionHead
 
 
 class CRTMArchitecture(nn.Module):

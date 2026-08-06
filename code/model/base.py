@@ -1,7 +1,7 @@
 import torch
 from typing import Any
 from pytorch_lightning import LightningModule
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from utilities.instantiators import instantiate
 import gc
 from typing import Callable
@@ -10,6 +10,35 @@ import os
 
 # Initialize logger
 logger = logging.getLogger(__name__)
+
+
+def load_model_from_config(path: str) -> DictConfig:
+    """
+    Load model configuration from a saved, resolved YAML file.
+
+    This function loads the model configuration (typically model.yaml
+    saved during model training). The returned DictConfig is then passed
+    to the appropriate model class, which handles instantiation and checkpoint loading.
+
+    Parameters
+    ----------
+    path : str
+        Path to the model configuration YAML file (e.g., /path/to/checkpoints/model.yaml)
+
+    Returns
+    -------
+    DictConfig
+        Configuration that will be instantiated by InverseModel.__init__
+    """
+
+    # Load model configuration
+    logger.info(f"Loading forward model config from: {path}")
+    config = OmegaConf.load(path)
+
+    # Trim the configuration to only extract the model parameters
+    config = OmegaConf.create({"_target_": config._target_, "cpkt_path": config.ckpt_path})
+
+    return config
 
 
 class BaseModel(LightningModule):

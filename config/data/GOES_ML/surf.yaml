@@ -21,6 +21,11 @@ train:
              'Surface soil temperature', 'Surface sea temperature', 'Surface snow temperature',
              'Surface eastward wind component', 'Surface northward wind component',
              'Vegetation area fraction', 'Fraction of condensed water', 'Water area fraction']
+      # Number of variables
+      n:
+        _target_: builtins.len
+        _args_:
+          - ${...type}
       # Loading function
       load:
         _target_: code.data.io.load_npy
@@ -54,6 +59,8 @@ valid:
       path: ${...dir}/surf.npy
       # Surface variable types
       type: ${....train.variables.surf.type}
+      # Number of variables
+      n: ${....train.variables.surf.n}
       # Loading function
       load:
         _target_: ${.....train.variables.surf.load._target_}
@@ -75,6 +82,8 @@ test:
       path: ${...dir}/surf.npy
       # Surface variable types
       type: ${....train.variables.surf.type}
+      # Number of variables
+      n: ${....train.variables.surf.n}
       # Loading function
       load:
         _target_: ${.....train.variables.surf.load._target_}
@@ -94,6 +103,8 @@ all:
       _recursive_: false
       # Surface variable types
       type: ${....train.variables.surf.type}
+      # Number of variables
+      n: ${....train.variables.surf.n}
       # Loading function
       load:
         _target_: numpy.concatenate

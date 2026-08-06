@@ -20,6 +20,11 @@ train:
         'Channel 7', 'Channel 8', 'Channel 9', 'Channel 10', 'Channel 11', 'Channel 12',
         'Channel 13', 'Channel 14', 'Channel 15', 'Channel 16'
       ]
+      # Number of variables
+      n:
+        _target_: builtins.len
+        _args_:
+          - ${...type}
       # Loading function
       load:
         _target_: operator.getitem
@@ -56,6 +61,8 @@ valid:
       path: ${...dir}/hofx_forward.npy
       # Channels
       type: ${data.stage.train.variables.hofx_forward_mean.type}
+      # Number of variables
+      n: ${data.stage.train.variables.hofx_forward_mean.n}
       # Loading function
       load:
         _target_: operator.getitem
@@ -83,6 +90,8 @@ test:
       path: ${...dir}/hofx_forward.npy
       # Channels
       type: ${data.stage.train.variables.hofx_forward_mean.type}
+      # Number of variables
+      n: ${data.stage.train.variables.hofx_forward_mean.n}
       # Loading function
       load:
         _target_: operator.getitem
@@ -152,6 +161,8 @@ all:
       _recursive_: false
       # Channels
       type: ${data.stage.train.variables.hofx_forward_mean.type}
+      # Number of variables
+      n: ${data.stage.train.variables.hofx_forward_mean.n}
       # Loading function
       load:
         _target_: numpy.concatenate

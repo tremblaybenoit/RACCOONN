@@ -16,7 +16,13 @@ train:
       # Path to the metadata file
       path: ${...dir}/meta.npy
       # Type of data
-      type: 'Meta data'
+      type: [ 'Sensor scan angle', 'Sensor zenith angle', 'Sensor view angle', 'Sensor azimuth angle',
+              'Sensor elevation angle', 'Solar azimuth angle', 'Solar zenith angle' ]
+      # Number of variables
+      n:
+        _target_: builtins.len
+        _args_:
+          - ${...type}
       # Loading function
       load:
         _target_: code.data.io.load_npy
@@ -47,6 +53,8 @@ valid:
       path: ${...dir}/meta.npy
       # Type of data
       type: ${....train.variables.meta.type}
+      # Number of variables
+      n: ${....train.variables.meta.n}
       # Loading function
       load:
         _target_: ${.....train.variables.meta.load._target_}
@@ -68,6 +76,8 @@ test:
       path: ${...dir}/meta.npy
       # Type of data
       type: ${....train.variables.meta.type}
+      # Number of variables
+      n: ${....train.variables.meta.n}
       # Loading function
       load:
         _target_: ${.....train.variables.meta.load._target_}
@@ -76,12 +86,6 @@ test:
         dtype: ${data.dtype}
       # Transformations to apply
       transformations: ${....train.variables.meta.transformations}
-# Predict set
-predict:
-  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
-  variables:
-    # Metadata
-    meta: ${...test.variables.meta}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -93,6 +97,8 @@ all:
       _recursive_: false
       # Type of data
       type: ${....train.variables.meta.type}
+      # Number of variables
+      n: ${....train.variables.meta.n}
       # Loading function
       load:
         _target_: numpy.concatenate
