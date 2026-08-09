@@ -35,7 +35,7 @@ train:
           _partial_: true
           stats:
             _target_: code.preprocessing.statistics.read_statistics_var
-            path: ${preprocessing.statistics.output.path}
+            load: ${preprocessing.statistics.output.load}
             key: 'pressure_log'
             dtype: ${data.dtype}
 # Validation set
@@ -99,22 +99,4 @@ all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Pressure (log-transformed)
-    pressure_log:
-      # Dataset class
-      _target_: ${....train.variables.pressure_log._target_}
-      _recursive_: false
-      # Type of pressure levels
-      type: ${....train.variables.pressure_log.type}
-      # Number of variables
-      n: ${....train.variables.pressure_log.n}
-      # Loading function
-      load:
-        _target_: numpy.concatenate
-        _args_:
-          - - ${.......train.variables.pressure_log.load}
-            - ${.......valid.variables.pressure_log.load}
-            - ${.......test.variables.pressure_log.load}
-          - 0
-      # Transformations to apply
-      transformations: ${....train.variables.pressure_log.transformations}
-
+    pressure_log: ${...train.variables.pressure_log}

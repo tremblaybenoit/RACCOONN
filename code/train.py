@@ -53,9 +53,9 @@ class Operator:
 
         # For reproducibility, set randomizer seed if provided
         if self.config.get("seed"):
-            lightning.seed_everything(self.config.task_seed, workers=True)
+            lightning.seed_everything(self.config.seed, workers=True)
 
-    def setup(self, stage: str = 'train', config_loader: DictConfig | None = None) -> None:
+    def _init_trainer(self, stage: str = 'train', config_loader: DictConfig | None = None) -> None:
         """ Setup trainer object.
 
             Parameters
@@ -97,6 +97,30 @@ class Operator:
         # Trainer
         logger.info("Waking up trainer...")
         self.trainer = instantiate(self.config.trainer, callbacks=self.callbacks, logger=self.trainer_logger)
+
+    def _init_model(self, ckpt_path: str | None = None, strict: bool = False) -> None:
+        """ Initialize model, optionally load from checkpoint, and set dtype.
+
+            Parameters
+            ----------
+            ckpt_path: str or None. Path to checkpoint to load. If None, trains from scratch.
+            strict: bool. If True, require exact key match when loading checkpoint.
+
+            Returns
+            -------
+            None.
+        """
+        logger.info("Initializing model...")
+        self.model = instantiate(self.config.model)
+
+        # Load checkpoint if provided
+        if ckpt_path is not None:
+            logger.info(f"Loading checkpoint...")
+            self.model.load_ckpt(ckpt_path, strict=strict)
+
+        # Set dtype
+        dtype = self.config.data.get('dtype', 'float32')
+        self.model = self.model.to(None, dtype=getattr(torch, dtype))
 
     @staticmethod
     def accumulate_batch_results(batch_results: list, keys: list | None = None,
@@ -186,29 +210,6 @@ class Operator:
 
         return accumulated
 
-    def init_model(self, ckpt_path: str | None = None, strict: bool = False) -> None:
-        """ Initialize model, optionally load from checkpoint, and set dtype.
-
-            Parameters
-            ----------
-            ckpt_path: str or None. Path to checkpoint to load. If None, trains from scratch.
-            strict: bool. If True, require exact key match when loading checkpoint.
-
-            Returns
-            -------
-            None.
-        """
-        logger.info("Initializing model...")
-        self.model = instantiate(self.config.model)
-
-        # Load checkpoint if provided
-        logger.info(f"Loading checkpoint...")
-        self.model.load_ckpt(ckpt_path or self.model.ckpt_path, strict=strict)
-
-        # Set dtype
-        dtype = self.config.data.get('dtype', 'float32')
-        self.model = self.model.to(None, dtype=getattr(torch, dtype))
-
     def train(self) -> None:
         """ Loads data, loggers, callbacks, trainer, and then trains and tests the model.
             Saves the training weights and biases in a checkpoint file.
@@ -223,7 +224,7 @@ class Operator:
         """
 
         # Data loader and trainer setup
-        self.setup(stage='train')
+        self._init_trainer(stage='train')
 
         # Model initialization based on checkpoint scenario
         ckpt_resume = self.config.get("resume_from_checkpoint", None)
@@ -232,17 +233,17 @@ class Operator:
         # Resume: Trainer handles checkpoint restoration (weights + optimizer + scheduler)
         if ckpt_resume and os.path.exists(ckpt_resume):
             logger.info(f"Resuming training from checkpoint: {ckpt_resume}")
-            self.init_model()  # Fresh model, trainer will restore state
+            self._init_model()  # Fresh model, trainer will restore state
             self.trainer.fit(self.model, self.loader, ckpt_path=ckpt_resume)
         # Init: Load weights only for transfer learning (new optimizer + scheduler)
         elif ckpt_init and os.path.exists(ckpt_init):
             logger.info(f"Initializing model from checkpoint: {ckpt_init}")
-            self.init_model(ckpt_init, strict=True)  # Load weights + set dtype
+            self._init_model(ckpt_path=ckpt_init, strict=True)  # Load weights + set dtype
             self.trainer.fit(self.model, self.loader)
         # Scratch: Train from random initialization
         else:
             logger.info("Training model from scratch...")
-            self.init_model()  # Fresh model
+            self._init_model()  # Fresh model
             self.trainer.fit(self.model, self.loader)
         logger.info("Done!")
         
@@ -284,11 +285,11 @@ class Operator:
         """
 
         # Data loader and trainer setup
-        self.setup(stage='test')
+        self._init_trainer(stage='test')
 
         # Load model from checkpoint if not already loaded
         if self.model is None:
-            self.init_model()
+            self._init_model(ckpt_path=self.config.model.ckpt_path)
 
         # Evaluate on test set
         logger.info("Running against test set...")
@@ -342,11 +343,11 @@ class Operator:
             config_loader = self.config.loader
 
         # Data loader and trainer setup
-        self.setup(stage='predict', config_loader=config_loader)
+        self._init_trainer(stage='predict', config_loader=config_loader)
 
         # Load model from checkpoint if not already loaded
         if self.model is None:
-            self.init_model()
+            self._init_model(ckpt_path=self.config.model.ckpt_path)
 
         # Predict on dataset
         logger.info("Predicting on dataset...")

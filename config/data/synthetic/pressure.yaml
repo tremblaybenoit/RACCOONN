@@ -40,7 +40,7 @@ train:
           _partial_: true
           stats:
             _target_: code.preprocessing.statistics.read_statistics_var
-            path: ${preprocessing.statistics.output.path}
+            load: ${preprocessing.statistics.output.load}
             key: 'pressure'
             dtype: ${data.dtype}
 # Validation set
@@ -114,22 +114,4 @@ all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Pressure
-    pressure:
-      # Dataset class
-      _target_: ${....train.variables.pressure._target_}
-      _recursive_: false
-      # Type of pressure levels
-      type: ${....train.variables.pressure.type}
-      # Number of variables
-      n: ${....train.variables.pressure.n}
-      # Loading function
-      load:
-        _target_: numpy.concatenate
-        _args_:
-          - - ${.......train.variables.pressure.load}
-            - ${.......valid.variables.pressure.load}
-            - ${.......test.variables.pressure.load}
-          - 0
-      # Transformations to apply
-      transformations: ${....train.variables.pressure.transformations}
-
+    pressure: ${...train.variables.pressure}

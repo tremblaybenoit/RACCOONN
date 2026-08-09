@@ -205,21 +205,25 @@ RACCOONN uses the [Snakemake workflow management system](https://snakemake.readt
 To perform a dry-run (i.e., to check the workflow prior to execution) of the Snakefile rule [`test`](Snakefile) with the [`inverse_default`](config/experiment/inverse_default.yaml) experiment configuration:
 
 ```bash
-snakemake --dry-run --verbose test --config hydra-experiment=inverse_default
+snakemake --dry-run --verbose test --config experiment=inverse_default
 ```
-
-Remove `--dry-run` to actually run the workflow. 
 
 To account for missing dependencies, add the `--rerun-incomplete` flag:
 
 ```bash
-snakemake --dry-run --rerun-incomplete --verbose test --config hydra-experiment=inverse_default
+snakemake --dry-run --rerun-incomplete --verbose test --config experiment=inverse_default
+```
+
+To run the workflow, remove `--dry-run` and specify the number of `--cores` to use (type 'all' to use all available cores):
+
+```bash
+snakemake --cores all --verbose test --config experiment=inverse_default
 ```
 
 To draw a [directed acyclic graph (DAG)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) of the training workflow (e.g., [`code/train_inverse.mmd`](code/train_inverse.mmd) for Snakefile rule [`test`](Snakefile)):
 
 ```bash
-snakemake test --rulegraph mermaid-js --config hydra-experiment=inverse_default > code/train_inverse.mmd
+snakemake test --rulegraph mermaid-js --config experiment=inverse_default > code/train_inverse.mmd
 ```
 Replace `--rulegraph` with `--dag` to highlight completed rules with dashed boxes.
 

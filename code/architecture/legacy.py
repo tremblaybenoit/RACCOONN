@@ -83,13 +83,13 @@ class CRTMArchitecture(nn.Module):
         else:
             self.std_scale = None
 
-    def forward(self, input: dict) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass for the CRTM architecture.
 
         Parameters
         ----------
-        input : dict. Dictionary containing input tensors (profiles, surface, meta).
+        x: torch.Tensor. Concatenation of input tensors (profiles, surface, meta).
             profiles: torch.Tensor. Input tensor for profiles.
             surface: torch.Tensor. Input tensor for surface variables.
             meta: torch.Tensor. Input tensor for meta variables.
@@ -98,10 +98,6 @@ class CRTMArchitecture(nn.Module):
         -------
         torch.Tensor. Output tensor (mean BT + std).
         """
-        # Reformat variables
-        prof = input['prof']  # (batch, nprofvars, nlevels)
-        prof = self.flatten(prof)
-        x = self.concat(prof, input['surf'], input['meta'])
 
         # Shared feature extraction
         features = x

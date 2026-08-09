@@ -579,6 +579,7 @@ class HeterogeneousPredictionHeads(nn.Module):
 
             # Create heads with individual configurations
             self.heads = nn.ModuleList()
+            self.out_features = 0
             for i, head_cfg in enumerate(heads):
                 # Extract configuration with defaults
                 out_features = head_cfg.get('out_features', 1)
@@ -599,18 +600,16 @@ class HeterogeneousPredictionHeads(nn.Module):
                     post_process=post_process,
                 )
                 self.heads.append(head)
+                # Calculate total output dimension from heads
+                self.out_features += out_features
 
         # Handle nn.ModuleList (pre-constructed heads)
         elif isinstance(heads, nn.ModuleList):
             self.heads = heads
-
         else:
             raise TypeError(
                 f"heads must be ListConfig or nn.ModuleList, got {type(heads)}"
             )
-
-        # Calculate total output dimension from heads
-        self.out_features = sum(head.out_features for head in self.heads)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

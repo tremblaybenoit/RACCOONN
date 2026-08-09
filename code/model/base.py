@@ -47,7 +47,7 @@ class BaseModel(LightningModule):
     """
 
     def __init__(self, ckpt_path: str | DictConfig, architecture: DictConfig, optimizer: DictConfig | None = None,
-                 lr_scheduler: DictConfig | None = None, loss_func: DictConfig | Callable | None = None) -> None:
+                 scheduler: DictConfig | None = None, loss: DictConfig | Callable | None = None) -> None:
         """ Initialize model.
 
         Parameters
@@ -55,8 +55,8 @@ class BaseModel(LightningModule):
         ckpt_path: str. Path to the checkpoint of the model.
         architecture: DictConfig. Configuration object for the model architecture.
         optimizer: DictConfig. Optimizer for the model.
-        lr_scheduler: DictConfig. Configuration object for the learning rate scheduler (optional).
-        loss_func: DictConfig | Callable. Loss function for the model.
+        scheduler: DictConfig. Configuration object for the learning rate scheduler (optional).
+        loss: DictConfig | Callable. Loss function for the model.
 
         Returns
         -------
@@ -71,21 +71,21 @@ class BaseModel(LightningModule):
         # Model architecture
         self.architecture = instantiate(architecture)
         # Learning rate scheduler
-        self.lr_scheduler = lr_scheduler
+        self.scheduler = scheduler
         # Optimizer initialization
         self.optimizer = optimizer
         # Loss function
-        if loss_func is not None:
-            if isinstance(loss_func, DictConfig):
-                self.loss_func = instantiate(loss_func)
-            elif isinstance(loss_func, Callable):
-                self.loss_func = loss_func
+        if loss is not None:
+            if isinstance(loss, DictConfig):
+                self.loss = instantiate(loss)
+            elif isinstance(loss, Callable):
+                self.loss = loss
             else:
-                raise ValueError("loss_func must be a DictConfig or a callable.")
+                raise ValueError("loss must be a DictConfig or a callable.")
         else:
-            self.loss_func = None
+            self.loss = None
         # Store hyperparameters
-        self.save_hyperparameters(ignore=['optimizer', 'lr_scheduler', 'loss_func'])
+        self.save_hyperparameters(ignore=['optimizer', 'scheduler', 'loss'])
 
     def forward(self, input_dict: dict) -> torch.Tensor:
         """ Perform forward pass through architecture.
@@ -106,8 +106,12 @@ class BaseModel(LightningModule):
             Predictions from the architecture (tensor).
         """
 
-        # Concatenate all tensors along last dimension
-        input_tensor = torch.cat(list(input_dict.values()), dim=-1)
+        # Reshape all tensors to 2D (batch, features) before concatenation
+        reshaped = [
+            x.reshape(x.size(0), -1) if x.dim() > 2 else x
+            for x in input_dict.values()
+        ]
+        input_tensor = torch.cat(reshaped, dim=-1)
         return self.architecture(input_tensor)
 
     def _infer(self, batch: dict) -> dict:
@@ -148,9 +152,9 @@ class BaseModel(LightningModule):
         step = self._infer(batch)
 
         # Stage-dependent operation: Loss
-        if stage in ('train', 'valid', 'test') and self.loss_func is not None:
+        if stage in ('train', 'valid', 'test') and self.loss is not None:
             # Compute loss
-            loss = self.loss_func(step['output'], batch['target'])
+            loss = self.loss(step['output'], batch['target'])
             # If dictionary with multiple terms
             if isinstance(loss, dict):
                 # Track total loss
@@ -270,16 +274,16 @@ class BaseModel(LightningModule):
             optimizer = instantiate(self.optimizer, params=self.parameters())
 
             # Check if learning rate scheduler is defined
-            if self.lr_scheduler is not None:
+            if self.scheduler is not None:
                 # Instantiate learning rate scheduler
-                lr_scheduler = instantiate(self.lr_scheduler, optimizer=optimizer)
+                scheduler = instantiate(self.scheduler, optimizer=optimizer)
 
                 # Check if the learning rate scheduler is specifically reducing on plateau
-                reduce_on_plateau = isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)
+                reduce_on_plateau = isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)
 
                 # Instantiate from config object
                 return {'optimizer': optimizer,
-                        'lr_scheduler': {'scheduler': lr_scheduler,
+                        'lr_scheduler': {'scheduler': scheduler,
                                          'interval': 'epoch',
                                          'monitor': 'valid_loss',
                                          'frequency': 1,
@@ -306,8 +310,8 @@ class BaseModel(LightningModule):
         # Class inheritance
         super().to(device, dtype=dtype, non_blocking=non_blocking)
         # Move loss function to device
-        if hasattr(self.loss_func, 'to'):
-            self.loss_func = self.loss_func.to(device)
+        if hasattr(self.loss, 'to'):
+            self.loss = self.loss.to(device)
         return self
 
     def load_ckpt(self, ckpt_path: str | None = None, strict: bool = False, freeze: bool = False) -> 'BaseModel':

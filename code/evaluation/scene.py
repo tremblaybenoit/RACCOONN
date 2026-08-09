@@ -19,7 +19,7 @@ def main(config: DictConfig) -> None:
 
         Parameters
         ----------
-        config: str. Main hydra configuration file containing all model hyperparameters.
+        config: DictConfig. Main hydra configuration file containing all model hyperparameters.
 
         Returns
         -------
@@ -28,22 +28,10 @@ def main(config: DictConfig) -> None:
 
     # Load variables for training, validation and test sets
     logger.info("Loading coordinates for training, validation and test sets...")
-    lat_train = load_variable(config.data.stage.train.variables.lat)
-    lon_train = load_variable(config.data.stage.train.variables.lon)
-    scans_train = load_variable(config.data.stage.train.variables.scans)
-    mask_train = load_variable(config.data.stage.train.variables.cloud_mask)
-    lat_valid = load_variable(config.data.stage.valid.variables.lat)
-    lon_valid = load_variable(config.data.stage.valid.variables.lon)
-    scans_valid = load_variable(config.data.stage.valid.variables.scans)
-    mask_valid = load_variable(config.data.stage.valid.variables.cloud_mask)
-    lat_test = load_variable(config.data.stage.test.variables.lat)
-    lon_test = load_variable(config.data.stage.test.variables.lon)
-    scans_test = load_variable(config.data.stage.test.variables.scans)
-    mask_test = load_variable(config.data.stage.test.variables.cloud_mask)
-    lat = np.concatenate([lat_train, lat_valid, lat_test], axis=0)
-    lon = np.concatenate([lon_train, lon_valid, lon_test], axis=0)
-    scans = np.concatenate([scans_train, scans_valid, scans_test], axis=0)
-    mask = np.concatenate([mask_train, mask_valid, mask_test], axis=0).astype(int)
+    lat = np.asarray(load_variable(config.data.stage.all.variables.lat))
+    lon = np.asarray(load_variable(config.data.stage.all.variables.lon))
+    scans = np.asarray(load_variable(config.data.stage.all.variables.scans))
+    mask = np.asarray(load_variable(config.data.stage.all.variables.cloud_mask)).astype(int)
 
     # Get unique scans
     unique_scans = np.unique(scans)

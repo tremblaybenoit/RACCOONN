@@ -42,11 +42,11 @@ train:
         normalization:
           _target_: code.data.transformations.NormalizeMeta
           settings:
+            meta_sin_vars: [ 0, 1, 2, 3, 4, 5 ]
             meta_cos_vars: [ 6 ]
             meta_scale_factor: 180
             meta_scale_offset: -180
             meta_scale_vars: [ ]
-            dtype: ${data.dtype}
 # Validation set
 valid:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.

@@ -51,12 +51,13 @@ if config_preprocessing:
                 params:
                     # Hydra configuration
                     config_name = config_name,
-                    experiment = config_experiment
+                    experiment = config_experiment,
+                    operation = prep_type
                 output:
                     results = get_filenames(config_prep.get('output', {}), exclude_keys={'transformations'})
                 shell:
-                    f"""
-                    python -m code.preprocessing.{prep_type} --config-name={params.config_name} {params.experiment}
+                    """
+                    python -m code.preprocessing.{params.operation} --config-name={params.config_name} {params.experiment}
                     """
 
         # Else loop over each preprocessing step in the current operation
@@ -86,13 +87,15 @@ if config_preprocessing:
                         params:
                             # Hydra configuration
                             config_name = config_name,
-                            experiment = config_experiment
+                            experiment = config_experiment,
+                            overrides = delete_overrides,
+                            operation = prep_type
                         output:
                             results = get_filenames(config_step.get('output', {}), exclude_keys={'transformations'})
                         shell:
-                            f"""
-                            python -m code.preprocessing.{prep_type} --config-name={params.config_name} \
-                            {params.experiment} {delete_overrides}
+                            """
+                            python -m code.preprocessing.{params.operation} --config-name={params.config_name} \
+                            {params.experiment} {params.overrides}
                             """
 
 

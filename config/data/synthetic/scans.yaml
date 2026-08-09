@@ -38,8 +38,8 @@ train:
           _partial_: true
           stats:
             _target_: code.preprocessing.statistics.read_statistics_var
-            path: ${preprocessing.statistics.output.path}
-            var: 'scans'
+            load: ${preprocessing.statistics.output.load}
+            key: 'scans'
             dtype: ${data.dtype}
 # Validation set
 valid:

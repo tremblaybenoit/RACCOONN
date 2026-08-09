@@ -1,6 +1,6 @@
 # CRTM Architecture
-_target_: code.architecture.CRTMArchitecture
-_recursive_: false
+_target_: code.architecture.legacy.CRTMArchitecture
+_recursive_: true
 
 # Number of input variables
 nprofvars: ${data.stage.train.variables.prof.n}

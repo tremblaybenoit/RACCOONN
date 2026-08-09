@@ -8,15 +8,13 @@ from typing import Callable
 class NormalizeProfiles:
     """ Normalize profiles using min-max scaling. """
 
-    def __init__(self, profmin: np.ndarray, profmax: np.ndarray, inverse_transform: bool=False,
-                 dtype: str='float32') -> None:
+    def __init__(self, profmin: np.ndarray, profmax: np.ndarray, dtype: str='float32') -> None:
         """ Initialize NormalizeProfiles.
 
         Parameters
         ----------
         profmin : np.ndarray. Minimum profile values.
         profmax : np.ndarray. Maximum profile values.
-        inverse_transform : bool. If True, applies inverse normalization.
         dtype : str. Data type for the profiles (default is 'float64').
 
         Returns
@@ -33,15 +31,14 @@ class NormalizeProfiles:
 
         self.profmax = profmax.astype(dtype)  if len(profmax.shape) >= 2 \
             else profmax.reshape([9, 1]).astype(dtype)
-        # Inverse transform flag
-        self.inverse_transform = inverse_transform
 
-    def forward(self, x: torch.Tensor | np.ndarray) -> torch.Tensor | np.ndarray:
+    def forward(self, x: torch.Tensor | np.ndarray, inverse_transform: bool = False) -> torch.Tensor | np.ndarray:
         """ Forward pass for NormalizeProfiles.
 
         Parameters
         ----------
         x : torch.Tensor. Input tensor (profiles).
+        inverse_transform : bool. If True, applies inverse normalization.
 
         Returns
         -------
@@ -49,7 +46,7 @@ class NormalizeProfiles:
         """
 
         # Apply transformation
-        return affine(x, self.profmax, self.profmin, inverse_transform=not self.inverse_transform)
+        return affine(x, self.profmax, self.profmin, inverse_transform=not inverse_transform)
 
     __call__ = forward  # Make the instance callable for normalization
 
@@ -78,15 +75,13 @@ class NormalizeProfiles:
 
 class NormalizeSurface:
     """ Normalize surface using min-max scaling. """
-    def __init__(self, surfmin: np.ndarray, surfmax: np.ndarray, inverse_transform: bool=False,
-                 dtype: str='float32') -> None:
+    def __init__(self, surfmin: np.ndarray, surfmax: np.ndarray, dtype: str='float32') -> None:
         """ Initialize NormalizeSurface.
 
         Parameters
         ----------
         surfmin : np.ndarray. Minimum surface values.
         surfmax : np.ndarray. Maximum surface values.
-        inverse_transform : bool. If True, applies inverse normalization.
         dtype : str. Data type for the surfaces (default is 'float64').
 
         Returns
@@ -103,24 +98,23 @@ class NormalizeSurface:
         # Load min and max surfaces
         self.surfmin = surfmin.astype(dtype)
         self.surfmax = surfmax.astype(dtype)
-        # Inverse transform flag
-        self.inverse_transform = inverse_transform
 
 
-    def forward(self, x: torch.Tensor | np.ndarray) -> torch.Tensor | np.ndarray:
+    def forward(self, x: torch.Tensor | np.ndarray, inverse_transform: bool = False) -> torch.Tensor | np.ndarray:
         """ Forward pass for NormalizeSurface.
 
         Parameters
         ----------
         x : torch.Tensor. Input tensor (surface).
+        inverse_transform : bool. If True, applies inverse normalization.
 
         Returns
         -------
         torch.Tensor. Normalized tensor.
         """
 
-        # Apply transformation
-        return affine(x, self.surfmax-self.surfmin, self.surfmin, inverse_transform=not self.inverse_transform)
+        # Apply transformation (use parameter if provided, else use instance attribute)
+        return affine(x, self.surfmax-self.surfmin, self.surfmin, inverse_transform=not inverse_transform)
 
     __call__ = forward  # Make the instance callable for normalization
 
@@ -177,12 +171,13 @@ class NormalizeMeta:
         self.meta_scale_factor = settings['meta_scale_factor']
         self.meta_scale_offset = settings['meta_scale_offset']
 
-    def forward(self, x: torch.Tensor | np.ndarray) -> torch.Tensor | np.ndarray:
+    def forward(self, x: torch.Tensor | np.ndarray, inverse_transform: bool = False) -> torch.Tensor | np.ndarray:
         """ Forward pass for NormalizeMeta.
 
         Parameters
         ----------
         x : torch.Tensor. Input tensor (meta variables).
+        inverse_transform : bool. Not used for meta normalization (no inverse).
 
         Returns
         -------

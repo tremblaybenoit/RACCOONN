@@ -23,8 +23,8 @@ class InverseModel(BaseModel):
         ckpt_path: str | DictConfig,
         architecture: DictConfig,
         optimizer: DictConfig | None = None,
-        lr_scheduler: DictConfig | None = None,
-        loss_func: DictConfig | Callable | None = None,
+        scheduler: DictConfig | None = None,
+        loss: DictConfig | Callable | None = None,
         forward_model: DictConfig | ForwardModel | None = None,
     ) -> None:
         """
@@ -38,9 +38,9 @@ class InverseModel(BaseModel):
             Configuration for the model architecture.
         optimizer : DictConfig, optional
             Optimizer configuration
-        lr_scheduler : DictConfig, optional
+        scheduler : DictConfig, optional
             Learning rate scheduler configuration
-        loss_func : DictConfig | Callable, optional
+        loss : DictConfig | Callable, optional
             Loss function configuration
         forward_model : DictConfig | ForwardModel, optional
             Configuration for the forward model used in physics-informed loss computation.
@@ -52,8 +52,8 @@ class InverseModel(BaseModel):
             ckpt_path=ckpt_path,
             architecture=architecture,
             optimizer=optimizer,
-            lr_scheduler=lr_scheduler,
-            loss_func=loss_func,
+            scheduler=scheduler,
+            loss=loss,
         )
 
         # Forward model (observation operator)

@@ -714,6 +714,7 @@ def plot_rmse_bars(ax, values, positions, height=0.3, colors=None, labels=None, 
 
     n = len(values)
     for i in range(n):
+        breakpoint()
         bars = ax.barh(positions + i * height, values[i], color=None if colors is None else colors[i],
                        height=height, align='edge', label=None if labels is None else labels[i], **bar_kwargs)
         bar_font_size = 10 if n <= 2 else 7
@@ -819,8 +820,8 @@ def plot_rmse_bars3(ax, values, positions, height=0.25, colors=None, labels=None
 
 
 
-def fig_rmse_bars(rmse_raw: list, rmse_norm: list=None, figname=None, channels=None, height=0.25, colors=None,
-                  labels=None, x_range=None, y_label=None, x_label=None, title=None):
+def fig_rmse_bars(rmse_raw: list, rmse_norm: list | None =None, figname=None, channels=None, height=0.25, colors: str | list[str] | None=None,
+                  labels: str | list[str] | None=None, x_range=None, y_label=None, x_label=None, title=None):
     """
     Plot raw and normalized RMSE bars side by side using a flexible gridspec.
 

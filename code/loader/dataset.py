@@ -62,12 +62,12 @@ class UnivariateDataset(Dataset):
         """
         raise NotImplementedError("Subclass must implement __len__")
 
-    def __getitem__(self, idx: int) -> np.ndarray | torch.Tensor:
+    def __getitem__(self, index: int | slice) -> np.ndarray | torch.Tensor:
         """ Get item from dataset. Must be implemented by subclass.
 
             Parameters
             ----------
-            idx : int. Index to retrieve.
+            index : int or slice. Index or slice to retrieve.
 
             Returns
             -------
@@ -89,6 +89,7 @@ class EagerDataset(UnivariateDataset):
         self,
         load: DictConfig,
         transformations: DictConfig | None = None,
+        type: str | list[str] | None = None,
         as_tensor: bool = True,
         **kwargs,
     ) -> None:
@@ -98,6 +99,7 @@ class EagerDataset(UnivariateDataset):
             ----------
             load            : DictConfig. Loading function config (e.g. data.io.load_npy).
             transformations : DictConfig or None. Transformation pipeline config.
+            type            : str or list[str] or None. Variable(s) string(s).
             as_tensor       : bool. If True, return tensors; if False, return numpy arrays.
                               Default True.
             **kwargs        : Additional fields from config passed but not used.
@@ -113,6 +115,7 @@ class EagerDataset(UnivariateDataset):
         # Load and transform data once at initialization
         self.load_cfg = load
         self.data = self.load()
+        self.type = type
 
     def load(self) -> np.ndarray | torch.Tensor:
         """ Load data from file and apply transformation pipeline.
@@ -146,20 +149,20 @@ class EagerDataset(UnivariateDataset):
         """
         return len(self.data)
 
-    def __getitem__(self, idx: int) -> np.ndarray | torch.Tensor:
+    def __getitem__(self, index: int | slice) -> np.ndarray | torch.Tensor:
         """ Get item from dataset by index.
 
             Data format (numpy or tensor) is determined by as_tensor parameter set at init time.
 
             Parameters
             ----------
-            idx : int. Index to retrieve.
+            index : int or slice. Index or slice to retrieve.
 
             Returns
             -------
             np.ndarray or torch.Tensor. Data at the given index (already in requested format).
         """
-        return self.data[idx]
+        return self.data[index]
 
 
 class ConstantDataset(EagerDataset):
@@ -176,6 +179,7 @@ class ConstantDataset(EagerDataset):
         self,
         load: DictConfig,
         transformations: DictConfig | None = None,
+        type: str | list[str] | None = None,
         squeeze: bool = True,
         as_tensor: bool = True,
         **kwargs,
@@ -186,6 +190,7 @@ class ConstantDataset(EagerDataset):
             ----------
             load            : DictConfig. Loading function config with _target_ specifying the loader.
             transformations : DictConfig or None. Transformation pipeline config.
+            type:           : str or list[str] or None. Variable(s) string(s).
             squeeze         : bool. If True and data has shape[0]==1, squeeze the first dimension.
                               Default True.
             as_tensor       : bool. If True, return tensors; if False, return numpy arrays.
@@ -201,7 +206,7 @@ class ConstantDataset(EagerDataset):
         self.squeeze = squeeze
 
         # Initialize parent class (loads and transforms data)
-        super().__init__(load=load, transformations=transformations, as_tensor=as_tensor, **kwargs)
+        super().__init__(load=load, transformations=transformations, as_tensor=as_tensor, type=type, **kwargs)
 
         # Apply squeeze if requested
         if self.squeeze and self.data.shape[0] == 1:
@@ -218,14 +223,14 @@ class ConstantDataset(EagerDataset):
         """
         return 1
 
-    def __getitem__(self, idx: int) -> np.ndarray | torch.Tensor:
+    def __getitem__(self, index: int | slice) -> np.ndarray | torch.Tensor:
         """ Get constant value (index is ignored).
 
             Data format (numpy or tensor) is determined by as_tensor parameter set at init time.
 
             Parameters
             ----------
-            idx : int. Index (ignored for constants).
+            index : int or slice. Index (ignored for constants).
 
             Returns
             -------
@@ -321,12 +326,12 @@ class LazyDataset(UnivariateDataset):
         """
         return len(self.files)
 
-    def __getitem__(self, idx: int) -> np.ndarray | torch.Tensor:
+    def __getitem__(self, index: int | slice) -> np.ndarray | torch.Tensor:
         """ Load one file on-demand, apply transformations, and convert to requested format.
 
             Parameters
             ----------
-            idx : int. Index into the file list.
+            index : int or slice. Index or slice into the file list.
 
             Returns
             -------
@@ -335,7 +340,7 @@ class LazyDataset(UnivariateDataset):
         """
 
         # Load the file at this index using the instantiated load config
-        arr = self.load_fn(path=self.files[idx])
+        arr = self.load_fn(path=self.files[index])
 
         # Ensure contiguous array
         arr = np.ascontiguousarray(arr)
@@ -438,12 +443,12 @@ class MultivariateDataset(Dataset):
         """
         return self._len
 
-    def __getitem__(self, idx: int) -> dict:
+    def __getitem__(self, index: int | slice) -> dict:
         """ Get sample at index, assembling input and target dictionaries.
 
             Parameters
             ----------
-            idx : int. Index to retrieve.
+            index : int. Index to retrieve.
 
             Returns
             -------
@@ -454,7 +459,7 @@ class MultivariateDataset(Dataset):
 
         # Build input dictionary by fetching from each input variable dataset
         input_dict = {
-            key: self.input_datasets[key][idx]
+            key: self.input_datasets[key][index]
             for key in self.input_keys
         }
 
@@ -463,7 +468,7 @@ class MultivariateDataset(Dataset):
         # Add target dictionary if targets are provided
         if self.target_datasets is not None and self.target_keys is not None:
             target_dict = {
-                key: self.target_datasets[key][idx]
+                key: self.target_datasets[key][index]
                 for key in self.target_keys
             }
             out['target'] = target_dict
@@ -471,7 +476,7 @@ class MultivariateDataset(Dataset):
         # Add context dictionary if context is provided
         if self.context_datasets is not None and self.context_keys is not None:
             context_dict = {
-                key: self.context_datasets[key][idx]
+                key: self.context_datasets[key][index]
                 for key in self.context_keys
             }
             out['context'] = context_dict

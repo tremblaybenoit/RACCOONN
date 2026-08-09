@@ -32,7 +32,8 @@ class ArtifactLogger(Callback):
         save_every_n_epochs: int = 100,
         save_on_improvement: bool = True,
         monitor: str = "valid_loss",
-        monitor_mode: str = "min"
+        monitor_mode: str = "min",
+        monitor_variables: list[str] | None = None
     ) -> None:
         """
         Initialize ArtifactLogger callback.
@@ -51,6 +52,8 @@ class ArtifactLogger(Callback):
             Metric to monitor for improvements.
         monitor_mode : str, default "min"
             Whether to minimize or maximize the monitored metric ("min" or "max").
+        monitor_variables : list[str], optional
+            Variables to monitor. If None or empty, process all variables.
         """
 
         # Class inheritance
@@ -60,6 +63,9 @@ class ArtifactLogger(Callback):
         self.which_statistics = which_statistics or ['mean', 'stdev', 'rmse', 'mae']
         self.runners: dict[str, RunningStats] = {}
         self.metrics: dict[str, dict] = {}
+        
+        # Variables to monitor (None means all variables)
+        self.monitor_variables = monitor_variables
 
         # Initialize list of figures
         self.figs = []
@@ -123,19 +129,54 @@ class ArtifactLogger(Callback):
         predictions = outputs.get('output', {})
         targets = batch.get('target', {})
 
-        # Update runners for each variable in predictions that has a runner
+        # Update runners for each variable in predictions that this callback monitors
         for var_name in predictions.keys():
-            if var_name in self.runners:
-                # Convert tensor targets to numpy if needed
-                target_data = targets.get(var_name)
-                if isinstance(target_data, torch.Tensor):
-                    target_data = target_data.detach().cpu().numpy()
+            # Skip variables this callback doesn't monitor (if monitor_variables is set)
+            if self.monitor_variables is not None and var_name not in self.monitor_variables:
+                continue
+            
+            pred_data = predictions[var_name]
+            
+            # Extract only the mean (first half of channels) for mean+std format
+            if isinstance(pred_data, torch.Tensor):
+                if pred_data.size(1) % 2 == 0:  # Even number of channels suggests mean+std
+                    n_channels = pred_data.size(1) // 2
+                    pred_data = pred_data[:, :n_channels]
+                pred_data = pred_data.detach().cpu().numpy()
+            else:
+                if pred_data.shape[1] % 2 == 0:
+                    n_channels = pred_data.shape[1] // 2
+                    pred_data = pred_data[:, :n_channels]
+            
+            # Convert tensor targets to numpy if needed
+            target_data = targets.get(var_name)
+            if isinstance(target_data, torch.Tensor):
+                target_data = target_data.detach().cpu().numpy()
+            
+            # Delegate to subclass-specific logic for updating runners
+            self._update_runners(var_name, pred_data, target_data, batch)
+    
+    def _update_runners(self, var_name, pred_data, target_data, batch):
+        """
+        Update runners with processed data. Can be overridden by subclasses for custom logic.
 
-                self.runners[var_name].update(
-                    data=predictions[var_name],
-                    target=target_data,
-                    axis=0
-                )
+        Parameters
+        ----------
+        var_name : str
+            Variable name.
+        pred_data : ndarray
+            Processed prediction data (numpy array).
+        target_data : ndarray
+            Processed target data (numpy array).
+        batch : dict
+            Full batch dict (may contain context, masks, etc).
+        """
+        if var_name in self.runners:
+            self.runners[var_name].update(
+                data=pred_data,
+                target=target_data,
+                axis=0
+            )
 
     def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
         """
@@ -155,9 +196,12 @@ class ArtifactLogger(Callback):
         if trainer.sanity_checking:
             return
 
-        # Finalize metrics from runners
+        # Finalize metrics from runners that have accumulated data
         self.metrics = {}
         for runner_name, runner in self.runners.items():
+            # Skip runners with no accumulated data (e.g., cloud_mask in clear-sky datasets)
+            if isinstance(runner._n, (int, float)) and runner._n == 0.0:
+                continue
             self.metrics[runner_name] = runner.compute(dtype='float32')
 
         # Build figures from finalized metrics
@@ -365,14 +409,69 @@ class ForwardLogger(ArtifactLogger):
         """
 
         # Class inheritance
-        super().__init__(which_statistics, save_every_n_epochs, save_on_improvement, monitor, monitor_mode)
+        super().__init__(
+            which_statistics, 
+            save_every_n_epochs, 
+            save_on_improvement, 
+            monitor, 
+            monitor_mode,
+            monitor_variables=['hofx', 'hofx_forward']
+        )
 
         # Figure tags
         self.tags = ["Valid_RadianceRMSE"]
 
+    def _update_runners(self, var_name, pred_data, target_data, batch):
+        """
+        Update hofx runners with mask-based statistics.
+
+        Applies cloud/clear and daytime/nighttime masks to separate hofx predictions
+        before accumulating statistics. This allows per-condition performance analysis.
+
+        Parameters
+        ----------
+        var_name : str
+            Variable name (should be 'hofx' or 'hofx_forward').
+        pred_data : ndarray
+            Prediction data (already extracted mean).
+        target_data : ndarray
+            Target data.
+        batch : dict
+            Batch dict with 'context' containing masks.
+        """
+        # Extract context masks
+        context = batch.get('context', {})
+        
+        # Apply masks and update corresponding runners
+        masks = {
+            'clear': ~context.get('cloud_mask') if context.get('cloud_mask') is not None else None,
+            'cloud': context.get('cloud_mask'),
+            'day': context.get('daytime_mask'),
+            'night': ~context.get('daytime_mask') if context.get('daytime_mask') is not None else None,
+        }
+        
+        for runner_key, mask in masks.items():
+            if runner_key in self.runners and mask is not None:
+                # Convert mask to numpy if needed
+                if isinstance(mask, torch.Tensor):
+                    mask = mask.detach().cpu().numpy().astype(bool)
+                
+                # Extract masked data and targets using boolean indexing
+                masked_pred = pred_data[mask]
+                masked_target = target_data[mask] if target_data is not None else None
+                
+                # Only update if we have data
+                if len(masked_pred) > 0:
+                    self.runners[runner_key].update(
+                        data=masked_pred,
+                        target=masked_target,
+                        axis=0
+                    )
+
+
     def on_validation_epoch_start(self, trainer, pl_module):
         """
-        Initialize runners for hofx metrics.
+        Initialize runners for hofx metrics by mask.
 
         Parameters
         ----------
@@ -381,11 +480,12 @@ class ForwardLogger(ArtifactLogger):
         pl_module : pytorch_lightning.LightningModule
             The model instance.
         """
-        # Create runners for hofx metrics
-        # hofx shape: [batch, 20] (10 channels × 2 for mean+stdev)
+        # Create separate runners for each mask condition
         self.runners = {
-            'hofx': RunningStats(which=self.which_statistics),
-            'hofx_forward': RunningStats(which=self.which_statistics),
+            'clear': RunningStats(which=self.which_statistics),
+            'cloud': RunningStats(which=self.which_statistics),
+            'day': RunningStats(which=self.which_statistics),
+            'night': RunningStats(which=self.which_statistics),
         }
 
     def _figure_builder(self, trainer, pl_module):
@@ -402,43 +502,33 @@ class ForwardLogger(ArtifactLogger):
         pl_module : pytorch_lightning.LightningModule
             The model instance.
         """
-        # Determine which variable is available
-        hofx_var = None
-        if 'hofx' in self.metrics:
-            hofx_var = 'hofx'
-        elif 'hofx_forward' in self.metrics:
-            hofx_var = 'hofx_forward'
 
-        if hofx_var is None:
-            logger.warning("No hofx or hofx_forward metrics computed for this epoch")
-            return
-
-        hofx_stats = self.metrics[hofx_var]
+        # Get radiance channels
+        channels = trainer.datamodule.ds_valid.target_datasets['hofx'].type
+        n_channels = len(channels)
 
         # Extract metrics (already numpy arrays from RunningStats.compute())
-        rmse = hofx_stats.get('rmse')
-
-        if rmse is None:
-            logger.warning(f"RMSE not computed for {hofx_var} metrics")
-            return
-
-        # Channel labels (typically 10 MW channels)
-        n_channels = len(rmse) if isinstance(rmse, (list, np.ndarray)) else 1
-        # Get profile variable labels
-        channel_labels = [f"Ch_{i}" for i in range(n_channels)]
-        try:
-            if hasattr(trainer, 'datamodule') and trainer.datamodule is not None:
-                channel_labels = trainer.datamodule.stage.valid.target.variables.hofx.type
-        except Exception as e:
-            logger.warning(f"Could not retrieve hofx labels: {e}")
+        rmse = []
+        labels = []
+        colors = []
+        colors_dict = {'clear': '#D81B60', 'cloud': '#1E88E5', 'day': '#FFC107', 'night': 'r'}
+        for runner_name in self.runners.keys():
+            if runner_name in self.metrics:
+                rmse.append(self.metrics[runner_name]['rmse'])
+            else:
+                rmse.append(np.zeros((n_channels,)))
+            labels.append(runner_name)
+            colors.append(colors_dict.get(runner_name, '#000000'))
 
         # Create figure with RMSE bars
         self.figs.append(
             fig_rmse_bars(
-                [rmse],
+                rmse,
                 None,
-                labels=channel_labels,
-                title=[f"{hofx_var} RMSE per channel"]
+                labels=labels,
+                colors=colors,
+                # channels=channels,
+                title=[f"Forward model RMSE per channel"]
             )
         )
 

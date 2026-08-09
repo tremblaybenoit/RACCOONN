@@ -38,7 +38,7 @@ train:
           _partial_: true
           stats:
             _target_: code.preprocessing.statistics.read_statistics_var
-            path: ${preprocessing.statistics.output.path}
+            load: ${preprocessing.statistics.output.load}
             key: 'x_slant'
             dtype: ${data.dtype}
 # Validation set

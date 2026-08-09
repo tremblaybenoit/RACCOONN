@@ -37,7 +37,7 @@ hidden_layer:
 
 # Output layer: heterogeneous dual heads (mean and std)
 output_layer:
-  _target_: code.architecture.mlp.HeterogenousPredictionHeads
+  _target_: code.architecture.mlp.HeterogeneousPredictionHeads
   in_features: ${..hidden_layer.out_features}
   heads:
     # Head 1: Mean brightness temperature [0,1] -> denormalized to physical range
