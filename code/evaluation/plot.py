@@ -709,15 +709,12 @@ def plot_rmse_bars(ax, values, positions, height=0.3, colors=None, labels=None, 
     if x_range is None:
         x_range = compute_min_max(values, symmetric=False)
         x_range = (0, 1.2*x_range[1])
-    # Aspect ratio
-    # ax.set_aspect(1)
 
     n = len(values)
+    bar_font_size = 10 if n <= 2 else 7
     for i in range(n):
-        breakpoint()
         bars = ax.barh(positions + i * height, values[i], color=None if colors is None else colors[i],
                        height=height, align='edge', label=None if labels is None else labels[i], **bar_kwargs)
-        bar_font_size = 10 if n <= 2 else 7
         ax.bar_label(bars, fmt="%.2f", fontsize=bar_font_size)
 
     # Set axis limits

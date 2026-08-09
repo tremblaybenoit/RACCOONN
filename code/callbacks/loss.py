@@ -143,6 +143,7 @@ class LossLogger(Callback):
 
             # Key associated with current stage's loss
             loss_key = f'{stage}_loss'
+            pl_module.log(f'{stage}_loss', outputs['loss'], on_epoch=True, prog_bar=True, logger=True)
 
             # If no loss was logged, skip
             if loss_key not in outputs:
