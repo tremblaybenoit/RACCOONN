@@ -1,6 +1,7 @@
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import Callback
 import torch
+import numpy as np
 from typing import Any
 
 
@@ -97,7 +98,7 @@ class LossLogger(Callback):
         batch_idx : int
             Batch index (unused).
         dataloader_idx : int
-            Dataloader index (unused).
+            Data loader index (unused).
         """
         # self._log_losses(pl_module, outputs, 'test')
         pass
@@ -150,79 +151,101 @@ class LossLogger(Callback):
                 return
 
             # Extract dictionary
-            loss_dict = outputs[loss_key]
-            if not isinstance(loss_dict, dict):
-                return
+            loss = outputs[loss_key]
 
-            # Log each loss component
-            for key, value in loss_dict.items():
+            # Single loss term
+            if isinstance(loss, np.ndarray):
 
-                # Handle scalar losses (int/float)
-                if isinstance(value, (int, float)):
-                    pl_module.log(
-                        f'{stage}_loss_{key}',
-                        value,
-                        on_epoch=True,
-                        prog_bar=(key == 'total'),
-                        logger=True
-                    )
+                # If per-variable logging
+                if self.log_per_variable:
 
-                # Handle tensor losses
-                elif isinstance(value, torch.Tensor):
-                    value = value.detach()
+                    # Compute mean across first dimension
+                    per_var = loss.mean(axis=0)
 
-                    # Scalar tensor (0D)
-                    if value.ndim == 0:
+                    # If 3D tensor, also average over level dimension
+                    if per_var.ndim > 1:
+                        per_var = per_var.mean(axis=-1)
+
+                    # Log each variable
+                    for i, var_loss in enumerate(per_var):
                         pl_module.log(
-                            f'{stage}_loss_{key}',
-                            value.item(),
-                            on_epoch=True,
-                            prog_bar=(key == 'total'),
-                            logger=True
-                        )
-
-                    # 1D tensor: [batch] or similar - log mean
-                    elif value.ndim == 1:
-                        pl_module.log(
-                            f'{stage}_loss_{key}',
-                            value.mean().item(),
-                            on_epoch=True,
-                            prog_bar=(key == 'total'),
-                            logger=True
-                        )
-
-                    # 2D tensor: [batch, var] - log mean + per-variable
-                    # 3D tensor: [batch, var, level] - log mean + per-variable (averaged over level)
-                    elif value.ndim == 2 or value.ndim == 3:
-                        pl_module.log(
-                            f'{stage}_loss_{key}',
-                            value.mean().item(),
+                            f'{stage}_loss_var_{i}',
+                            var_loss.item(),
                             on_epoch=True,
                             prog_bar=False,
                             logger=True
                         )
 
-                        # If per-variable logging
-                        if self.log_per_variable:
+            elif not isinstance(loss, dict):
 
-                            # Compute mean across first dimension
-                            per_var = value.mean(dim=0)
+                # Log each loss component
+                for key, value in loss.items():
 
-                            # If 3D tensor, also average over level dimension
-                            if per_var.ndim > 1:
-                                per_var = per_var.mean(dim=-1)
+                    # Handle scalar losses (int/float)
+                    if isinstance(value, (int, float)):
+                        pl_module.log(
+                            f'{stage}_loss_{key}',
+                            value,
+                            on_epoch=True,
+                            prog_bar=(key == 'total'),
+                            logger=True
+                        )
 
-                            # Log each variable
-                            for i, var_loss in enumerate(per_var):
-                                pl_module.log(
-                                    f'{stage}_loss_{key}_var_{i}',
-                                    var_loss.item(),
-                                    on_epoch=True,
-                                    prog_bar=False,
-                                    logger=True
-                                )
-        else:
-            raise ValueError(f"Unsupported loss instance.")
+                    # Handle tensor losses
+                    elif isinstance(value, np.ndarray):
+
+                        # Scalar tensor (0D)
+                        if value.ndim == 0:
+                            pl_module.log(
+                                f'{stage}_loss_{key}',
+                                value.item(),
+                                on_epoch=True,
+                                prog_bar=(key == 'total'),
+                                logger=True
+                            )
+
+                        # 1D tensor: [batch] or similar - log mean
+                        elif value.ndim == 1:
+                            pl_module.log(
+                                f'{stage}_loss_{key}',
+                                value.mean().item(),
+                                on_epoch=True,
+                                prog_bar=(key == 'total'),
+                                logger=True
+                            )
+
+                        # 2D tensor: [batch, var] - log mean + per-variable
+                        # 3D tensor: [batch, var, level] - log mean + per-variable (averaged over level)
+                        elif value.ndim == 2 or value.ndim == 3:
+                            pl_module.log(
+                                f'{stage}_loss_{key}',
+                                value.mean().item(),
+                                on_epoch=True,
+                                prog_bar=False,
+                                logger=True
+                            )
+
+                            # If per-variable logging
+                            if self.log_per_variable:
+
+                                # Compute mean across first dimension
+                                per_var = value.mean(axis=0)
+
+                                # If 3D tensor, also average over level dimension
+                                if per_var.ndim > 1:
+                                    per_var = per_var.mean(axis=-1)
+
+                                # Log each variable
+                                for i, var_loss in enumerate(per_var):
+                                    pl_module.log(
+                                        f'{stage}_loss_{key}_var_{i}',
+                                        var_loss.item(),
+                                        on_epoch=True,
+                                        prog_bar=False,
+                                        logger=True
+                                    )
+            else:
+                raise ValueError(f"Unsupported loss instance.")
 
     @staticmethod
     def _log_train_metrics(pl_module):
@@ -244,6 +267,7 @@ class LossLogger(Callback):
             'train_l2_norm',
             l2_norm,
             on_epoch=True,
+            on_step=False,
             prog_bar=False,
             logger=True
         )
@@ -255,6 +279,7 @@ class LossLogger(Callback):
                 'train_lr',
                 lr,
                 on_epoch=True,
+                on_step=False,
                 prog_bar=False,
                 logger=True
             )

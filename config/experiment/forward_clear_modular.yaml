@@ -8,7 +8,7 @@ defaults:
   - override /data: forward_default
   - override /preprocessing: forward_default
   - override /loader: default
-  - override /architecture: forward_default
+  - override /architecture: forward_modular
   - override /loss: forward_default
   - override /optimizer: default
   - override /scheduler: default
@@ -26,7 +26,7 @@ task_name: "forward_clear"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../forward_outputs"
-  run_id: "default"
+  run_id: "modular"
   data_dir: ../synthetic_${data.dtype}_clear
   # checkpoint_dir: "code/model/checkpoints/forward"
 
