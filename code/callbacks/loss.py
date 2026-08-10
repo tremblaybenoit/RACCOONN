@@ -144,16 +144,17 @@ class LossLogger(Callback):
 
             # Key associated with current stage's loss
             loss_key = f'{stage}_loss'
-            pl_module.log(f'{stage}_loss', outputs['loss'], on_epoch=True, prog_bar=True, logger=True)
+            pl_module.log(loss_key, outputs['loss'], on_epoch=True, prog_bar=True, logger=True)
 
-            # If no loss was logged, skip
+            # If the loss wasn't computed from multiple terms
+            # or multidimensional losses, then skip further logging
             if loss_key not in outputs:
                 return
 
-            # Extract dictionary
+            # Extract dictionary of loss terms
             loss = outputs[loss_key]
 
-            # Single loss term
+            # Single loss term (multidimensional tensor)
             if isinstance(loss, np.ndarray):
 
                 # If per-variable logging
@@ -176,6 +177,7 @@ class LossLogger(Callback):
                             logger=True
                         )
 
+            # Multiple loss terms
             elif not isinstance(loss, dict):
 
                 # Log each loss component
@@ -187,7 +189,7 @@ class LossLogger(Callback):
                             f'{stage}_loss_{key}',
                             value,
                             on_epoch=True,
-                            prog_bar=(key == 'total'),
+                            prog_bar=False,
                             logger=True
                         )
 
@@ -200,7 +202,7 @@ class LossLogger(Callback):
                                 f'{stage}_loss_{key}',
                                 value.item(),
                                 on_epoch=True,
-                                prog_bar=(key == 'total'),
+                                prog_bar=False,
                                 logger=True
                             )
 
@@ -210,7 +212,7 @@ class LossLogger(Callback):
                                 f'{stage}_loss_{key}',
                                 value.mean().item(),
                                 on_epoch=True,
-                                prog_bar=(key == 'total'),
+                                prog_bar=False,
                                 logger=True
                             )
 

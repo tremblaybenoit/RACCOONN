@@ -162,9 +162,9 @@ class BaseModel(LightningModule):
                 # Detach loss components
                 step[f'{stage}_loss'] = {
                     key: value.detach().cpu().numpy() if isinstance(value, torch.Tensor)
-                    else value for key, value in loss.items()
+                    else value for key, value in loss.items() if key != 'total'
                 }
-            elif isinstance(loss, torch.Tensor):
+            elif isinstance(loss, torch.Tensor) and loss.dim() > 0:
                 step['loss'] = loss.mean()  # type: ignore
                 step[f'{stage}_loss'] = loss.detach().cpu().numpy()
             else:

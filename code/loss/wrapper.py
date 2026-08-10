@@ -184,12 +184,12 @@ class WeightedLoss(torch.nn.Module):
         -------
         dict[str, torch.Tensor]
             Loss dict with:
-            - 'loss': combined loss (scalar)
+            - 'total': combined loss (scalar)
             - '{term_name}': individual term loss
         """
 
         # Loop over loss terms
-        loss_dict = {'loss': torch.tensor(0.0)}
+        loss_dict = {'total': torch.tensor(0.0)}
         for term, config_term in self.config.items():
             # Extract weight and function
             weight = self.weight[term]
@@ -243,9 +243,9 @@ class WeightedLoss(torch.nn.Module):
 
             # Extract scalar if needed
             if term_loss.dim() > 0:
-                loss_dict['loss'] += weight * term_loss.mean()
+                loss_dict['total'] += weight * term_loss.mean()
                 loss_dict[term] = term_loss.detach().cpu().numpy()
             else:
-                loss_dict['loss'] += weight * term_loss
+                loss_dict['total'] += weight * term_loss
 
         return loss_dict
