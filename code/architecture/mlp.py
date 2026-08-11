@@ -210,8 +210,8 @@ class MLPBlock(nn.Module):
 
     def __init__(
         self,
-        in_features: int,
-        out_features: int,
+        in_features: int | DictConfig,
+        out_features: int | DictConfig,
         activation: DictConfig | None = None,
         norm_type: str | None = None,
         dropout_rate: float = 0.0,
@@ -246,6 +246,12 @@ class MLPBlock(nn.Module):
 
         # Class inheritance
         super().__init__()
+
+        # Determine in_features and out_features if provided as DictConfig
+        if isinstance(in_features, DictConfig):
+            in_features = instantiate(in_features)
+        if isinstance(out_features, DictConfig):
+            out_features = instantiate(out_features)
 
         # Resolve Activation Function
         if activation is None:
@@ -321,9 +327,9 @@ class MLPBlocks(nn.Module):
 
     def __init__(
         self,
-        in_features: int,
-        out_features: int,
-        hidden_features: int | None = None,
+        in_features: int | DictConfig,
+        out_features: int | DictConfig,
+        hidden_features: int | DictConfig | None = None,
         n_blocks: int = 1,
         activation: DictConfig | None = None,
         final_activation: DictConfig | None = None,
@@ -432,9 +438,9 @@ class PredictionHead(nn.Module):
 
     def __init__(
         self,
-        in_features: int,
-        out_features: int,
-        hidden_features: int | None = None,
+        in_features: int | DictConfig,
+        out_features: int | DictConfig,
+        hidden_features: int | DictConfig | None = None,
         n_layers: int = 1,
         activation: DictConfig | None = None,
         dropout_rate: float = 0.0,
@@ -445,11 +451,11 @@ class PredictionHead(nn.Module):
 
         Parameters
         ----------
-        in_features : int
+        in_features : int | DictConfig
             Input feature dimension.
-        out_features : int
+        out_features : int | DictConfig
             Output feature dimension (number of predictions).
-        hidden_features : int or None, default=None
+        hidden_features : int | DictConfig | None, default=None
             Hidden layer dimension (used if n_layers > 1).
         n_layers : int, default=1
             Number of layers in the head. If 1, a simple linear layer.
@@ -467,6 +473,14 @@ class PredictionHead(nn.Module):
 
         # Class inheritance
         super().__init__()
+
+        # Resolve number of features if provided as DictConfig
+        if isinstance(in_features, DictConfig):
+            in_features = instantiate(in_features)
+        if isinstance(out_features, DictConfig):
+            out_features = instantiate(out_features)
+        if isinstance(hidden_features, DictConfig):
+            hidden_features = instantiate(hidden_features)
         self.out_features = out_features
 
         if n_layers == 1:
@@ -535,8 +549,8 @@ class HeterogeneousPredictionHeads(nn.Module):
 
     def __init__(
         self,
+        in_features: int | DictConfig,
         heads: ListConfig | nn.ModuleList,
-        in_features: int | None = None,
     ) -> None:
         """
         Initialize heterogeneous prediction heads.
@@ -570,12 +584,13 @@ class HeterogeneousPredictionHeads(nn.Module):
         # Class inheritance
         super().__init__()
 
+        # Resolve in_features if provided as DictConfig
+        if isinstance(in_features, DictConfig):
+            in_features = instantiate(in_features)
+        self.in_features = in_features
+
         # Handle ListConfig (config-driven initialization)
         if isinstance(heads, ListConfig):
-            # Number of input features
-            if in_features is None:
-                raise ValueError("in_features must be provided when heads is a ListConfig")
-            self.in_features = in_features
 
             # Create heads with individual configurations
             self.heads = nn.ModuleList()
@@ -601,6 +616,8 @@ class HeterogeneousPredictionHeads(nn.Module):
                 )
                 self.heads.append(head)
                 # Calculate total output dimension from heads
+                if isinstance(out_features, DictConfig):
+                    out_features = instantiate(out_features)
                 self.out_features += out_features
 
         # Handle nn.ModuleList (pre-constructed heads)
