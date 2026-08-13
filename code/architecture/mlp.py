@@ -544,13 +544,14 @@ class HeterogeneousPredictionHeads(nn.Module):
     2. Via `heads` (pre-constructed nn.ModuleList) - heads are used directly
 
     This design allows both declarative config-driven initialization and programmatic
-    construction. Outputs from all heads are concatenated along the feature dimension.
+    construction. Outputs from all heads can be either concatenated or returned as a tuple.
     """
 
     def __init__(
         self,
         in_features: int | DictConfig,
         heads: ListConfig | nn.ModuleList,
+        out_concat: bool = True,
     ) -> None:
         """
         Initialize heterogeneous prediction heads.
@@ -579,10 +580,16 @@ class HeterogeneousPredictionHeads(nn.Module):
         in_features : int, optional
             Input feature dimension (shared by all heads).
             Required only if `heads` is a ListConfig.
+        out_concat : bool, default=True
+            If True, concatenates outputs from all heads along the feature dimension.
+            If False, returns outputs as a tuple of tensors.
         """
 
         # Class inheritance
         super().__init__()
+
+        # Store output format behavior
+        self.out_concat = out_concat
 
         # Resolve in_features if provided as DictConfig
         if isinstance(in_features, DictConfig):
@@ -628,7 +635,7 @@ class HeterogeneousPredictionHeads(nn.Module):
                 f"heads must be ListConfig or nn.ModuleList, got {type(heads)}"
             )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor | tuple[torch.Tensor, ...]:
         """
         Forward pass through all prediction heads.
 
@@ -639,12 +646,15 @@ class HeterogeneousPredictionHeads(nn.Module):
 
         Returns
         -------
-        torch.Tensor
-            Concatenated output from all heads, shape (..., out_features_total).
-            where out_features_total is the sum of all head output dimensions.
+        torch.Tensor | tuple[torch.Tensor, ...]
+            If out_concat=True: Concatenated output from all heads, shape (..., out_features_total).
+            If out_concat=False: Tuple of tensors, one per head.
         """
         outputs = [head(x) for head in self.heads]
-        return torch.cat(outputs, dim=-1)
+        if self.out_concat:
+            return torch.cat(outputs, dim=-1)
+        else:
+            return tuple(outputs)
 
 
 class HomogeneousPredictionHeads(HeterogeneousPredictionHeads):
@@ -652,7 +662,7 @@ class HomogeneousPredictionHeads(HeterogeneousPredictionHeads):
     Multiple prediction heads with identical architectures.
 
     Creates n_heads identical PredictionHead modules for multitask learning.
-    Outputs from all heads are concatenated along the feature dimension.
+    Outputs from all heads can be either concatenated or returned as a tuple.
 
     This is a special case of HeterogeneousPredictionHeads where all heads have
     the same configuration. This class provides a simpler API for this common case.
@@ -671,6 +681,7 @@ class HomogeneousPredictionHeads(HeterogeneousPredictionHeads):
         activation: DictConfig | None = None,
         dropout_rate: float = 0.0,
         post_process: DictConfig | Callable | None = None,
+        out_concat: bool = True,
     ) -> None:
         """
         Initialize multiple identical prediction heads.
@@ -694,6 +705,9 @@ class HomogeneousPredictionHeads(HeterogeneousPredictionHeads):
             Dropout probability for each head.
         post_process : DictConfig | Callable, optional
             Post-processing function applied after each head (e.g., denormalization).
+        out_concat : bool, default=True
+            If True, concatenates outputs from all heads along the feature dimension.
+            If False, returns outputs as a tuple of tensors.
         """
 
         # Create n_heads identical prediction heads directly
@@ -710,8 +724,8 @@ class HomogeneousPredictionHeads(HeterogeneousPredictionHeads):
             for _ in range(n_heads)
         ])
 
-        # Pass pre-constructed heads to parent
-        super().__init__(heads=heads)
+        # Pass pre-constructed heads to parent with out_concat flag
+        super().__init__(heads=heads, out_concat=out_concat)
 
 
 class MLPModular(nn.Module):
@@ -878,7 +892,7 @@ class MLPModular(nn.Module):
         self.input_out_dim = input_out_dim
         self.hidden_out_dim = current_dim
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor | tuple[torch.Tensor, ...]:
         """
         Forward pass through the modular MLP.
 
@@ -895,8 +909,9 @@ class MLPModular(nn.Module):
 
         Returns
         -------
-        torch.Tensor
-            Output tensor from output_layer.
+        torch.Tensor | tuple[torch.Tensor, ...]
+            Output from output_layer. Can be either a single tensor or a tuple of tensors
+            if the output_layer returns multiple outputs.
         """
 
         # Positional Encoding

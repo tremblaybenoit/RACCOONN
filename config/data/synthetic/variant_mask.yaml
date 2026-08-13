@@ -1,0 +1,52 @@
+# Format:
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+
+# All data (complete dataset)
+all:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Variant mask
+    variant_mask:
+      # Dataset class
+      _target_: code.loader.dataset.ConstantDataset
+      _recursive_: false
+      # Type of data
+      type: 'Variant mask'
+      # Loading function
+      load:
+        _target_: code.preprocessing.mask.variant_mask
+        # Statistics of the profile variable to compute the mask
+        stats:
+          _target_: code.data.preprocessing.statistics.read_statistics_var
+          load: ${preprocessing.statistics.output.load}
+          key: 'prof'
+          dtype: ${data.dtype}
+        # Ratio threshold to determine constant profile levels
+        threshold: 0.005
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Variant mask
+    variant_mask: ${...all.variables.variant_mask}
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Variant mask
+    variant_mask: ${...all.variables.variant_mask}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Variant mask
+    variant_mask: ${...all.variables.variant_mask}
+# Predict set
+predict:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Variant mask
+    variant_mask: ${...all.variables.variant_mask}

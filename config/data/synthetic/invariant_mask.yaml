@@ -8,45 +8,39 @@
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
-    # Pressure mask
-    pressure_mask:
+    # Prof mask
+    invariant_mask:
       # Dataset class
       _target_: code.loader.dataset.ConstantDataset
       _recursive_: false
       # Type of data
-      type: 'Pressure mask'
+      type: 'Invariant mask'
       # Loading function
       load:
-        _target_: code.preprocessing.mask.pressure_mask
-        # Statistics of the pressure variable to compute the mask
-        stats:
-          _target_: code.data.preprocessing.statistics.read_statistics_var
-          load: ${preprocessing.statistics.output.load}
-          key: 'pressure'
-          dtype: ${data.dtype}
-        # Ratio threshold to determine constant pressure levels
-        threshold: 0.005
+        _target_: numpy.logical_not
+        _args_:
+          - ${....variant_mask.load}
 # Training set
 train:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
-    # Pressure mask
-    pressure_mask: ${...all.variables.pressure_mask}
+    # Invariant mask
+    invariant_mask: ${...all.variables.invariant_mask}
 # Validation set
 valid:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
-    # Pressure mask
-    pressure_mask: ${...all.variables.pressure_mask}
+    # Invariant mask
+    invariant_mask: ${...all.variables.invariant_mask}
 # Test set
 test:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
-    # Pressure mask
-    pressure_mask: ${...all.variables.pressure_mask}
+    # Invariant mask
+    invariant_mask: ${...all.variables.invariant_mask}
 # Predict set
 predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
-    # Pressure mask
-    pressure_mask: ${...all.variables.pressure_mask}
+    # Invariant mask
+    invariant_mask: ${...all.variables.invariant_mask}

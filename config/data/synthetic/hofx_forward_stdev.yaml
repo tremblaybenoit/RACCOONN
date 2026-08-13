@@ -14,17 +14,11 @@ train:
       _target_: code.loader.dataset.EagerDataset
       _recursive_: false
       # Path to the HOFX (simulated observations) file
-      path: ${...dir}/hofx_forward.npy
+      path: ${...results.hofx.path}
       # Channels
-      type: [
-        'Channel 7', 'Channel 8', 'Channel 9', 'Channel 10', 'Channel 11', 'Channel 12',
-        'Channel 13', 'Channel 14', 'Channel 15', 'Channel 16'
-      ]
+      type: ${..hofx.type}
       # Number of variables
-      n:
-        _target_: builtins.len
-        _args_:
-          - ${...type}
+      n: ${..hofx.n}
       # Loading function
       load:
         _target_: operator.getitem
@@ -35,19 +29,10 @@ train:
             split: ${......split}
           - _target_: numpy.s_
             _args_:
+              - ${......n}:
               - null
-              - 10:
       # Transformations to apply
-      transformations:
-        # Per-variable normalization
-        normalization:
-          _target_: code.data.transformations.identity
-          _partial_: true
-          stats:
-            _target_: code.preprocessing.statistics.read_statistics_var
-            path: ${preprocessing.statistics.output.path}
-            key: 'hofx'
-            dtype: ${data.dtype}
+      transformations: null
 # Validation set
 valid:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
@@ -58,7 +43,7 @@ valid:
       _target_: ${data.stage.train.variables.hofx_forward_stdev._target_}
       _recursive_: false
       # Path to the HOFX (simulated observations) file
-      path: ${...dir}/hofx_forward.npy
+      path: ${...results.hofx.path}
       # Channels
       type: ${data.stage.train.variables.hofx_forward_stdev.type}
       # Number of variables
@@ -73,8 +58,8 @@ valid:
             split: ${......split}
           - _target_: numpy.s_
             _args_:
+              - ${......n}:
               - null
-              - 10:
       # Transformations to apply
       transformations: ${data.stage.train.variables.hofx_forward_stdev.transformations}
 # Test set
@@ -87,7 +72,7 @@ test:
       _target_: ${data.stage.train.variables.hofx_forward_stdev._target_}
       _recursive_: false
       # Path to the HOFX (simulated observations) file
-      path: ${...dir}/hofx_forward.npy
+      path: ${...results.hofx.path}
       # Channels
       type: ${data.stage.train.variables.hofx_forward_stdev.type}
       # Number of variables
@@ -102,8 +87,8 @@ test:
             split: ${......split}
           - _target_: numpy.s_
             _args_:
+              - ${......n}:
               - null
-              - 10:
       # Transformations to apply
       transformations: ${data.stage.train.variables.hofx_forward_stdev.transformations}
   # Results-specific configuration for the test stage

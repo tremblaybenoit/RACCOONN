@@ -231,7 +231,7 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
                     logger.info(f"Loading variable '{variable}'")
                     data_stage[variable] = instantiate(config_stage.variables[variable].load)
                 # Apply mask
-                if variable not in ('pressure', 'pressure_mask') and mask is not None:
+                if variable not in ('pressure', 'variant_mask', 'invariant_mask') and mask is not None:
                     data_stage[variable] = data_stage[variable][mask]
                 # If atmospheric profiles and clear sky, extract non-zero profiles
                 if variable == 'prof' and data_stage[variable].shape[1] > 3 and (clear_keep and not cloud_keep):
@@ -261,7 +261,7 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
                 if hasattr(config_variable, 'path'):
                     os.makedirs(os.path.dirname(config_variable.path), exist_ok=True)
                 # Pressure is constant, skip masking, otherwise mask
-                if variable not in ('pressure', 'pressure_mask') and mask is not None:
+                if variable not in ('pressure', 'variant_mask', 'invariant_mask') and mask is not None:
                     data_stage[variable] = data_stage[variable][mask]
                 # If atmospheric profiles and clear sky, extract non-zero profiles
                 if variable == 'prof' and data_stage[variable].shape[1] > 3 and (clear_keep and not cloud_keep):
@@ -298,7 +298,7 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
                         # Save function
                         save_fn = instantiate(config_variable.save)
                         # Pressure is constant, skip masking, otherwise mask
-                        if variable not in ('pressure', 'pressure_mask'):
+                        if variable not in ('pressure', 'variant_mask', 'invariant_mask'):
                             save_fn(data_all[variable][coords])
                         else:
                             save_fn(data_all[variable])

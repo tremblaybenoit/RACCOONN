@@ -1,23 +1,35 @@
-# Variational Loss for inverse problems
-_target_: code.loss.variational.VarLoss
+# Variational Loss for inverse problems using LossTerms
+_target_: code.loss.LossTerms
 
-# Weights for observation (obs), model, and boundary condition (bcs) errors
-lambda_obs: 0.0
-lambda_model: 1.0
-lambda_bcs: 1.0
+config:
+  # Observation loss term: forward-modeled radiance vs. observations
+  hofx:
+    weight: 1.0
+    instance:
+      _target_: code.loss.LossTerm
+      function:
+        _target_: code.loss.basic.MSE
+      output_keys: 'hofx_forward'
+      target_keys: 'hofx_forward'
 
-# Loss term for observations
-loss_obs:
-  _target_: code.loss.basic.MSE
+  # Model constraint: inverted profile vs. prior with pressure mask
+  prof:
+    weight: 1.0
+    instance:
+      _target_: code.loss.LossTerm
+      function:
+        _target_: code.loss.basic.MSE
+      output_keys: 'prof'
+      target_keys: 'prof_prior'
+      # context_keys: 'variant_mask'
 
-# Loss term for model variables
-loss_model:
-  _target_: code.loss.basic.MSE
-
-# Loss term for boundary conditions
-loss_bcs:
-  _target_: code.loss.basic.MSE
-
-# Pressure mask: Consider only pressure levels with non-zero variance
-pressure_mask: ${data.stage.all.variables.pressure_mask.load}
-
+  # Boundary conditions: fixed profile levels (no masking)
+  # bcs:
+  #   weight: 1.0
+  #   instance:
+  #     _target_: code.loss.LossTerm
+  #     function:
+  #       _target_: code.loss.basic.MSE
+  #     output_keys: 'prof'
+  #     target_keys: 'prof'
+  #     context_keys: 'invariant_mask'

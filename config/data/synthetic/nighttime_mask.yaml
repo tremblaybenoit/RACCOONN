@@ -1,0 +1,87 @@
+# Format:
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Clear mask
+    nighttime_mask:
+      # Dataset class
+      _target_: code.loader.dataset.EagerDataset
+      _recursive_: false
+      # Type of data
+      type: 'Clear mask'
+      # Loading function (clear filter is negation of cloud mask)
+      load:
+        _target_: numpy.logical_not
+        _args_:
+          - ${....daytime_mask.load}
+      # Transformations to apply
+      transformations: null
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Clear mask
+    nighttime_mask:
+      # Dataset class
+      _target_: ${....train.variables.nighttime_mask._target_}
+      _recursive_: false
+      # Type of data
+      type: ${....train.variables.nighttime_mask.type}
+      # Loading function (clear filter is negation of cloud mask)
+      load:
+        _target_: ${.....train.variables.nighttime_mask.load._target_}
+        _args_:
+          - ${....daytime_mask.load}
+      # Transformations to apply
+      transformations: ${....train.variables.nighttime_mask.transformations}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Clear mask
+    nighttime_mask:
+      # Dataset class
+      _target_: ${....train.variables.nighttime_mask._target_}
+      _recursive_: false
+      # Type of data
+      type: ${....train.variables.nighttime_mask.type}
+      # Loading function (clear filter is negation of cloud mask)
+      load:
+        _target_: ${.....train.variables.nighttime_mask.load._target_}
+        _args_:
+          - ${....daytime_mask.load}
+      # Transformations to apply
+      transformations: ${....train.variables.nighttime_mask.transformations}
+# Predict set
+predict:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Clear mask
+    nighttime_mask: ${...test.variables.nighttime_mask}
+# All data (complete dataset)
+all:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Clear mask
+    nighttime_mask:
+      # Dataset class
+      _target_: ${....train.variables.nighttime_mask._target_}
+      _recursive_: false
+      # Type of data
+      type: ${....train.variables.nighttime_mask.type}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......train.variables.nighttime_mask.load}
+            - ${.......valid.variables.nighttime_mask.load}
+            - ${.......test.variables.nighttime_mask.load}
+          - 0
+      # Transformations to apply
+      transformations: null

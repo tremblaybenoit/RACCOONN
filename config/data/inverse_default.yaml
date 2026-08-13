@@ -3,7 +3,8 @@ defaults:
   - synthetic/hofx_forward@stage
   - synthetic/hofx_forward_mean@stage
   - synthetic/hofx_forward_stdev@stage
-  - synthetic/pressure_mask@stage
+  - synthetic/variant_mask@stage
+  - synthetic/invariant_mask@stage
   - synthetic/prof_prior@stage
   - synthetic/lat_slant@stage
   - synthetic/lon_slant@stage
@@ -14,7 +15,8 @@ defaults:
   - synthetic/hofx_forward@source
   - synthetic/hofx_forward_mean@source
   - synthetic/hofx_forward_stdev@source
-  - synthetic/pressure_mask@source
+  - synthetic/variant_mask@source
+  - synthetic/invariant_mask@source
   - synthetic/lat_slant@source
   - synthetic/lon_slant@source
   - synthetic/x_slant@source
@@ -27,7 +29,8 @@ dtype: 'float32'
 # Variables to use as input/output
 select_input: ['lat', 'lon', 'scans', 'pressure']
 select_target: ['hofx_forward', 'prof', 'prof_prior']
-select_context: ['meta', 'surf', 'clear_mask', 'cloud_mask', 'daytime_mask', 'pressure_mask']
+select_context: ['meta', 'surf', 'clear_mask', 'cloud_mask', 'daytime_mask', 'nighttime_mask',
+                 'variant_mask', 'invariant_mask']
 
 # Original data - Split the data into training, validation, and test sets
 source:

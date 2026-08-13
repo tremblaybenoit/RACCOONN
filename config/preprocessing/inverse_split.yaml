@@ -116,8 +116,8 @@ covariance:
       # Scans
       scans:
         load: ${data.source.all.variables.scans.load}
-      # Pressure filter: Consider only pressure levels with non-zero variance
-      pressure_filter: ${data.source.all.variables.pressure_mask}
+      # Variant mask: Consider only profile pressure levels with non-zero variance
+      variant_mask: ${data.source.all.variables.variant_mask}
 
   # Error covariance matrix in observation space
   R:

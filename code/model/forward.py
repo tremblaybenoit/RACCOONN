@@ -66,47 +66,13 @@ class ForwardModel(BaseModel):
         dict
             Dictionary with 'output' key containing {'hofx': predictions}.
         """
-        return {'output': {'hofx': self.forward(batch['input'])}}
 
-    def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor | dict:
-        """ Perform training/validation/test step.
+        # Forward pass
+        out = self.forward(batch['input'])
 
-            Parameters
-            ----------
-            batch: dict. Batch from the training set.
-            batch_nb: int. Index of the batch out of the training set.
-            stage: str. Current operation: "train", "valid", or "test".
-
-            Returns
-            -------
-            dict. Step output with 'output' key and optional 'loss' keys.
-        """
-
-        # Build structured output (customization point for subclasses via _infer())
-        step = self._infer(batch)
-
-        # Stage-dependent operation: Loss
-        if stage in ('train', 'valid', 'test') and self.loss is not None:
-            # Compute loss
-            loss = self.loss(step['output']['hofx'], batch['target']['hofx'])
-            # If dictionary with multiple terms
-            if isinstance(loss, dict):
-                # Track total loss
-                step['loss'] = loss['total']
-                # Detach loss components
-                step[f'{stage}_loss'] = {
-                    key: value.detach().cpu().numpy() if isinstance(value, torch.Tensor)
-                    else value for key, value in loss.items()
-                }
-            elif isinstance(loss, torch.Tensor):
-                step['loss'] = loss.mean()  # type: ignore
-                step[f'{stage}_loss'] = loss.detach().cpu().numpy()
-            else:
-                step['loss'] = loss
-        # Detach outputs
-        step['output'] = {
-            key: value.detach().cpu().numpy() if isinstance(value, torch.Tensor)
-            else value for key, value in step['output'].items()
-        }
-
-        return step
+        if isinstance(out, torch.Tensor):
+            return {'output': {'hofx': out}}
+        elif isinstance(out, tuple):
+            return {'output': {'hofx_mean': out[0], 'hofx_stdev': out[1]}}
+        else:
+            raise ValueError("Forward model output must be a torch.Tensor or a tuple of tensors.")
