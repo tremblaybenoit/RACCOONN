@@ -102,10 +102,10 @@ test:
       # Transformations to apply
       transformations: ${....train.variables.prof.transformations}
   # Results-specific configuration for the test stage
-  results:
+  output:
     # Atmospheric profiles
     prof:
-      # Path to the atmospheric profiles results file
+      # Path to the atmospheric profiles output file
       path: ${paths.run_dir}/test_prof.npy
       # Save function
       save:
@@ -144,10 +144,10 @@ predict:
       # Transformations to apply
       transformations: ${....train.variables.prof.transformations}
   # Results-specific configuration for the predict stage
-  results:
+  output:
     # Atmospheric profiles
     prof:
-      # Path to the atmospheric profiles results file
+      # Path to the atmospheric profiles output file
       path: ${paths.run_dir}/predict_prof.npy
       # Save function
       save:

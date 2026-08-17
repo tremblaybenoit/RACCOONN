@@ -141,12 +141,18 @@ class InverseModel(BaseModel):
 
         # Forward-modeled observations (requires batch['context'])
         if self.forward_model is not None and 'context' in batch:
-            output['hofx_forward'] = self.forward_model(
-                {
-                    'prof': output['prof'],
-                    'surf': batch['context']['surf'],
-                    'meta': batch['context']['meta']
-                }
-            )
+            if all(k in batch['context'] for k in ['surf', 'meta']):
+                forward_model_output = self.forward_model(
+                    {
+                        'prof': output['prof'],
+                        'surf': batch['context']['surf'],
+                        'meta': batch['context']['meta']
+                    }
+                )
+                if isinstance(forward_model_output, torch.Tensor):
+                    output['hofx'] = forward_model_output
+                elif isinstance(forward_model_output, tuple):
+                    output['hofx'] = forward_model_output[0]
+                    output['hofx_stdev'] = forward_model_output[1]
 
         return output

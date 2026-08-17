@@ -1,7 +1,7 @@
 # CRPS Loss for forward model using LossTerm
-_target_: code.loss.LossTerm
+_target_: code.loss.wrapper.LossTerm
 function:
   _target_: code.loss.probabilistic.CRPS
-output_keys: 'hofx'
+output_keys: ['hofx', 'hofx_stdev']
 target_keys: 'hofx'
 

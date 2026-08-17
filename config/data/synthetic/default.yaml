@@ -3,6 +3,7 @@ defaults:
   - cloud_mask
   - daytime_mask
   - hofx
+  - hofx_stdev
   - lat
   - lon
   - meta

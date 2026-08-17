@@ -9,64 +9,106 @@ train:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    hofx_forward:
+    nnofx:
       # Dataset class
       _target_: code.loader.dataset.EagerDataset
       _recursive_: false
       # Path to the HOFX (simulated observations) file
-      path: ${...results.hofx.path}
+      path: ${...dir}/nnofx.npy
       # Channels
       type: ${..hofx.type}
       # Number of variables
       n: ${..hofx.n}
       # Loading function
-      load: ${...results.hofx.load}
+      load:
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: code.data.io.save_npy
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${..hofx.transformations}
+      transformations:
+        # Per-variable normalization
+        normalization:
+          _target_: code.data.transformations.identity
+          _partial_: true
+          stats:
+            _target_: code.preprocessing.statistics.read_statistics_var
+            load: ${preprocessing.statistics.output.load}
+            key: 'nnofx'
+            dtype: ${data.dtype}
 # Validation set
 valid:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    hofx_forward:
+    nnofx:
       # Dataset class
-      _target_: ${data.stage.train.variables.hofx_forward._target_}
+      _target_: ${....train.variables.nnofx._target_}
       _recursive_: false
       # Path to the HOFX (simulated observations) file
-      path: ${...results.hofx.path}
+      path: ${...dir}/nnofx.npy
       # Channels
-      type: ${data.stage.train.variables.hofx_forward.type}
+      type: ${....train.variables.nnofx.type}
       # Number of variables
-      n: ${data.stage.train.variables.hofx_forward.n}
+      n: ${....train.variables.nnofx.n}
       # Loading function
-      load: ${...results.hofx.load}
+      load:
+        _target_: ${.....train.variables.nnofx.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: ${.....train.variables.nnofx.save._target_}
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.hofx_forward.transformations}
+      transformations: ${....train.variables.nnofx.transformations}
 # Test set
 test:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    hofx_forward:
+    nnofx:
       # Dataset class
-      _target_: ${data.stage.train.variables.hofx_forward._target_}
+      _target_: ${....train.variables.nnofx._target_}
       _recursive_: false
       # Path to the HOFX (simulated observations) file
-      path: ${...results.hofx.path}
+      path: ${...dir}/nnofx.npy
       # Channels
-      type: ${data.stage.train.variables.hofx_forward.type}
+      type: ${....train.variables.nnofx.type}
       # Number of variables
-      n: ${data.stage.train.variables.hofx_forward.n}
+      n: ${....train.variables.nnofx.n}
       # Loading function
-      load: ${...results.hofx.load}
+      load:
+        _target_: ${.....train.variables.nnofx.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: ${.....train.variables.nnofx.save._target_}
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.hofx_forward.transformations}
+      transformations: ${....train.variables.nnofx.transformations}
   # Results-specific configuration for the test stage
   results:
     # HOFX (Simulated Observations)
-    hofx_forward:
+    nnofx:
       # Path to the HOFX results file
-      path: ${paths.run_dir}/test_hofx_forward.npy
+      path: ${paths.run_dir}/nnofx_test.npy
       # Save function
       save:
         _target_: numpy.save
@@ -79,19 +121,19 @@ test:
         path: ${..path}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.hofx_forward.transformations}
+      transformations: ${....train.variables.nnofx.transformations}
 # Predict set
 predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    hofx_forward: ${data.stage.test.variables.hofx_forward}
+    nnofx: ${...test.variables.nnofx}
   # Results-specific configuration for the predict stage
   results:
     # HOFX (Simulated Observations)
-    hofx_forward:
+    nnofx:
       # Path to the HOFX results file
-      path: ${paths.run_dir}/predict_hofx_forward.npy
+      path: ${paths.run_dir}/nnofx_predict.npy
       # Save function
       save:
         _target_: numpy.save
@@ -104,27 +146,27 @@ predict:
         path: ${..path}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${data.stage.train.variables.hofx_forward.transformations}
+      transformations: ${....train.variables.nnofx.transformations}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    hofx_forward:
+    nnofx:
       # Dataset class
-      _target_: ${data.stage.train.variables.hofx_forward._target_}
+      _target_: ${....train.variables.nnofx._target_}
       _recursive_: false
       # Channels
-      type: ${data.stage.train.variables.hofx_forward.type}
+      type: ${....train.variables.nnofx.type}
       # Number of variables
-      n: ${data.stage.train.variables.hofx_forward.n}
+      n: ${....train.variables.nnofx.n}
       # Loading function
       load:
         _target_: numpy.concatenate
         _args_:
-          - - ${data.stage.train.variables.hofx_forward.load}
-            - ${data.stage.valid.variables.hofx_forward.load}
-            - ${data.stage.test.variables.hofx_forward.load}
+          - - ${.......train.variables.nnofx.load}
+            - ${.......valid.variables.nnofx.load}
+            - ${.......test.variables.nnofx.load}
           - 0
       # Transformations to apply
-      transformations: ${data.stage.train.variables.hofx_forward.transformations}
+      transformations: ${....train.variables.nnofx.transformations}

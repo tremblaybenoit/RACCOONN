@@ -42,10 +42,10 @@ class BaseDataloader(pl.LightningDataModule):
         self.shuffle = shuffle
 
         # Datasets
-        self.ds_train = None
-        self.ds_valid = None
-        self.ds_test = None
-        self.ds_pred = None
+        self.train = None
+        self.valid = None
+        self.test = None
+        self.predict = None
 
     def train_dataloader(self) -> DataLoader:
         """ Loads training set.
@@ -59,7 +59,7 @@ class BaseDataloader(pl.LightningDataModule):
             Training set (inputs & outputs).
 
         """
-        return DataLoader(self.ds_train, batch_size=self.batch_size, num_workers=self.num_workers,
+        return DataLoader(self.train, batch_size=self.batch_size, num_workers=self.num_workers,
                           pin_memory=self.pin_memory, persistent_workers=self.persistent_workers, shuffle=self.shuffle)
 
     def val_dataloader(self) -> DataLoader:
@@ -74,7 +74,7 @@ class BaseDataloader(pl.LightningDataModule):
             Validation set (inputs & outputs).
 
         """
-        return DataLoader(self.ds_valid, batch_size=self.batch_size, num_workers=self.num_workers,
+        return DataLoader(self.valid, batch_size=self.batch_size, num_workers=self.num_workers,
                           pin_memory=self.pin_memory, persistent_workers=self.persistent_workers)
 
     def test_dataloader(self) -> DataLoader:
@@ -89,7 +89,7 @@ class BaseDataloader(pl.LightningDataModule):
             Test set (inputs & outputs).
 
         """
-        return DataLoader(self.ds_test, batch_size=self.batch_size, num_workers=self.num_workers,
+        return DataLoader(self.test, batch_size=self.batch_size, num_workers=self.num_workers,
                           pin_memory=self.pin_memory, persistent_workers=self.persistent_workers)
 
     def predict_dataloader(self) -> DataLoader:
@@ -104,7 +104,7 @@ class BaseDataloader(pl.LightningDataModule):
             Prediction set (inputs & outputs if available).
 
         """
-        return DataLoader(self.ds_pred, batch_size=self.batch_size, num_workers=self.num_workers,
+        return DataLoader(self.predict, batch_size=self.batch_size, num_workers=self.num_workers,
                           pin_memory=self.pin_memory, persistent_workers=self.persistent_workers)
 
 
@@ -147,10 +147,11 @@ class Dataloader(BaseDataloader):
         # Load datasets
         if stage == 'train':
             # Training/validation data
-            self.ds_train, self.ds_valid = instantiate(self.ds_stage.train), instantiate(self.ds_stage.valid)
+            self.train, self.valid = instantiate(self.ds_stage.train), instantiate(self.ds_stage.valid)
         elif stage == 'test':
-            # Test/prediction data
-            self.ds_test = instantiate(self.ds_stage.test)
-        elif stage == 'pred':
+            # Test data - load into predict to enable trainer.predict()
+            self.test = instantiate(self.ds_stage.test)
+            self.predict = self.test
+        elif stage == 'predict':
             # Prediction data
-            self.ds_pred = instantiate(self.ds_stage.predict)
+            self.predict = instantiate(self.ds_stage.predict)

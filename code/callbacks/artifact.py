@@ -32,8 +32,7 @@ class ArtifactLogger(Callback):
         save_every_n_epochs: int = 100,
         save_on_improvement: bool = True,
         monitor: str = "valid_loss",
-        monitor_mode: str = "min",
-        monitor_variables: list[str] | None = None
+        monitor_mode: str = "min"
     ) -> None:
         """
         Initialize ArtifactLogger callback.
@@ -52,8 +51,6 @@ class ArtifactLogger(Callback):
             Metric to monitor for improvements.
         monitor_mode : str, default "min"
             Whether to minimize or maximize the monitored metric ("min" or "max").
-        monitor_variables : list[str], optional
-            Variables to monitor. If None or empty, process all variables.
         """
 
         # Class inheritance
@@ -63,9 +60,6 @@ class ArtifactLogger(Callback):
         self.which_statistics = which_statistics or ['mean', 'stdev', 'rmse', 'mae']
         self.runners: dict[str, RunningStats] = {}
         self.metrics: dict[str, dict] = {}
-        
-        # Variables to monitor (None means all variables)
-        self.monitor_variables = monitor_variables
 
         # Initialize list of figures
         self.figs = []
@@ -102,8 +96,8 @@ class ArtifactLogger(Callback):
         """
         Process each validation batch and accumulate metrics using RunningStats.
 
-        Dynamically tracks all variables present in outputs['output'] that have
-        corresponding runners initialized in on_validation_epoch_start().
+        Subclasses should override this method to extract their specific variables
+        from outputs and update their runners accordingly.
 
         Parameters
         ----------
@@ -118,43 +112,17 @@ class ArtifactLogger(Callback):
         batch_idx : int
             Batch index (unused).
         dataloader_idx : int
-            Dataloader index (unused).
+            Data loader index (unused).
         """
 
         # Skip if sanity checking
         if trainer.sanity_checking:
             return
 
-        # Extract predictions and targets
-        predictions = outputs.get('output', {})
-        targets = batch.get('target', {})
-
-        # Update runners for each variable in predictions that this callback monitors
-        for var_name in predictions.keys():
-            # Skip variables this callback doesn't monitor (if monitor_variables is set)
-            if self.monitor_variables is not None and var_name not in self.monitor_variables:
-                continue
-            
-            pred_data = predictions[var_name]
-            
-            # Extract only the mean (first half of channels) for mean+std format
-            if isinstance(pred_data, torch.Tensor):
-                if pred_data.size(1) % 2 == 0:  # Even number of channels suggests mean+std
-                    n_channels = pred_data.size(1) // 2
-                    pred_data = pred_data[:, :n_channels]
-                pred_data = pred_data.detach().cpu().numpy()
-            else:
-                if pred_data.shape[1] % 2 == 0:
-                    n_channels = pred_data.shape[1] // 2
-                    pred_data = pred_data[:, :n_channels]
-            
-            # Convert tensor targets to numpy if needed
-            target_data = targets.get(var_name)
-            if isinstance(target_data, torch.Tensor):
-                target_data = target_data.detach().cpu().numpy()
-            
-            # Delegate to subclass-specific logic for updating runners
-            self._update_runners(var_name, pred_data, target_data, batch)
+        # Subclasses should override this method
+        raise NotImplementedError(
+            f"{self.__class__.__name__} must implement on_validation_batch_end()"
+        )
     
     def _update_runners(self, var_name, pred_data, target_data, batch):
         """
@@ -414,12 +382,73 @@ class ForwardLogger(ArtifactLogger):
             save_every_n_epochs, 
             save_on_improvement, 
             monitor, 
-            monitor_mode,
-            monitor_variables=['hofx', 'hofx_forward']
+            monitor_mode
         )
 
         # Figure tags
         self.tags = ["Valid_RadianceRMSE"]
+
+    def on_validation_batch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, outputs: Any,
+                                batch: Any, batch_idx: int, dataloader_idx=0) -> None:
+        """
+        Process hofx predictions for brightness temperature metrics.
+
+        Handles both 'hofx' and 'hofx_mean' prediction keys, extracts mean from
+        dual predictions [mean, std], and delegates mask-based filtering to _update_runners().
+
+        Parameters
+        ----------
+        trainer : pytorch_lightning.Trainer
+            The trainer instance.
+        pl_module : pytorch_lightning.LightningModule
+            The model instance.
+        outputs : dict
+            Model's validation_step output with 'hofx' or 'hofx_mean' predictions.
+        batch : dict
+            Input batch with targets and context.
+        batch_idx : int
+            Batch index (unused).
+        dataloader_idx : int
+            Data loader index (unused).
+        """
+
+        # Skip if sanity checking
+        if trainer.sanity_checking:
+            return
+
+        # Extract predictions and targets
+        predictions = outputs.get('output', {})
+        targets = batch.get('target', {})
+
+        # Extract prediction and convert to numpy
+        pred_data = predictions['hofx']
+        if isinstance(pred_data, torch.Tensor):
+            pred_data = pred_data.detach().cpu().numpy()
+
+        # If 'hofx_mean' is predicted but 'hofx_mean' is not a target, use 'hofx' target
+        if 'nnofx' in targets:
+            target_data = targets.get('nnofx')
+        else:
+            target_data = targets.get('hofx')
+        
+        if isinstance(target_data, torch.Tensor):
+            target_data = target_data.detach().cpu().numpy()
+
+        # Extract only matching number of channels from target if needed
+        n_pred_channels = pred_data.shape[1]
+        n_target_channels = target_data.shape[1]
+        if n_pred_channels != n_target_channels:
+            pred_data = pred_data[:, :np.min(n_pred_channels, n_target_channels)]
+            target_data = target_data[:, :np.min(n_target_channels, n_target_channels)]
+        elif n_pred_channels > 10:
+            pred_data = pred_data[:, :n_pred_channels // 2]
+            target_data = target_data[:, :n_pred_channels // 2]
+        else:
+            pred_data = pred_data[:, :n_pred_channels]
+            target_data = target_data[:, :n_pred_channels]
+
+        # Update runners with mask-based filtering
+        self._update_runners('hofx', pred_data, target_data, batch)
 
     def _update_runners(self, var_name, pred_data, target_data, batch):
         """
@@ -444,10 +473,10 @@ class ForwardLogger(ArtifactLogger):
         
         # Apply masks and update corresponding runners
         masks = {
-            'clear': ~context.get('cloud_mask') if context.get('cloud_mask') is not None else None,
+            'clear': context.get('clear_mask'),
             'cloud': context.get('cloud_mask'),
             'day': context.get('daytime_mask'),
-            'night': ~context.get('daytime_mask') if context.get('daytime_mask') is not None else None,
+            'night': context.get('nighttime_mask')
         }
         
         for runner_key, mask in masks.items():
@@ -603,7 +632,7 @@ class InverseLogger(ArtifactLogger):
                                 batch: Any, batch_idx: int, dataloader_idx=0) -> None:
         """
         Process validation batch and extract pressure levels from first batch.
-        Also accumulate prof_prior statistics.
+        Also accumulate prof and prof_prior statistics.
 
         Parameters
         ----------
@@ -618,8 +647,13 @@ class InverseLogger(ArtifactLogger):
         batch_idx : int
             Batch index.
         dataloader_idx : int
-            Dataloader index.
+            Data loader index.
         """
+
+        # Skip if sanity checking
+        if trainer.sanity_checking:
+            return
+
         # Store pressure levels from first batch (same for all samples)
         if batch_idx == 0 and self.pressure_levels is None:
             try:
@@ -633,8 +667,29 @@ class InverseLogger(ArtifactLogger):
             except Exception as e:
                 logger.warning(f"Could not extract pressure levels from batch: {e}")
 
-        # Call parent's on_validation_batch_end to process prof metrics
-        super().on_validation_batch_end(trainer, pl_module, outputs, batch, batch_idx, dataloader_idx)
+        # Extract predictions and targets
+        predictions = outputs.get('output', {})
+        targets = batch.get('target', {})
+
+        # Process prof (the only variable InverseLogger cares about)
+        if 'prof' in predictions:
+            # Extract prof prediction and convert to numpy
+            pred_data = predictions['prof']
+            if isinstance(pred_data, torch.Tensor):
+                pred_data = pred_data.detach().cpu().numpy()
+
+            # Extract prof target
+            target_data = targets.get('prof')
+            if isinstance(target_data, torch.Tensor):
+                target_data = target_data.detach().cpu().numpy()
+
+            # Update prof runner
+            if 'prof' in self.runners:
+                self.runners['prof'].update(
+                    data=pred_data,
+                    target=target_data,
+                    axis=0
+                )
 
         # Separately accumulate prof_prior vs prof_target stats (prior vs truth)
         # Only compute once as background doesn't change across epochs

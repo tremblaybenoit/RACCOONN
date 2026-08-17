@@ -1,5 +1,5 @@
 # Variational Loss for inverse problems using LossTerms
-_target_: code.loss.LossTerms
+_target_: code.loss.wrapper.LossTerms
 
 config:
   # Observation loss term: forward-modeled radiance vs. observations

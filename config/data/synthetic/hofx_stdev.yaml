@@ -1,0 +1,92 @@
+# Format:
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # HOFX (Simulated Observations)
+    hofx_stdev:
+      # Channels
+      type: ${..hofx.type}
+      # Number of variables
+      n: ${..hofx.n}
+      # Transformations to apply
+      transformations: null
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # HOFX (Simulated Observations)
+    hofx_stdev:
+      # Path to the HOFX (simulated observations) file
+      path: ${...dir}/hofx_stdev.npy
+      # Channels
+      type: ${data.stage.train.variables.hofx_stdev.type}
+      # Number of variables
+      n: ${data.stage.train.variables.hofx_stdev.n}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.hofx_stdev.transformations}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # HOFX (Simulated Observations)
+    hofx_stdev:
+      # Channels
+      type: ${data.stage.train.variables.hofx_stdev.type}
+      # Number of variables
+      n: ${data.stage.train.variables.hofx_stdev.n}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.hofx_stdev.transformations}
+  # Results-specific configuration for the test stage
+  output:
+    # HOFX (Simulated Observations)
+    hofx_stdev:
+      # Path to the HOFX output file
+      path: ${paths.run_dir}/hofx_stdev_test.npy
+      # Loading function
+      load:
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: code.data.io.save_npy
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.hofx_stdev.transformations}
+# Predict set
+predict:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # HOFX (Simulated Observations)
+    hofx_stdev: ${data.stage.test.variables.hofx_stdev}
+  # Results-specific configuration for the predict stage
+  output:
+    # HOFX (Simulated Observations)
+    hofx_stdev:
+      # Path to the HOFX output file
+      path: ${paths.run_dir}/hofx_stdev_predict.npy
+      # Loading function
+      load:
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: code.data.io.save_npy
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${data.stage.train.variables.hofx_stdev.transformations}

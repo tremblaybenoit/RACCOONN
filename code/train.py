@@ -19,6 +19,134 @@ torch.backends.cudnn.allow_tf32 = False
 logger = logging.getLogger(__name__)
 
 
+def _accumulate_output(batch_output: list, keys: list | None = None,
+                       config_stage: DictConfig | None = None) -> dict:
+    """ Accumulate results from individual batches into concatenated arrays.
+
+        Efficiently accumulates specified keys from batch results with single-pass iteration,
+        recursive concatenation handling nested dict structures. Optionally applies inverse
+        transformations to all accumulated keys based on stage-specific configuration.
+
+        Parameters
+        ----------
+        batch_output: list. List of dicts returned by trainer.test() or trainer.predict().
+                       Each dict contains keys like 'output', 'latent', 'mask', etc.
+        keys: list or None. List of keys to accumulate. If None, defaults to ['output', 'latent', 'mask'].
+        config_stage: DictConfig or None. Stage-specific loader configuration containing transformations for each key.
+
+        Returns
+        -------
+        dict. Dictionary with accumulated results (numpy arrays concatenated across batches).
+              Inverse transformations applied to denormalize data.
+              Example: {'output': {'hofx': array_denormalized, 'prof': array_denormalized}, ...}
+    """
+
+    # Default: Accumulate common keys
+    if keys is None:
+        keys = ['output', 'latent', 'mask']
+
+    # Pre-initialize accumulator for all keys (single-pass efficiency)
+    accumulated = {key: [] for key in keys}
+
+    # Single pass: collect specified keys
+    for batch_result in batch_output:
+        for key in keys:
+            if key in batch_result:
+                accumulated[key].append(batch_result[key])
+    # Remove empty keys
+    accumulated = {k: v for k, v in accumulated.items() if v}
+
+    # Recursively concatenate nested lists of arrays
+    def concat_recursive(lst):
+        """Recursively concatenate nested lists of arrays or dicts."""
+
+        # If it's a list of dicts, concatenate each key
+        if isinstance(lst[0], dict):
+            result = {}
+            for key in lst[0].keys():
+                values = [item[key] for item in lst]
+                result[key] = concat_recursive(values)
+            return result
+        # If it's a list of arrays, concatenate
+        elif isinstance(lst[0], np.ndarray):
+            return np.concatenate(lst)
+        # Otherwise return as-is (scalars, etc.)
+        else:
+            return lst
+
+    accumulated = {key: concat_recursive(value) for key, value in accumulated.items()}
+
+    # Apply inverse transformations to accumulated keys based on stage config
+    """
+    if config_stage is not None:
+        logger.info(f"Applying inverse transformations...")
+
+        # For each accumulated key, check if there's configuration for it
+        for acc_key in accumulated.keys():
+            if hasattr(config_stage, acc_key):
+                # Extract key-specific config
+                key_config = getattr(config_stage, acc_key)
+                acc_data = accumulated[acc_key]
+
+                # Handle nested dict structure (e.g., {'hofx': array, 'prof': array})
+                if isinstance(acc_data, dict):
+                    # Loop over variables
+                    for var_name, var_data in acc_data.items():
+                        if var_name in key_config and hasattr(key_config[var_name], 'transformations'):
+                            var_transforms = key_config[var_name].transformations
+                            if var_transforms is not None:
+                                # Apply inverse transformation
+                                transform_fn = compose_transformations(var_transforms, inverse_transform=True)
+                                accumulated[acc_key][var_name] = transform_fn(var_data)
+                # Handle flat array structure (single variable)
+                elif hasattr(key_config, 'transformations'):
+                    var_transforms = key_config.transformations
+                    if var_transforms is not None:
+                        transform_fn = compose_transformations(var_transforms, inverse_transform=True)
+                        accumulated[acc_key] = transform_fn(acc_data)
+    """
+
+    return accumulated
+
+
+def _save_output(output: dict, config_stage: DictConfig) -> None:
+    """ Save output to file(s).
+
+        Parameters
+        ----------
+        output: dict. Each output dict contains keys like 'output', 'latent', 'mask', etc.
+        config_stage: DictConfig or None. Stage-specific loader configuration containing transformations for each key.
+
+        Returns
+        -------
+        dict. Dictionary with accumulated results (numpy arrays concatenated across batches).
+              Inverse transformations applied to denormalize data.
+              Example: {'output': {'hofx': array_denormalized, 'prof': array_denormalized}, ...}
+    """
+
+    # Loop over types of outputs
+    for key, data in output.items():
+        if hasattr(config_stage, key):
+            key_config = getattr(config_stage, key)
+            # Handle nested dict structure containing variables
+            if isinstance(data, dict):
+                for var_name, var_data in data.items():
+                    if var_name in key_config and hasattr(key_config[var_name], 'save'):
+                        save_config = key_config[var_name].save
+                        if isinstance(save_config, DictConfig) and 'path' in save_config:
+                            os.makedirs(os.path.dirname(save_config.path), exist_ok=True)
+                        save_function = instantiate(save_config)
+                        save_function(var_data)
+            # Handle flat array structure (single variable)
+            elif hasattr(key_config, 'save'):
+                save_config = key_config.save
+                if isinstance(save_config, DictConfig) and 'path' in save_config:
+                    os.makedirs(os.path.dirname(save_config.path), exist_ok=True)
+                save_function = instantiate(save_config)
+                save_function(data)
+    return
+
+
 class Operator:
     """Class for training a neural network operator."""
     def __init__(self, config: DictConfig) -> None:
@@ -116,99 +244,33 @@ class Operator:
         # Load checkpoint if provided
         if ckpt_path is not None:
             logger.info(f"Loading checkpoint...")
-            self.model.load_ckpt(ckpt_path, strict=strict)
+            self.model.load_ckpt(ckpt_path=ckpt_path, strict=strict)
 
         # Set dtype
         dtype = self.config.data.get('dtype', 'float32')
         self.model = self.model.to(None, dtype=getattr(torch, dtype))
 
-    @staticmethod
-    def accumulate_batch_results(batch_results: list, keys: list | None = None,
-                                 config_stage: DictConfig | None = None) -> dict:
-        """ Accumulate results from individual batches into concatenated arrays.
-
-            Efficiently accumulates specified keys from batch results with single-pass iteration,
-            recursive concatenation handling nested dict structures. Optionally applies inverse
-            transformations to all accumulated keys based on stage-specific configuration.
+    def _run_model(self) -> dict:
+        """ Run model to generate a prediction.
 
             Parameters
             ----------
-            batch_results: list. List of dicts returned by trainer.test() or trainer.predict().
-                           Each dict contains keys like 'output', 'latent', 'mask', etc.
-            keys: list or None. List of keys to accumulate. If None, defaults to ['output', 'latent', 'mask'].
-            config_stage: DictConfig or None. Stage-specific loader configuration containing transformations for each key.
+            None.
 
             Returns
             -------
-            dict. Dictionary with accumulated results (numpy arrays concatenated across batches).
-                  Inverse transformations applied to denormalize data.
-                  Example: {'output': {'hofx': array_denormalized, 'prof': array_denormalized}, ...}
+            None.
         """
 
-        # Default: Accumulate common keys
-        if keys is None:
-            keys = ['output', 'latent', 'mask']
+        # Evaluate on test set
+        logger.info("Running model on data...")
+        batch_output = self.trainer.predict(self.model, self.loader)
 
-        # Pre-initialize accumulator for all keys (single-pass efficiency)
-        accumulated = {key: [] for key in keys}
+        # Accumulate results from all batches
+        logger.info("Accumulating output...")
+        batch_output = _accumulate_output(batch_output, config_stage=self.loader.predict)
 
-        # Single pass: collect specified keys
-        for batch_result in batch_results:
-            for key in keys:
-                if key in batch_result:
-                    accumulated[key].append(batch_result[key])
-        # Remove empty keys
-        accumulated = {k: v for k, v in accumulated.items() if v}
-
-        # Recursively concatenate nested lists of arrays
-        def concat_recursive(lst):
-            """Recursively concatenate nested lists of arrays or dicts."""
-
-            # If it's a list of dicts, concatenate each key
-            if isinstance(lst[0], dict):
-                result = {}
-                for key in lst[0].keys():
-                    values = [item[key] for item in lst]
-                    result[key] = concat_recursive(values)
-                return result
-            # If it's a list of arrays, concatenate
-            elif isinstance(lst[0], np.ndarray):
-                return np.concatenate(lst)
-            # Otherwise return as-is (scalars, etc.)
-            else:
-                return lst
-
-        accumulated = {key: concat_recursive(value) for key, value in accumulated.items()}
-
-        # Apply inverse transformations to accumulated keys based on stage config
-        if config_stage is not None:
-            logger.info(f"Applying inverse transformations...")
-
-            # For each accumulated key, check if there's configuration for it
-            for acc_key in accumulated.keys():
-                if hasattr(config_stage, acc_key):
-                    # Extract key-specific config
-                    key_config = getattr(config_stage, acc_key)
-                    acc_data = accumulated[acc_key]
-
-                    # Handle nested dict structure (e.g., {'hofx': array, 'prof': array})
-                    if isinstance(acc_data, dict):
-                        # Loop over variables
-                        for var_name, var_data in acc_data.items():
-                            if var_name in key_config and hasattr(key_config[var_name], 'transformations'):
-                                var_transforms = key_config[var_name].transformations
-                                if var_transforms is not None:
-                                    # Apply inverse transformation
-                                    transform_fn = compose_transformations(var_transforms, inverse_transform=True)
-                                    accumulated[acc_key][var_name] = transform_fn(var_data)
-                    # Handle flat array structure (single variable)
-                    elif hasattr(key_config, 'transformations'):
-                        var_transforms = key_config.transformations
-                        if var_transforms is not None:
-                            transform_fn = compose_transformations(var_transforms, inverse_transform=True)
-                            accumulated[acc_key] = transform_fn(acc_data)
-
-        return accumulated
+        return batch_output
 
     def train(self) -> None:
         """ Loads data, loggers, callbacks, trainer, and then trains and tests the model.
@@ -285,43 +347,21 @@ class Operator:
         """
 
         # Data loader and trainer setup
+        logger.info("Initializing trainer for test set...")
         self._init_trainer(stage='test')
 
         # Load model from checkpoint if not already loaded
         if self.model is None:
+            logger.info("Initializing model...")
             self._init_model(ckpt_path=self.config.model.ckpt_path)
 
         # Evaluate on test set
-        logger.info("Running against test set...")
-        batch_results = self.trainer.test(self.model, self.loader)
-
-        # Accumulate results from all batches
-        logger.info("Accumulating test results...")
-        config_stage = self.config.loader.stage.test
-        batch_results = self.accumulate_batch_results(batch_results, config_stage=config_stage)
+        logger.info("Running model...")
+        output = self._run_model()
 
         # Save results to file
-        logger.info("Saving results to file...")
-        for result_key, result_data in batch_results.items():
-            if hasattr(config_stage, result_key):
-                key_config = getattr(config_stage, result_key)
-
-                # Handle nested dict structure containing variables
-                if isinstance(result_data, dict):
-                    for var_name, var_data in result_data.items():
-                        if var_name in key_config and hasattr(key_config[var_name], 'save'):
-                            save_config = key_config[var_name].save
-                            if isinstance(save_config, DictConfig) and 'path' in save_config:
-                                os.makedirs(os.path.dirname(save_config.path), exist_ok=True)
-                            save_function = instantiate(save_config)
-                            save_function(var_data)
-                # Handle flat array structure (single variable)
-                elif hasattr(key_config, 'save'):
-                    save_config = key_config.save
-                    if isinstance(save_config, DictConfig) and 'path' in save_config:
-                        os.makedirs(os.path.dirname(save_config.path), exist_ok=True)
-                    save_function = instantiate(save_config)
-                    save_function(result_data)
+        logger.info("Saving output to file...")
+        _save_output(output, config_stage=self.loader.test)
 
     def predict(self, config_loader: DictConfig | None = None) -> dict:
         """ Predicts the output of the model on a given dataset.
@@ -343,21 +383,19 @@ class Operator:
             config_loader = self.config.loader
 
         # Data loader and trainer setup
+        logger.info("Initializing trainer for prediction set...")
         self._init_trainer(stage='predict', config_loader=config_loader)
 
         # Load model from checkpoint if not already loaded
         if self.model is None:
+            logger.info("Initializing model...")
             self._init_model(ckpt_path=self.config.model.ckpt_path)
 
         # Predict on dataset
-        logger.info("Predicting on dataset...")
-        batch_results = self.trainer.predict(self.model, self.loader)
+        logger.info("Running model...")
+        output = self._run_model()
 
-        # Accumulate results from all batches
-        logger.info("Accumulating prediction results...")
-        batch_results = self.accumulate_batch_results(batch_results, config_stage=config_loader.stage.predict)
-
-        return batch_results
+        return output
 
 
 @hydra.main(version_base=None, config_path=get_config_path(), config_name="default")

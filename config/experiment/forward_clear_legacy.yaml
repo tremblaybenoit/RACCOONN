@@ -1,0 +1,125 @@
+# @package _global_
+# Experiment-specific Hydra structure
+
+# Overriding default structure
+defaults:
+  - override /paths: default
+  - override /hydra: default
+  - override /data: forward_default
+  - override /preprocessing: forward_default
+  - override /loader: default
+  - override /architecture: forward_default
+  - override /loss: forward_default
+  - override /optimizer: default
+  - override /scheduler: default
+  - override /model: forward_default
+  - override /callbacks: forward_default
+  - override /logger: default
+  - override /trainer: gpu
+
+# All parameters below will be merged with parameters from default configurations set above.
+# This allows you to overwrite only specified parameters
+
+# Task name. Note that it determines the output directory path
+task_name: "forward_clear"  # Experiment
+
+# Run id (unique identifier for the run)
+paths:
+  task_dir: "../forward_outputs"
+  run_id: "legacy"
+  data_dir: ../synthetic_${data.dtype}_clear
+  # checkpoint_dir: "code/model/checkpoints/forward"
+
+# Preprocessing
+preprocessing:
+  # Recast data to new format, spatiotemporal distribution
+  recast:
+    # What the method needs as input
+    input:
+      # Mask to apply
+      mask:
+        # Cloud/clear sky
+        cloud_mask: false
+        clear_mask: true
+  # Statistics of the dataset
+  statistics:
+    # What the method produces as output (pickle file)
+    output:
+      # Path to statistics file
+      path: code/data/statistics/synthetic_clear.pkl
+
+# Data configuration
+data:
+  # Precision
+  dtype: 'float32'
+  # Source data
+  source:
+    # Training set
+    train:
+      # Path to the training data
+      dir: ../synthetic_float32/Train2
+    # Validation set
+    valid:
+      # Path to the validation data
+      dir: ../synthetic_float32/Val2
+    # Test set
+    test:
+      # Path to the test data
+      dir: ../synthetic_float32/Test2
+  # Split ratios for training, validation, and test sets
+  stage:
+    # Training set
+    train:
+      # Variables
+      variables:
+        # Atmospheric profiles
+        prof:
+          # Types of profiles for clear skies
+          type: ['Air temperature', 'Humidity mixing ratio', 'Ozone mixing ratio']
+          # Transformations
+          transformations:
+            # Normalization function and parameters
+            normalization:
+              _target_: code.data.transformations.min_max
+              _partial_: true
+              stats:
+                _target_: code.preprocessing.statistics.read_statistics_var
+                load: ${preprocessing.statistics.output.load}
+                key: 'prof'
+                dtype: ${data.dtype}
+              axis: 1
+    # Validation set
+    valid:
+      # Variables
+      variables:
+        # Atmospheric profiles
+        prof:
+          # Transformations
+          transformations: ${data.stage.train.variables.prof.transformations}
+    # Test set
+    test:
+      # Variables
+      variables:
+        # Atmospheric profiles
+        prof:
+          # Transformations
+          transformations: ${data.stage.train.variables.prof.transformations}
+    # Prediction set
+    predict:
+      # Variables
+      variables:
+        # Atmospheric profiles
+        prof:
+          # Transformations
+          transformations: ${data.stage.train.variables.prof.transformations}
+
+# Logger configuration
+logger:
+  # MLflow logger
+  ports:
+    mlflow: 5001
+
+# Trainer configuration
+trainer:
+  # Maximum number of epochs
+  max_epochs: 192

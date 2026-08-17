@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig
 from typing import Dict, Any
 from utilities.instantiators import instantiate
 import logging
@@ -37,7 +37,7 @@ def extract_values(
     # Normalize to list
     if isinstance(keys, str):
         keys = [keys]
-    elif isinstance(keys, (list, tuple)):
+    elif isinstance(keys, (list, tuple, ListConfig)):
         keys = list(keys)
     else:
         keys = [keys]
@@ -107,9 +107,9 @@ class LossTerm(torch.nn.Module):
             )
 
         # Input, target, and context variables
-        self.output_keys = output_keys
-        self.target_keys = target_keys
-        self.context_keys = context_keys
+        self.output_keys = instantiate(output_keys)
+        self.target_keys = instantiate(target_keys)
+        self.context_keys = instantiate(context_keys) if context_keys else None
 
     def forward(
         self,
@@ -170,13 +170,19 @@ class LossTerm(torch.nn.Module):
 
         # Compute loss
         if isinstance(output_values, tuple):
-            loss = self.loss_term(*output_values, *target_values)
+            if isinstance(target_values, tuple):
+                loss = self.loss_term(*output_values, *target_values)
+            else:
+                loss = self.loss_term(*output_values, target_values)
         else:
-            loss = self.loss_term(output_values, target_values)
+            if isinstance(target_values, tuple):
+                loss = self.loss_term(output_values, *target_values)
+            else:
+                loss = self.loss_term(output_values, target_values)
 
         return loss
 
-    def to(self, device, dtype: torch.dtype | None = None, non_blocking: bool = False):
+    def to(self, device):
         """
         Move module and loss term to device.
 
@@ -184,10 +190,6 @@ class LossTerm(torch.nn.Module):
         ----------
         device : torch.device
             Target device
-        dtype : torch.dtype, optional
-            Target data type
-        non_blocking : bool, optional
-            Whether to use non-blocking transfers
 
         Returns
         -------
@@ -196,9 +198,9 @@ class LossTerm(torch.nn.Module):
         """
 
         # Class inheritance
-        super().to(device, dtype=dtype, non_blocking=non_blocking)
+        super().to(device)
         # Move loss term
-        self.loss_term = self.loss_term.to(device, dtype=dtype, non_blocking=non_blocking)
+        self.loss_term = self.loss_term.to(device)
         return self
 
 
@@ -262,7 +264,7 @@ class LossTerms(torch.nn.Module):
                 f"Registered loss term '{term}' (weight={self.weights[term]})"
             )
 
-    def to(self, device, dtype: torch.dtype | None = None, non_blocking: bool = False):
+    def to(self, device):
         """
         Move module and all loss terms to device.
 
@@ -270,10 +272,6 @@ class LossTerms(torch.nn.Module):
         ----------
         device : torch.device
             Target device
-        dtype : torch.dtype, optional
-            Target data type
-        non_blocking : bool, optional
-            Whether to use non-blocking transfers
 
         Returns
         -------
@@ -282,12 +280,12 @@ class LossTerms(torch.nn.Module):
         """
 
         # Class inheritance
-        super().to(device, dtype=dtype, non_blocking=non_blocking)
+        super().to(device)
 
         # Move individual loss terms
         for term, loss_term in self.loss_terms.items():
             if hasattr(loss_term, 'to'):
-                self.loss_terms[term] = loss_term.to(device, dtype=dtype, non_blocking=non_blocking)
+                self.loss_terms[term] = loss_term.to(device)
         return self
 
     def forward(

@@ -65,8 +65,8 @@ stage:
     output:
       _target_: code.loader.dataset.select_variables
       _recursive_: false
-      config: ${data.stage.test.results}
-      keys: ${data.select_target}
+      config: ${data.stage.test.output}
+      keys: ${data.select_output}
   # Prediction stage
   predict:
     _target_: ${loader.stage.train._target_}
@@ -74,5 +74,5 @@ stage:
     output:
       _target_: code.loader.dataset.select_variables
       _recursive_: false
-      config: ${data.stage.predict.results}
-      keys: ${data.select_target}
+      config: ${data.stage.predict.output}
+      keys: ${data.select_output}

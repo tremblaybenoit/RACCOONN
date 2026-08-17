@@ -4,7 +4,7 @@ _recursive_: false
 # No positional encoding
 positional_encoding: null
 
-# Input layer
+# Input layer: single MLPBlock
 input_layer:
   _target_: code.architecture.mlp.MLPBlock
   _recursive_: false
@@ -17,37 +17,35 @@ input_layer:
             - ${data.stage.train.variables.pressure.n}
         - ${data.stage.train.variables.surf.n}
         - ${data.stage.train.variables.meta.n}
-  out_features: ${..hidden_layer.out_features}
+  out_features: ${..hidden_layer.in_features}
   activation:
-    _target_: code.architecture.activation.Swish
+    _target_: torch.nn.GELU
   norm_type: none
   dropout_rate: 0.0
   residual: false
 
-# Hidden layers
+# Hidden layer:
 hidden_layer:
   _target_: code.architecture.mlp.MLPBlocks
   _recursive_: false
   in_features: ${.hidden_features}
   out_features: ${.hidden_features}
   hidden_features: 512
-  n_blocks: 2
-  activation:
-    _target_: code.architecture.activation.Swish
+  n_blocks: 3
+  activation: ${..input_layer.activation}
   norm_type: none
   dropout_rate: 0.0
   residual: false
 
-# Output layer: Dual heads (mean and std)
+# Output layer: heterogeneous dual heads (mean and std)
 output_layer:
   _target_: code.architecture.mlp.HeterogeneousPredictionHeads
   _recursive_: false
   in_features: ${..hidden_layer.out_features}
-  out_concat: false
   heads:
     # Head 1: Mean brightness temperature [0,1] -> denormalized to physical range
     - out_features: ${data.stage.train.variables.hofx.n}
-      n_layers: 1
+      n_layers: 1  # Just linear, no hidden layers
       activation:
         _target_: torch.nn.Sigmoid
       post_process:
@@ -60,7 +58,7 @@ output_layer:
 
     # Head 2: Std uncertainty with Softplus and learnable scaling
     - out_features: ${data.stage.train.variables.hofx.n}
-      n_layers: 1
+      n_layers: 1  # Just linear, no hidden layers
       activation:
         _target_: torch.nn.Softplus
       post_process:

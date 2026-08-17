@@ -110,11 +110,11 @@ test:
       # Transformations to apply
       transformations: ${....train.variables.hofx.transformations}
   # Results-specific configuration for the test stage
-  results:
+  output:
     # HOFX (Simulated Observations)
     hofx:
       # Path to the HOFX results file
-      path: ${paths.run_dir}/test_hofx.npy
+      path: ${paths.run_dir}/hofx_test.npy
       # Save function
       save:
         _target_: numpy.save
@@ -135,11 +135,11 @@ predict:
     # HOFX (Simulated Observations)
     hofx: ${...test.variables.hofx}
   # Results-specific configuration for the predict stage
-  results:
+  output:
     # HOFX (Simulated Observations)
     hofx:
       # Path to the HOFX results file
-      path: ${paths.run_dir}/predict_hofx.npy
+      path: ${paths.run_dir}/hofx_predict.npy
       # Save function
       save:
         _target_: numpy.save

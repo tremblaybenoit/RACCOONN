@@ -69,10 +69,9 @@ class ForwardModel(BaseModel):
 
         # Forward pass
         out = self.forward(batch['input'])
-
         if isinstance(out, torch.Tensor):
             return {'output': {'hofx': out}}
         elif isinstance(out, tuple):
-            return {'output': {'hofx_mean': out[0], 'hofx_stdev': out[1]}}
+            return {'output': {'hofx': out[0], 'hofx_stdev': out[1]}}
         else:
             raise ValueError("Forward model output must be a torch.Tensor or a tuple of tensors.")

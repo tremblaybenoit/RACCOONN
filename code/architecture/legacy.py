@@ -23,6 +23,7 @@ class CRTMArchitecture(nn.Module):
         bt_norm_min: float = 180.0,
         std_output_activation_offset: float = 0.001,
         std_scale_trainable: bool = True,
+        out_concat: bool = True,
     ):
         """
         Initialize CRTM Architecture.
@@ -40,6 +41,7 @@ class CRTMArchitecture(nn.Module):
         bt_norm_min : float. Minimum brightness temperature for normalization.
         std_output_activation_offset : float. Offset for standard deviation output.
         std_scale_trainable : bool. Whether the standard deviation scale is trainable.
+        out_concat : bool. Whether to concatenate the output tensors.
         """
 
         # Class inheritance
@@ -84,8 +86,9 @@ class CRTMArchitecture(nn.Module):
             self.std_scale = Scale()
         else:
             self.std_scale = None
+        self.out_concat = out_concat
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         """
         Forward pass for the CRTM architecture.
 
@@ -121,4 +124,7 @@ class CRTMArchitecture(nn.Module):
         out_std = out_std + self.std_output_activation_offset
 
         # Concatenate outputs
-        return torch.cat([out, out_std], dim=1)
+        if self.out_concat:
+            return torch.cat([out, out_std], dim=1)
+        else:
+            return out, out_std

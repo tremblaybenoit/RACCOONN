@@ -18,3 +18,4 @@ bt_norm_max: 355
 bt_norm_min: 180
 std_output_activation_offset: 0.001
 std_scale_trainable: true
+out_concat: false

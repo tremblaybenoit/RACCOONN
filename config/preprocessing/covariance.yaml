@@ -113,7 +113,7 @@ covariance:
     input:
       # Innovation estimates for the observation variables
       data:
-        load: ${data.stage.all.variables.hofx_forward_stdev.load}
+        load: ${data.stage.all.variables.hofx_stdev.load}
         transformations:  null
       # Latitude
       lat:
@@ -130,7 +130,7 @@ covariance:
     regularization_factor: 0.
     # Plot flag
     plot_flag: true
-    # Recentering
+    # Re-centering
     recenter: true
     mean_type: 'temporal'
     # Apply data transformations to the input data before computing the covariance matrix

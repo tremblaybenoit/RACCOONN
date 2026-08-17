@@ -154,7 +154,7 @@ class BaseModel(LightningModule):
         # Stage-dependent operation: Loss
         if stage in ('train', 'valid', 'test') and self.loss is not None:
             # Compute loss
-            loss = self.loss(step['output'], batch['target'])
+            loss = self.loss(step['output'], batch)
             # If dictionary with multiple terms
             if isinstance(loss, dict):
                 # Track total loss
@@ -337,15 +337,13 @@ class BaseModel(LightningModule):
         RuntimeError: If state_dict loading fails with strict=True.
         """
 
-        # Assign checkpoint path (use provided path or fall back to self.ckpt_path)
-        if ckpt_path is None and self.ckpt_path is not None:
-            ckpt_path = self.ckpt_path
-        else:
+        # Use provided path or fall back to instance attribute
+        ckpt_path = ckpt_path or self.ckpt_path
+        if not ckpt_path:
             raise ValueError("No checkpoint path provided and self.ckpt_path is not set")
 
-        # Check if checkpoint exists
         if not os.path.exists(ckpt_path):
-            raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
+            raise FileNotFoundError(f"Checkpoint file not found at: {ckpt_path}")
 
         logger.info(f"Loading checkpoint from: {ckpt_path}")
 

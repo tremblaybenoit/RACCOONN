@@ -1,5 +1,5 @@
 # MSE Loss using LossTerm
-_target_: code.loss.LossTerm
+_target_: code.loss.wrapper.LossTerm
 function:
   _target_: code.loss.basic.MSE
 output_keys: 'hofx_forward'

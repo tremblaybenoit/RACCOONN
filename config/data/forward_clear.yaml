@@ -9,6 +9,7 @@ dtype: 'float32'
 select_input: ['prof', 'meta', 'surf']
 select_target: ['hofx']
 select_context: ['clear_mask', 'cloud_mask', 'daytime_mask', 'nighttime_mask']
+select_output: ['hofx', 'hofx_stdev']
 
 # Original data - Split the data into training, validation, and test sets
 source:

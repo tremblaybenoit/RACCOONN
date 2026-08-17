@@ -727,6 +727,12 @@ def plot_rmse_bars(ax, values, positions, height=0.3, colors=None, labels=None, 
     ax.get_xaxis().set_tick_params(which='both', direction=tickdir, width=tickw, length=tickl, labelsize=font_size,
                                    bottom=True, top=True)
 
+    # Assuming positions contains integer indices or range bounds:
+    y_min = int(np.floor(positions.min()))
+    y_max = int(np.ceil(positions.max()))
+
+    ax.set_yticks(np.arange(y_min, y_max + 1, 1))
+
     # Set axis labels
     ax.set_ylabel(y_label, fontsize=font_size, labelpad=y_labelpad)
     ax.set_xlabel(x_label, fontsize=font_size, labelpad=x_labelpad)

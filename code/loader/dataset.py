@@ -373,7 +373,7 @@ class MultivariateDataset(Dataset):
         input: DictConfig,
         target: DictConfig | None = None,
         context: DictConfig | None = None,
-        results: DictConfig | None = None,
+        output: DictConfig | None = None,
         as_tensor: bool = True,
     ) -> None:
         """ Initialize MultivariateDataset.
@@ -388,7 +388,7 @@ class MultivariateDataset(Dataset):
                       Must contain the same number of entries in the same order as input.
             context : DictConfig or None. Same structure as input for context variables.
                       Must contain the same number of entries in the same order as input.
-            results : DictConfig or None. Results configuration for saving outputs.
+            output  : DictConfig or None. Results configuration for saving outputs.
             as_tensor : bool. If True, all sub-datasets return tensors; if False, numpy arrays.
                         This value is imposed on all sub-datasets, overriding their configs.
                         Default True.
@@ -428,8 +428,8 @@ class MultivariateDataset(Dataset):
         else:
             self.context_datasets = None
 
-        # Store results config
-        self.results = results
+        # Store output config
+        self.output = output
 
         # Infer dataset length from first input variable
         self._len = len(next(iter(self.input_datasets.values())))
