@@ -1,8 +1,7 @@
 import logging
 import hydra
 from omegaconf import DictConfig
-from utilities.instantiators import instantiate
-from code.train import Operator
+from code.train import Operator, _save_output
 from utilities.logic import get_config_path
 import torch
 # Force full FP32 matmul on CUDA (disable TF32) for more reproducible numerics
@@ -33,13 +32,11 @@ def main(config: DictConfig) -> None:
 
     # Evaluate on prediction set
     logger.info("Predicting using the model...")
-    pred = forward_model.predict(config.loader)
+    output = forward_model.predict(config.loader)
 
     # Save predictions to file
     logger.info("Saving predictions to file...")
-    save_function = instantiate(config.loader.stage.predict.results.output.save)
-    save_function(pred)
-    # TODO: Update for proper handling of results
+    _save_output(output, config.loader.predict)
 
 
 if __name__ == '__main__':

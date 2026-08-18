@@ -215,3 +215,78 @@ class TransformationLayer(nn.Module):
             Transformed tensor.
         """
         return self.transform(x)
+
+
+class TransformationsLayer(nn.Module):
+    """Wrapper for applying transformations (from code.data.transformations) as a torch.nn.Module.
+
+    Supports both single-variable and multi-variable transformations:
+    - Single variable: transformation config → applied to input tensor
+    - Multi-variable: dict of configs → applied to dict of tensors
+    """
+
+    def __init__(self, transformations: DictConfig | dict) -> None:
+        """Initialize transformation layer(s).
+
+        Parameters
+        ----------
+        transformations : DictConfig or dict
+            Single transformation config (DictConfig):
+                {_target_: min_max, stats: {...}}
+                Applied to single input tensor
+
+            Or dict of transformation configs (for multi-variable):
+                {'prof': {_target_: min_max, ...},
+                 'surf': {_target_: min_max, ...},
+                 'meta': {_target_: min_max, ...}}
+                Applied to dict of tensors with matching keys
+
+        Returns
+        -------
+        None.
+        """
+
+        # Class inheritance
+        super().__init__()
+
+        # Detect single vs multi-variable
+        if isinstance(transformations, dict) and not hasattr(transformations, '_target_'):
+            # Multi-variable: dict of configs
+            self.is_multi = True
+            self.transforms = {}
+            for var_name, var_cfg in transformations.items():
+                if var_cfg is not None:
+                    self.transforms[var_name] = instantiate(var_cfg)
+        else:
+            # Single variable: single config (DictConfig)
+            self.is_multi = False
+            self.transform = instantiate(transformations)
+
+    def forward(self, x: torch.Tensor | dict) -> torch.Tensor | dict:
+        """Apply transformation(s) to input.
+
+        Parameters
+        ----------
+        x : torch.Tensor or dict
+            Single tensor (for single-variable) or
+            dict of tensors (for multi-variable)
+
+        Returns
+        -------
+        torch.Tensor or dict
+            Transformed input, same type as input
+        """
+
+        if self.is_multi:
+            # Multi-variable: x is dict
+            output = {}
+            for key, value in x.items():
+                if key in self.transforms and value is not None:
+                    output[key] = self.transforms[key](value)
+                else:
+                    # Pass through unchanged
+                    output[key] = value
+            return output
+        else:
+            # Single variable: x is tensor
+            return self.transform(x)

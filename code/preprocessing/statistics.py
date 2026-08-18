@@ -39,7 +39,8 @@ def read_statistics(load: DictConfig, tensor: bool = False, dtype: str = 'float3
     return stats
 
 
-def read_statistics_var(load: DictConfig, key: str, tensor: bool = False, dtype: str = 'float32') -> dict:
+def read_statistics_var(load: DictConfig, key: str, tensor: bool = False, dtype: str = 'float32',
+                        split: DictConfig | slice | None = None) -> dict:
     """ Read statistics of a specific variable from a file.
 
         Parameters
@@ -48,6 +49,7 @@ def read_statistics_var(load: DictConfig, key: str, tensor: bool = False, dtype:
         key: str. Variable to read statistics for.
         tensor: bool. If True, returns statistics as torch tensors, otherwise as numpy arrays.
         dtype: str. Data type of the torch tensors (if tensor=True).
+        split: slice or None. If provided, slice the statistics along the first axis.
 
         Returns
         -------
@@ -69,6 +71,12 @@ def read_statistics_var(load: DictConfig, key: str, tensor: bool = False, dtype:
     # If key is hofx, only read the first 10 values
     if key == 'hofx':
         stats = {key: value[0:10] for key, value in stats.items()}
+
+    # Apply slicing if split is provided
+    if split is not None:
+        if isinstance(split, DictConfig):
+            split = instantiate(split)
+        stats = {key: value[split] if isinstance(value, np.ndarray) else value for key, value in stats.items()}
 
     # Return statistics for the specified variable
     return stats

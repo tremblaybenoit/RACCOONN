@@ -18,9 +18,26 @@ loss: ${loss}
 architecture: ${architecture}
 
 # Forward model - reference external config
-forward_model: 
-#  _target_: code.model.base.load_model_from_config
-#  path: ../forward_outputs/forward_default/checkpoints/default/model.yaml
+forward_model:
   _target_: code.model.forward.ForwardModel
   ckpt_path: ../forward_outputs/forward_default/checkpoints/default/model.ckpt
   architecture: ../forward_outputs/forward_default/checkpoints/default/architecture.yaml
+
+
+# Forward model - reference external config
+# forward:
+#   model:
+#     _target_: code.model.forward.ForwardModel
+#     ckpt_path: ../forward_outputs/forward_default/checkpoints/default/model.ckpt
+#     architecture: ../forward_outputs/forward_default/checkpoints/default/architecture.yaml
+#  transformations:
+#
+#
+#
+# forward_model:
+#   _target_: torch.nn.Sequential
+#   _args_:
+#     - Transformation layer
+#     - _target_: code.model.forward.ForwardModel
+#       ckpt_path: ../forward_outputs/forward_default/checkpoints/default/model.ckpt
+#       architecture: ../forward_outputs/forward_default/checkpoints/default/architecture.yaml

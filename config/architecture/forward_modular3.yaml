@@ -8,6 +8,13 @@ positional_encoding: null
 input_layer:
   _target_: code.architecture.mlp.MLPBlock
   _recursive_: false
+  pre_process:
+    _target_: code.architecture.layer.TransformationsLayer
+    _partial_: true
+    transformations:
+      _target_: code.loader.dataset.select_transformations
+      _recursive_: false
+      config: ${loader.stage.train.input}
   in_features: # Total input features (profiles + surface + meta)
     _target_: builtins.sum
     _args_:
@@ -53,7 +60,11 @@ output_layer:
       post_process:
         _target_: code.data.transformations.min_max
         _partial_: true
-        stats: ${data.stage.train.variables.hofx.transformations.normalization.stats}
+        stats:
+          _target_: code.preprocessing.statistics.read_statistics_var
+          load: ${preprocessing.statistics.output.load}
+          key: 'hofx'
+          dtype: ${data.dtype}
         inverse_transform: true
 
     # Head 2: Std uncertainty with Softplus and learnable scaling

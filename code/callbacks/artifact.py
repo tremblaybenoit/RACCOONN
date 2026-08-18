@@ -533,7 +533,7 @@ class ForwardLogger(ArtifactLogger):
         """
 
         # Get radiance channels
-        channels = trainer.datamodule.ds_valid.target_datasets['hofx'].type
+        channels = trainer.datamodule.valid.target_datasets['hofx'].type
         n_channels = len(channels)
 
         # Extract metrics (already numpy arrays from RunningStats.compute())
@@ -553,7 +553,8 @@ class ForwardLogger(ArtifactLogger):
         self.figs.append(
             fig_rmse_bars(
                 rmse,
-                None,
+                channels=np.arange(0, n_channels),
+                x_range=[[0, 2.0]],
                 labels=labels,
                 colors=colors,
                 # channels=channels,

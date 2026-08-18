@@ -7,6 +7,50 @@ from utilities.instantiators import instantiate
 from typing import Literal
 
 
+def split_slice(*args):
+    """ Create a numpy slice object from arguments using numpy.s_.
+
+        Supports flexible indexing: single or multi-dimensional, with support for
+        slices, integers, None (for :), and lists/tuples (converted to multi-dim indexing).
+
+        Parameters
+        ----------
+        *args: int, slice, None, Ellipsis, or list/tuple
+            Indexing arguments:
+            - Single argument for 1D indexing (e.g., 5, 1:10, None)
+            - Multiple arguments for multi-dimensional indexing
+            - List/tuple arguments are converted to tuples for multi-dim indexing
+            - None represents : (all elements)
+            - Ellipsis (...) is supported
+
+        Returns
+        -------
+        Index object: numpy.s_ indexed result (np.s_[...]).
+            Can be directly used to index arrays: array[result]
+
+        Examples
+        --------
+        split_slice(1, 10)                      # -> np.s_[1, 10]
+        split_slice([1, 10])                    # -> np.s_[1, 10] (tuple conversion)
+        split_slice(slice(1, 10))               # -> np.s_[1:10]
+        split_slice(slice(1, 10), None)         # -> np.s_[1:10, :]
+        split_slice([slice(1, 10), None])       # -> np.s_[1:10, :] (tuple conversion)
+    """
+
+    if len(args) == 0:
+        return np.s_[:]
+    elif len(args) == 1:
+        spec = args[0]
+        # Convert list to tuple for proper multi-dimensional indexing
+        if isinstance(spec, list):
+            return np.s_[tuple(spec)]
+        else:
+            return np.s_[spec]
+    else:
+        # Multiple arguments: pass as tuple for multi-dimensional indexing
+        return np.s_[args]
+
+
 def save_pkl(path: str, data: dict) -> None:
     """ Save a dictionary as a pickle file.
 
@@ -124,7 +168,7 @@ def load_npy(path: str, split: np.ndarray | int | slice | None = None, dtype: st
         if isinstance(split, int):
             return np.asarray(data[split:split+1].squeeze(0), dtype=dtype)
         # Slice of indices
-        elif isinstance(split, slice):
+        elif isinstance(split, (slice, tuple)):
             if data.dtype == np.dtype(dtype):
                 return data[split]
             return np.asarray(data[split], dtype=dtype)

@@ -81,9 +81,8 @@ def main(config: DictConfig) -> None:
 
     # Plots
     logger.info("Plot comparison...")
-    fig2 = fig_rmse_bars(rmse,
-                         x_range=[[0, 0.8]],
-                         colors = colors, labels=labels,
+    fig2 = fig_rmse_bars(rmse, channels=np.arange(n_channels), x_range=[[0, 0.8]],
+                         colors=colors, labels=labels,
                          title=["Forward model RMSE per channel"])
     save_plot(fig2, config.paths.run_dir + '/hofx_test_rmse_bars.png')
 
