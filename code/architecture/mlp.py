@@ -742,6 +742,7 @@ class MLPModular(nn.Module):
 
     def __init__(
         self,
+        pre_process: DictConfig | nn.Module | None = None,
         positional_encoding: DictConfig | nn.Module | None = None,
         input_layer: DictConfig | nn.Module | None = None,
         hidden_layer: DictConfig | nn.Module | None = None,
@@ -756,6 +757,10 @@ class MLPModular(nn.Module):
 
         Parameters
         ----------
+        pre_process : DictConfig or nn.Module or None, default=None
+            Optional preprocessing layer applied to raw input before positional encoding.
+            Can be used for normalization, transformations, or other input preprocessing.
+            If None, input is passed directly to positional encoding.
         positional_encoding : DictConfig or nn.Module or None, default=None
             Optional positional/coordinate encoding to prepend to input.
             If None, input is used as-is (no encoding).
@@ -792,6 +797,14 @@ class MLPModular(nn.Module):
 
         # Class inheritance
         super().__init__()
+
+        # Preprocessing Layer (applied first to raw input)
+        if isinstance(pre_process, DictConfig):
+            self.pre_process = instantiate(pre_process)
+        elif isinstance(pre_process, nn.Module):
+            self.pre_process = pre_process
+        else:
+            self.pre_process = nn.Identity()
 
         # Positional Encoding
         if isinstance(positional_encoding, DictConfig):
@@ -892,15 +905,16 @@ class MLPModular(nn.Module):
         self.input_out_dim = input_out_dim
         self.hidden_out_dim = current_dim
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor | tuple[torch.Tensor, ...]:
+    def forward(self, x: torch.Tensor | dict) -> torch.Tensor | tuple[torch.Tensor, ...]:
         """
         Forward pass through the modular MLP.
 
         Data flow:
-        1. Positional encoding (if configured)
-        2. Input layer projection
-        3. Hidden layer with optional encoding injection
-        4. Output layer with optional skip connections and encoding injection
+        1. Preprocessing layer (if configured)
+        2. Positional encoding (if configured)
+        3. Input layer projection
+        4. Hidden layer with optional encoding injection
+        5. Output layer with optional skip connections and encoding injection
 
         Parameters
         ----------
@@ -913,6 +927,17 @@ class MLPModular(nn.Module):
             Output from output_layer. Can be either a single tensor or a tuple of tensors
             if the output_layer returns multiple outputs.
         """
+
+        # Preprocessing Layer
+        x = self.pre_process(x)
+
+        # Concatenate input
+        if isinstance(x, dict):
+            x = [
+                x.reshape(x.size(0), -1) if x.dim() > 2 else x
+                for x in x.values()
+            ]
+            x = torch.cat(x, dim=-1)
 
         # Positional Encoding
         x_enc = self.positional_encoding(x)

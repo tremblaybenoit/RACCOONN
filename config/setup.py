@@ -4,6 +4,7 @@ from omegaconf import OmegaConf
 from hydra import initialize, compose
 from hydra.core.hydra_config import HydraConfig
 import argparse
+import config.resolvers  # Register custom Hydra resolvers
 
 
 def get_filenames(

@@ -294,16 +294,10 @@ def multiplication(data: np.ndarray | torch.Tensor, factor: np.ndarray | torch.T
             else torch.finfo(scaling_factor.dtype).eps
         denom = scaling_factor + eps
         # Divide
-        if isinstance(data, torch.Tensor):
-            return data.div_(denom)  # type: ignore
-        else:
-            return np.divide(data, denom, out=data)
+        return data/denom
     else:
         # Multiply
-        if isinstance(data, torch.Tensor):
-            return data.mul_(scaling_factor)  # type: ignore
-        else:
-            return np.multiply(data, scaling_factor, out=data)
+        return data*scaling_factor
 
 
 def translation(data: np.ndarray | torch.Tensor, value: np.ndarray | torch.Tensor,
@@ -327,15 +321,9 @@ def translation(data: np.ndarray | torch.Tensor, value: np.ndarray | torch.Tenso
     # Un-standardization or standardization
     if inverse_transform:
         # Subtract
-        if isinstance(data, torch.Tensor):
-            return data.sub_(shift_value)  # type: ignore
-        else:
-            return np.subtract(data, shift_value, out=data)
+        return data - shift_value
     else:
-        if isinstance(data, torch.Tensor):
-            return data.add_(shift_value)  # type: ignore
-        else:
-            return np.add(data, shift_value, out=data)
+        return data + shift_value
 
 
 def affine(data: np.ndarray | torch.Tensor, factor: np.ndarray | torch.Tensor, value: np.ndarray | torch.Tensor,

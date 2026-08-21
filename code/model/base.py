@@ -107,6 +107,7 @@ class BaseModel(LightningModule):
         """
 
         # Reshape all tensors to 2D (batch, features) before concatenation
+        # TODO: Consider whether to do here or within the network
         reshaped = [
             x.reshape(x.size(0), -1) if x.dim() > 2 else x
             for x in input_dict.values()

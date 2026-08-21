@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from omegaconf import DictConfig
 from utilities.instantiators import instantiate
+from code.data.transformations import compose_transformations
 
 
 class ScaleLayer(nn.Module):
@@ -179,16 +180,24 @@ class AffineLayer(nn.Module):
 
 
 class TransformationLayer(nn.Module):
-    """Wrapper for applying a transformation (from code.data.transformations) as a torch.nn.Module."""
+    """Wrapper for applying a single transformation pipeline as a torch.nn.Module.
+    
+    Wraps code.data.transformations.compose_transformations for single-variable use.
+    """
 
-    def __init__(self, transformation: DictConfig) -> None:
-        """Initialize a transformation layer.
+    def __init__(self, transformations: DictConfig | None = None,
+                 inverse_transform: bool = False) -> None:
+        """Initialize transformation layer.
 
         Parameters
         ----------
-        transformation : DictConfig
-            Configuration dictionary specifying the transformation to apply.
-            Must include '_target_' key pointing to the transformation function.
+        transformations : DictConfig | None
+            Transformation config: {_target_: min_max, stats: {...}}
+            Or None for identity (no-op).
+        
+        inverse_transform : bool, default=False
+            If True, applies inverse transformations (denormalization).
+            If False, applies forward transformations (normalization).
 
         Returns
         -------
@@ -198,21 +207,21 @@ class TransformationLayer(nn.Module):
         # Class inheritance
         super().__init__()
 
-        # Transform to apply
-        self.transform = instantiate(transformation)
+        # Compose transformations
+        self.transform = compose_transformations(transformations, inverse_transform=inverse_transform)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Apply the transformation to input.
+        """Apply transformation to input.
 
         Parameters
         ----------
         x : torch.Tensor
-            Input tensor.
+            Input tensor
 
         Returns
         -------
         torch.Tensor
-            Transformed tensor.
+            Transformed tensor
         """
         return self.transform(x)
 
@@ -225,12 +234,13 @@ class TransformationsLayer(nn.Module):
     - Multi-variable: dict of configs → applied to dict of tensors
     """
 
-    def __init__(self, transformations: DictConfig | dict) -> None:
+    def __init__(self, transformations: DictConfig,
+                 inverse_transform: bool = False) -> None:
         """Initialize transformation layer(s).
 
         Parameters
         ----------
-        transformations : DictConfig or dict
+        transformations : DictConfig
             Single transformation config (DictConfig):
                 {_target_: min_max, stats: {...}}
                 Applied to single input tensor
@@ -241,6 +251,10 @@ class TransformationsLayer(nn.Module):
                  'meta': {_target_: min_max, ...}}
                 Applied to dict of tensors with matching keys
 
+        inverse_transform : bool, default=False
+            If True, applies inverse transformations (denormalization).
+            If False, applies forward transformations (normalization).
+
         Returns
         -------
         None.
@@ -249,44 +263,56 @@ class TransformationsLayer(nn.Module):
         # Class inheritance
         super().__init__()
 
-        # Detect single vs multi-variable
-        if isinstance(transformations, dict) and not hasattr(transformations, '_target_'):
-            # Multi-variable: dict of configs
-            self.is_multi = True
-            self.transforms = {}
-            for var_name, var_cfg in transformations.items():
-                if var_cfg is not None:
-                    self.transforms[var_name] = instantiate(var_cfg)
-        else:
-            # Single variable: single config (DictConfig)
-            self.is_multi = False
-            self.transform = instantiate(transformations)
+        # Pre-build modules and segregate keys to eliminate runtime string hashing
+        modules = {}
+        for var_name, var_cfg in transformations.items():
+            if var_cfg is not None:
+                modules[str(var_name)] = TransformationLayer(var_cfg, inverse_transform=inverse_transform)
+
+        self.layers = nn.ModuleDict(modules)
+        # Store keys as a tuple for ultra-fast iteration
+        self.keys = tuple(self.layers.keys())
 
     def forward(self, x: torch.Tensor | dict) -> torch.Tensor | dict:
         """Apply transformation(s) to input.
 
         Parameters
         ----------
-        x : torch.Tensor or dict
-            Single tensor (for single-variable) or
-            dict of tensors (for multi-variable)
+        x : dict
+            Dict of tensors (for multi-variable) or
+            dict with a single tensor (for single-variable)
 
         Returns
         -------
-        torch.Tensor or dict
+        dict
             Transformed input, same type as input
         """
 
-        if self.is_multi:
-            # Multi-variable: x is dict
-            output = {}
-            for key, value in x.items():
-                if key in self.transforms and value is not None:
-                    output[key] = self.transforms[key](value)
-                else:
-                    # Pass through unchanged
-                    output[key] = value
-            return output
-        else:
-            # Single variable: x is tensor
-            return self.transform(x)
+        # Fallback if already a tensor
+        if not isinstance(x, dict):
+            transformed = self.layers(x) if self.layers is not None else x
+            if transformed.dim() > 2:
+                transformed = transformed.reshape(transformed.size(0), -1)
+            return transformed
+
+        # Fast path execution using pre-registered keys
+        tensors = []
+        for key, val in x.items():
+
+            # Route through transformation layer if it exists, otherwise pass through
+            if key in self.keys:
+                transformed = self.layers[key](val)
+            else:
+                transformed = val
+
+            # Efficient spatial flattening (keeps batch dimension 0 intact)
+            if transformed.dim() > 2:
+                transformed = transformed.flatten(start_dim=1)
+
+            tensors.append(transformed)
+
+        if not tensors:
+            raise ValueError("No valid tensors found in the input dictionary.")
+
+        # Concatenate all variables into a single tensor along the feature dimension
+        return torch.cat(tensors, dim=-1)

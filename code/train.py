@@ -9,7 +9,6 @@ import pytorch_lightning as lightning
 from utilities.logger import TrainerLogger
 from utilities.instantiators import instantiate, instantiate_list
 from utilities.logic import get_config_path
-from code.data.transformations import compose_transformations
 # Force full FP32 matmul on CUDA (disable TF32) for more reproducible numerics
 torch.set_float32_matmul_precision('highest')
 torch.backends.cuda.matmul.allow_tf32 = False
@@ -74,39 +73,7 @@ def _accumulate_output(batch_output: list, keys: list | None = None,
         else:
             return lst
 
-    accumulated = {key: concat_recursive(value) for key, value in accumulated.items()}
-
-    # Apply inverse transformations to accumulated keys based on stage config
-    """
-    if config_stage is not None:
-        logger.info(f"Applying inverse transformations...")
-
-        # For each accumulated key, check if there's configuration for it
-        for acc_key in accumulated.keys():
-            if hasattr(config_stage, acc_key):
-                # Extract key-specific config
-                key_config = getattr(config_stage, acc_key)
-                acc_data = accumulated[acc_key]
-
-                # Handle nested dict structure (e.g., {'hofx': array, 'prof': array})
-                if isinstance(acc_data, dict):
-                    # Loop over variables
-                    for var_name, var_data in acc_data.items():
-                        if var_name in key_config and hasattr(key_config[var_name], 'transformations'):
-                            var_transforms = key_config[var_name].transformations
-                            if var_transforms is not None:
-                                # Apply inverse transformation
-                                transform_fn = compose_transformations(var_transforms, inverse_transform=True)
-                                accumulated[acc_key][var_name] = transform_fn(var_data)
-                # Handle flat array structure (single variable)
-                elif hasattr(key_config, 'transformations'):
-                    var_transforms = key_config.transformations
-                    if var_transforms is not None:
-                        transform_fn = compose_transformations(var_transforms, inverse_transform=True)
-                        accumulated[acc_key] = transform_fn(acc_data)
-    """
-
-    return accumulated
+    return {key: concat_recursive(value) for key, value in accumulated.items()}
 
 
 def _save_output(output: dict, config_stage: DictConfig) -> None:
@@ -249,6 +216,7 @@ class Operator:
         # Set dtype
         dtype = self.config.data.get('dtype', 'float32')
         self.model = self.model.to(None, dtype=getattr(torch, dtype))
+        self.model = torch.compile(self.model, mode="reduce-overhead")
 
     def _run_model(self) -> dict:
         """ Run model to generate a prediction.
@@ -292,6 +260,24 @@ class Operator:
         ckpt_resume = self.config.get("resume_from_checkpoint", None)
         ckpt_init = self.config.get("init_from_checkpoint", None)
 
+        # Save resolved model configuration for downstream use
+        config_architecture_path = os.path.join(self.config.paths.checkpoint_dir, "architecture.yaml")
+        with open(config_architecture_path, 'w') as f:
+            OmegaConf.save(self.config.model.architecture, f)
+        logger.info(f"Saving model architecture configuration...")
+
+        # Save resolved model configuration for downstream use
+        config_model_path = os.path.join(self.config.paths.checkpoint_dir, "model.yaml")
+        with open(config_model_path, 'w') as f:
+            OmegaConf.save(self.config.model, f)
+        logger.info(f"Saving model configuration...")
+
+        # Save resolved experiment configuration for downstream use
+        config_experiment_path = os.path.join(self.config.paths.checkpoint_dir, "experiment.yaml")
+        with open(config_experiment_path, 'w') as f:
+            OmegaConf.save(self.config, f)
+        logger.info(f"Saving experiment configuration...")
+
         # Resume: Trainer handles checkpoint restoration (weights + optimizer + scheduler)
         if ckpt_resume and os.path.exists(ckpt_resume):
             logger.info(f"Resuming training from checkpoint: {ckpt_resume}")
@@ -314,24 +300,6 @@ class Operator:
         # Save optimal model checkpoint along with configuration
         logger.info("Saving model checkpoint...")
         self.trainer.save_checkpoint(self.model.ckpt_path, weights_only=False)
-
-        # Save resolved model configuration for downstream use
-        config_architecture_path = os.path.join(self.config.paths.checkpoint_dir, "architecture.yaml")
-        with open(config_architecture_path, 'w') as f:
-            OmegaConf.save(self.config.model.architecture, f)
-        logger.info(f"Saving model architecture configuration...")
-
-        # Save resolved model configuration for downstream use
-        config_model_path = os.path.join(self.config.paths.checkpoint_dir, "model.yaml")
-        with open(config_model_path, 'w') as f:
-            OmegaConf.save(self.config.model, f)
-        logger.info(f"Saving model configuration...")
-
-        # Save resolved experiment configuration for downstream use
-        config_experiment_path = os.path.join(self.config.paths.checkpoint_dir, "experiment.yaml")
-        with open(config_experiment_path, 'w') as f:
-            OmegaConf.save(self.config, f)
-        logger.info(f"Saving experiment configuration...")
 
     def test(self) -> None:
         """ Loads data, callbacks, trainer, and then tests the model.
