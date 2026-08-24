@@ -25,6 +25,7 @@ class InverseModel(BaseModel):
         optimizer: DictConfig | None = None,
         scheduler: DictConfig | None = None,
         loss: DictConfig | Callable | None = None,
+        post_process: DictConfig | None = None,
         forward_model: DictConfig | ForwardModel | None = None,
     ) -> None:
         """
@@ -42,6 +43,8 @@ class InverseModel(BaseModel):
             Learning rate scheduler configuration
         loss : DictConfig | Callable, optional
             Loss function configuration
+        post_process : DictConfig, optional
+            Post-processing layer configuration to transform outputs to physical space.
         forward_model : DictConfig | ForwardModel, optional
             Configuration for the forward model used in physics-informed loss computation.
             If DictConfig, can include 'ckpt_path' key to load pre-trained weights.
@@ -54,6 +57,7 @@ class InverseModel(BaseModel):
             optimizer=optimizer,
             scheduler=scheduler,
             loss=loss,
+            post_process=post_process,
         )
 
         # Forward model (observation operator)
@@ -119,11 +123,13 @@ class InverseModel(BaseModel):
         return out.view(batch_size, n_levels, n_prof).transpose(1, 2)
 
     def _infer(self, batch: dict) -> dict:
-        """ Build output structure for inverse model.
+        """ Build output structure for inverse model with post-processing.
 
         Performs profile inversion and optionally applies forward model
-        to compute observation consistency (hofx). Receives full batch
-        to enable access to batch['context'] for forward model evaluation.
+        to compute observation consistency. Applies post-processing to transform
+        outputs to physical space.
+
+        Receives full batch to enable access to batch['context'] for forward model evaluation.
 
         Parameters
         ----------
@@ -133,26 +139,33 @@ class InverseModel(BaseModel):
         Returns
         -------
         dict
-            Dictionary containing {'prof': predictions, 'hofx': optional}.
+            Dictionary with 'output' key containing post-processed predictions in physical space.
         """
 
         # Inversion of atmospheric profiles
-        output = {'prof': self.forward(batch['input'])}
+        output_dict = {'prof': self.forward(batch['input'])}
 
         # Forward-modeled observations (requires batch['context'])
         if self.forward_model is not None and 'context' in batch:
             if all(k in batch['context'] for k in ['surf', 'meta']):
                 forward_model_output = self.forward_model(
                     {
-                        'prof': output['prof'],
+                        'prof': output_dict['prof'],
                         'surf': batch['context']['surf'],
                         'meta': batch['context']['meta']
                     }
                 )
                 if isinstance(forward_model_output, torch.Tensor):
-                    output['hofx'] = forward_model_output
+                    output_dict['bt_inverse'] = forward_model_output
                 elif isinstance(forward_model_output, tuple):
-                    output['hofx'] = forward_model_output[0]
-                    output['hofx_stdev'] = forward_model_output[1]
+                    output_dict['bt_inverse'] = forward_model_output[0]
+                    output_dict['bt_inverse_stdev'] = forward_model_output[1]
+
+        # Wrap in output structure
+        output = {'output': output_dict}
+
+        # Apply post-processing to transform outputs to physical space
+        if self.post_process is not None:
+            output['output'] = self.post_process(output['output'])
 
         return output

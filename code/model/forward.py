@@ -24,6 +24,7 @@ class ForwardModel(BaseModel):
         optimizer: DictConfig | None = None,
         scheduler: DictConfig | None = None,
         loss: DictConfig | None = None,
+        post_process: DictConfig | None = None,
     ) -> None:
         """
         Initialize ForwardModel.
@@ -40,6 +41,8 @@ class ForwardModel(BaseModel):
             Learning rate scheduler configuration
         loss : DictConfig, optional
             Loss function configuration
+        post_process : DictConfig, optional
+            Post-processing layer configuration to transform outputs to physical space.
         """
 
         # Class inheritance
@@ -49,12 +52,13 @@ class ForwardModel(BaseModel):
             optimizer=optimizer,
             scheduler=scheduler,
             loss=loss,
+            post_process=post_process,
         )
 
     def _infer(self, batch: dict) -> dict:
-        """ Build output structure for forward model.
+        """ Build output structure for forward model with post-processing.
 
-        Wraps forward model predictions with 'hofx' (homogenized observed radiance) key.
+        Wraps forward model predictions with structured key and applies post-processing.
 
         Parameters
         ----------
@@ -64,14 +68,20 @@ class ForwardModel(BaseModel):
         Returns
         -------
         dict
-            Dictionary with 'output' key containing {'hofx': predictions}.
+            Dictionary with 'output' key containing predictions in physical space.
         """
 
         # Forward pass
         out = self.forward(batch['input'])
         if isinstance(out, torch.Tensor):
-            return {'output': {'hofx': out}}
+            output = {'output': {'bt_forward': out}}
         elif isinstance(out, tuple):
-            return {'output': {'hofx': out[0], 'hofx_stdev': out[1]}}
+            output = {'output': {'bt_forward': out[0], 'bt_forward_stdev': out[1]}}
         else:
             raise ValueError("Forward model output must be a torch.Tensor or a tuple of tensors.")
+
+        # Apply post-processing to transform outputs to physical space
+        if self.post_process is not None:
+            output['output'] = self.post_process(output['output'])
+
+        return output

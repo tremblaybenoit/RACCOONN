@@ -9,8 +9,8 @@ config:
       _target_: code.loss.LossTerm
       function:
         _target_: code.loss.basic.MSE
-      output_keys: 'hofx_forward'
-      target_keys: 'hofx_forward'
+      output_keys: 'bt_forward'
+      target_keys: 'bt_crtm'
 
   # Model constraint: inverted profile vs. prior with pressure mask
   prof:
@@ -19,7 +19,7 @@ config:
       _target_: code.loss.LossTerm
       function:
         _target_: code.loss.basic.MSE
-      output_keys: 'prof'
+      output_keys: 'prof_inverse'
       target_keys: 'prof_prior'
       # context_keys: 'variant_mask'
 

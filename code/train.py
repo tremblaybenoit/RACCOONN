@@ -37,7 +37,7 @@ def _accumulate_output(batch_output: list, keys: list | None = None,
         -------
         dict. Dictionary with accumulated results (numpy arrays concatenated across batches).
               Inverse transformations applied to denormalize data.
-              Example: {'output': {'hofx': array_denormalized, 'prof': array_denormalized}, ...}
+              Example: {'output': {'bt_forward': array_denormalized, 'prof': array_denormalized}, ...}
     """
 
     # Default: Accumulate common keys
@@ -88,7 +88,7 @@ def _save_output(output: dict, config_stage: DictConfig) -> None:
         -------
         dict. Dictionary with accumulated results (numpy arrays concatenated across batches).
               Inverse transformations applied to denormalize data.
-              Example: {'output': {'hofx': array_denormalized, 'prof': array_denormalized}, ...}
+              Example: {'output': {'bt_forward': array_denormalized, 'prof': array_denormalized}, ...}
     """
 
     # Loop over types of outputs
@@ -343,7 +343,7 @@ class Operator:
             Returns
             -------
             dict. Accumulated predictions from the model with structure:
-                  {'output': {'hofx': array, 'prof': array, ...}, ...}
+                  {'output': {'bt_forward': array, 'prof': array, ...}, ...}
         """
 
         # Create output directories for all result variables

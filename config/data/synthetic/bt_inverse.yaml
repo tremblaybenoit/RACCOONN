@@ -9,16 +9,16 @@ train:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    nnofx:
+    bt_inverse:
       # Dataset class
       _target_: code.loader.dataset.EagerDataset
       _recursive_: false
       # Path to the HOFX (simulated observations) file
-      path: ${...dir}/nnofx.npy
+      path: ${paths.run_dir}/bt_inverse_train.npy
       # Channels
-      type: ${..hofx.type}
+      type: ${..bt_crtm.type}
       # Number of variables
-      n: ${..hofx.n}
+      n: ${..bt_crtm.n}
       # Loading function
       load:
         _target_: code.data.io.load_npy
@@ -41,132 +41,118 @@ train:
           stats:
             _target_: code.preprocessing.statistics.read_statistics_var
             load: ${preprocessing.statistics.output.load}
-            key: 'nnofx'
+            key: 'bt_crtm'
             dtype: ${data.dtype}
 # Validation set
 valid:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    nnofx:
+    bt_inverse:
       # Dataset class
-      _target_: ${....train.variables.nnofx._target_}
+      _target_: ${....train.variables.bt_inverse._target_}
       _recursive_: false
       # Path to the HOFX (simulated observations) file
-      path: ${...dir}/nnofx.npy
+      path: ${paths.run_dir}/bt_inverse_valid.npy
       # Channels
-      type: ${....train.variables.nnofx.type}
+      type: ${....train.variables.bt_inverse.type}
       # Number of variables
-      n: ${....train.variables.nnofx.n}
+      n: ${....train.variables.bt_inverse.n}
       # Loading function
       load:
-        _target_: ${.....train.variables.nnofx.load._target_}
+        _target_: ${.....train.variables.bt_inverse.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Save function
       save:
-        _target_: ${.....train.variables.nnofx.save._target_}
+        _target_: ${.....train.variables.bt_inverse.save._target_}
         _partial_: true
         _args_:
           - ${...path}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${....train.variables.nnofx.transformations}
+      transformations: ${....train.variables.bt_inverse.transformations}
 # Test set
 test:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    nnofx:
+    bt_inverse:
       # Dataset class
-      _target_: ${....train.variables.nnofx._target_}
+      _target_: ${....train.variables.bt_inverse._target_}
       _recursive_: false
       # Path to the HOFX (simulated observations) file
-      path: ${...dir}/nnofx.npy
+      path: ${paths.run_dir}/bt_inverse_test.npy
       # Channels
-      type: ${....train.variables.nnofx.type}
+      type: ${....train.variables.bt_inverse.type}
       # Number of variables
-      n: ${....train.variables.nnofx.n}
+      n: ${....train.variables.bt_inverse.n}
       # Loading function
       load:
-        _target_: ${.....train.variables.nnofx.load._target_}
+        _target_: ${.....train.variables.bt_inverse.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Save function
       save:
-        _target_: ${.....train.variables.nnofx.save._target_}
+        _target_: ${.....train.variables.bt_inverse.save._target_}
         _partial_: true
         _args_:
           - ${...path}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${....train.variables.nnofx.transformations}
-  # Results-specific configuration for the test stage
-  results:
-    # HOFX (Simulated Observations)
-    nnofx:
-      # Path to the HOFX results file
-      path: ${paths.run_dir}/nnofx_test.npy
-      # Save function
-      save:
-        _target_: numpy.save
-        _partial_: true
-        _args_:
-          - ${...path}
-      # Loading function
-      load:
-        _target_: code.data.io.load_npy
-        path: ${..path}
-        dtype: ${data.dtype}
-      # Transformations to apply
-      transformations: ${....train.variables.nnofx.transformations}
+      transformations: ${....train.variables.bt_inverse.transformations}
 # Predict set
 predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    nnofx: ${...test.variables.nnofx}
-  # Results-specific configuration for the predict stage
-  results:
-    # HOFX (Simulated Observations)
-    nnofx:
-      # Path to the HOFX results file
-      path: ${paths.run_dir}/nnofx_predict.npy
+    bt_inverse:
+      # Dataset class
+      _target_: ${....train.variables.bt_inverse._target_}
+      _recursive_: false
+      # Path to the HOFX (simulated observations) file
+      path: ${paths.run_dir}/bt_inverse_predict.npy
+      # Channels
+      type: ${....train.variables.bt_inverse.type}
+      # Number of variables
+      n: ${....train.variables.bt_inverse.n}
+      # Loading function
+      load:
+        _target_: ${.....train.variables.bt_inverse.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
       # Save function
       save:
-        _target_: numpy.save
+        _target_: ${.....train.variables.bt_inverse.save._target_}
         _partial_: true
         _args_:
           - ${...path}
-      # Loading function
-      load:
-        _target_: code.data.io.load_npy
-        path: ${..path}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${....train.variables.nnofx.transformations}
+      transformations: ${....train.variables.bt_inverse.transformations}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    nnofx:
+    bt_inverse:
       # Dataset class
-      _target_: ${....train.variables.nnofx._target_}
+      _target_: ${....train.variables.bt_inverse._target_}
       _recursive_: false
       # Channels
-      type: ${....train.variables.nnofx.type}
+      type: ${....train.variables.bt_inverse.type}
       # Number of variables
-      n: ${....train.variables.nnofx.n}
+      n: ${....train.variables.bt_inverse.n}
       # Loading function
       load:
         _target_: numpy.concatenate
         _args_:
-          - - ${.......train.variables.nnofx.load}
-            - ${.......valid.variables.nnofx.load}
-            - ${.......test.variables.nnofx.load}
+          - - ${.......train.variables.bt_inverse.load}
+            - ${.......valid.variables.bt_inverse.load}
+            - ${.......test.variables.bt_inverse.load}
           - 0
       # Transformations to apply
-      transformations: ${....train.variables.nnofx.transformations}
+      transformations: ${....train.variables.bt_inverse.transformations}

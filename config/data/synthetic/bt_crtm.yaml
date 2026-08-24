@@ -9,12 +9,12 @@ train:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    hofx:
+    bt_crtm:
       # Dataset class
       _target_: code.loader.dataset.EagerDataset
       _recursive_: false
       # Path to the HOFX (simulated observations) file
-      path: ${...dir}/hofx.npy
+      path: ${...dir}/bt_crtm.npy
       # Channels
       type: [
         'Channel 7', 'Channel 8', 'Channel 9', 'Channel 10', 'Channel 11', 'Channel 12',
@@ -47,132 +47,94 @@ train:
           stats:
             _target_: code.preprocessing.statistics.read_statistics_var
             load: ${preprocessing.statistics.output.load}
-            key: 'hofx'
+            key: 'bt_crtm'
             dtype: ${data.dtype}
 # Validation set
 valid:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    hofx:
+    bt_crtm:
       # Dataset class
-      _target_: ${....train.variables.hofx._target_}
+      _target_: ${....train.variables.bt_crtm._target_}
       _recursive_: false
       # Path to the HOFX (simulated observations) file
-      path: ${...dir}/hofx.npy
+      path: ${...dir}/bt_crtm.npy
       # Channels
-      type: ${....train.variables.hofx.type}
+      type: ${....train.variables.bt_crtm.type}
       # Number of variables
-      n: ${....train.variables.hofx.n}
+      n: ${....train.variables.bt_crtm.n}
       # Loading function
       load:
-        _target_: ${.....train.variables.hofx.load._target_}
+        _target_: ${.....train.variables.bt_crtm.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Save function
       save:
-        _target_: ${.....train.variables.hofx.save._target_}
+        _target_: ${.....train.variables.bt_crtm.save._target_}
         _partial_: true
         _args_:
           - ${...path}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${....train.variables.hofx.transformations}
+      transformations: ${....train.variables.bt_crtm.transformations}
 # Test set
 test:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    hofx:
+    bt_crtm:
       # Dataset class
-      _target_: ${....train.variables.hofx._target_}
+      _target_: ${....train.variables.bt_crtm._target_}
       _recursive_: false
       # Path to the HOFX (simulated observations) file
-      path: ${...dir}/hofx.npy
+      path: ${...dir}/bt_crtm.npy
       # Channels
-      type: ${....train.variables.hofx.type}
+      type: ${....train.variables.bt_crtm.type}
       # Number of variables
-      n: ${....train.variables.hofx.n}
+      n: ${....train.variables.bt_crtm.n}
       # Loading function
       load:
-        _target_: ${.....train.variables.hofx.load._target_}
+        _target_: ${.....train.variables.bt_crtm.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Save function
       save:
-        _target_: ${.....train.variables.hofx.save._target_}
+        _target_: ${.....train.variables.bt_crtm.save._target_}
         _partial_: true
         _args_:
           - ${...path}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${....train.variables.hofx.transformations}
-  # Results-specific configuration for the test stage
-  output:
-    # HOFX (Simulated Observations)
-    hofx:
-      # Path to the HOFX results file
-      path: ${paths.run_dir}/hofx_test.npy
-      # Save function
-      save:
-        _target_: numpy.save
-        _partial_: true
-        _args_:
-          - ${...path}
-      # Loading function
-      load:
-        _target_: code.data.io.load_npy
-        path: ${..path}
-        dtype: ${data.dtype}
-      # Transformations to apply
-      transformations: ${....train.variables.hofx.transformations}
+      transformations: ${....train.variables.bt_crtm.transformations}
 # Predict set
 predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    hofx: ${...test.variables.hofx}
-  # Results-specific configuration for the predict stage
-  output:
-    # HOFX (Simulated Observations)
-    hofx:
-      # Path to the HOFX results file
-      path: ${paths.run_dir}/hofx_predict.npy
-      # Save function
-      save:
-        _target_: numpy.save
-        _partial_: true
-        _args_:
-          - ${...path}
-      # Loading function
-      load:
-        _target_: code.data.io.load_npy
-        path: ${..path}
-        dtype: ${data.dtype}
-      # Transformations to apply
-      transformations: ${....train.variables.hofx.transformations}
+    bt_crtm: ${...test.variables.bt_crtm}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    hofx:
+    bt_crtm:
       # Dataset class
-      _target_: ${....train.variables.hofx._target_}
+      _target_: ${....train.variables.bt_crtm._target_}
       _recursive_: false
       # Channels
-      type: ${....train.variables.hofx.type}
+      type: ${....train.variables.bt_crtm.type}
       # Number of variables
-      n: ${....train.variables.hofx.n}
+      n: ${....train.variables.bt_crtm.n}
       # Loading function
       load:
         _target_: numpy.concatenate
         _args_:
-          - - ${.......train.variables.hofx.load}
-            - ${.......valid.variables.hofx.load}
-            - ${.......test.variables.hofx.load}
+          - - ${.......train.variables.bt_crtm.load}
+            - ${.......valid.variables.bt_crtm.load}
+            - ${.......test.variables.bt_crtm.load}
           - 0
       # Transformations to apply
-      transformations: ${....train.variables.hofx.transformations}
+      transformations: ${....train.variables.bt_crtm.transformations}

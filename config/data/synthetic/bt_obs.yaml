@@ -1,0 +1,127 @@
+# Format:
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Observations
+    bt_obs:
+      # Dataset class
+      _target_: code.loader.dataset.EagerDataset
+      _recursive_: false
+      # Path to the observations file
+      path: ${...dir}/bt_obs.npy
+      # Type of data
+      type: ${....train.variables.bt_crtm.type}
+      # Loading function
+      load:
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: code.data.io.save_npy
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations:
+        # Per-variable normalization
+        normalization:
+          _target_: code.data.transformations.identity
+          _partial_: true
+          stats:
+            _target_: code.preprocessing.statistics.read_statistics_var
+            load: ${preprocessing.statistics.output.load}
+            key: 'bt_obs'
+            dtype: ${data.dtype}
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Observations
+    bt_obs:
+      # Dataset class
+      _target_: ${....train.variables.bt_obs._target_}
+      _recursive_: false
+      # Path to the observations file
+      path: ${...dir}/bt_obs.npy
+      # Type of data
+      type: ${....train.variables.bt_obs.type}
+      # Loading function
+      load:
+        _target_: ${.....train.variables.bt_obs.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: ${.....train.variables.bt_obs.save._target_}
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${....train.variables.bt_obs.transformations}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Observations
+    bt_obs:
+      # Dataset class
+      _target_: ${....train.variables.bt_obs._target_}
+      _recursive_: false
+      # Path to the observations file
+      path: ${...dir}/bt_obs.npy
+      # Type of data
+      type: ${....train.variables.bt_obs.type}
+      # Loading function
+      load:
+        _target_: ${.....train.variables.bt_obs.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: ${.....train.variables.bt_obs.save._target_}
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${....train.variables.bt_obs.transformations}
+# Predict set
+predict:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Observations
+    bt_obs: ${...test.variables.bt_obs}
+# All data (complete dataset)
+all:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Observations
+    bt_obs:
+      # Dataset class
+      _target_: ${....train.variables.bt_obs._target_}
+      _recursive_: false
+      # Type of data
+      type: ${....train.variables.bt_obs.type}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......train.variables.bt_obs.load}
+            - ${.......valid.variables.bt_obs.load}
+            - ${.......test.variables.bt_obs.load}
+          - 0
+      # Transformations to apply
+      transformations: ${....train.variables.bt_obs.transformations}
+

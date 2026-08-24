@@ -10,25 +10,49 @@ pin_memory: true  # Pin memory for faster data transfer to GPU
 stage:
   # Training stage
   train:
-    _target_: code.loader.dataset.MultivariateDataset
-    input: ${extract:${data.stage.train.variables},${data.select_input}}
-    target: ${extract:${data.stage.train.variables},${data.select_target}}
-    context: ${extract:${data.stage.train.variables},${data.select_context}}
+    _target_: code.loader.dataset.MultivariateDatasets
+    input:
+      _target_: code.loader.dataset.MultivariateDataset
+      variables: ${extract:${data.stage.train.variables},${data.select_input}}
+    target:
+      _target_: code.loader.dataset.MultivariateDataset
+      variables: ${extract:${data.stage.train.variables},${data.select_target}}
+    context:
+      _target_: code.loader.dataset.MultivariateDataset
+      variables: ${extract:${data.stage.train.variables},${data.select_context}}
   # Validation stage
   valid:
     _target_: ${loader.stage.train._target_}
-    input: ${extract:${data.stage.valid.variables},${data.select_input}}
-    target: ${extract:${data.stage.valid.variables},${data.select_target}}
-    context: ${extract:${data.stage.valid.variables},${data.select_context}}
+    input:
+      _target_: ${loader.stage.train.input._target_}
+      variables: ${extract:${data.stage.valid.variables},${data.select_input}}
+    target:
+      _target_: ${loader.stage.train.target._target_}
+      variables: ${extract:${data.stage.valid.variables},${data.select_target}}
+    context:
+      _target_: ${loader.stage.train.context._target_}
+      variables: ${extract:${data.stage.valid.variables},${data.select_context}}
   # Test stage
   test:
     _target_: ${loader.stage.train._target_}
-    input: ${extract:${data.stage.test.variables},${data.select_input}}
-    target: ${extract:${data.stage.test.variables},${data.select_target}}
-    context: ${extract:${data.stage.test.variables},${data.select_context}}
-    output: ${extract:${data.stage.test.output},${data.select_output}}
+    input:
+      _target_: ${loader.stage.train.input._target_}
+      variables: ${extract:${data.stage.test.variables},${data.select_input}}
+    target:
+      _target_: ${loader.stage.train.target._target_}
+      variables: ${extract:${data.stage.test.variables},${data.select_target}}
+    context:
+      _target_: ${loader.stage.train.context._target_}
+      variables: ${extract:${data.stage.test.variables},${data.select_context}}
+    output:
+      _target_: ${loader.stage.train.output._target_}
+      variables: ${extract:${data.stage.test.output},${data.select_output}}
   # Prediction stage
   predict:
     _target_: ${loader.stage.train._target_}
-    input: ${loader.stage.test.input}
-    output: ${extract:${data.stage.predict.output},${data.select_output}}
+    input:
+      _target_: ${loader.stage.train.input._target_}
+      variables: ${extract:${data.stage.predict.variables},${data.select_input}}
+    output:
+      _target_: ${loader.stage.train.output._target_}
+      variables: ${extract:${data.stage.predict.output},${data.select_output}}

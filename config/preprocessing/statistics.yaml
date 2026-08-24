@@ -5,7 +5,7 @@ statistics:
   _recursive_: false  # Do not instantiate nested objects
   # Exclude variables from the statistics computation
   exclude: ['clear_mask', 'cloud_mask', 'daytime_mask', 'nighttime_mask', 'variant_mask', 'invariant_mask',
-            'prof_prior', 'hofx_forward', 'hofx_forward_mean', 'hofx_forward_stdev']
+            'prof_prior', 'bt_forward', 'bt_forward_stdev', 'bt_inverse', 'bt_inverse_stdev']
   # What the method needs as input
   input: ${data.stage.all.variables}
   # Computation parameters

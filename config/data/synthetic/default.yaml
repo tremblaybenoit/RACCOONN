@@ -1,13 +1,15 @@
 defaults:
+  - bt_crtm
+  - bt_forward
+  - bt_forward_stdev
+  - bt_obs
   - clear_mask
   - cloud_mask
   - daytime_mask
-  - hofx
   - hofx_stdev
   - lat
   - lon
   - meta
-  - obs
   - nighttime_mask
   - pressure
   - pressure_log

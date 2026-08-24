@@ -53,7 +53,7 @@ output_layer:
   out_concat: false
   heads:
     # Head 1: Mean brightness temperature [0,1] -> denormalized to physical range
-    - out_features: ${data.stage.train.variables.hofx.n}
+    - out_features: ${data.stage.train.variables.bt_crtm.n}
       n_layers: 1
       activation:
         _target_: torch.nn.Sigmoid
@@ -63,12 +63,12 @@ output_layer:
         stats:
           _target_: code.preprocessing.statistics.read_statistics_var
           load: ${preprocessing.statistics.output.load}
-          key: 'hofx'
+          key: 'bt_crtm'
           dtype: ${data.dtype}
         inverse_transform: true
 
     # Head 2: Std uncertainty with Softplus and learnable scaling
-    - out_features: ${data.stage.train.variables.hofx.n}
+    - out_features: ${data.stage.train.variables.bt_crtm.n}
       n_layers: 1
       activation:
         _target_: torch.nn.Softplus

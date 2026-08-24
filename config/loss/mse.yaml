@@ -2,6 +2,6 @@
 _target_: code.loss.wrapper.LossTerm
 function:
   _target_: code.loss.basic.MSE
-output_keys: 'hofx_forward'
-target_keys: 'hofx_forward'
+output_keys: 'bt_forward'
+target_keys: 'bt_crtm'
 

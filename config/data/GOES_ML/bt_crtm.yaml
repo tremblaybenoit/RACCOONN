@@ -9,7 +9,7 @@ train:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    hofx:
+    bt_crtm:
       # Dataset class
       _target_: code.loader.dataset.EagerDataset
       _recursive_: false
@@ -38,67 +38,67 @@ valid:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    hofx:
+    bt_crtm:
       # Dataset class
-      _target_: ${....train.variables.hofx._target_}
+      _target_: ${....train.variables.bt_crtm._target_}
       _recursive_: false
       # Path to the HOFX (simulated observations) file
       path: ${...dir}/hofx.npy
       # Channels
-      type: ${....train.variables.hofx.type}
+      type: ${....train.variables.bt_crtm.type}
       # Number of variables
-      n: ${....train.variables.hofx.n}
+      n: ${....train.variables.bt_crtm.n}
       # Loading function
       load:
-        _target_: ${.....train.variables.hofx.load._target_}
+        _target_: ${.....train.variables.bt_crtm.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${....train.variables.hofx.transformations}
+      transformations: ${....train.variables.bt_crtm.transformations}
 # Test set
 test:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    hofx:
+    bt_crtm:
       # Dataset class
-      _target_: ${....train.variables.hofx._target_}
+      _target_: ${....train.variables.bt_crtm._target_}
       _recursive_: false
       # Path to the HOFX (simulated observations) file
       path: ${...dir}/hofx.npy
       # Channels
-      type: ${....train.variables.hofx.type}
+      type: ${....train.variables.bt_crtm.type}
       # Number of variables
-      n: ${....train.variables.hofx.n}
+      n: ${....train.variables.bt_crtm.n}
       # Loading function
       load:
-        _target_: ${.....train.variables.hofx.load._target_}
+        _target_: ${.....train.variables.bt_crtm.load._target_}
         path: ${..path}
         split: ${....split}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations: ${....train.variables.hofx.transformations}
+      transformations: ${....train.variables.bt_crtm.transformations}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    hofx:
+    bt_crtm:
       # Dataset class
-      _target_: ${....train.variables.hofx._target_}
+      _target_: ${....train.variables.bt_crtm._target_}
       _recursive_: false
       # Channels
-      type: ${....train.variables.hofx.type}
+      type: ${....train.variables.bt_crtm.type}
       # Number of variables
-      n: ${....train.variables.hofx.n}
+      n: ${....train.variables.bt_crtm.n}
       # Loading function
       load:
         _target_: numpy.concatenate
         _args_:
-          - - ${.......train.variables.hofx.load}
-            - ${.......valid.variables.hofx.load}
-            - ${.......test.variables.hofx.load}
+          - - ${.......train.variables.bt_crtm.load}
+            - ${.......valid.variables.bt_crtm.load}
+            - ${.......test.variables.bt_crtm.load}
           - 0
       # Transformations to apply
-      transformations: ${....train.variables.hofx.transformations}
+      transformations: ${....train.variables.bt_crtm.transformations}

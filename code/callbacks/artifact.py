@@ -421,15 +421,15 @@ class ForwardLogger(ArtifactLogger):
         targets = batch.get('target', {})
 
         # Extract prediction and convert to numpy
-        pred_data = predictions['hofx']
+        pred_data = predictions['bt_inverse'] if 'bt_inverse' in predictions else predictions.get('bt_forward')
         if isinstance(pred_data, torch.Tensor):
             pred_data = pred_data.detach().cpu().numpy()
 
-        # If 'hofx_mean' is predicted but 'hofx_mean' is not a target, use 'hofx' target
-        if 'nnofx' in targets:
-            target_data = targets.get('nnofx')
+        # If 'bt_forward_mean' is predicted but 'bt_forward_mean' is not a target, use 'bt_forward' target
+        if 'bt_forward' in targets:
+            target_data = targets.get('bt_forward')
         else:
-            target_data = targets.get('hofx')
+            target_data = targets.get('bt_crtm')
         
         if isinstance(target_data, torch.Tensor):
             target_data = target_data.detach().cpu().numpy()
@@ -448,7 +448,7 @@ class ForwardLogger(ArtifactLogger):
             target_data = target_data[:, :n_pred_channels]
 
         # Update runners with mask-based filtering
-        self._update_runners('hofx', pred_data, target_data, batch)
+        self._update_runners('bt', pred_data, target_data, batch)
 
     def _update_runners(self, var_name, pred_data, target_data, batch):
         """
@@ -533,7 +533,13 @@ class ForwardLogger(ArtifactLogger):
         """
 
         # Get radiance channels
-        channels = trainer.datamodule.valid.target_datasets['hofx'].type
+        channel_candidates = ['bt_forward', 'bt_crtm']
+        target_datasets = trainer.datamodule.valid.target_datasets
+        channels = next(
+            (target_datasets[key].type for key in channel_candidates
+             if key in target_datasets),
+            [f"Channel {i}" for i in range(1, 11)]
+        )
         n_channels = len(channels)
 
         # Extract metrics (already numpy arrays from RunningStats.compute())
@@ -622,7 +628,7 @@ class InverseLogger(ArtifactLogger):
         # Create runners for profile metrics
         # Profile shape: [batch, vars, levels]
         self.runners = {
-            'prof': RunningStats(which=self.which_statistics),
+            'prof_inverse': RunningStats(which=self.which_statistics),
         }
         # Static runners
         if self.runners_static:
@@ -673,9 +679,9 @@ class InverseLogger(ArtifactLogger):
         targets = batch.get('target', {})
 
         # Process prof (the only variable InverseLogger cares about)
-        if 'prof' in predictions:
+        if 'prof_inverse' in predictions:
             # Extract prof prediction and convert to numpy
-            pred_data = predictions['prof']
+            pred_data = predictions['prof_inverse']
             if isinstance(pred_data, torch.Tensor):
                 pred_data = pred_data.detach().cpu().numpy()
 
@@ -685,8 +691,8 @@ class InverseLogger(ArtifactLogger):
                 target_data = target_data.detach().cpu().numpy()
 
             # Update prof runner
-            if 'prof' in self.runners:
-                self.runners['prof'].update(
+            if 'prof_inverse' in self.runners:
+                self.runners['prof_inverse'].update(
                     data=pred_data,
                     target=target_data,
                     axis=0
@@ -785,7 +791,7 @@ class InverseLogger(ArtifactLogger):
         prof_labels = None
         try:
             if hasattr(trainer, 'datamodule') and trainer.datamodule is not None:
-                prof_labels = trainer.datamodule.stage.valid.target.variables.prof.type
+                prof_labels = trainer.datamodule.valid.target_datasets.get('prof', {}).type
         except Exception as e:
             logger.warning(f"Could not retrieve profile labels: {e}")
 

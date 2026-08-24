@@ -69,8 +69,8 @@ def read_statistics_var(load: DictConfig, key: str, tensor: bool = False, dtype:
                  for key, value in stats.items()}
 
     # If key is hofx, only read the first 10 values
-    if key == 'hofx':
-        stats = {key: value[0:10] for key, value in stats.items()}
+    # if key == 'hofx':
+    #    stats = {key: value[0:10] for key, value in stats.items()}
 
     # Apply slicing if split is provided
     if split is not None:

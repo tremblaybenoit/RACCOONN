@@ -2,6 +2,6 @@
 _target_: code.loss.wrapper.LossTerm
 function:
   _target_: code.loss.probabilistic.CRPS
-output_keys: ['hofx', 'hofx_stdev']
-target_keys: 'hofx'
+output_keys: ['bt_forward', 'bt_forward_stdev']
+target_keys: 'bt_crtm'
 

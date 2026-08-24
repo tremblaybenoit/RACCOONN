@@ -7,6 +7,7 @@ import gc
 from typing import Callable
 import logging
 import os
+import torch.nn as nn
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -47,7 +48,8 @@ class BaseModel(LightningModule):
     """
 
     def __init__(self, ckpt_path: str | DictConfig, architecture: DictConfig, optimizer: DictConfig | None = None,
-                 scheduler: DictConfig | None = None, loss: DictConfig | Callable | None = None) -> None:
+                 scheduler: DictConfig | None = None, loss: DictConfig | Callable | None = None,
+                 post_process: DictConfig | None = None) -> None:
         """ Initialize model.
 
         Parameters
@@ -57,6 +59,9 @@ class BaseModel(LightningModule):
         optimizer: DictConfig. Optimizer for the model.
         scheduler: DictConfig. Configuration object for the learning rate scheduler (optional).
         loss: DictConfig | Callable. Loss function for the model.
+        post_process: DictConfig or None. Post-processing layer configuration to transform outputs to physical space.
+                      Must instantiate to TransformationLayer or TransformationsLayer.
+                      Applied to model outputs to denormalize/transform predictions. Default None.
 
         Returns
         -------
@@ -84,8 +89,13 @@ class BaseModel(LightningModule):
                 raise ValueError("loss must be a DictConfig or a callable.")
         else:
             self.loss = None
+        # Post-processing layer (denormalization/transformation to physical space)
+        self.post_process: nn.Module | None = None
+        if post_process is not None:
+            self.post_process = instantiate(post_process)
+
         # Store hyperparameters
-        self.save_hyperparameters(ignore=['optimizer', 'scheduler', 'loss'])
+        self.save_hyperparameters(ignore=['optimizer', 'scheduler', 'loss', 'post_process'])
 
     def forward(self, input_dict: dict) -> torch.Tensor:
         """ Perform forward pass through architecture.
@@ -116,10 +126,13 @@ class BaseModel(LightningModule):
         return self.architecture(input_tensor)
 
     def _infer(self, batch: dict) -> dict:
-        """ Build output structure from batch.
+        """ Build output structure from batch with post-processing applied.
 
         Template method for customizing output structure. Receives full batch
         to enable complex logic (e.g., accessing batch['context'] for InverseModel).
+
+        Applies post-processing to transform outputs from normalized/model space
+        to physical space as part of building the final output structure.
 
         Subclasses override this to customize the output structure.
 
@@ -131,9 +144,15 @@ class BaseModel(LightningModule):
         Returns
         -------
         dict
-            Dictionary with 'output' key containing model predictions in desired structure.
+            Dictionary with 'output' key containing model predictions in physical space.
         """
-        return {'output': self.forward(batch['input'])}
+        output = {'output': self.forward(batch['input'])}
+
+        # Apply post-processing to transform outputs to physical space
+        if self.post_process is not None:
+            output['output'] = self.post_process(output['output'])
+
+        return output
 
     def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor | dict:
         """ Perform training/validation/test step.
@@ -142,7 +161,7 @@ class BaseModel(LightningModule):
             ----------
             batch: dict. Batch from the training set.
             batch_nb: int. Index of the batch out of the training set.
-            stage: str. Current operation: "train", "valid", or "test".
+            stage: str. Current operation: "train", "valid", "test", or "predict".
 
             Returns
             -------
@@ -150,11 +169,12 @@ class BaseModel(LightningModule):
         """
 
         # Build structured output (customization point for subclasses via _infer())
+        # _infer() includes post-processing to physical space
         step = self._infer(batch)
 
         # Stage-dependent operation: Loss
         if stage in ('train', 'valid', 'test') and self.loss is not None:
-            # Compute loss
+            # Compute loss on post-processed outputs in physical space
             loss = self.loss(step['output'], batch)
             # If dictionary with multiple terms
             if isinstance(loss, dict):
@@ -295,17 +315,17 @@ class BaseModel(LightningModule):
         return None
 
     def to(self, device, dtype: torch.dtype | None = None, non_blocking: bool = False):
-        """ Move the model and loss function to the specified device.
+        """ Move the model, loss function, and post-process layer to the specified device.
 
         Parameters
         ----------
-        device: torch.device. The device to move the model and loss function to.
+        device: torch.device. The device to move to.
         dtype: torch.dtype. The desired data type of the model parameters (optional).
-        non_blocking: bool. If True, and the source is in pinned memory, the
+        non_blocking: bool. If True, and the source is in pinned memory, transfers asynchronously.
 
         Returns
         -------
-        BaseModel. The instance with model and loss function moved to the specified device.
+        BaseModel. The instance with model, loss, and post-process moved to the specified device.
         """
 
         # Class inheritance
@@ -313,6 +333,9 @@ class BaseModel(LightningModule):
         # Move loss function to device
         if hasattr(self.loss, 'to'):
             self.loss = self.loss.to(device)
+        # Move post-process layer to device
+        if hasattr(self.post_process, 'to'):
+            self.post_process = self.post_process.to(device)
         return self
 
     def load_ckpt(self, ckpt_path: str | None = None, strict: bool = False, freeze: bool = False) -> 'BaseModel':

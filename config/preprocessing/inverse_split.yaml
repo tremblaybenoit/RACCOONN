@@ -128,7 +128,7 @@ covariance:
     input:
       # Innovation estimates for the observation variables
       data:
-        load: ${data.source.all.variables.hofx_forward_stdev.load}
+        load: ${data.source.all.variables.bt_forward_stdev.load}
         transformations: null
       # Latitude
       lat:

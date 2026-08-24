@@ -1,13 +1,13 @@
 defaults:
+  - bt_crtm
+  - bt_obs
   - clear_mask
   - cloud_mask
   - daytime_mask
-  - hofx
   - lat
   - lon
   - meta
   - nighttime_mask
-  - obs
   - pressure
   - prof
   - scans

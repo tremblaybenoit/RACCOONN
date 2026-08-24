@@ -32,8 +32,8 @@ recast:
           cloud_mask: ${data.source.train.variables.cloud_mask}
           # Daytime mask
           daytime_mask: ${data.source.train.variables.daytime_mask}
-          # hofx
-          hofx: ${data.source.train.variables.hofx}
+          # bt_crm
+          bt_crm: ${data.source.train.variables.bt_crm}
           # Latitude
           lat: ${data.source.train.variables.lat}
           # Longitude
@@ -41,7 +41,7 @@ recast:
           # Meta data
           meta: ${data.source.train.variables.meta}
           # Observations
-          obs: ${data.source.train.variables.obs}
+          bt_obs: ${data.source.train.variables.bt_obs}
           # Pressure
           pressure: ${data.source.train.variables.pressure}
           # Atmospheric profiles
@@ -58,8 +58,8 @@ recast:
           cloud_mask: ${data.source.valid.variables.cloud_mask}
           # Daytime mask
           daytime_mask: ${data.source.valid.variables.daytime_mask}
-          # hofx
-          hofx: ${data.source.valid.variables.hofx}
+          # bt_crm
+          bt_crm: ${data.source.valid.variables.bt_crm}
           # Latitude
           lat: ${data.source.valid.variables.lat}
           # Longitude
@@ -67,7 +67,7 @@ recast:
           # Meta data
           meta: ${data.source.valid.variables.meta}
           # Observations
-          obs: ${data.source.valid.variables.obs}
+          bt_obs: ${data.source.valid.variables.bt_obs}
           # Pressure
           pressure: ${data.source.valid.variables.pressure}
           # Atmospheric profiles
@@ -84,8 +84,8 @@ recast:
           cloud_mask: ${data.source.test.variables.cloud_mask}
           # Daytime mask
           daytime_mask: ${data.source.test.variables.daytime_mask}
-          # hofx
-          hofx: ${data.source.test.variables.hofx}
+          # bt_crm
+          bt_crm: ${data.source.test.variables.bt_crm}
           # Latitude
           lat: ${data.source.test.variables.lat}
           # Longitude
@@ -93,7 +93,7 @@ recast:
           # Meta data
           meta: ${data.source.test.variables.meta}
           # Observations
-          obs: ${data.source.test.variables.obs}
+          bt_obs: ${data.source.test.variables.bt_obs}
           # Pressure
           pressure: ${data.source.test.variables.pressure}
           # Atmospheric profiles
@@ -112,8 +112,8 @@ recast:
       train:
         # Variables
         variables:
-          # hofx
-          hofx: ${data.stage.train.variables.hofx}
+          # bt_crm
+          bt_crm: ${data.stage.train.variables.bt_crm}
           # Latitude
           lat: ${data.stage.train.variables.lat}
           # Longitude
@@ -121,7 +121,7 @@ recast:
           # Meta data
           meta: ${data.stage.train.variables.meta}
           # Observations
-          obs: ${data.stage.train.variables.obs}
+          bt_obs: ${data.stage.train.variables.bt_obs}
           # Pressure
           pressure: ${data.stage.train.variables.pressure}
           # Atmospheric profiles
@@ -134,8 +134,8 @@ recast:
       valid:
         # Variables
         variables:
-          # hofx
-          hofx: ${data.stage.valid.variables.hofx}
+          # bt_crm
+          bt_crm: ${data.stage.valid.variables.bt_crm}
           # Latitude
           lat: ${data.stage.valid.variables.lat}
           # Longitude
@@ -143,7 +143,7 @@ recast:
           # Meta data
           meta: ${data.stage.valid.variables.meta}
           # Observations
-          obs: ${data.stage.valid.variables.obs}
+          bt_obs: ${data.stage.valid.variables.bt_obs}
           # Pressure
           pressure: ${data.stage.valid.variables.pressure}
           # Atmospheric profiles
@@ -156,8 +156,8 @@ recast:
       test:
         # Variables
         variables:
-          # hofx
-          hofx: ${data.stage.test.variables.hofx}
+          # bt_crm
+          bt_crm: ${data.stage.test.variables.bt_crm}
           # Latitude
           lat: ${data.stage.test.variables.lat}
           # Longitude
@@ -165,7 +165,7 @@ recast:
           # Meta data
           meta: ${data.stage.test.variables.meta}
           # Observations
-          obs: ${data.stage.test.variables.obs}
+          bt_obs: ${data.stage.test.variables.bt_obs}
           # Pressure
           pressure: ${data.stage.test.variables.pressure}
           # Atmospheric profiles
