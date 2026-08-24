@@ -1,3 +1,25 @@
+# Forward-modeling of observations
 forward:
-  model:
-  loader:
+
+  # Training set
+  train:
+    _target_: code.preprocessing.forward.predict
+    loader: ${loader.stage.train}
+    model: ${model.forward_model}
+    trainer: ${trainer}
+
+  # Validation set
+  valid:
+
+  # Test set
+  test:
+
+  # Source training set
+  source_train:
+
+  # Source validation set
+  source_valid:
+
+  # Source test set
+  source_test:
+

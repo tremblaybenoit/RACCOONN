@@ -179,7 +179,7 @@ class AffineLayer(nn.Module):
             return (x - self.offset) / self.scale
 
 
-class TransformationLayer(nn.Module):
+class TransformationsLayer(nn.Module):
     """Wrapper for applying a single transformation pipeline as a torch.nn.Module.
     
     Wraps code.data.transformations.compose_transformations for single-variable use.
@@ -226,7 +226,7 @@ class TransformationLayer(nn.Module):
         return self.transform(x)
 
 
-class TransformationsLayer(nn.Module):
+class TransformationsLayers(nn.Module):
     """Wrapper for applying transformations (from code.data.transformations) as a torch.nn.Module.
 
     Supports both single-variable and multi-variable transformations:
@@ -267,13 +267,13 @@ class TransformationsLayer(nn.Module):
         modules = {}
         for var_name, var_cfg in transformations.items():
             if var_cfg is not None:
-                modules[str(var_name)] = TransformationLayer(var_cfg, inverse_transform=inverse_transform)
+                modules[str(var_name)] = TransformationsLayer(var_cfg, inverse_transform=inverse_transform)
 
         self.layers = nn.ModuleDict(modules)
         # Store keys as a tuple for ultra-fast iteration
         self.keys = tuple(self.layers.keys())
 
-    def forward(self, x: torch.Tensor | dict) -> torch.Tensor | dict:
+    def forward(self, x: dict) -> dict:
         """Apply transformation(s) to input.
 
         Parameters
@@ -288,31 +288,14 @@ class TransformationsLayer(nn.Module):
             Transformed input, same type as input
         """
 
-        # Fallback if already a tensor
-        if not isinstance(x, dict):
-            transformed = self.layers(x) if self.layers is not None else x
-            if transformed.dim() > 2:
-                transformed = transformed.reshape(transformed.size(0), -1)
-            return transformed
-
         # Fast path execution using pre-registered keys
-        tensors = []
+        transformed = {}
         for key, val in x.items():
 
             # Route through transformation layer if it exists, otherwise pass through
             if key in self.keys:
-                transformed = self.layers[key](val)
+                transformed[key] = self.layers[key](val)
             else:
-                transformed = val
+                transformed[key] = val
 
-            # Efficient spatial flattening (keeps batch dimension 0 intact)
-            if transformed.dim() > 2:
-                transformed = transformed.flatten(start_dim=1)
-
-            tensors.append(transformed)
-
-        if not tensors:
-            raise ValueError("No valid tensors found in the input dictionary.")
-
-        # Concatenate all variables into a single tensor along the feature dimension
-        return torch.cat(tensors, dim=-1)
+        return transformed

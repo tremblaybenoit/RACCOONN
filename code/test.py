@@ -13,9 +13,8 @@ torch.backends.cudnn.allow_tf32 = False
 logger = logging.getLogger(__name__)
 
 
-@hydra.main(version_base=None, config_path=get_config_path(), config_name="default")
-def main(config: DictConfig) -> None:
-    """ Train neural network based on set of configurations.
+def test(config: DictConfig) -> None:
+    """ Test neural network based on set of configurations.
 
         Parameters
         ----------
@@ -33,6 +32,23 @@ def main(config: DictConfig) -> None:
     # Evaluate on test set
     logger.info("Testing model...")
     forward_model.test()
+
+
+@hydra.main(version_base=None, config_path=get_config_path(), config_name="default")
+def main(config: DictConfig) -> None:
+    """ Train neural network based on set of configurations.
+
+        Parameters
+        ----------
+        config: str. Main hydra configuration file containing all model hyperparameters.
+
+        Returns
+        -------
+        None.
+    """
+
+    # Test model
+    test(config)
 
 
 if __name__ == '__main__':

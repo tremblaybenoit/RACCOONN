@@ -1,6 +1,5 @@
 import torch
 from omegaconf import DictConfig
-from code.model.base import BaseModel
 from code.model.forward import ForwardModel
 from utilities.instantiators import instantiate
 from typing import Callable
@@ -10,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class InverseModel(BaseModel):
+class InverseModel(ForwardModel):
     """
     Inverse model for atmospheric retrievals.
 
@@ -25,6 +24,7 @@ class InverseModel(BaseModel):
         optimizer: DictConfig | None = None,
         scheduler: DictConfig | None = None,
         loss: DictConfig | Callable | None = None,
+        pre_process: DictConfig | None = None,
         post_process: DictConfig | None = None,
         forward_model: DictConfig | ForwardModel | None = None,
     ) -> None:
@@ -45,6 +45,8 @@ class InverseModel(BaseModel):
             Loss function configuration
         post_process : DictConfig, optional
             Post-processing layer configuration to transform outputs to physical space.
+        pre_process : DictConfig, optional
+            Pre-processing layer configuration to transform inputs to model space.
         forward_model : DictConfig | ForwardModel, optional
             Configuration for the forward model used in physics-informed loss computation.
             If DictConfig, can include 'ckpt_path' key to load pre-trained weights.
@@ -57,6 +59,7 @@ class InverseModel(BaseModel):
             optimizer=optimizer,
             scheduler=scheduler,
             loss=loss,
+            pre_process=pre_process,
             post_process=post_process,
         )
 
@@ -74,7 +77,7 @@ class InverseModel(BaseModel):
         else:
             self.forward_model = None
 
-    def forward(self, input_dict: dict) -> torch.Tensor:
+    def forward(self, input_dict: dict, training_flag: bool = False) -> dict:
         """ Perform forward pass with coordinate expansion.
 
         Expands input variables across pressure levels before passing to architecture.
@@ -87,12 +90,18 @@ class InverseModel(BaseModel):
             Dictionary of input variables. May contain:
             - Variables with shape (Batch, ) which get expanded to (Batch, n_levels, 1)
             - Variables with shape (Batch, n_levels) which get reshaped to (Batch, n_levels, 1)
+        training_flag : bool, optional
+            Flag indicating whether the model is in training mode. Default is False.
 
         Returns
         -------
-        torch.Tensor
-            Profile predictions with shape (Batch, n_prof, n_levels).
+        dict
+            Dictionary with 'prof' key containing profile predictions with shape (Batch, n_prof, n_levels).
         """
+
+        # Apply pre-processing to transform inputs to model space
+        if not training_flag and self.pre_process is not None:
+            input_dict = self.pre_process(input_dict)
 
         # Get n_levels from architecture if available, otherwise assume 1
         n_levels = input_dict['pressure'].shape[-1]
@@ -114,15 +123,21 @@ class InverseModel(BaseModel):
         inputs = torch.cat(tensors, dim=-1).view(-1, len(tensors))
 
         # Inference through architecture
-        out = self.architecture(inputs)
+        output_dict = {'prof': self.architecture(inputs)}
 
         # Reshape back to (Batch, n_prof, n_levels)
         # Assuming output shape is (Batch * n_levels, n_prof)
         batch_size = list(input_dict.values())[0].shape[0]
-        n_prof = out.shape[-1] if out.ndim > 1 else 1
-        return out.view(batch_size, n_levels, n_prof).transpose(1, 2)
+        n_prof = output_dict['prof'].shape[-1] if output_dict['prof'].ndim > 1 else 1
+        output_dict['prof'] = output_dict['prof'].view(batch_size, n_levels, n_prof).transpose(1, 2)
 
-    def _infer(self, batch: dict) -> dict:
+        # Apply post-processing to transform outputs to physical space
+        if self.post_process is not None:
+            output_dict = self.post_process(output_dict)
+
+        return output_dict
+
+    def _infer(self, batch: dict, training_flag: bool = False) -> dict:
         """ Build output structure for inverse model with post-processing.
 
         Performs profile inversion and optionally applies forward model
@@ -135,6 +150,8 @@ class InverseModel(BaseModel):
         ----------
         batch : dict
             Full batch containing 'input', 'context', and other batch data.
+        training_flag : bool, optional
+            Flag indicating whether the model is in training mode. Default is False.
 
         Returns
         -------
@@ -143,29 +160,22 @@ class InverseModel(BaseModel):
         """
 
         # Inversion of atmospheric profiles
-        output_dict = {'prof': self.forward(batch['input'])}
+        output_dict = {'output': self.forward(batch['input'], training_flag=training_flag)}
 
         # Forward-modeled observations (requires batch['context'])
         if self.forward_model is not None and 'context' in batch:
             if all(k in batch['context'] for k in ['surf', 'meta']):
                 forward_model_output = self.forward_model(
                     {
-                        'prof': output_dict['prof'],
+                        'prof': output_dict['output']['prof'],
                         'surf': batch['context']['surf'],
                         'meta': batch['context']['meta']
                     }
                 )
-                if isinstance(forward_model_output, torch.Tensor):
-                    output_dict['bt_inverse'] = forward_model_output
-                elif isinstance(forward_model_output, tuple):
-                    output_dict['bt_inverse'] = forward_model_output[0]
-                    output_dict['bt_inverse_stdev'] = forward_model_output[1]
+                # Switch keys ('bt_forward' → 'bt_inverse') for clarity in output
+                if 'bt_forward' in forward_model_output:
+                    output_dict['output']['bt_inverse'] = forward_model_output['bt_forward']
+                if 'bt_forward_stdev' in forward_model_output:
+                    output_dict['output']['bt_inverse_stdev'] = forward_model_output['bt_forward_stdev']
 
-        # Wrap in output structure
-        output = {'output': output_dict}
-
-        # Apply post-processing to transform outputs to physical space
-        if self.post_process is not None:
-            output['output'] = self.post_process(output['output'])
-
-        return output
+        return output_dict

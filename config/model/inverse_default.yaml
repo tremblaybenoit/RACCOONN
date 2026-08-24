@@ -14,30 +14,23 @@ scheduler: ${scheduler}
 # Loss function - reference external config
 loss: ${loss}
 
+# Pre-processing - reference
+pre_process:
+  _target_: code.architecture.layer.TransformationsLayers
+  _recursive_: false
+  transformations: ${extract_nested:${loader.stage.train.input},'transformations'}
+
 # Architecture - reference external config
 architecture: ${architecture}
 
+# Post-processing - reference
+post_process:
+  _target_: code.architecture.layer.TransformationsLayers
+  _recursive_: false
+  transformations: ${extract_nested:${loader.stage.train.output},'transformations'}
+  inverse_transform: true
+
 # Forward model - reference external config
 forward_model:
-  _target_: code.model.forward.ForwardModel
-  ckpt_path: ../forward_outputs/forward_default/checkpoints/default/model.ckpt
-  architecture: ../forward_outputs/forward_default/checkpoints/default/architecture.yaml
-
-
-# Forward model - reference external config
-# forward:
-#   model:
-#     _target_: code.model.forward.ForwardModel
-#     ckpt_path: ../forward_outputs/forward_default/checkpoints/default/model.ckpt
-#     architecture: ../forward_outputs/forward_default/checkpoints/default/architecture.yaml
-#  transformations:
-#
-#
-#
-# forward_model:
-#   _target_: torch.nn.Sequential
-#   _args_:
-#     - Transformation layer
-#     - _target_: code.model.forward.ForwardModel
-#       ckpt_path: ../forward_outputs/forward_default/checkpoints/default/model.ckpt
-#       architecture: ../forward_outputs/forward_default/checkpoints/default/architecture.yaml
+  _target_: code.model.wrapper.load_model_from_config
+  path: ../forward_outputs/forward_default/checkpoints/modular/model.yaml

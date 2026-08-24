@@ -13,6 +13,29 @@ torch.backends.cudnn.allow_tf32 = False
 logger = logging.getLogger(__name__)
 
 
+def predict(config: DictConfig) -> dict:
+    """ Predict using neural network based on set of configurations.
+
+        Parameters
+        ----------
+        config: str. Main hydra configuration file containing all model hyperparameters.
+
+        Returns
+        -------
+        dict. Model predictions.
+    """
+
+    # Initialize trainer object
+    logger.info("Initializing model...")
+    forward_model = Operator(config)
+
+    # Evaluate on prediction set
+    logger.info("Predicting using the model...")
+    output = forward_model.predict(config.loader)
+
+    return output
+
+
 @hydra.main(version_base=None, config_path=get_config_path(), config_name="default")
 def main(config: DictConfig) -> None:
     """ Train neural network based on set of configurations.
@@ -26,13 +49,8 @@ def main(config: DictConfig) -> None:
         None.
     """
 
-    # Initialize trainer object
-    logger.info("Initializing model...")
-    forward_model = Operator(config)
-
-    # Evaluate on prediction set
-    logger.info("Predicting using the model...")
-    output = forward_model.predict(config.loader)
+    # Predict using the model
+    output = predict(config)
 
     # Save predictions to file
     logger.info("Saving predictions to file...")

@@ -50,13 +50,6 @@ output_layer:
       n_layers: 1
       activation:
         _target_: torch.nn.Sigmoid
-      post_process:
-        _target_: code.data.transformations.min_max
-        _partial_: true
-        stats:
-          min: 180
-          max: 355
-        inverse_transform: true
 
     # Head 2: Std uncertainty with Softplus and learnable scaling
     - out_features: ${data.stage.train.variables.bt_crtm.n}
@@ -64,13 +57,12 @@ output_layer:
       activation:
         _target_: torch.nn.Softplus
       post_process:
-        _target_: torch.nn.Sequential
-        _args_:
-          - _target_: code.architecture.layer.ScaleLayer
-            scale: 1.0
-            learnable: true
-          - _target_: code.architecture.layer.OffsetLayer
-            offset: 0.001
+        _target_: code.architecture.layer.AffineLayer
+        factor: 1.0
+        factor_learnable: true
+        value: 0.001
+        value_learnable: false
+        inverse_transform: true
 
 # Skip connections
 hidden_skip: false

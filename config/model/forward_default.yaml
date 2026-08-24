@@ -14,5 +14,11 @@ scheduler: ${scheduler}
 # Loss function - reference external config
 loss: ${loss}
 
+# Pre-processing - reference
+pre_process:
+  _target_: code.architecture.layer.TransformationsLayers
+  _recursive_: false
+  transformations: ${extract_nested:${loader.stage.train.input},'transformations'}
+
 # Architecture - reference external config
 architecture: ${architecture}

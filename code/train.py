@@ -86,9 +86,7 @@ def _save_output(output: dict, config_stage: DictConfig) -> None:
 
         Returns
         -------
-        dict. Dictionary with accumulated results (numpy arrays concatenated across batches).
-              Inverse transformations applied to denormalize data.
-              Example: {'output': {'bt_forward': array_denormalized, 'prof': array_denormalized}, ...}
+        None.
     """
 
     # Loop over types of outputs
@@ -256,27 +254,15 @@ class Operator:
         # Data loader and trainer setup
         self._init_trainer(stage='train')
 
-        # Model initialization based on checkpoint scenario
-        ckpt_resume = self.config.get("resume_from_checkpoint", None)
-        ckpt_init = self.config.get("init_from_checkpoint", None)
-
-        # Save resolved model configuration for downstream use
-        config_architecture_path = os.path.join(self.config.paths.checkpoint_dir, "architecture.yaml")
-        with open(config_architecture_path, 'w') as f:
-            OmegaConf.save(self.config.model.architecture, f)
-        logger.info(f"Saving model architecture configuration...")
-
         # Save resolved model configuration for downstream use
         config_model_path = os.path.join(self.config.paths.checkpoint_dir, "model.yaml")
         with open(config_model_path, 'w') as f:
             OmegaConf.save(self.config.model, f)
         logger.info(f"Saving model configuration...")
 
-        # Save resolved experiment configuration for downstream use
-        config_experiment_path = os.path.join(self.config.paths.checkpoint_dir, "experiment.yaml")
-        with open(config_experiment_path, 'w') as f:
-            OmegaConf.save(self.config, f)
-        logger.info(f"Saving experiment configuration...")
+        # Model initialization based on checkpoint scenario
+        ckpt_resume = self.config.get("resume_from_checkpoint", None)
+        ckpt_init = self.config.get("init_from_checkpoint", None)
 
         # Resume: Trainer handles checkpoint restoration (weights + optimizer + scheduler)
         if ckpt_resume and os.path.exists(ckpt_resume):
@@ -294,8 +280,6 @@ class Operator:
             self._init_model()  # Fresh model
             self.trainer.fit(self.model, self.loader)
         logger.info("Done!")
-        
-        # TODO: Add warning if self.model.ckpt_path already exists when transfer learning or training from scratch
 
         # Save optimal model checkpoint along with configuration
         logger.info("Saving model checkpoint...")
@@ -366,8 +350,7 @@ class Operator:
         return output
 
 
-@hydra.main(version_base=None, config_path=get_config_path(), config_name="default")
-def main(config: DictConfig) -> None:
+def train(config: DictConfig) -> None:
     """ Train neural network based on set of configurations.
 
         Parameters
@@ -381,11 +364,29 @@ def main(config: DictConfig) -> None:
 
     # Initialize trainer object
     logger.info("Initializing model...")
-    forward_model = Operator(config)
+    model = Operator(config)
 
     # Train the model
     logger.info("Training model...")
-    forward_model.train()
+    model.train()
+
+
+@hydra.main(version_base=None, config_path=get_config_path(), config_name="default")
+def main(config: DictConfig) -> None:
+    """ Train neural network based on set of configurations.
+
+        Parameters
+        ----------
+        config: str. Main hydra configuration file containing all model hyperparameters.
+
+        Returns
+        -------
+        None.
+    """
+
+    # Perform model training
+    train(config)
+
 
 if __name__ == '__main__':
     """ Train model.
