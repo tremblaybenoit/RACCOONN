@@ -25,6 +25,10 @@ stage:
       _target_: code.loader.dataset.MultivariateDataset
       _recursive_: false
       variables: ${extract:${data.stage.train.variables},${data.select_context}}
+    output:
+      _target_: code.loader.dataset.MultivariateDataset
+      _recursive_: false
+      variables: ${extract:${data.stage.train.variables},${data.select_output}}
   # Validation stage
   valid:
     _target_: ${loader.stage.train._target_}
@@ -42,6 +46,10 @@ stage:
       _target_: ${loader.stage.train.context._target_}
       _recursive_: false
       variables: ${extract:${data.stage.valid.variables},${data.select_context}}
+    output:
+      _target_: ${loader.stage.train.output._target_}
+      _recursive_: false
+      variables: ${extract:${data.stage.valid.variables},${data.select_output}}
   # Test stage
   test:
     _target_: ${loader.stage.train._target_}
@@ -60,7 +68,7 @@ stage:
       _recursive_: false
       variables: ${extract:${data.stage.test.variables},${data.select_context}}
     output:
-      _target_: code.loader.dataset.MultivariateDataset
+      _target_: ${loader.stage.train.output._target_}
       _recursive_: false
       variables: ${extract:${data.stage.test.variables},${data.select_output}}
   # Prediction stage
@@ -73,6 +81,6 @@ stage:
       variables: ${extract:${data.stage.predict.variables},${data.select_input}}
       apply_transformations: false
     output:
-      _target_: code.loader.dataset.MultivariateDataset
+      _target_: ${loader.stage.train.output._target_}
       _recursive_: false
       variables: ${extract:${data.stage.predict.variables},${data.select_output}}

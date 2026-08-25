@@ -3,23 +3,162 @@ forward:
 
   # Training set
   train:
-    _target_: code.preprocessing.forward.predict
-    loader: ${loader.stage.train}
-    model: ${model.forward_model}
-    trainer: ${trainer}
+    _target_: code.predict.predict
+    config:
+      loader:
+        # Data loader configuration for model training
+        _target_: code.loader.dataloader.Dataloader
+        _recursive_: false
+        batch_size: ${loader.batch_size}
+        num_workers: ${loader.num_workers}
+        persistent_workers: ${loader.persistent_workers}
+        pin_memory: ${loader.pin_memory}
+        stage:
+          predict:
+            _target_: code.loader.dataset.MultivariateDatasets
+            _recursive_: false
+            input:
+              _target_: code.loader.dataset.MultivariateDataset
+              _recursive_: false
+              variables: ${extract:${data.stage.train.variables},['prof', 'meta', 'surf']}
+            output:
+              _target_: code.loader.dataset.MultivariateDataset
+              _recursive_: false
+              variables: ${extract:${data.stage.train.variables},['bt_crtm']}
+      model: ${model.forward_model}
+      trainer: ${trainer}
 
   # Validation set
   valid:
+    _target_: code.predict.predict
+    config:
+      loader:
+        # Data loader configuration for model training
+        _target_: code.loader.dataloader.Dataloader
+        _recursive_: false
+        batch_size: ${loader.batch_size}
+        num_workers: ${loader.num_workers}
+        persistent_workers: ${loader.persistent_workers}
+        pin_memory: ${loader.pin_memory}
+        stage:
+          predict:
+            _target_: code.loader.dataset.MultivariateDatasets
+            _recursive_: false
+            input:
+              _target_: code.loader.dataset.MultivariateDataset
+              _recursive_: false
+              variables: ${extract:${data.stage.valid.variables},['prof', 'meta', 'surf']}
+            output:
+              _target_: code.loader.dataset.MultivariateDataset
+              _recursive_: false
+              variables: ${extract:${data.stage.valid.variables},['bt_crtm']}
+      model: ${model.forward_model}
+      trainer: ${trainer}
 
   # Test set
   test:
+    _target_: code.predict.predict
+    config:
+      loader:
+        # Data loader configuration for model training
+        _target_: code.loader.dataloader.Dataloader
+        _recursive_: false
+        batch_size: ${loader.batch_size}
+        num_workers: ${loader.num_workers}
+        persistent_workers: ${loader.persistent_workers}
+        pin_memory: ${loader.pin_memory}
+        stage:
+          predict:
+            _target_: code.loader.dataset.MultivariateDatasets
+            _recursive_: false
+            input:
+              _target_: code.loader.dataset.MultivariateDataset
+              _recursive_: false
+              variables: ${extract:${data.stage.test.variables},['prof', 'meta', 'surf']}
+            output:
+              _target_: code.loader.dataset.MultivariateDataset
+              _recursive_: false
+              variables: ${extract:${data.stage.test.variables},['bt_crtm']}
+      model: ${model.forward_model}
+      trainer: ${trainer}
 
   # Source training set
   source_train:
+    _target_: code.predict.predict
+    config:
+      loader:
+        # Data loader configuration for model training
+        _target_: code.loader.dataloader.Dataloader
+        _recursive_: false
+        batch_size: ${loader.batch_size}
+        num_workers: ${loader.num_workers}
+        persistent_workers: ${loader.persistent_workers}
+        pin_memory: ${loader.pin_memory}
+        stage:
+          predict:
+            _target_: code.loader.dataset.MultivariateDatasets
+            _recursive_: false
+            input:
+              _target_: code.loader.dataset.MultivariateDataset
+              _recursive_: false
+              variables: ${extract:${data.source.train.variables},['prof', 'meta', 'surf']}
+            output:
+              _target_: code.loader.dataset.MultivariateDataset
+              _recursive_: false
+              variables: ${extract:${data.source.train.variables},['bt_crtm']}
+      model: ${model.forward_model}
+      trainer: ${trainer}
 
   # Source validation set
   source_valid:
+    _target_: code.predict.predict
+    config:
+      loader:
+        # Data loader configuration for model training
+        _target_: code.loader.dataloader.Dataloader
+        _recursive_: false
+        batch_size: ${loader.batch_size}
+        num_workers: ${loader.num_workers}
+        persistent_workers: ${loader.persistent_workers}
+        pin_memory: ${loader.pin_memory}
+        stage:
+          predict:
+            _target_: code.loader.dataset.MultivariateDatasets
+            _recursive_: false
+            input:
+              _target_: code.loader.dataset.MultivariateDataset
+              _recursive_: false
+              variables: ${extract:${data.source.valid.variables},['prof', 'meta', 'surf']}
+            output:
+              _target_: code.loader.dataset.MultivariateDataset
+              _recursive_: false
+              variables: ${extract:${data.source.valid.variables},['bt_crtm']}
+      model: ${model.forward_model}
+      trainer: ${trainer}
 
   # Source test set
   source_test:
-
+    _target_: code.predict.predict
+    config:
+      loader:
+        # Data loader configuration for model training
+        _target_: code.loader.dataloader.Dataloader
+        _recursive_: false
+        batch_size: ${loader.batch_size}
+        num_workers: ${loader.num_workers}
+        persistent_workers: ${loader.persistent_workers}
+        pin_memory: ${loader.pin_memory}
+        stage:
+          predict:
+            _target_: code.loader.dataset.MultivariateDatasets
+            _recursive_: false
+            input:
+              _target_: code.loader.dataset.MultivariateDataset
+              _recursive_: false
+              variables: ${extract:${data.source.test.variables},['prof', 'meta', 'surf']}
+            output:
+              _target_: code.loader.dataset.MultivariateDataset
+              _recursive_: false
+              variables: ${extract:${data.source.test.variables},['bt_crtm']}
+      model: ${model.forward_model}
+      trainer: ${trainer}

@@ -3,7 +3,6 @@ from scipy.linalg import block_diag
 import hydra
 from omegaconf import DictConfig
 from sqlalchemy.orm import identity
-
 from code.data.io import load_variable
 from code.data.transformations import Compose
 from utilities.instantiators import instantiate

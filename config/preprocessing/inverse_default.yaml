@@ -4,5 +4,6 @@ defaults:
   - slant           # Then: compute slant coordinates
   - statistics      # Then: compute statistics
   - mask            # Then: compute masks
+  - forward         # Then: compute forward model
   - covariance      # Finally: compute covariance
   - _self_
