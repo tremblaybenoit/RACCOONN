@@ -51,7 +51,7 @@ output_layer:
       activation:
         _target_: torch.nn.Sigmoid
       post_process:
-        _target_: code.architecture.layer.TransformationLayer
+        _target_: code.architecture.layer.TransformationsLayer
         transformations: ${data.stage.train.variables.bt_forward.transformations}
         inverse_transform: true
 
