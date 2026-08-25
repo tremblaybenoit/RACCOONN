@@ -534,7 +534,7 @@ class ForwardLogger(ArtifactLogger):
 
         # Get radiance channels
         channel_candidates = ['bt_forward', 'bt_crtm']
-        target_datasets = trainer.datamodule.valid.target_datasets
+        target_datasets = trainer.datamodule.valid.target
         channels = next(
             (target_datasets[key].type for key in channel_candidates
              if key in target_datasets),

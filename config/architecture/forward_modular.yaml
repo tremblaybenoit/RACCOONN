@@ -50,6 +50,10 @@ output_layer:
       n_layers: 1
       activation:
         _target_: torch.nn.Sigmoid
+      post_process:
+        _target_: code.architecture.layer.TransformationLayer
+        transformations: ${data.stage.train.variables.bt_forward.transformations}
+        inverse_transform: true
 
     # Head 2: Std uncertainty with Softplus and learnable scaling
     - out_features: ${data.stage.train.variables.bt_crtm.n}
