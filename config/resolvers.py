@@ -28,12 +28,17 @@ def filter_keys(config: DictConfig, keys: list[str] | str | None = None) -> Dict
         return config
 
     # Create filtered config with only selected keys
-    filtered = OmegaConf.create({})
-    for k in keys_list:
-        if k in config:
-            filtered[k] = config[k]
-    
-    return filtered
+    # Resolve the subtree in its original parent context first
+    resolved_dict = OmegaConf.to_container(config, resolve=True)
+
+    if not isinstance(resolved_dict, dict):
+        return config
+
+    # Filter keys from the fully resolved dictionary
+    filtered = {k: resolved_dict[k] for k in keys_list if k in resolved_dict}
+
+    # Return as a new, standalone DictConfig
+    return OmegaConf.create(filtered)
 
 
 def resolver_extract(config: DictConfig, keys: str | list | None = None) -> DictConfig | ListConfig:
@@ -89,11 +94,12 @@ def resolver_extract_nested(config: DictConfig, keys: str | list | None = None, 
     DictConfig
         Filtered configuration with only the extracted subkey from each key.
     """
+
     # Auto-detect 2-argument form: ${extract_nested:config, subkey}
     if subkey is None and isinstance(keys, str):
         subkey = keys
         keys = None
-    
+
     # Parse keys
     if isinstance(keys, (list, tuple, ListConfig)):
         keys = list(keys)
@@ -101,20 +107,21 @@ def resolver_extract_nested(config: DictConfig, keys: str | list | None = None, 
         keys = [k.strip() for k in keys.split(',') if k.strip()]
     else:
         keys = None
-    
-    # Filter to selected keys
-    filtered = OmegaConf.create({})
-    for k in config.keys():
-        if keys is None or k in keys:
-            filtered[k] = config[k]
-    
-    # Extract subkey from each item
-    extracted = OmegaConf.create({})
-    for k in filtered.keys():
-        if subkey and subkey in filtered[k]:
-            extracted[k] = filtered[k][subkey]
-    
-    return extracted
+
+    # Resolve the subtree in its original parent context first
+    resolved_dict = OmegaConf.to_container(config, resolve=True)
+
+    if not isinstance(resolved_dict, dict):
+        return OmegaConf.create({})
+
+    # Filter keys and extract subkeys from the resolved dict
+    extracted = {}
+    for k, v in resolved_dict.items():
+        if (keys is None or k in keys) and isinstance(v, dict):
+            if subkey and subkey in v:
+                extracted[k] = v[subkey]
+
+    return OmegaConf.create(extracted)
 
 
 def register_custom_resolvers() -> None:

@@ -32,8 +32,8 @@ recast:
           cloud_mask: ${data.source.train.variables.cloud_mask}
           # Daytime mask
           daytime_mask: ${data.source.train.variables.daytime_mask}
-          # bt_crm
-          bt_crm: ${data.source.train.variables.bt_crm}
+          # bt_crtm
+          bt_crtm: ${data.source.train.variables.bt_crtm}
           # Latitude
           lat: ${data.source.train.variables.lat}
           # Longitude
@@ -58,8 +58,8 @@ recast:
           cloud_mask: ${data.source.valid.variables.cloud_mask}
           # Daytime mask
           daytime_mask: ${data.source.valid.variables.daytime_mask}
-          # bt_crm
-          bt_crm: ${data.source.valid.variables.bt_crm}
+          # bt_crtm
+          bt_crtm: ${data.source.valid.variables.bt_crtm}
           # Latitude
           lat: ${data.source.valid.variables.lat}
           # Longitude
@@ -84,8 +84,8 @@ recast:
           cloud_mask: ${data.source.test.variables.cloud_mask}
           # Daytime mask
           daytime_mask: ${data.source.test.variables.daytime_mask}
-          # bt_crm
-          bt_crm: ${data.source.test.variables.bt_crm}
+          # bt_crtm
+          bt_crtm: ${data.source.test.variables.bt_crtm}
           # Latitude
           lat: ${data.source.test.variables.lat}
           # Longitude
@@ -112,8 +112,8 @@ recast:
       train:
         # Variables
         variables:
-          # bt_crm
-          bt_crm: ${data.stage.train.variables.bt_crm}
+          # bt_crtm
+          bt_crtm: ${data.stage.train.variables.bt_crtm}
           # Latitude
           lat: ${data.stage.train.variables.lat}
           # Longitude
@@ -134,8 +134,8 @@ recast:
       valid:
         # Variables
         variables:
-          # bt_crm
-          bt_crm: ${data.stage.valid.variables.bt_crm}
+          # bt_crtm
+          bt_crtm: ${data.stage.valid.variables.bt_crtm}
           # Latitude
           lat: ${data.stage.valid.variables.lat}
           # Longitude
@@ -156,8 +156,8 @@ recast:
       test:
         # Variables
         variables:
-          # bt_crm
-          bt_crm: ${data.stage.test.variables.bt_crm}
+          # bt_crtm
+          bt_crtm: ${data.stage.test.variables.bt_crtm}
           # Latitude
           lat: ${data.stage.test.variables.lat}
           # Longitude

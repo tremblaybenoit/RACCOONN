@@ -1,5 +1,4 @@
 from config.setup import read_hydra_as_dict, setup_directories_from_hydra, get_filenames
-import code.config.resolvers  # Register custom Hydra resolvers
 import sys
 
 

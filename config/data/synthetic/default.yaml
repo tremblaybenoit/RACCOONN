@@ -6,7 +6,6 @@ defaults:
   - clear_mask
   - cloud_mask
   - daytime_mask
-  - hofx_stdev
   - lat
   - lon
   - meta

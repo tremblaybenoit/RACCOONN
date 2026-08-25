@@ -1,5 +1,5 @@
 from torch.utils.data import Dataset
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 from utilities.instantiators import instantiate
 from utilities.tensors import to_tensor
 from code.data.transformations import compose_transformations
@@ -522,7 +522,7 @@ class MultivariateDatasets(Dataset):
         self.output = output
 
         # Infer dataset length from first input variable
-        self._len = len(next(iter(self.input.values())))
+        self._len = len(self.input)
 
     def __len__(self) -> int:
         """ Return length of the dataset.

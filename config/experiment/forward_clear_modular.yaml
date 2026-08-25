@@ -88,6 +88,32 @@ data:
                 key: 'prof'
                 dtype: ${data.dtype}
               axis: 1
+        # Radiances
+        bt_crtm:
+          # Channels
+          type: [
+            'Channel 8', 'Channel 9', 'Channel 10', 'Channel 11', 'Channel 12',
+            'Channel 13', 'Channel 14', 'Channel 15', 'Channel 16'
+          ]
+          # Loading function
+          load:
+            split:
+              _target_: code.data.io.split_slice
+              _args_:
+                - _target_: builtins.slice
+                  _args_: [ null ]  # Equivalent to :
+                - _target_: builtins.slice
+                  _args_: [ 1, 10 ]  # Equivalent to 1:10
+          # Transformations
+          transformations:
+            # Normalization function and parameters
+            normalization:
+              stats:
+                split:
+                  _target_: code.data.io.split_slice
+                  _args_:
+                    - _target_: builtins.slice
+                      _args_: [ 1, 10 ]  # Equivalent to 1:10
     # Validation set
     valid:
       # Variables
@@ -96,6 +122,32 @@ data:
         prof:
           # Transformations
           transformations: ${data.stage.train.variables.prof.transformations}
+        # Radiances
+        bt_crtm:
+          # Channels
+          type: [
+            'Channel 8', 'Channel 9', 'Channel 10', 'Channel 11', 'Channel 12',
+            'Channel 13', 'Channel 14', 'Channel 15', 'Channel 16'
+          ]
+          # Loading function
+          load:
+            split:
+              _target_: code.data.io.split_slice
+              _args_:
+                - _target_: builtins.slice
+                  _args_: [ null ]  # Equivalent to :
+                - _target_: builtins.slice
+                  _args_: [ 1, 10 ]  # Equivalent to 1:10
+          # Transformations
+          transformations:
+            # Normalization function and parameters
+            normalization:
+              stats:
+                split:
+                  _target_: code.data.io.split_slice
+                  _args_:
+                    - _target_: builtins.slice
+                      _args_: [ 1, 10 ]  # Equivalent to 1:10
     # Test set
     test:
       # Variables
@@ -104,6 +156,32 @@ data:
         prof:
           # Transformations
           transformations: ${data.stage.train.variables.prof.transformations}
+        # Radiances
+        bt_crtm:
+          # Channels
+          type: [
+            'Channel 8', 'Channel 9', 'Channel 10', 'Channel 11', 'Channel 12',
+            'Channel 13', 'Channel 14', 'Channel 15', 'Channel 16'
+          ]
+          # Loading function
+          load:
+            split:
+              _target_: code.data.io.split_slice
+              _args_:
+                - _target_: builtins.slice
+                  _args_: [ null ]  # Equivalent to :
+                - _target_: builtins.slice
+                  _args_: [ 1, 10 ]  # Equivalent to 1:10
+          # Transformations
+          transformations:
+            # Normalization function and parameters
+            normalization:
+              stats:
+                split:
+                  _target_: code.data.io.split_slice
+                  _args_:
+                    - _target_: builtins.slice
+                      _args_: [ 1, 10 ]  # Equivalent to 1:10
     # Prediction set
     predict:
       # Variables
@@ -117,9 +195,9 @@ data:
 logger:
   # MLflow logger
   ports:
-    mlflow: 5001
+    mlflow: 5002
 
 # Trainer configuration
 trainer:
   # Maximum number of epochs
-  max_epochs: 192
+  max_epochs: 96
