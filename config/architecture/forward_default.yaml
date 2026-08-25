@@ -7,6 +7,7 @@ nprofvars: ${data.stage.train.variables.prof.n}
 nsurfvars: ${data.stage.train.variables.surf.n}
 nmetavars: ${data.stage.train.variables.meta.n}
 nlevels: ${data.stage.train.variables.pressure.n}
+nchannels: ${data.stage.train.variables.bt_crtm.n}
 
 # Neural network parameters
 nnodes_bt: 512

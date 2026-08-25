@@ -542,13 +542,8 @@ class Compose:
         """
         # Apply transformations in sequence
         for transform in self.pipeline:
-            # Set inverse_transform parameter if transform supports it
-            if hasattr(transform, 'inverse_transform'):
-                # If transform object has inverse_transform attribute, use it directly
-                data = transform(data, inverse_transform=self.inverse_transform)
-            else:
-                # Fallback: just call the transform
-                data = transform(data)
+            # If transform object has inverse_transform attribute, use it directly
+            data = transform(data, inverse_transform=self.inverse_transform)
 
         return data
 

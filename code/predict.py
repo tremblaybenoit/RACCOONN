@@ -54,7 +54,7 @@ def main(config: DictConfig) -> None:
 
     # Save predictions to file
     logger.info("Saving predictions to file...")
-    _save_output(output, config.loader.predict)
+    _save_output(output, config.loader.stage.predict)
 
 
 if __name__ == '__main__':

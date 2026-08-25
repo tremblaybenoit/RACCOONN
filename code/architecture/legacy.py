@@ -16,6 +16,7 @@ class CRTMArchitecture(nn.Module):
         nsurfvars: int,
         nmetavars: int,
         nlevels: int,
+        nchannels: int = 10,
         nnodes_bt: int = 512,
         nhidden_bt: int = 3,
         dropout_rate: float = 0.0,
@@ -34,6 +35,7 @@ class CRTMArchitecture(nn.Module):
         nsurfvars : int. Number of surface variables.
         nmetavars : int. Number of meta variables.
         nlevels : int. Number of vertical levels.
+        nchannels : int. Number of channels.
         nnodes_bt : int. Number of neurons in hidden layers.
         nhidden_bt : int. Number of hidden layers.
         dropout_rate : float. Dropout rate.
@@ -52,6 +54,7 @@ class CRTMArchitecture(nn.Module):
         self.nsurfvars = nsurfvars
         self.nmetavars = nmetavars
         self.nlevels = nlevels
+        self.nchannels = nchannels
         self.max_T = bt_norm_max
         self.min_T = bt_norm_min
         self.std_output_activation_offset = std_output_activation_offset
@@ -80,8 +83,8 @@ class CRTMArchitecture(nn.Module):
             self.dropout_layers.append(nn.Dropout(dropout_rate))
 
         # Output layers
-        self.out_T = nn.Linear(nnodes_bt, 10)
-        self.out_std = nn.Linear(nnodes_bt, 10)
+        self.out_T = nn.Linear(nnodes_bt, nchannels)
+        self.out_std = nn.Linear(nnodes_bt, nchannels)
         if std_scale_trainable:
             self.std_scale = Scale()
         else:

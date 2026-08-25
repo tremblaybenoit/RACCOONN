@@ -27,13 +27,13 @@ def main(config: DictConfig) -> None:
 
     # Load test set output (predictions)
     logger.info("Load test set outputs...")
-    nnofx = instantiate(config.data.stage.test.output.hofx.load)
-    nnofx_stdev = instantiate(config.data.stage.test.output.hofx_stdev.load)
+    bt_forward = instantiate(config.data.stage.test.variables.bt_forward.load)
+    bt_forward_stdev = instantiate(config.data.stage.test.variables.bt_forward_stdev.load)
 
     # Load test set references
     logger.info("Load test set references...")
-    hofx = instantiate(config.data.stage.test.variables.hofx.load)
-    n_channels = hofx.shape[1]
+    bt_crtm = instantiate(config.data.stage.test.variables.bt_crtm.load)
+    n_channels = bt_crtm.shape[1]
 
     # Create masks and compute rmse by condition
     mask_dict = {
@@ -60,7 +60,7 @@ def main(config: DictConfig) -> None:
     metrics = {}
     for key, m in mask_dict.items():
         # Compute rmse
-        runners[key].update(data=nnofx[m], target=hofx[m], axis=0)
+        runners[key].update(data=bt_forward[m], target=bt_crtm[m], axis=0)
     for runner_name, runner  in runners.items():
         # Skip runners with no accumulated data (e.g., cloud_mask in clear-sky datasets)
         if isinstance(runner._n, (int, float)) and runner._n == 0.0:
@@ -84,7 +84,7 @@ def main(config: DictConfig) -> None:
     fig2 = fig_rmse_bars(rmse, channels=np.arange(n_channels), x_range=[[0, 0.8]],
                          colors=colors, labels=labels,
                          title=["Forward model RMSE per channel"])
-    save_plot(fig2, config.paths.run_dir + '/hofx_test_rmse_bars.png')
+    save_plot(fig2, config.paths.run_dir + '/bt_crtm_test_rmse_bars.png')
 
 
 if __name__ == '__main__':

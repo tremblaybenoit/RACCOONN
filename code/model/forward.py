@@ -212,11 +212,15 @@ class ForwardModel(LightningModule):
                 step[f'{stage}_loss'] = loss.detach().cpu().numpy()
             else:
                 step['loss'] = loss
-        # Detach outputs
-        step['output'] = {
-            key: value.detach().cpu().numpy() if isinstance(value, torch.Tensor)
-            else value for key, value in step['output'].items()
-        }
+        
+        # Stage-aware output conversion
+        # Train/valid: keep outputs as tensors on GPU for callbacks (ForwardLogger handles conversion)
+        # Test/predict: convert to numpy for saving/returning
+        if stage in ('test', 'predict'):
+            step['output'] = {
+                key: value.detach().cpu().numpy() if isinstance(value, torch.Tensor)
+                else value for key, value in step['output'].items()
+            }
 
         return step
 

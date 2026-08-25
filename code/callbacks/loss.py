@@ -40,7 +40,7 @@ class LossLogger(Callback):
     def on_train_batch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, outputs: Any,
                            batch: Any, batch_idx: int) -> None:
         """
-        Log training batch losses and training-specific metrics.
+        Log training batch losses.
 
         Parameters
         ----------
@@ -56,6 +56,21 @@ class LossLogger(Callback):
             Batch index (unused).
         """
         self._log_losses(pl_module, outputs, 'train')
+
+    def on_train_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
+        """
+        Log training-specific metrics once per epoch (L2 norm, learning rate).
+
+        These metrics provide insight into training stability and optimization progress.
+        Only computed at epoch end to avoid redundant per-batch computation.
+
+        Parameters
+        ----------
+        trainer : Trainer
+            PyTorch Lightning trainer.
+        pl_module : LightningModule
+            The model.
+        """
         self._log_train_metrics(pl_module)
 
     def on_validation_batch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, outputs: Any,

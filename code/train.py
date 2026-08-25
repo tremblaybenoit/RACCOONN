@@ -18,8 +18,7 @@ torch.backends.cudnn.allow_tf32 = False
 logger = logging.getLogger(__name__)
 
 
-def _accumulate_output(batch_output: list, keys: list | None = None,
-                       config_stage: DictConfig | None = None) -> dict:
+def _accumulate_output(batch_output: list, keys: list | None = None) -> dict:
     """ Accumulate results from individual batches into concatenated arrays.
 
         Efficiently accumulates specified keys from batch results with single-pass iteration,
@@ -31,7 +30,6 @@ def _accumulate_output(batch_output: list, keys: list | None = None,
         batch_output: list. List of dicts returned by trainer.test() or trainer.predict().
                        Each dict contains keys like 'output', 'latent', 'mask', etc.
         keys: list or None. List of keys to accumulate. If None, defaults to ['output', 'latent', 'mask'].
-        config_stage: DictConfig or None. Stage-specific loader configuration containing transformations for each key.
 
         Returns
         -------
@@ -95,13 +93,13 @@ def _save_output(output: dict, config_stage: DictConfig) -> None:
             key_config = getattr(config_stage, key)
             # Handle nested dict structure containing variables
             if isinstance(data, dict):
-                for var_name, var_data in data.items():
-                    if var_name in key_config and hasattr(key_config[var_name], 'save'):
-                        save_config = key_config[var_name].save
+                for var_name, var_config in key_config.variables.items():
+                    if var_name in data and hasattr(var_config, 'save'):
+                        save_config = var_config.save
                         if isinstance(save_config, DictConfig) and 'path' in save_config:
                             os.makedirs(os.path.dirname(save_config.path), exist_ok=True)
                         save_function = instantiate(save_config)
-                        save_function(var_data)
+                        save_function(data[var_name])
             # Handle flat array structure (single variable)
             elif hasattr(key_config, 'save'):
                 save_config = key_config.save
@@ -234,7 +232,7 @@ class Operator:
 
         # Accumulate results from all batches
         logger.info("Accumulating output...")
-        batch_output = _accumulate_output(batch_output, config_stage=self.loader.predict)
+        batch_output = _accumulate_output(batch_output)
 
         return batch_output
 
@@ -319,7 +317,7 @@ class Operator:
 
         # Save results to file
         logger.info("Saving output to file...")
-        _save_output(output, config_stage=self.loader.test)
+        _save_output(output, config_stage=self.config.loader.stage.test)
 
     def predict(self, config_loader: DictConfig | None = None) -> dict:
         """ Predicts the output of the model on a given dataset.
