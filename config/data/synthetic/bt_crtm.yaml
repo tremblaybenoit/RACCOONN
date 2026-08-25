@@ -42,7 +42,7 @@ train:
       transformations:
         # Per-variable normalization
         normalization:
-          _target_: code.data.transformations.identity
+          _target_: code.data.transformations.min_max
           _partial_: true
           stats:
             _target_: code.preprocessing.statistics.read_statistics_var

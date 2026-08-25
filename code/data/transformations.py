@@ -497,55 +497,43 @@ def clip(data: np.ndarray | torch.Tensor, stats: dict) -> np.ndarray | torch.Ten
         raise TypeError("Input data must be a numpy array or a torch tensor.")
 
 
-def compose_transformations(transformations: DictConfig | None = None, inverse_transform: bool = False) -> Callable:
+class Compose:
     """
-    Create a transformation function from a transformation config.
-
-    Similar to UnivariateDataset._transform and _inverse_transform, this builds
-    a pipeline of transformations that can be applied to data.
+    Applies a sequence of transformations in order.
 
     Parameters
     ----------
     transformations : DictConfig, optional
         Configuration dict with transformation specifications.
         Each transformation must support the 'inverse_transform' parameter.
-        If None, returns an identity function.
+        If None, this becomes an identity transformation.
     inverse_transform : bool, default False
-        If True, applies inverse transformations (unnormalization).
+        If True, applies inverse transformations (denormalization).
         If False, applies forward transformations (normalization).
-
-    Returns
-    -------
-    callable
-        A function that takes data and transforms it by applying
-        the transformation pipeline in order (or reverse if inverse_transform=True).
     """
 
-    # If no transformation, skip
-    if transformations is None:
-        # Return identity function if no transformations
-        return identity
+    def __init__(self, transformations: DictConfig | None = None, inverse_transform: bool = False):
+        """Initialize transformation pipeline."""
+        self.inverse_transform = inverse_transform
+        self.pipeline = []
 
-    # Build transformation pipeline
-    pipeline = []
-    if inverse_transform:
-        # For inverse transform, create all transforms then reverse the order
-        for key in transformations.keys():
-            pipeline.append(instantiate(transformations[key]))
-        pipeline.reverse()
-    else:
-        # For forward transform, apply in order
-        for key in transformations.keys():
-            pipeline.append(instantiate(transformations[key]))
+        # Build transformation pipeline
+        if transformations is not None:
+            # Instantiate all transformations
+            for key in transformations.keys():
+                self.pipeline.append(instantiate(transformations[key]))
+            # Reverse order if applying inverse transformation
+            if inverse_transform:
+                self.pipeline.reverse()
 
-    def transform_function(data: np.ndarray | torch.Tensor) -> np.ndarray | torch.Tensor:
+    def __call__(self, data: np.ndarray | torch.Tensor) -> np.ndarray | torch.Tensor:
         """
         Apply transformation pipeline to data.
 
         Parameters
         ----------
         data : np.ndarray or torch.Tensor
-            Data to transform (normalize or unnormalize).
+            Data to transform (normalize or denormalize).
 
         Returns
         -------
@@ -553,15 +541,38 @@ def compose_transformations(transformations: DictConfig | None = None, inverse_t
             Transformed data.
         """
         # Apply transformations in sequence
-        for transform in pipeline:
+        for transform in self.pipeline:
             # Set inverse_transform parameter if transform supports it
             if hasattr(transform, 'inverse_transform'):
                 # If transform object has inverse_transform attribute, use it directly
-                data = transform(data, inverse_transform=inverse_transform)
+                data = transform(data, inverse_transform=self.inverse_transform)
             else:
                 # Fallback: just call the transform
                 data = transform(data)
 
         return data
 
-    return transform_function
+    def to(self, device, dtype: torch.dtype | None = None, non_blocking: bool = False):
+        """
+        Move all transformation parameters to the specified device.
+
+        Propagates device/dtype to all transforms in the pipeline that support it.
+
+        Parameters
+        ----------
+        device : torch.device or str
+            The device to move parameters to.
+        dtype : torch.dtype, optional
+            The desired data type (optional).
+        non_blocking : bool, default=False
+            If True, use asynchronous transfers when possible.
+
+        Returns
+        -------
+        Compose
+            Self for method chaining.
+        """
+        for transform in self.pipeline:
+            if hasattr(transform, 'to'):
+                transform.to(device)
+        return self

@@ -214,7 +214,7 @@ class Operator:
         # Set dtype
         dtype = self.config.data.get('dtype', 'float32')
         self.model = self.model.to(None, dtype=getattr(torch, dtype))
-        self.model = torch.compile(self.model, mode="reduce-overhead")
+        # self.model = torch.compile(self.model, mode="reduce-overhead")
 
     def _run_model(self) -> dict:
         """ Run model to generate a prediction.
@@ -260,9 +260,15 @@ class Operator:
             OmegaConf.save(self.config.model, f)
         logger.info(f"Saving model configuration...")
 
+        # Save resolved experiment configuration for downstream use
+        config_experiment_path = os.path.join(self.config.paths.checkpoint_dir, "experiment.yaml")
+        with open(config_experiment_path, 'w') as f:
+            OmegaConf.save(self.config, f)
+        logger.info(f"Saving experiment configuration...")
+
         # Model initialization based on checkpoint scenario
-        ckpt_resume = self.config.get("resume_from_checkpoint", None)
-        ckpt_init = self.config.get("init_from_checkpoint", None)
+        ckpt_resume = self.config.get("resume_from_ckpt", None)
+        ckpt_init = self.config.get("init_from_ckpt", None)
 
         # Resume: Trainer handles checkpoint restoration (weights + optimizer + scheduler)
         if ckpt_resume and os.path.exists(ckpt_resume):

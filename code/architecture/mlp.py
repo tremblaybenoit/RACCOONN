@@ -467,7 +467,6 @@ class PredictionHead(nn.Module):
             Dropout probability for intermediate layers.
         post_process : DictConfig | Callable, optional
             Post-processing function applied after forward pass.
-            Can be compose_transformations, custom denormalization, etc.
             If DictConfig, instantiated via instantiate().
         """
 

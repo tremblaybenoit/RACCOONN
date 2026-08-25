@@ -15,7 +15,7 @@ defaults:
   - override /model: forward_default
   - override /callbacks: forward_default
   - override /logger: default
-  - override /trainer: gpu
+  - override /trainer: cpu
 
 # All parameters below will be merged with parameters from default configurations set above.
 # This allows you to overwrite only specified parameters
@@ -58,14 +58,63 @@ data:
     train:
       # Path to the training data
       dir: ../synthetic_float32/Train2
+      # Variables
+      variables:
+        # Radiances
+        bt_obs:
+          # Channels
+          type: ${data.source.train.variables.bt_crtm.type}
+          # Loading function
+          load:
+            split: ${data.source.train.variables.bt_crtm.load.split}
+        # Radiances
+        bt_crtm:
+          # Channels
+          type: [
+            'Channel 8', 'Channel 9', 'Channel 10', 'Channel 11', 'Channel 12',
+            'Channel 13', 'Channel 14', 'Channel 15', 'Channel 16'
+          ]
+          # Loading function
+          load:
+            split:
+              _target_: code.data.io.split_slice
+              _args_:
+                - _target_: builtins.slice
+                  _args_: [ null ]  # Equivalent to :
+                - _target_: builtins.slice
+                  _args_: [ 1, 10 ]  # Equivalent to 1:10
     # Validation set
     valid:
       # Path to the validation data
       dir: ../synthetic_float32/Val2
+      # Variables
+      variables:
+        # Radiances
+        bt_obs:
+          # Loading function
+          load:
+            split: ${data.source.train.variables.bt_obs.load.split}
+        # Radiances
+        bt_crtm:
+          # Loading function
+          load:
+            split: ${data.source.train.variables.bt_crtm.load.split}
     # Test set
     test:
       # Path to the test data
       dir: ../synthetic_float32/Test2
+      # Variables
+      variables:
+        # Radiances
+        bt_obs:
+          # Loading function
+          load:
+            split: ${data.source.train.variables.bt_obs.load.split}
+        # Radiances
+        bt_crtm:
+          # Loading function
+          load:
+            split: ${data.source.train.variables.bt_crtm.load.split}
   # Split ratios for training, validation, and test sets
   stage:
     # Training set
@@ -91,29 +140,7 @@ data:
         # Radiances
         bt_crtm:
           # Channels
-          type: [
-            'Channel 8', 'Channel 9', 'Channel 10', 'Channel 11', 'Channel 12',
-            'Channel 13', 'Channel 14', 'Channel 15', 'Channel 16'
-          ]
-          # Loading function
-          load:
-            split:
-              _target_: code.data.io.split_slice
-              _args_:
-                - _target_: builtins.slice
-                  _args_: [ null ]  # Equivalent to :
-                - _target_: builtins.slice
-                  _args_: [ 1, 10 ]  # Equivalent to 1:10
-          # Transformations
-          transformations:
-            # Normalization function and parameters
-            normalization:
-              stats:
-                split:
-                  _target_: code.data.io.split_slice
-                  _args_:
-                    - _target_: builtins.slice
-                      _args_: [ 1, 10 ]  # Equivalent to 1:10
+          type: ${data.source.train.variables.bt_crtm.type}
     # Validation set
     valid:
       # Variables
@@ -122,32 +149,6 @@ data:
         prof:
           # Transformations
           transformations: ${data.stage.train.variables.prof.transformations}
-        # Radiances
-        bt_crtm:
-          # Channels
-          type: [
-            'Channel 8', 'Channel 9', 'Channel 10', 'Channel 11', 'Channel 12',
-            'Channel 13', 'Channel 14', 'Channel 15', 'Channel 16'
-          ]
-          # Loading function
-          load:
-            split:
-              _target_: code.data.io.split_slice
-              _args_:
-                - _target_: builtins.slice
-                  _args_: [ null ]  # Equivalent to :
-                - _target_: builtins.slice
-                  _args_: [ 1, 10 ]  # Equivalent to 1:10
-          # Transformations
-          transformations:
-            # Normalization function and parameters
-            normalization:
-              stats:
-                split:
-                  _target_: code.data.io.split_slice
-                  _args_:
-                    - _target_: builtins.slice
-                      _args_: [ 1, 10 ]  # Equivalent to 1:10
     # Test set
     test:
       # Variables
@@ -156,32 +157,6 @@ data:
         prof:
           # Transformations
           transformations: ${data.stage.train.variables.prof.transformations}
-        # Radiances
-        bt_crtm:
-          # Channels
-          type: [
-            'Channel 8', 'Channel 9', 'Channel 10', 'Channel 11', 'Channel 12',
-            'Channel 13', 'Channel 14', 'Channel 15', 'Channel 16'
-          ]
-          # Loading function
-          load:
-            split:
-              _target_: code.data.io.split_slice
-              _args_:
-                - _target_: builtins.slice
-                  _args_: [ null ]  # Equivalent to :
-                - _target_: builtins.slice
-                  _args_: [ 1, 10 ]  # Equivalent to 1:10
-          # Transformations
-          transformations:
-            # Normalization function and parameters
-            normalization:
-              stats:
-                split:
-                  _target_: code.data.io.split_slice
-                  _args_:
-                    - _target_: builtins.slice
-                      _args_: [ 1, 10 ]  # Equivalent to 1:10
     # Prediction set
     predict:
       # Variables
@@ -200,4 +175,11 @@ logger:
 # Trainer configuration
 trainer:
   # Maximum number of epochs
-  max_epochs: 96
+  max_epochs: 1
+
+# Loader configuration
+loader:
+  # Batch size for training, validation, and test sets
+  batch_size: 32
+  # Number of workers for data loading
+  num_workers: 8

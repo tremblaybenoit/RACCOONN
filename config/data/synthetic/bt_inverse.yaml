@@ -16,9 +16,9 @@ train:
       # Path to the HOFX (simulated observations) file
       path: ${paths.run_dir}/bt_inverse_train.npy
       # Channels
-      type: ${..bt_crtm.type}
+      type: ${..bt_forward.type}
       # Number of variables
-      n: ${..bt_crtm.n}
+      n: ${..bt_forward.n}
       # Loading function
       load:
         _target_: code.data.io.load_npy
@@ -33,16 +33,7 @@ train:
           - ${...path}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations:
-        # Per-variable normalization
-        normalization:
-          _target_: code.data.transformations.identity
-          _partial_: true
-          stats:
-            _target_: code.preprocessing.statistics.read_statistics_var
-            load: ${preprocessing.statistics.output.load}
-            key: 'bt_crtm'
-            dtype: ${data.dtype}
+      transformations: ${..bt_forward.transformations}
 # Validation set
 valid:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.

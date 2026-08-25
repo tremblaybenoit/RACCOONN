@@ -33,16 +33,7 @@ train:
           - ${...path}
         dtype: ${data.dtype}
       # Transformations to apply
-      transformations:
-        # Per-variable normalization
-        normalization:
-          _target_: code.data.transformations.min_max
-          _partial_: true
-          stats:
-            _target_: code.preprocessing.statistics.read_statistics_var
-            load: ${preprocessing.statistics.output.load}
-            key: 'bt_crtm'
-            dtype: ${data.dtype}
+      transformations: ${..bt_crtm.transformations}
 # Validation set
 valid:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.

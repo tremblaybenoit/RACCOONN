@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
 from omegaconf import DictConfig
-from utilities.instantiators import instantiate
-from code.data.transformations import compose_transformations
+from code.data.transformations import Compose
 
 
 class ScaleLayer(nn.Module):
@@ -181,8 +180,6 @@ class AffineLayer(nn.Module):
 
 class TransformationsLayer(nn.Module):
     """Wrapper for applying a single transformation pipeline as a torch.nn.Module.
-    
-    Wraps code.data.transformations.compose_transformations for single-variable use.
     """
 
     def __init__(self, transformations: DictConfig | None = None,
@@ -207,8 +204,8 @@ class TransformationsLayer(nn.Module):
         # Class inheritance
         super().__init__()
 
-        # Compose transformations
-        self.transform = compose_transformations(transformations, inverse_transform=inverse_transform)
+        # Create Compose transformation pipeline
+        self.transform = Compose(transformations, inverse_transform=inverse_transform)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Apply transformation to input.
@@ -299,3 +296,28 @@ class TransformationsLayers(nn.Module):
                 transformed[key] = val
 
         return transformed
+
+    def to(self, device, dtype: torch.dtype | None = None, non_blocking: bool = False):
+        """Move all transformation parameters to the specified device.
+
+        Propagates device/dtype to all transformation layers and their underlying Compose objects.
+
+        Parameters
+        ----------
+        device : torch.device or str
+            The device to move parameters to.
+        dtype : torch.dtype, optional
+            The desired data type (optional).
+        non_blocking : bool, default=False
+            If True, use asynchronous transfers when possible.
+
+        Returns
+        -------
+        TransformationsLayers
+            Self for method chaining.
+        """
+        super().to(device, dtype=dtype, non_blocking=non_blocking)
+        for layer in self.layers.values():
+            if hasattr(layer.transform, 'to'):
+                layer.transform.to(device)
+        return self

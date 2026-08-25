@@ -534,7 +534,7 @@ class ForwardLogger(ArtifactLogger):
 
         # Get radiance channels
         channel_candidates = ['bt_forward', 'bt_crtm']
-        target_datasets = trainer.datamodule.valid.target
+        target_datasets = trainer.datamodule.valid.target.datasets
         channels = next(
             (target_datasets[key].type for key in channel_candidates
              if key in target_datasets),
@@ -563,7 +563,6 @@ class ForwardLogger(ArtifactLogger):
                 x_range=[[0, 2.0]],
                 labels=labels,
                 colors=colors,
-                # channels=channels,
                 title=[f"Forward model RMSE per channel"]
             )
         )

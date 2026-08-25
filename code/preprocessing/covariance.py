@@ -2,8 +2,10 @@ import numpy as np
 from scipy.linalg import block_diag
 import hydra
 from omegaconf import DictConfig
+from sqlalchemy.orm import identity
+
 from code.data.io import load_variable
-from code.data.transformations import compose_transformations, identity
+from code.data.transformations import Compose
 from utilities.instantiators import instantiate
 from utilities.logic import get_config_path
 from code.evaluation.plot import plot_map, save_plot, flexible_gridspec
@@ -35,8 +37,13 @@ def prior_from_bounded_perturbations(input: DictConfig, output: DictConfig | Non
 
     # Load true state (with transformations applied) and original dimensions
     x_true_transformed = load_variable(input.prof, apply_transform=apply_transform)
+
     if apply_transform and input.prof.get('transformations', None) is not None:
-        inverse_transform_fn = compose_transformations(input.prof.transformations, inverse_transform=True)
+        # Create inverse transformation function (Compose returns identity if transformations is None)
+        inverse_transform_fn = Compose(
+            transformations=input.prof.get('transformations', None),
+            inverse_transform=True
+        )
     else:
         inverse_transform_fn = identity
     x_dims = x_true_transformed.shape
