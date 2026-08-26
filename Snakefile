@@ -105,7 +105,7 @@ if 'train' in config_loader:
         name: "train"
         input:
             # Input data
-            data = set(get_filenames(config_loader['train']) + get_filenames(config_loader['valid'])),
+            data = set(get_filenames(config_loader['train'], exclude_keys={'output', 'latent'}) + get_filenames(config_loader['valid'], exclude_keys={'output', 'latent'})),
             # Model dependencies (if any)
             model = get_filenames(config_model, exclude_keys={'ckpt_path'})
         params:
@@ -149,7 +149,9 @@ if 'predict' in config_loader:
             # Input data
             data = get_filenames(config_loader['predict'], exclude_keys={'output', 'latent'}),
             # Model checkpoint
-            checkpoint = config_model['ckpt_path']
+            checkpoint = config_model['ckpt_path'],
+            # Test results
+            results = get_filenames(config_loader['test'], exclude_keys={'input', 'context', 'target', 'transformations'})
         params:
             # Hydra configuration
             config_name = config_name,

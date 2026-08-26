@@ -102,7 +102,21 @@ predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Z coordinate (slant)
-    z_slant: ${...test.variables.z_slant}
+    z_slant:
+      # Dataset class
+      _target_: ${....train.variables.z_slant._target_}
+      _recursive_: false
+      # Type of data
+      type: ${....train.variables.z_slant.type}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......valid.variables.z_slant.load}
+            - ${.......test.variables.z_slant.load}
+          - 0
+      # Transformations to apply
+      transformations: ${....train.variables.z_slant.transformations}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.

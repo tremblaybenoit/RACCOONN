@@ -102,7 +102,21 @@ predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Scans
-    scans: ${...test.variables.scans}
+    scans:
+      # Dataset class
+      _target_: ${....train.variables.scans._target_}
+      _recursive_: false
+      # Type of scans
+      type: ${....train.variables.scans.type}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......valid.variables.scans.load}
+            - ${.......test.variables.scans.load}
+          - 0
+      # Transformations to apply
+      transformations: ${....train.variables.scans.transformations}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.

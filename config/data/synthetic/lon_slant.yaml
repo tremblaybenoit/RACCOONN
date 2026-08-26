@@ -102,7 +102,21 @@ predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Longitude (slant)
-    lon_slant: ${...test.variables.lon_slant}
+    lon_slant:
+      # Dataset class
+      _target_: ${....train.variables.lon_slant._target_}
+      _recursive_: false
+      # Type of data
+      type: ${....train.variables.lon_slant.type}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......valid.variables.lon_slant.load}
+            - ${.......test.variables.lon_slant.load}
+          - 0
+      # Transformations to apply
+      transformations: ${....train.variables.lon_slant.transformations}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.

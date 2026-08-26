@@ -8,17 +8,17 @@ defaults:
   - synthetic/bt_inverse_stdev@stage
   - synthetic/lat_slant@stage
   - synthetic/lon_slant@stage
-  - synthetic/x_slant@stage
-  - synthetic/y_slant@stage
-  - synthetic/z_slant@stage
+  # - synthetic/x_slant@stage
+  # - synthetic/y_slant@stage
+  # - synthetic/z_slant@stage
   - synthetic/default@source
   - synthetic/variant_mask@source
   - synthetic/invariant_mask@source
-  - synthetic/lat_slant@source
-  - synthetic/lon_slant@source
-  - synthetic/x_slant@source
-  - synthetic/y_slant@source
-  - synthetic/z_slant@source
+  # - synthetic/lat_slant@source
+  # - synthetic/lon_slant@source
+  # - synthetic/x_slant@source
+  # - synthetic/y_slant@source
+  # - synthetic/z_slant@source
 
 # dtype
 dtype: 'float32'

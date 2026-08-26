@@ -102,7 +102,21 @@ predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Longitude
-    lon: ${...test.variables.lon}
+    lon:
+      # Dataset class
+      _target_: ${....train.variables.lon._target_}
+      _recursive_: false
+      # Type of data
+      type: ${....train.variables.lon.type}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......valid.variables.lon.load}
+            - ${.......test.variables.lon.load}
+          - 0
+      # Transformations to apply
+      transformations: ${....train.variables.lon.transformations}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.

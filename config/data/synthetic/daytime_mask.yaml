@@ -63,7 +63,21 @@ predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Daytime mask
-    daytime_mask: ${...test.variables.daytime_mask}
+    daytime_mask:
+      # Dataset class
+      _target_: ${....train.variables.daytime_mask._target_}
+      _recursive_: false
+      # Type of data
+      type: ${....train.variables.daytime_mask.type}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......valid.variables.daytime_mask.load}
+            - ${.......test.variables.daytime_mask.load}
+          - 0
+      # Transformations to apply
+      transformations: null
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.

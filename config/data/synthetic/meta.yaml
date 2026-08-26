@@ -112,7 +112,24 @@ predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Metadata
-    meta: ${...test.variables.meta}
+    meta:
+      # Dataset class
+      _target_: ${....train.variables.meta._target_}
+      _recursive_: false
+      # Type of data
+      type: ${....train.variables.meta.type}
+      # Number of variables
+      n: ${....train.variables.meta.n}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......valid.variables.meta.load}
+            - ${.......test.variables.meta.load}
+          - 0
+      # Transformations to apply
+      transformations: ${....train.variables.meta.transformations}
+
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.

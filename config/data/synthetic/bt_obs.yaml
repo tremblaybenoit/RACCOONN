@@ -102,7 +102,21 @@ predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Observations
-    bt_obs: ${...test.variables.bt_obs}
+    bt_obs:
+      # Dataset class
+      _target_: ${....train.variables.bt_obs._target_}
+      _recursive_: false
+      # Type of data
+      type: ${....train.variables.bt_obs.type}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......valid.variables.bt_obs.load}
+            - ${.......test.variables.bt_obs.load}
+          - 0
+      # Transformations to apply
+      transformations: ${....train.variables.bt_obs.transformations}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.

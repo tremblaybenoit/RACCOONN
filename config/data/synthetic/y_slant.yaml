@@ -102,7 +102,21 @@ predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Y coordinate (slant)
-    y_slant: ${...test.variables.y_slant}
+    y_slant:
+      # Dataset class
+      _target_: ${....train.variables.y_slant._target_}
+      _recursive_: false
+      # Type of data
+      type: ${....train.variables.y_slant.type}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......valid.variables.y_slant.load}
+            - ${.......test.variables.y_slant.load}
+          - 0
+      # Transformations to apply
+      transformations: ${....train.variables.y_slant.transformations}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.

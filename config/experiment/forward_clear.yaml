@@ -15,7 +15,7 @@ defaults:
   - override /model: forward_default
   - override /callbacks: forward_default
   - override /logger: default
-  - override /trainer: cpu
+  - override /trainer: gpu
 
 # All parameters below will be merged with parameters from default configurations set above.
 # This allows you to overwrite only specified parameters
@@ -175,7 +175,7 @@ logger:
 # Trainer configuration
 trainer:
   # Maximum number of epochs
-  max_epochs: 1
+  max_epochs: 96
 
 # Loader configuration
 loader:

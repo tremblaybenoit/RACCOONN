@@ -114,7 +114,23 @@ predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # HOFX (Simulated Observations)
-    bt_crtm: ${...test.variables.bt_crtm}
+    bt_crtm:
+      # Dataset class
+      _target_: ${....train.variables.bt_crtm._target_}
+      _recursive_: false
+      # Channels
+      type: ${....train.variables.bt_crtm.type}
+      # Number of variables
+      n: ${....train.variables.bt_crtm.n}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......valid.variables.bt_crtm.load}
+            - ${.......test.variables.bt_crtm.load}
+          - 0
+      # Transformations to apply
+      transformations: ${....train.variables.bt_crtm.transformations}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.

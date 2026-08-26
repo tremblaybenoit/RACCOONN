@@ -212,7 +212,7 @@ class Operator:
         # Set dtype
         dtype = self.config.data.get('dtype', 'float32')
         self.model = self.model.to(None, dtype=getattr(torch, dtype))
-        # self.model = torch.compile(self.model, mode="reduce-overhead")
+        self.model = torch.compile(self.model, mode="reduce-overhead")
 
     def _run_model(self) -> dict:
         """ Run model to generate a prediction.

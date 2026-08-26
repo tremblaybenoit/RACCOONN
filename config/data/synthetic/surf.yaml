@@ -122,18 +122,17 @@ predict:
       # Dataset class
       _target_: ${....train.variables.surf._target_}
       _recursive_: false
-      # Path to the surface variables file
-      path: ${...dir}/surf.npy
       # Surface variable types
       type: ${....train.variables.surf.type}
       # Number of variables
       n: ${....train.variables.surf.n}
       # Loading function
       load:
-        _target_: ${.....train.variables.surf.load._target_}
-        path: ${..path}
-        split: ${....split}
-        dtype: ${data.dtype}
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......valid.variables.surf.load}
+            - ${.......test.variables.surf.load}
+          - 0
       # Transformations to apply
       transformations: ${....train.variables.surf.transformations}
 # All data (complete dataset)

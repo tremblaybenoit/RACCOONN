@@ -110,18 +110,17 @@ predict:
       # Dataset class
       _target_: ${....train.variables.prof._target_}
       _recursive_: false
-      # Path to the atmospheric profiles file
-      path: ${...dir}/prof.npy
-      # Profile types
+      # Type of the atmospheric profiles
       type: ${....train.variables.prof.type}
       # Number of variables
       n: ${....train.variables.prof.n}
       # Loading function
       load:
-        _target_: ${.....train.variables.prof.load._target_}
-        path: ${..path}
-        split: ${....split}
-        dtype: ${data.dtype}
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......valid.variables.prof.load}
+            - ${.......test.variables.prof.load}
+          - 0
       # Transformations to apply
       transformations: ${....train.variables.prof.transformations}
 # All data (complete dataset)
