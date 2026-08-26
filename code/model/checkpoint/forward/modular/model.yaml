@@ -14,7 +14,17 @@ scheduler:
   threshold: 0.0
   threshold_mode: abs
 loss:
-  _target_: code.loss.probabilistic.CRPS
+  _target_: code.loss.wrapper.LossTerm
+  function:
+    _target_: code.loss.probabilistic.CRPS
+  output_keys:
+  - bt_forward
+  - bt_forward_stdev
+  target_keys: bt_crtm
+pre_process:
+  _target_: code.architecture.layer.TransformationsLayers
+  _recursive_: false
+  transformations: {}
 architecture:
   _target_: code.architecture.mlp.MLPModular
   _recursive_: false
@@ -82,12 +92,12 @@ architecture:
     _target_: code.architecture.mlp.HeterogeneousPredictionHeads
     _recursive_: false
     in_features: 512
+    out_concat: false
     heads:
     - out_features:
         _target_: builtins.len
         _args_:
-        - - Channel 7
-          - Channel 8
+        - - Channel 8
           - Channel 9
           - Channel 10
           - Channel 11
@@ -100,17 +110,23 @@ architecture:
       activation:
         _target_: torch.nn.Sigmoid
       post_process:
-        _target_: code.data.transformations.min_max
-        _partial_: true
-        stats:
-          min: 180
-          max: 355
+        _target_: code.architecture.layer.TransformationsLayer
+        transformations:
+          normalization:
+            _target_: code.data.transformations.min_max
+            _partial_: true
+            stats:
+              _target_: code.preprocessing.statistics.read_statistics_var
+              load:
+                _target_: code.data.io.load_pkl
+                path: code/data/statistics/synthetic_clear.pkl
+              key: bt_crtm
+              dtype: float32
         inverse_transform: true
     - out_features:
         _target_: builtins.len
         _args_:
-        - - Channel 7
-          - Channel 8
+        - - Channel 8
           - Channel 9
           - Channel 10
           - Channel 11
@@ -123,13 +139,12 @@ architecture:
       activation:
         _target_: torch.nn.Softplus
       post_process:
-        _target_: torch.nn.Sequential
-        _args_:
-        - _target_: code.architecture.layer.ScaleLayer
-          scale: 1.0
-          learnable: true
-        - _target_: code.architecture.layer.OffsetLayer
-          offset: 0.001
+        _target_: code.architecture.layer.AffineLayer
+        factor: 1.0
+        factor_learnable: true
+        value: 0.001
+        value_learnable: false
+        inverse_transform: true
   hidden_skip: false
   output_skip: false
   inject_encoding_hidden: false
