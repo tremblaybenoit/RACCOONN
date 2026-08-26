@@ -4,73 +4,73 @@ defaults:
   - _self_
 
 # Compute slant path coordinates
-slant:
-  # Training set
-  source_train:
-    # Function
-    _target_: code.preprocessing.slant.compute_slant_path
-    _recursive_: false  # Do not instantiate nested objects
-    # What the method needs as input
-    input:
-      # Coordinates
-      lat: ${data.source.train.variables.lat}
-      lon: ${data.source.train.variables.lon}
-      pressure: ${data.source.train.variables.pressure}
-      # Meta data
-      meta: ${data.source.train.variables.meta}
-      # Profiles
-      prof: ${data.source.train.variables.prof}
-    output:
-      # Coordinates
-      lat: ${data.source.train.variables.lat_slant}
-      lon: ${data.source.train.variables.lon_slant}
-      z: ${data.source.train.variables.z_slant}
-      x: ${data.source.train.variables.x_slant}
-      y: ${data.source.train.variables.y_slant}
-  # Validation set
-  source_valid:
-    # Function
-    _target_: code.preprocessing.slant.compute_slant_path
-    _recursive_: false  # Do not instantiate nested objects
-    # What the method needs as input
-    input:
-      # Coordinates
-      lat: ${data.source.valid.variables.lat}
-      lon: ${data.source.valid.variables.lon}
-      pressure: ${data.source.valid.variables.pressure}
-      # Meta data
-      meta: ${data.source.valid.variables.meta}
-      # Profiles
-      prof: ${data.source.valid.variables.prof}
-    output:
-      # Coordinates
-      lat: ${data.source.valid.variables.lat_slant}
-      lon: ${data.source.valid.variables.lon_slant}
-      z: ${data.source.valid.variables.z_slant}
-      x: ${data.source.valid.variables.x_slant}
-      y: ${data.source.valid.variables.y_slant}
-  # Test set
-  source_test:
-    # Function
-    _target_: code.preprocessing.slant.compute_slant_path
-    _recursive_: false  # Do not instantiate nested objects
-    # What the method needs as input
-    input:
-      # Coordinates
-      lat: ${data.source.test.variables.lat}
-      lon: ${data.source.test.variables.lon}
-      pressure: ${data.source.test.variables.pressure}
-      # Meta data
-      meta: ${data.source.test.variables.meta}
-      # Profiles
-      prof: ${data.source.test.variables.prof}
-    output:
-      # Coordinates
-      lat: ${data.source.test.variables.lat_slant}
-      lon: ${data.source.test.variables.lon_slant}
-      z: ${data.source.test.variables.z_slant}
-      x: ${data.source.test.variables.x_slant}
-      y: ${data.source.test.variables.y_slant}
+#slant:
+#  # Training set
+#  source_train:
+#    # Function
+#    _target_: code.preprocessing.slant.compute_slant_path
+#    _recursive_: false  # Do not instantiate nested objects
+#    # What the method needs as input
+#    input:
+#      # Coordinates
+#      lat: ${data.source.train.variables.lat}
+#      lon: ${data.source.train.variables.lon}
+#      pressure: ${data.source.train.variables.pressure}
+#      # Meta data
+#      meta: ${data.source.train.variables.meta}
+#      # Profiles
+#      prof: ${data.source.train.variables.prof}
+#    output:
+#      # Coordinates
+#      lat: ${data.source.train.variables.lat_slant}
+#      lon: ${data.source.train.variables.lon_slant}
+#      z: ${data.source.train.variables.z_slant}
+#      x: ${data.source.train.variables.x_slant}
+#      y: ${data.source.train.variables.y_slant}
+#  # Validation set
+#  source_valid:
+#    # Function
+#    _target_: code.preprocessing.slant.compute_slant_path
+#    _recursive_: false  # Do not instantiate nested objects
+#    # What the method needs as input
+#    input:
+#      # Coordinates
+#      lat: ${data.source.valid.variables.lat}
+#      lon: ${data.source.valid.variables.lon}
+#      pressure: ${data.source.valid.variables.pressure}
+#      # Meta data
+#      meta: ${data.source.valid.variables.meta}
+#      # Profiles
+#      prof: ${data.source.valid.variables.prof}
+#    output:
+#      # Coordinates
+#      lat: ${data.source.valid.variables.lat_slant}
+#      lon: ${data.source.valid.variables.lon_slant}
+#      z: ${data.source.valid.variables.z_slant}
+#      x: ${data.source.valid.variables.x_slant}
+#      y: ${data.source.valid.variables.y_slant}
+#  # Test set
+#  source_test:
+#    # Function
+#    _target_: code.preprocessing.slant.compute_slant_path
+#    _recursive_: false  # Do not instantiate nested objects
+#    # What the method needs as input
+#    input:
+#      # Coordinates
+#      lat: ${data.source.test.variables.lat}
+#      lon: ${data.source.test.variables.lon}
+#      pressure: ${data.source.test.variables.pressure}
+#      # Meta data
+#      meta: ${data.source.test.variables.meta}
+#      # Profiles
+#      prof: ${data.source.test.variables.prof}
+#    output:
+#      # Coordinates
+#      lat: ${data.source.test.variables.lat_slant}
+#      lon: ${data.source.test.variables.lon_slant}
+#      z: ${data.source.test.variables.z_slant}
+#      x: ${data.source.test.variables.x_slant}
+#      y: ${data.source.test.variables.y_slant}
 
 # Recast data to new format, spatiotemporal distribution
 recast:
@@ -104,18 +104,13 @@ covariance:
     # What the method needs as input
     input:
       # Variables to consider for the covariance estimation
-      data:
-        load: ${data.source.all.variables.prof.load}
-        transformations:  ${data.source.all.variables.prof.transformations}
+      data: ${data.source.all.variables.prof}
       # Latitude
-      lat:
-        load: ${data.source.all.variables.lat.load}
+      lat: ${data.source.all.variables.lat}
       # Longitude
-      lon:
-        load: ${data.source.all.variables.lon.load}
+      lon: ${data.source.all.variables.lon}
       # Scans
-      scans:
-        load: ${data.source.all.variables.scans.load}
+      scans: ${data.source.all.variables.scans}
       # Variant mask: Consider only profile pressure levels with non-zero variance
       variant_mask: ${data.source.all.variables.variant_mask}
 
@@ -127,15 +122,10 @@ covariance:
     # What the method needs as input
     input:
       # Innovation estimates for the observation variables
-      data:
-        load: ${data.source.all.variables.bt_forward_stdev.load}
-        transformations: null
+      data: ${data.source.all.variables.bt_forward_err}
       # Latitude
-      lat:
-        load: ${data.source.all.variables.lat.load}
+      lat: ${data.source.all.variables.lat}
       # Longitude
-      lon:
-        load: ${data.source.all.variables.lon.load}
+      lon: ${data.source.all.variables.lon}
       # Scans
-      scans:
-        load: ${data.source.all.variables.scans.load}
+      scans: ${data.source.all.variables.scans}

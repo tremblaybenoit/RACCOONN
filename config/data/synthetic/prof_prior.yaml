@@ -14,16 +14,11 @@ train:
       _target_: code.loader.dataset.EagerDataset
       _recursive_: false
       # Path to the atmospheric profiles file
-      path: null
+      # path: null
       # Profile types
-      type: ['Air temperature', 'Cloud ice particle effective radius', 'Cloud water particle effective radius',
-             'Snow particle effective radius', 'Humidity mixing ratio', 'Cloud ice mass', 'Cloud water mass',
-             'Snow mass', 'Ozone mixing ratio']
+      type: ${..prof.type}
       # Number of variables
-      n:
-        _target_: builtins.len
-        _args_:
-          - ${...type}
+      n: ${..prof.n}
       # Loading function
       load:
         _target_: code.preprocessing.covariance.prior_from_bounded_perturbations
@@ -54,7 +49,7 @@ valid:
       _target_: ${....train.variables.prof_prior._target_}
       _recursive_: false
       # Path to the atmospheric profiles file
-      path: null
+      # path: null
       # Profile types
       type: ${....train.variables.prof_prior.type}
       # Number of variables
@@ -85,7 +80,7 @@ test:
       _target_: ${....train.variables.prof_prior._target_}
       _recursive_: false
       # Path to the atmospheric profiles file
-      path: null
+      # path: null
       # Profile types
       type: ${....train.variables.prof_prior.type}
       # Number of variables
@@ -111,7 +106,23 @@ predict:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.
   variables:
     # Atmospheric profiles
-    prof_prior: ${...test.variables.prof_prior}
+    prof_prior:
+      # Dataset class
+      _target_: ${....train.variables.prof_prior._target_}
+      _recursive_: false
+      # Type of the atmospheric profiles
+      type: ${....train.variables.prof_prior.type}
+      # Number of variables
+      n: ${....train.variables.prof_prior.n}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......valid.variables.prof_prior.load}
+            - ${.......test.variables.prof_prior.load}
+          - 0
+      # Transformations to apply
+      transformations: ${....train.variables.prof_prior.transformations}
 # All data (complete dataset)
 all:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.

@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.linalg import block_diag
 import hydra
+import torch
 from omegaconf import DictConfig
 from sqlalchemy.orm import identity
 from code.data.io import load_variable
@@ -15,8 +16,38 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def err(input: DictConfig, output: DictConfig | None = None, apply_transform: bool = False) -> np.ndarray | torch.Tensor | None:
+    """ Compute the model error covariance matrix.
+
+        Parameters
+        ----------
+        input: DictConfig. Main hydra configuration file containing all model hyperparameters.
+        output: DictConfig. Output configuration.
+        apply_transform: bool. If True, apply normalization transform to the data before computing covariance.
+
+        Returns
+        -------
+        None.
+    """
+    # Load data and reference (with transformations applied)
+    data = load_variable(input.data, as_tensor=False, apply_transform=apply_transform)
+    ref = load_variable(input.ref, as_tensor=False, apply_transform=apply_transform)
+    # Compute model error (data - reference)
+    data_err = data - ref
+
+    # Save to file
+    if output is not None and hasattr(output, 'save'):
+        logger.info(f"Saving validated prior to {output.path}...")
+        save_func = instantiate(output.save)
+        save_func(data_err)
+        return None
+    else:
+        return data_err
+
+
+
 def prior_from_bounded_perturbations(input: DictConfig, output: DictConfig | None = None,
-                                     seed: int | None = None, apply_transform: bool = True) -> np.ndarray | None:
+                                     seed: int | None = None, apply_transform: bool = False) -> np.ndarray | None:
     """ Compute the prior from the model error covariance matrix and perturbations.
 
         Parameters
@@ -132,7 +163,7 @@ def prior_from_bounded_perturbations(input: DictConfig, output: DictConfig | Non
 
 def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor: float = 1.0,
                           regularization_factor: float = 1.0, plot_flag: bool=True, recenter: bool=False,
-                          univariate: bool = False, mean_type: str='spatiotemporal', apply_transform: bool=True) -> None:
+                          univariate: bool = False, mean_type: str='spatiotemporal', apply_transform: bool=False) -> None:
     """ Compute climatological covariance matrix of a given dataset.
 
         Parameters

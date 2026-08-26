@@ -1,0 +1,139 @@
+# Format:
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # HOFX (Simulated Observations)
+    bt_forward_err:
+      # Dataset class
+      _target_: code.loader.dataset.EagerDataset
+      _recursive_: false
+      # Path to the HOFX (simulated observations) file
+      path: ${paths.run_dir}/bt_forward_train.npy
+      # Channels
+      type: ${..bt_crtm.type}
+      # Number of variables
+      n: ${..bt_crtm.n}
+      # Loading function
+      load:
+        _target_: code.preprocessing.covariance.err
+        # What the method needs as input
+        input:
+          # Error components
+          data: ${....bt_forward}
+          true: ${....bt_crtm}
+        # Parameters
+        apply_transform: false
+      # Transformations to apply
+      transformations: null
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # HOFX (Simulated Observations)
+    bt_forward_err:
+      # Dataset class
+      _target_: ${....train.variables.bt_forward_err._target_}
+      _recursive_: false
+      # Path to the HOFX (simulated observations) file
+      # path: ${paths.run_dir}/bt_forward_err_valid.npy
+      # Channels
+      type: ${....train.variables.bt_forward_err.type}
+      # Number of variables
+      n: ${....train.variables.bt_forward_err.n}
+      # Loading function
+      load:
+        _target_: code.preprocessing.covariance.err
+        # What the method needs as input
+        input:
+          # Error components
+          data: ${....bt_forward}
+          true: ${....bt_crtm}
+        # Parameters
+        apply_transform: false
+      # Transformations to apply
+      transformations: ${....train.variables.bt_forward_err.transformations}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # HOFX (Simulated Observations)
+    bt_forward_err:
+      # Dataset class
+      _target_: ${....train.variables.bt_forward_err._target_}
+      _recursive_: false
+      # Path to the HOFX (simulated observations) file
+      # path: ${...dir}/bt_forward_err_test.npy
+      # Channels
+      type: ${....train.variables.bt_forward_err.type}
+      # Number of variables
+      n: ${....train.variables.bt_forward_err.n}
+      # Loading function
+      load:
+        _target_: code.preprocessing.covariance.err
+        # What the method needs as input
+        input:
+          # Error components
+          data: ${....bt_forward}
+          true: ${....bt_crtm}
+        # Parameters
+        apply_transform: false
+      # Transformations to apply
+      transformations: ${....train.variables.bt_forward_err.transformations}
+# Predict set
+predict:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # HOFX (Simulated Observations)
+    bt_forward_err:
+      # Dataset class
+      _target_: ${....train.variables.bt_forward_err._target_}
+      _recursive_: false
+      # Path to the HOFX (simulated observations) file
+      # path: ${...dir}/bt_forward_err_predict.npy
+      # Channels
+      type: ${....train.variables.bt_forward_err.type}
+      # Number of variables
+      n: ${....train.variables.bt_forward_err.n}
+      # Loading function
+      load:
+        _target_: code.preprocessing.covariance.err
+        # What the method needs as input
+        input:
+          # Error components
+          data: ${....bt_forward}
+          true: ${....bt_crtm}
+        # Parameters
+        apply_transform: false
+      # Transformations to apply
+      transformations: ${....train.variables.bt_forward_err.transformations}
+# All data (complete dataset)
+all:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # HOFX (Simulated Observations)
+    bt_forward_err:
+      # Dataset class
+      _target_: ${....train.variables.bt_forward_err._target_}
+      _recursive_: false
+      # Channels
+      type: ${....train.variables.bt_forward_err.type}
+      # Number of variables
+      n: ${....train.variables.bt_forward_err.n}
+      # Loading function
+      load:
+        _target_: code.preprocessing.covariance.err
+        # What the method needs as input
+        input:
+          # Error components
+          data: ${....bt_forward}
+          true: ${....bt_crtm}
+        # Parameters
+        apply_transform: false
+      # Transformations to apply
+      transformations: ${....train.variables.bt_forward_err.transformations}

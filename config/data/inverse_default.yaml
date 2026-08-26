@@ -6,12 +6,13 @@ defaults:
   - synthetic/prof_prior@stage
   - synthetic/bt_inverse@stage
   - synthetic/bt_inverse_stdev@stage
-  - synthetic/lat_slant@stage
-  - synthetic/lon_slant@stage
+  # - synthetic/lat_slant@stage
+  # - synthetic/lon_slant@stage
   # - synthetic/x_slant@stage
   # - synthetic/y_slant@stage
   # - synthetic/z_slant@stage
   - synthetic/default@source
+  - synthetic/bt_forward_err@source
   - synthetic/variant_mask@source
   - synthetic/invariant_mask@source
   # - synthetic/lat_slant@source
@@ -25,7 +26,7 @@ dtype: 'float32'
 
 # Variables to use as input/output
 select_input: ['lat', 'lon', 'scans', 'pressure']
-select_target: ['prof', 'prof_prior', 'bt_crtm', 'bt_inverse', 'bt_inverse_stdev']
+select_target: ['prof', 'prof_prior', 'bt_crtm']
 select_context: ['meta', 'surf', 'clear_mask', 'cloud_mask', 'daytime_mask', 'nighttime_mask',
                  'variant_mask', 'invariant_mask']
 select_output: ['bt_inverse', 'bt_inverse_stdev', 'prof_inverse']
@@ -67,7 +68,7 @@ stage:
     # Variables
     variables:
       # Atmospheric profiles
-      prof:
+      prof_inverse:
         # Transformations to apply
         transformations:
           # Per-variable normalization
@@ -88,9 +89,9 @@ stage:
     # Variables
     variables:
       # Atmospheric profiles
-      prof:
+      prof_inverse:
         # Transformations to apply
-        transformations: ${data.stage.train.variables.prof.transformations}
+        transformations: ${data.stage.train.variables.prof_inverse.transformations}
 
   # Test set
   test:
@@ -101,9 +102,9 @@ stage:
     # Variables
     variables:
       # Atmospheric profiles
-      prof:
+      prof_inverse:
         # Transformations to apply
-        transformations: ${data.stage.train.variables.prof.transformations}
+        transformations: ${data.stage.train.variables.prof_inverse.transformations}
 
   # Prediction set (NOTE: By default, we use the test set as the prediction set for demonstration purposes)
   predict:
@@ -114,6 +115,6 @@ stage:
     # Variables
     variables:
       # Atmospheric profiles
-      prof:
+      prof_inverse:
         # Transformations to apply
-        transformations: ${data.stage.train.variables.prof.transformations}
+        transformations: ${data.stage.train.variables.prof_inverse.transformations}

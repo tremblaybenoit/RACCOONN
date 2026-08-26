@@ -9,18 +9,13 @@ covariance:
     # What the method needs as input
     input:
       # Variables to consider for the covariance estimation
-      data:
-        load: ${data.stage.all.variables.prof.load}
-        transformations:  ${data.stage.all.variables.prof.transformations}
+      data: ${data.stage.all.variables.prof}
       # Latitude
-      lat:
-        load: ${data.stage.all.variables.lat.load}
+      lat: ${data.stage.all.variables.lat}
       # Longitude
-      lon:
-        load: ${data.stage.all.variables.lon.load}
+      lon: ${data.stage.all.variables.lon}
       # Scans
-      scans:
-        load: ${data.stage.all.variables.scans.load}
+      scans: ${data.stage.all.variables.scans}
       # Variant mask: Consider only profile pressure levels with non-zero variance
       variant_mask: ${data.source.all.variables.variant_mask}
     # Univariate or multivariate
@@ -36,7 +31,7 @@ covariance:
     # Type of recentering:
     mean_type: 'temporal'
     # Apply data transformations to the input data before computing the covariance matrix
-    apply_transform: true
+    apply_transform: false
     # What the method produces as output
     output:
       # Covariance matrix
@@ -110,21 +105,15 @@ covariance:
     _target_: code.preprocessing.covariance.climatological_matrix
     _recursive_: false  # Do not instantiate nested objects
     # What the method needs as input
-    # TODO: Modify input to be the error
     input:
       # Innovation estimates for the observation variables
-      data:
-        load: ${data.stage.all.variables.bt_forward_stdev.load}
-        transformations:  null
+      data: ${data.stage.all.variables.bt_forward_err}
       # Latitude
-      lat:
-        load: ${data.stage.all.variables.lat.load}
+      lat: ${data.stage.all.variables.lat}
       # Longitude
-      lon:
-        load: ${data.stage.all.variables.lon.load}
+      lon: ${data.stage.all.variables.lon}
       # Scans
-      scans:
-        load: ${data.stage.all.variables.scans.load}
+      scans: ${data.stage.all.variables.scans}
     # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
     scaling_factor: 1.0
     # Regularization parameter to ensure numerical stability
@@ -133,9 +122,9 @@ covariance:
     plot_flag: true
     # Re-centering
     recenter: true
-    mean_type: 'temporal'
+    mean_type: 'spatiotemporal'
     # Apply data transformations to the input data before computing the covariance matrix
-    apply_transform: true
+    apply_transform: false
     # What the method produces as output
     output:
       # Covariance matrix

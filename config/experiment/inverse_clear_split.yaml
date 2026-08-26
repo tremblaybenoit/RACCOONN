@@ -76,6 +76,15 @@ data:
     test:
       # Path to the test data
       dir: ../synthetic_float32_clear/Test2
+    # Prediction set
+    predict:
+      # Variables
+      variables:
+        # Radiances
+        bt_forward:
+          # Path to the prediction data
+          path: '../forward_outputs/forward_clear/runs/modular/bt_forward_predict.npy'
+
   # Split ratios for training, validation, and test sets
   stage:
     # Training set
@@ -83,7 +92,7 @@ data:
       # Variables
       variables:
         # Atmospheric profiles
-        prof:
+        prof_inverse:
           # Transformations
           transformations:
             # Normalization function and parameters
@@ -101,28 +110,28 @@ data:
       # Variables
       variables:
         # Atmospheric profiles
-        prof:
+        prof_inverse:
           # Transformations
-          transformations: ${data.stage.train.variables.prof.transformations}
+          transformations: ${data.stage.train.variables.prof_inverse.transformations}
     # Test set
     test:
       # Variables
       variables:
         # Atmospheric profiles
-        prof:
+        prof_inverse:
           # Transformations
-          transformations: ${data.stage.train.variables.prof.transformations}
+          transformations: ${data.stage.train.variables.prof_inverse.transformations}
     # Prediction set
     predict:
       # Variables
       variables:
         # Atmospheric profiles
-        prof:
+        prof_inverse:
           # Transformations
-          transformations: ${data.stage.train.variables.prof.transformations}
+          transformations: ${data.stage.train.variables.prof_inverse.transformations}
 
 # Logger configuration
 logger:
   # MLflow logger
   ports:
-    mlflow: 5002
+    mlflow: 5003

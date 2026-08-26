@@ -4,8 +4,10 @@ statistics:
   _target_: code.preprocessing.statistics.compute_statistics
   _recursive_: false  # Do not instantiate nested objects
   # Exclude variables from the statistics computation
-  exclude: ['clear_mask', 'cloud_mask', 'daytime_mask', 'nighttime_mask', 'variant_mask', 'invariant_mask',
-            'prof_prior', 'bt_forward', 'bt_forward_stdev', 'bt_inverse', 'bt_inverse_stdev']
+  exclude: ['clear_mask', 'cloud_mask', 'daytime_mask', 'nighttime_mask',
+            'variant_mask', 'invariant_mask', 'prof_prior', 'prof_inverse',
+            'bt_forward', 'bt_forward_stdev', 'bt_forward_err',
+            'bt_inverse', 'bt_inverse_stdev']
   # What the method needs as input
   input: ${data.stage.all.variables}
   # Computation parameters
