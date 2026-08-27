@@ -22,11 +22,12 @@ train:
       # Loading function
       load:
         _target_: code.preprocessing.covariance.err
+        _recursive_: false
         # What the method needs as input
         input:
           # Error components
-          data: ${....bt_forward}
-          true: ${....bt_crtm}
+          x: ${....bt_forward}
+          x_true: ${....bt_crtm}
         # Parameters
         apply_transform: false
       # Transformations to apply
@@ -49,11 +50,12 @@ valid:
       # Loading function
       load:
         _target_: code.preprocessing.covariance.err
+        _recursive_: false
         # What the method needs as input
         input:
           # Error components
-          data: ${....bt_forward}
-          true: ${....bt_crtm}
+          x: ${....bt_forward}
+          x_true: ${....bt_crtm}
         # Parameters
         apply_transform: false
       # Transformations to apply
@@ -76,11 +78,12 @@ test:
       # Loading function
       load:
         _target_: code.preprocessing.covariance.err
+        _recursive_: false
         # What the method needs as input
         input:
           # Error components
-          data: ${....bt_forward}
-          true: ${....bt_crtm}
+          x: ${....bt_forward}
+          x_true: ${....bt_crtm}
         # Parameters
         apply_transform: false
       # Transformations to apply
@@ -103,11 +106,12 @@ predict:
       # Loading function
       load:
         _target_: code.preprocessing.covariance.err
+        _recursive_: false
         # What the method needs as input
         input:
           # Error components
-          data: ${....bt_forward}
-          true: ${....bt_crtm}
+          x: ${....bt_forward}
+          x_true: ${....bt_crtm}
         # Parameters
         apply_transform: false
       # Transformations to apply
@@ -128,11 +132,12 @@ all:
       # Loading function
       load:
         _target_: code.preprocessing.covariance.err
+        _recursive_: false
         # What the method needs as input
         input:
           # Error components
-          data: ${....bt_forward}
-          true: ${....bt_crtm}
+          x: ${....bt_forward}
+          x_true: ${....bt_crtm}
         # Parameters
         apply_transform: false
       # Transformations to apply

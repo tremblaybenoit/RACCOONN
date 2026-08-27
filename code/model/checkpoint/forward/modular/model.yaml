@@ -24,7 +24,47 @@ loss:
 pre_process:
   _target_: code.architecture.layer.TransformationsLayers
   _recursive_: false
-  transformations: {}
+  transformations:
+    prof:
+      normalization:
+        _target_: code.data.transformations.min_max
+        _partial_: true
+        stats:
+          _target_: code.preprocessing.statistics.read_statistics_var
+          load:
+            _target_: code.data.io.load_pkl
+            path: code/data/statistics/synthetic_clear.pkl
+          key: prof
+          dtype: float32
+        axis: 1
+    meta:
+      normalization:
+        _target_: code.data.transformations.NormalizeMeta
+        settings:
+          meta_sin_vars:
+          - 0
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          meta_cos_vars:
+          - 6
+          meta_scale_factor: 180
+          meta_scale_offset: -180
+          meta_scale_vars: []
+    surf:
+      normalization:
+        _target_: code.data.transformations.NormalizeSurface
+        surfmax:
+          _target_: numpy.loadtxt
+          _args_:
+          - code/data/statistics/surfmax.txt
+        surfmin:
+          _target_: numpy.loadtxt
+          _args_:
+          - code/data/statistics/surfmin.txt
+        dtype: float32
 architecture:
   _target_: code.architecture.mlp.MLPModular
   _recursive_: false

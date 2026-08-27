@@ -55,7 +55,15 @@ source:
     split: null
 
   # Prediction set
-  predict: null
+  predict:
+    # Split
+    split: null
+    # Variables
+    variables:
+      # Radiances
+      bt_forward:
+        # Path to the prediction data
+        path: '../forward_outputs/forward_clear/runs/modular/bt_forward_predict.npy'
 
 # Split the data into training, validation, and test sets
 stage:

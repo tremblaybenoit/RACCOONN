@@ -98,6 +98,55 @@ covariance:
           _target_: numpy.load
           _args_:
             - ${preprocessing.covariance.B.output.matrix_pseudo_inverse.path}
+      # Correlation matrix
+      correlation:
+        # File path to save/load the correlation matrix
+        path: code/data/statistics/B_correlation.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.B.output.correlation.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.B.output.correlation.path}
+      # Inverse of the correlation matrix
+      correlation_inverse:
+        # File path to save/load the inverse of the correlation matrix
+        path: code/data/statistics/B_correlation_inverse.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.B.output.correlation_inverse.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.B.output.correlation_inverse.path}
+      # Pseudo-inverse of the correlation matrix
+      correlation_pseudo_inverse:
+        # Parameters
+        params:
+          # Condition number threshold for the pseudo-inverse (e.g., to handle near-singular matrices)
+          rcond: 1e-3
+        # File path to save/load the pseudo-inverse of the correlation matrix
+        path: code/data/statistics/B_correlation_pseudo_inverse.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.B.output.correlation_pseudo_inverse.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.B.output.correlation_pseudo_inverse.path}
 
   # Error covariance matrix in observation space
   R:

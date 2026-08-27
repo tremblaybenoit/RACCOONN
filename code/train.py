@@ -214,28 +214,6 @@ class Operator:
         self.model = self.model.to(None, dtype=getattr(torch, dtype))
         # self.model = torch.compile(self.model, mode="reduce-overhead")
 
-    def _run_model(self) -> dict:
-        """ Run model to generate a prediction.
-
-            Parameters
-            ----------
-            None.
-
-            Returns
-            -------
-            None.
-        """
-
-        # Evaluate on test set
-        logger.info("Running model on data...")
-        batch_output = self.trainer.predict(self.model, self.loader)
-
-        # Accumulate results from all batches
-        logger.info("Accumulating output...")
-        batch_output = _accumulate_output(batch_output)
-
-        return batch_output
-
     def train(self) -> None:
         """ Loads data, loggers, callbacks, trainer, and then trains and tests the model.
             Saves the training weights and biases in a checkpoint file.
@@ -313,7 +291,11 @@ class Operator:
 
         # Evaluate on test set
         logger.info("Running model...")
-        output = self._run_model()
+        output = self.trainer.predict(self.model, dataloaders=self.loader.test_dataloader())
+
+        # Accumulate results from all batches
+        logger.info("Accumulating output...")
+        output = _accumulate_output(output)
 
         # Save results to file
         logger.info("Saving output to file...")
@@ -349,7 +331,11 @@ class Operator:
 
         # Predict on dataset
         logger.info("Running model...")
-        output = self._run_model()
+        output = self.trainer.predict(self.model, dataloaders=self.loader.predict_dataloader())
+
+        # Accumulate results from all batches
+        logger.info("Accumulating output...")
+        output = _accumulate_output(output)
 
         return output
 

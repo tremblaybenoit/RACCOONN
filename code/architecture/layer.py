@@ -265,7 +265,6 @@ class TransformationsLayers(nn.Module):
         for var_name, var_cfg in transformations.items():
             if var_cfg is not None:
                 modules[str(var_name)] = TransformationsLayer(var_cfg, inverse_transform=inverse_transform)
-
         self.layers = nn.ModuleDict(modules)
         # Store keys as a tuple for ultra-fast iteration
         self.keys = tuple(self.layers.keys())

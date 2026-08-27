@@ -151,7 +151,6 @@ class Dataloader(BaseDataloader):
         elif stage == 'test':
             # Test data - load into predict to enable trainer.predict()
             self.test = instantiate(self.ds_stage.test)
-            self.predict = self.test
         elif stage == 'predict':
             # Prediction data
             self.predict = instantiate(self.ds_stage.predict)

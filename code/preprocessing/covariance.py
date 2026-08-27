@@ -29,21 +29,21 @@ def err(input: DictConfig, output: DictConfig | None = None, apply_transform: bo
         -------
         None.
     """
+
     # Load data and reference (with transformations applied)
-    data = load_variable(input.data, as_tensor=False, apply_transform=apply_transform)
-    ref = load_variable(input.ref, as_tensor=False, apply_transform=apply_transform)
+    x = load_variable(input.x, as_tensor=False, apply_transform=apply_transform)
+    x_true = load_variable(input.x_true, as_tensor=False, apply_transform=apply_transform)
     # Compute model error (data - reference)
-    data_err = data - ref
+    x_err = x - x_true
 
     # Save to file
     if output is not None and hasattr(output, 'save'):
         logger.info(f"Saving validated prior to {output.path}...")
         save_func = instantiate(output.save)
-        save_func(data_err)
+        save_func(x_err)
         return None
     else:
-        return data_err
-
+        return x_err
 
 
 def prior_from_bounded_perturbations(input: DictConfig, output: DictConfig | None = None,

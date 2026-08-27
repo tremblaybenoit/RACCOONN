@@ -122,10 +122,10 @@ covariance:
     # What the method needs as input
     input:
       # Innovation estimates for the observation variables
-      data: ${data.source.all.variables.bt_forward_err}
+      data: ${data.source.predict.variables.bt_forward_err}
       # Latitude
-      lat: ${data.source.all.variables.lat}
+      lat: ${data.source.predict.variables.lat}
       # Longitude
-      lon: ${data.source.all.variables.lon}
+      lon: ${data.source.predict.variables.lon}
       # Scans
-      scans: ${data.source.all.variables.scans}
+      scans: ${data.source.predict.variables.scans}

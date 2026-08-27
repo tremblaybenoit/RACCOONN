@@ -68,6 +68,15 @@ data:
     train:
       # Path to the training data
       dir: ../synthetic_float32_clear/Train2
+      # Variables
+      variables:
+        # Radiances
+        bt_crtm:
+          # Channels
+          type: [
+            'Channel 8', 'Channel 9', 'Channel 10', 'Channel 11', 'Channel 12',
+            'Channel 13', 'Channel 14', 'Channel 15', 'Channel 16'
+          ]
     # Validation set
     valid:
       # Path to the validation data
@@ -105,6 +114,13 @@ data:
                 var: 'prof'
                 dtype: ${data.dtype}
               axis: 1
+        # Radiances
+        bt_crtm:
+          # Channels
+          type: [
+            'Channel 8', 'Channel 9', 'Channel 10', 'Channel 11', 'Channel 12',
+            'Channel 13', 'Channel 14', 'Channel 15', 'Channel 16'
+          ]
     # Validation set
     valid:
       # Variables
