@@ -50,20 +50,20 @@ covariance:
           _args_:
             - ${preprocessing.covariance.B.output.matrix.path}
       # Cholesky decomposition of the covariance matrix
-      cholesky:
+      matrix_cholesky:
         # File path to save/load the Cholesky decomposition of the covariance matrix
-        path: code/data/statistics/B_cholesky.npy
+        path: code/data/statistics/B_matrix_cholesky.npy
         # Save function
         save:
           _target_: numpy.save
           _partial_: true
           _args_:
-            - ${preprocessing.covariance.B.output.cholesky.path}
+            - ${preprocessing.covariance.B.output.matrix_cholesky.path}
         # Load function
         load:
           _target_: numpy.load
           _args_:
-            - ${preprocessing.covariance.B.output.cholesky.path}
+            - ${preprocessing.covariance.B.output.matrix_cholesky.path}
       # Inverse of the covariance matrix
       matrix_inverse:
         # File path to save/load the inverse of the covariance matrix
@@ -113,6 +113,21 @@ covariance:
           _target_: numpy.load
           _args_:
             - ${preprocessing.covariance.B.output.correlation.path}
+      # Cholesky decomposition of the correlation matrix
+      correlation_cholesky:
+        # File path to save/load the Cholesky decomposition of the covariance matrix
+        path: code/data/statistics/B_correlation_cholesky.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.B.output.correlation_cholesky.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.B.output.correlation_cholesky.path}
       # Inverse of the correlation matrix
       correlation_inverse:
         # File path to save/load the inverse of the correlation matrix

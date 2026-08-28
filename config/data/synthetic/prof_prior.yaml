@@ -21,18 +21,20 @@ train:
       n: ${..prof.n}
       # Loading function
       load:
-        _target_: code.preprocessing.covariance.prior_from_bounded_perturbations
+        _target_: code.preprocessing.covariance.prior_from_correlation_perturbations
+        _recursive_: false
         # What the method needs as input
         input:
           # Atmospheric profiles
           prof: ${....prof}
           # Cholesky matrix
-          cholesky: ${preprocessing.covariance.B.output.cholesky}
+          correlation_cholesky: ${preprocessing.covariance.B.output.correlation_cholesky}
+          matrix: ${preprocessing.covariance.B.output.matrix}
           # Statistics for lower/upper bounds
           stats:
             _target_: code.preprocessing.statistics.read_statistics_var
-            path: ${preprocessing.statistics.output.path}
-            var: 'prof'
+            load: ${preprocessing.statistics.output.load}
+            key: 'prof'
             dtype: ${data.dtype}
         # Parameters
         seed: 75
@@ -57,12 +59,14 @@ valid:
       # Loading function
       load:
         _target_: ${.....train.variables.prof_prior.load._target_}
+        _recursive_: false
         # What the method needs as input
         input:
           # Atmospheric profiles
           prof: ${....prof}
           # Cholesky matrix
-          cholesky: ${......train.variables.prof_prior.load.input.cholesky}
+          correlation_cholesky: ${......train.variables.prof_prior.load.input.correlation_cholesky}
+          matrix: ${......train.variables.prof_prior.load.input.matrix}
           # Statistics for lower/upper bounds
           stats: ${......train.variables.prof_prior.load.input.stats}
         # Parameters
@@ -88,12 +92,14 @@ test:
       # Loading function
       load:
         _target_: ${.....train.variables.prof_prior.load._target_}
+        _recursive_: false
         # What the method needs as input
         input:
           # Atmospheric profiles
           prof: ${....prof}
           # Cholesky matrix
-          cholesky: ${......train.variables.prof_prior.load.input.cholesky}
+          correlation_cholesky: ${......train.variables.prof_prior.load.input.correlation_cholesky}
+          matrix: ${......train.variables.prof_prior.load.input.matrix}
           # Statistics for lower/upper bounds
           stats: ${......train.variables.prof_prior.load.input.stats}
         # Parameters

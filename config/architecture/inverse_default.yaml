@@ -1,3 +1,60 @@
-# Default architecture
-defaults:
-  - mlp_modular
+_target_: code.architecture.mlp.MLPModular
+_recursive_: false
+
+# Positional encoding
+positional_encoding:
+  _target_: code.architecture.encoding.RescaledPositionalEncoding
+  _recursive_: false
+  d_input:
+    _target_: builtins.len
+    _args_:
+      - ${data.select_input}
+
+# Input layer
+input_layer:
+  _target_: code.architecture.mlp.MLPBlock
+  _recursive_: false
+  in_features: null  # Set by positional encoding output
+  out_features: 128
+  activation:
+    _target_: code.architecture.activation.Swish
+  norm_type: none
+  dropout_rate: 0.1
+  residual: false
+
+# Hidden layers
+hidden_layer:
+  _target_: code.architecture.mlp.MLPBlocks
+  _recursive_: false
+  in_features: ${.hidden_features}
+  out_features: ${.hidden_features}
+  hidden_features: 128
+  n_blocks: 2
+  activation:
+    _target_: code.architecture.activation.Swish
+  norm_type: none
+  dropout_rate: 0.1
+  residual: false
+
+# Output layer
+output_layer:
+  _target_: code.architecture.mlp.PredictionHead
+  _recursive_: false
+  in_features: ${..hidden_layer.out_features}
+  out_features: ${data.stage.train.variables.prof_inverse.n}
+  n_blocks: 1
+  activation:
+    _target_: torch.nn.Sigmoid
+  norm_type: none
+  dropout_rate: 0.
+  residual: false
+  post_process:
+    _target_: code.architecture.layer.TransformationsLayer
+    transformations: ${data.stage.train.variables.prof_inverse.transformations}
+    inverse_transform: true
+
+# Skip connections
+hidden_skip: false
+output_skip: false
+inject_encoding_hidden: false
+inject_encoding_output: false

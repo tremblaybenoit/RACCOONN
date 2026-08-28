@@ -240,7 +240,7 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
                 if hasattr(output, 'dtype'):
                     data_stage[variable] = data_stage[variable].astype(output.dtype)
                 # Check if variable is in data_all
-                if variable not in data_all:
+                if variable not in data_all or variable in ('pressure', 'variant_mask', 'invariant_mask'):
                     data_all[variable] = data_stage[variable]
                 else:
                     # Append along first dimension

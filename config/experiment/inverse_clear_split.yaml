@@ -40,14 +40,14 @@ preprocessing:
       mask:
         # Spatial domain:
         spatial_domain:
-          lat_min: -90.0
-          lat_max: 90.0
-          lon_min: -180.0
-          lon_max: 180.0
+          lat_min: -15.0
+          lat_max: 2.0
+          lon_min: -70.0
+          lon_max: -30.0
         # Temporal domain:
         temporal_window:
-          scans_min: 117.0
-          scans_max: 117.0
+          scans_min: 170.0
+          scans_max: 170.0
         # Cloud/clear sky
         cloud_mask: false
         clear_mask: true
@@ -92,7 +92,7 @@ data:
         # Radiances
         bt_forward:
           # Path to the prediction data
-          path: '../forward_outputs/forward_clear/runs/modular/bt_forward_predict.npy'
+          path: '../forward_outputs/forward_clear/runs/modular2/bt_forward_predict.npy'
 
   # Split ratios for training, validation, and test sets
   stage:

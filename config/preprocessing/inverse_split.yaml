@@ -83,6 +83,21 @@ recast:
         train: 0.6
         valid: 0.2
         test: 0.2
+      # Mask to apply
+      mask:
+        # Spatial domain:
+        spatial_domain:
+          lat_min: -90.0
+          lat_max: 90.0
+          lon_min: -180.0
+          lon_max: 180.0
+        # Temporal domain:
+        temporal_window:
+          scans_min: 0.0
+          scans_max: 181.0
+        # Cloud/clear sky
+        cloud_mask: true
+        clear_mask: true
       # Seed
       seed: 42
       # Tolerance for edges (degrees)
@@ -113,6 +128,17 @@ covariance:
       scans: ${data.source.all.variables.scans}
       # Variant mask: Consider only profile pressure levels with non-zero variance
       variant_mask: ${data.source.all.variables.variant_mask}
+      # Variant mask: Consider only profile pressure levels with non-zero variance
+      # variant_mask: ${data.source.all.variables.variant_mask}
+      # Spatial domain: Consider only profiles within the specified latitude and longitude bounds
+      spatial_mask:
+        _target_: code.preprocessing.mask.spatial_mask
+        lat: ${..lat.load}
+        lon: ${..lon.load}
+        lat_min: ${preprocessing.recast.input.mask.spatial_domain.lat_min}
+        lat_max: ${preprocessing.recast.input.mask.spatial_domain.lat_max}
+        lon_min: ${preprocessing.recast.input.mask.spatial_domain.lon_min}
+        lon_max: ${preprocessing.recast.input.mask.spatial_domain.lon_max}
 
   # Error covariance matrix in observation space
   R:
@@ -129,3 +155,14 @@ covariance:
       lon: ${data.source.predict.variables.lon}
       # Scans
       scans: ${data.source.predict.variables.scans}
+      # Variant mask: Consider only profile pressure levels with non-zero variance
+      # variant_mask: ${data.source.all.variables.variant_mask}
+      # Spatial domain: Consider only profiles within the specified latitude and longitude bounds
+      spatial_mask:
+        _target_: code.preprocessing.mask.spatial_mask
+        lat: ${..lat.load}
+        lon: ${..lon.load}
+        lat_min: ${preprocessing.recast.input.mask.spatial_domain.lat_min}
+        lat_max: ${preprocessing.recast.input.mask.spatial_domain.lat_max}
+        lon_min: ${preprocessing.recast.input.mask.spatial_domain.lon_min}
+        lon_max: ${preprocessing.recast.input.mask.spatial_domain.lon_max}
