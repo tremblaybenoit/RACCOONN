@@ -255,7 +255,7 @@ class MLPBlock(nn.Module):
 
         # Resolve Activation Function
         if activation is None:
-            act = nn.GELU()
+            act = nn.Identity()  # No activation if None
         else:
             # activation must be DictConfig - instantiate to ensure independence
             act = instantiate(activation)
@@ -380,11 +380,19 @@ class MLPBlocks(nn.Module):
         # Class inheritance
         super().__init__()
 
+        # Resolve in_features and out_features if provided as DictConfig
+        if isinstance(in_features, DictConfig):
+            in_features = instantiate(in_features)
+        if isinstance(out_features, DictConfig):
+            out_features = instantiate(out_features)
+
         # Store output dimension for external access
         self.out_features = out_features
 
         # Fall back to intermediate settings for final-layer overrides not explicitly provided
         hidden_features = hidden_features if hidden_features is not None else in_features
+        if isinstance(hidden_features, DictConfig):
+            hidden_features = instantiate(hidden_features)
         final_act = final_activation if final_activation is not None else activation
         final_norm = final_norm_type if final_norm_type is not None else norm_type
         final_drop = final_dropout_rate if final_dropout_rate is not None else dropout_rate
@@ -408,7 +416,6 @@ class MLPBlocks(nn.Module):
                 )
             )
             current_in = current_out
-
         self.model = nn.Sequential(*blocks)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -428,12 +435,15 @@ class MLPBlocks(nn.Module):
         return self.model(x)
 
 
-class PredictionHead(nn.Module):
+class PredictionHead(MLPBlocks):
     """
     Single prediction head for outputting predictions.
 
-    Can be a simple linear layer (n_layers=1) or a more complex MLP (n_layers>1).
-    Optionally applies post-processing (denormalization, transformations, etc.).
+    Inherits from MLPBlocks and adds optional post-processing capability.
+    Supports arbitrary depth (n_blocks >= 1) with configurable final activation.
+
+    Post-processing is applied after all MLP layers to transform outputs
+    (e.g., denormalization, coordinate transformations, etc.).
     """
 
     def __init__(
@@ -441,9 +451,15 @@ class PredictionHead(nn.Module):
         in_features: int | DictConfig,
         out_features: int | DictConfig,
         hidden_features: int | DictConfig | None = None,
-        n_layers: int = 1,
+        n_blocks: int = 1,
         activation: DictConfig | None = None,
+        final_activation: DictConfig | None = None,
+        norm_type: str | None = None,
+        final_norm_type: str | None = None,
         dropout_rate: float = 0.0,
+        final_dropout_rate: float | None = None,
+        residual: bool = False,
+        init_func: DictConfig | nn.Module | None = None,
         post_process: DictConfig | Callable | None = None,
     ) -> None:
         """
@@ -456,48 +472,48 @@ class PredictionHead(nn.Module):
         out_features : int | DictConfig
             Output feature dimension (number of predictions).
         hidden_features : int | DictConfig | None, default=None
-            Hidden layer dimension (used if n_layers > 1).
-        n_layers : int, default=1
-            Number of layers in the head. If 1, a simple linear layer.
-            If > 1, uses MLPBlocks for multi-layer processing.
+            Hidden layer dimension (used if n_blocks > 1).
+        n_blocks : int, default=1
+            Number of layers in the head. At least 1.
         activation : DictConfig or None, default=None
-            Activation function as DictConfig. Applied to intermediate layers, not final.
+            Intermediate activation function as DictConfig. Applied to non-final layers.
             Always pass DictConfig to ensure independent activation instances.
+        final_activation : DictConfig or None, default=None
+            Activation for the final layer as DictConfig. Falls back to activation if None.
+            Pass OmegaConf.create({'_target_': 'torch.nn.Identity'}) to suppress activation.
+        norm_type : str or None, default=None
+            Intermediate normalization type. Options: 'layer', 'batch', 'none'.
+        final_norm_type : str or None, default=None
+            Final block normalization type. Falls back to norm_type if None.
         dropout_rate : float, default=0.0
-            Dropout probability for intermediate layers.
+            Intermediate dropout probability. Range [0.0, 1.0].
+        final_dropout_rate : float or None, default=None
+            Final block dropout probability. Falls back to dropout_rate if None.
+        residual : bool, default=False
+            Whether to use residual connections within each block.
+        init_func : DictConfig | Callable or None, default=None
+            Weight initialization function for all blocks.
+            If None, auto-selected based on activation per block.
         post_process : DictConfig | Callable, optional
-            Post-processing function applied after forward pass.
+            Post-processing function applied after MLP layers.
             If DictConfig, instantiated via instantiate().
         """
 
-        # Class inheritance
-        super().__init__()
-
-        # Resolve number of features if provided as DictConfig
-        if isinstance(in_features, DictConfig):
-            in_features = instantiate(in_features)
-        if isinstance(out_features, DictConfig):
-            out_features = instantiate(out_features)
-        if isinstance(hidden_features, DictConfig):
-            hidden_features = instantiate(hidden_features)
-        self.out_features = out_features
-
-        if n_layers == 1:
-            # Simple linear head (no activation, no dropout)
-            self.head = nn.Linear(in_features, out_features)
-        else:
-            # Multi-layer head using MLPBlocks
-            # No activation on final layer, no dropout on final layer
-            self.head = MLPBlocks(
-                in_features=in_features,
-                out_features=out_features,
-                hidden_features=hidden_features or in_features,
-                n_blocks=n_layers,
-                activation=activation,
-                final_activation=OmegaConf.create({'_target_': 'torch.nn.Identity'}),
-                dropout_rate=dropout_rate,
-                final_dropout_rate=0.0,
-            )
+        # Initialize MLPBlocks with all parameters
+        super().__init__(
+            in_features=in_features,
+            out_features=out_features,
+            hidden_features=hidden_features,
+            n_blocks=n_blocks,
+            activation=activation,
+            final_activation=final_activation,
+            norm_type=norm_type,
+            final_norm_type=final_norm_type,
+            dropout_rate=dropout_rate,
+            final_dropout_rate=final_dropout_rate,
+            residual=residual,
+            init_func=init_func,
+        )
 
         # Post-processing function (denormalization, transformations, etc.)
         if post_process is not None:
@@ -512,6 +528,8 @@ class PredictionHead(nn.Module):
         """
         Forward pass through the prediction head.
 
+        Applies MLPBlocks forward pass, then optional post-processing.
+
         Parameters
         ----------
         x : torch.Tensor
@@ -521,12 +539,12 @@ class PredictionHead(nn.Module):
         -------
         torch.Tensor
             Output tensor of shape (..., out_features).
-            If post_process is configured, applied after head output.
+            If post_process is configured, applied after MLP layers.
         """
 
-        # Forward model
-        x = self.head(x)
-        # Apply postprocessing
+        # Forward through parent MLPBlocks
+        x = super().forward(x)
+        # Apply post-processing
         if self.post_process is not None:
             x = self.post_process(x)
         return x
@@ -548,7 +566,6 @@ class HeterogeneousPredictionHeads(nn.Module):
 
     def __init__(
         self,
-        in_features: int | DictConfig,
         heads: ListConfig | nn.ModuleList,
         out_concat: bool = True,
     ) -> None:
@@ -559,26 +576,23 @@ class HeterogeneousPredictionHeads(nn.Module):
         ----------
         heads : ListConfig[DictConfig] | nn.ModuleList
             Either:
-            - ListConfig of DictConfigs, one per head. Each DictConfig should contain:
+            - ListConfig of DictConfigs with `_target_: code.architecture.mlp.PredictionHead`.
+              Each head config can specify:
+              - in_features : int
+                  Input feature dimension for this head.
               - out_features : int
                   Output feature dimension for this head.
               - hidden_features : int, optional
-                  Hidden layer dimension (if n_layers > 1).
-              - n_layers : int, default=1
+                  Hidden layer dimension (if n_blocks > 1).
+              - n_blocks : int, default=1
                   Number of layers in this head.
               - activation : DictConfig or None, optional
-                  Activation function as DictConfig. Always pass DictConfig to ensure
-                  independent activation instances across heads.
+                  Activation function as DictConfig.
               - dropout_rate : float, default=0.0
                   Dropout probability for this head.
               - post_process : DictConfig | Callable, optional
                   Post-processing function (e.g., denormalization, transformations).
-              Requires `in_features` parameter.
             - Pre-constructed nn.ModuleList of prediction heads to use directly.
-              No need for `in_features` in this case.
-        in_features : int, optional
-            Input feature dimension (shared by all heads).
-            Required only if `heads` is a ListConfig.
         out_concat : bool, default=True
             If True, concatenates outputs from all heads along the feature dimension.
             If False, returns outputs as a tuple of tensors.
@@ -590,45 +604,24 @@ class HeterogeneousPredictionHeads(nn.Module):
         # Store output format behavior
         self.out_concat = out_concat
 
-        # Resolve in_features if provided as DictConfig
-        if isinstance(in_features, DictConfig):
-            in_features = instantiate(in_features)
-        self.in_features = in_features
-
         # Handle ListConfig (config-driven initialization)
         if isinstance(heads, ListConfig):
-
-            # Create heads with individual configurations
-            self.heads = nn.ModuleList()
-            self.out_features = 0
-            for i, head_cfg in enumerate(heads):
-                # Extract configuration with defaults
-                out_features = head_cfg.get('out_features', 1)
-                hidden_features = head_cfg.get('hidden_features', None)
-                n_layers = head_cfg.get('n_layers', 1)
-                activation = head_cfg.get('activation', None)
-                dropout_rate = head_cfg.get('dropout_rate', 0.0)
-                post_process = head_cfg.get('post_process', None)
-
-                # Create individual head
-                head = PredictionHead(
-                    in_features=in_features,
-                    out_features=out_features,
-                    hidden_features=hidden_features,
-                    n_layers=n_layers,
-                    activation=activation,
-                    dropout_rate=dropout_rate,
-                    post_process=post_process,
-                )
-                self.heads.append(head)
-                # Calculate total output dimension from heads
-                if isinstance(out_features, DictConfig):
-                    out_features = instantiate(out_features)
-                self.out_features += out_features
+            # Instantiate each head config (expects _target_: code.architecture.mlp.PredictionHead)
+            self.heads = nn.ModuleList([instantiate(head_cfg) for head_cfg in heads])
+            # Calculate total output dimension from instantiated heads
+            self.out_features = sum(
+                h.out_features for h in self.heads
+                if hasattr(h, 'out_features')
+            )
 
         # Handle nn.ModuleList (pre-constructed heads)
         elif isinstance(heads, nn.ModuleList):
             self.heads = heads
+            # Calculate total output dimension
+            self.out_features = sum(
+                h.out_features for h in self.heads
+                if hasattr(h, 'out_features')
+            )
         else:
             raise TypeError(
                 f"heads must be ListConfig or nn.ModuleList, got {type(heads)}"
@@ -656,30 +649,24 @@ class HeterogeneousPredictionHeads(nn.Module):
             return tuple(outputs)
 
 
-class HomogeneousPredictionHeads(HeterogeneousPredictionHeads):
+class HomogeneousPredictionHeads(nn.Module):
     """
     Multiple prediction heads with identical architectures.
 
-    Creates n_heads identical PredictionHead modules for multitask learning.
+    Creates n_heads identical prediction head modules from a single head configuration.
+    Useful for multitask learning where all heads share the same architecture but have
+    independent weights.
+
+    Each head configuration is instantiated n times via `instantiate()` to ensure every
+    head is a distinct module with independent weights (no parameter sharing).
+
     Outputs from all heads can be either concatenated or returned as a tuple.
-
-    This is a special case of HeterogeneousPredictionHeads where all heads have
-    the same configuration. This class provides a simpler API for this common case.
-
-    Inherits from HeterogeneousPredictionHeads and passes pre-constructed heads
-    to the parent instead of configs, avoiding unnecessary config interpretation.
     """
 
     def __init__(
         self,
         n_heads: int,
-        in_features: int,
-        out_features: int,
-        hidden_features: int | None = None,
-        n_layers: int = 1,
-        activation: DictConfig | None = None,
-        dropout_rate: float = 0.0,
-        post_process: DictConfig | Callable | None = None,
+        head: DictConfig,
         out_concat: bool = True,
     ) -> None:
         """
@@ -688,43 +675,59 @@ class HomogeneousPredictionHeads(HeterogeneousPredictionHeads):
         Parameters
         ----------
         n_heads : int
-            Number of prediction heads to create.
-        in_features : int
-            Input feature dimension (shared by all heads).
-        out_features : int
-            Output feature dimension per head.
-        hidden_features : int or None, default=None
-            Hidden layer dimension (if n_layers > 1).
-        n_layers : int, default=1
-            Number of layers in each head.
-        activation : DictConfig or None, default=None
-            Activation function as DictConfig for intermediate layers in each head.
-            Always pass DictConfig to ensure independent activation instances.
-        dropout_rate : float, default=0.0
-            Dropout probability for each head.
-        post_process : DictConfig | Callable, optional
-            Post-processing function applied after each head (e.g., denormalization).
+            Number of prediction heads to create. Each head is instantiated independently.
+        head : DictConfig
+            Head configuration with `_target_`.
+            Note: Must be DictConfig to ensure each head gets independent weights.
+            If you need to use a pre-constructed module, use HeterogeneousPredictionHeads
+            with pre-constructed heads passed as nn.ModuleList.
         out_concat : bool, default=True
             If True, concatenates outputs from all heads along the feature dimension.
             If False, returns outputs as a tuple of tensors.
         """
 
-        # Create n_heads identical prediction heads directly
-        heads = nn.ModuleList([
-            PredictionHead(
-                in_features=in_features,
-                out_features=out_features,
-                hidden_features=hidden_features,
-                n_layers=n_layers,
-                activation=activation,
-                dropout_rate=dropout_rate,
-                post_process=post_process,
-            )
-            for _ in range(n_heads)
-        ])
+        # Class inheritance
+        super().__init__()
 
-        # Pass pre-constructed heads to parent with out_concat flag
-        super().__init__(heads=heads, out_concat=out_concat)
+        # Store output format behavior
+        self.out_concat = out_concat
+
+        # Create n_heads independent head instances
+        if isinstance(head, DictConfig):
+            # Each instantiate() call creates independent head with fresh weights
+            self.heads = nn.ModuleList([instantiate(head) for _ in range(n_heads)])
+        else:
+            raise TypeError(
+                f"HomogeneousPredictionHeads requires DictConfig (got {type(head)}). "
+                f"To use a pre-constructed module, use HeterogeneousPredictionHeads with heads as nn.ModuleList."
+            )
+
+        # Calculate total output dimension from instantiated heads
+        self.out_features = sum(
+            h.out_features for h in self.heads
+            if hasattr(h, 'out_features')
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor | tuple[torch.Tensor, ...]:
+        """
+        Forward pass through all prediction heads.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor of shape (..., in_features).
+
+        Returns
+        -------
+        torch.Tensor | tuple[torch.Tensor, ...]
+            If out_concat=True: Concatenated output from all heads, shape (..., out_features_total).
+            If out_concat=False: Tuple of tensors, one per head.
+        """
+        outputs = [head(x) for head in self.heads]
+        if self.out_concat:
+            return torch.cat(outputs, dim=-1)
+        else:
+            return tuple(outputs)
 
 
 class MLPModular(nn.Module):
@@ -964,4 +967,3 @@ class MLPModular(nn.Module):
 
         # Output Layer
         return self.output_layer(x_out)
-

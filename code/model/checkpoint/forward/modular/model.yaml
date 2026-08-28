@@ -134,7 +134,10 @@ architecture:
     in_features: 512
     out_concat: false
     heads:
-    - out_features:
+    - _target_: code.architecture.mlp.PredictionHead
+      _recursive_: false
+      in_features: ${....hidden_layer.out_features}
+      out_features:
         _target_: builtins.len
         _args_:
         - - Channel 8
@@ -146,7 +149,7 @@ architecture:
           - Channel 14
           - Channel 15
           - Channel 16
-      n_layers: 1
+      n_blocks: 1
       activation:
         _target_: torch.nn.Sigmoid
       post_process:
@@ -163,7 +166,10 @@ architecture:
               key: bt_crtm
               dtype: float32
         inverse_transform: true
-    - out_features:
+    - _target_: code.architecture.mlp.PredictionHead
+      _recursive_: false
+      in_features: ${....hidden_layer.out_features}
+      out_features:
         _target_: builtins.len
         _args_:
         - - Channel 8
@@ -175,7 +181,7 @@ architecture:
           - Channel 14
           - Channel 15
           - Channel 16
-      n_layers: 1
+      n_blocks: 1
       activation:
         _target_: torch.nn.Softplus
       post_process:

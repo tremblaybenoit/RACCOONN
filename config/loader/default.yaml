@@ -58,7 +58,7 @@ stage:
       _target_: ${loader.stage.train.input._target_}
       _recursive_: false
       variables: ${extract:${data.stage.test.variables},${data.select_input}}
-      apply_transformations: true
+      apply_transformations: false
     target:
       _target_: ${loader.stage.train.target._target_}
       _recursive_: false
