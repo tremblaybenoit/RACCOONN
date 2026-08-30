@@ -293,10 +293,7 @@ def load_variable(config: DictConfig | ListConfig, apply_transform: bool = False
     elif isinstance(config, DictConfig):
 
         # Instantiate dataset (with optional transformation of the data)
-        if apply_transform:
-            dataset = instantiate(config, as_tensor=as_tensor)
-        else:
-            dataset = instantiate(config, transformations=None, as_tensor=as_tensor)
+        dataset = instantiate(config, apply_transformations=apply_transform, as_tensor=as_tensor)
 
         # Determine whether the data needs to be lazy loaded or is eager
         # If a path is provided in the load function, then it's eager

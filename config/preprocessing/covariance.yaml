@@ -23,7 +23,7 @@ covariance:
     # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
     scaling_factor: 1.0
     # Regularization parameter to ensure numerical stability
-    regularization_factor: 1e-3
+    regularization_factor: 1e-5
     # Plot flag
     plot_flag: true
     # Recentering
@@ -31,7 +31,7 @@ covariance:
     # Type of recentering:
     mean_type: 'temporal'
     # Apply data transformations to the input data before computing the covariance matrix
-    apply_transform: false
+    apply_transform: true
     # What the method produces as output
     output:
       # Covariance matrix
@@ -188,7 +188,7 @@ covariance:
     recenter: true
     mean_type: 'spatiotemporal'
     # Apply data transformations to the input data before computing the covariance matrix
-    apply_transform: false
+    apply_transform: true
     # What the method produces as output
     output:
       # Covariance matrix

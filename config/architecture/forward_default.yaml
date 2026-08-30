@@ -1,22 +1,80 @@
-# CRTM Architecture
-_target_: code.architecture.legacy.CRTMArchitecture
-_recursive_: true
+_target_: code.architecture.mlp.MLPModular
+_recursive_: false
 
-# Number of input variables
-nprofvars: ${data.stage.train.variables.prof.n}
-nsurfvars: ${data.stage.train.variables.surf.n}
-nmetavars: ${data.stage.train.variables.meta.n}
-nlevels: ${data.stage.train.variables.pressure.n}
-nchannels: ${data.stage.train.variables.bt_crtm.n}
+# No positional encoding
+positional_encoding: null
 
-# Neural network parameters
-nnodes_bt: 512
-nhidden_bt: 3
-dropout_rate: 0.0
+# Input layer
+input_layer:
+  _target_: code.architecture.mlp.MLPBlock
+  _recursive_: false
+  in_features: # Total input features (profiles + surface + meta)
+    _target_: builtins.sum
+    _args_:
+      - - _target_: operator.mul
+          _args_:
+            - ${data.stage.train.variables.prof.n}
+            - ${data.stage.train.variables.pressure.n}
+        - ${data.stage.train.variables.surf.n}
+        - ${data.stage.train.variables.meta.n}
+  out_features: ${..hidden_layer.out_features}
+  activation:
+    _target_: code.architecture.activation.Swish
+  norm_type: none
+  dropout_rate: 0.0
+  residual: false
 
-# Output activation parameters
-bt_norm_max: 355
-bt_norm_min: 180
-std_output_activation_offset: 0.001
-std_scale_trainable: true
-out_concat: false
+# Hidden layers
+hidden_layer:
+  _target_: code.architecture.mlp.MLPBlocks
+  _recursive_: false
+  in_features: ${.hidden_features}
+  out_features: ${.hidden_features}
+  hidden_features: 512
+  n_blocks: 2
+  activation:
+    _target_: code.architecture.activation.Swish
+  norm_type: none
+  dropout_rate: 0.0
+  residual: false
+
+# Output layer: Dual heads (mean and std)
+output_layer:
+  _target_: code.architecture.mlp.HeterogeneousPredictionHeads
+  _recursive_: false
+  out_concat: false
+  heads:
+    # Head 1: Mean brightness temperature [0,1] -> denormalized to physical range
+    - _target_: code.architecture.mlp.PredictionHead
+      _recursive_: false
+      in_features: ${....hidden_layer.out_features}
+      out_features: ${data.stage.train.variables.bt_crtm.n}
+      n_blocks: 1
+      activation:
+        _target_: torch.nn.Sigmoid
+      post_process:
+        _target_: code.architecture.layer.TransformationsLayer
+        transformations: ${data.stage.train.variables.bt_forward.transformations}
+        inverse_transform: true
+
+    # Head 2: Std uncertainty with Softplus and learnable scaling
+    - _target_: code.architecture.mlp.PredictionHead
+      _recursive_: false
+      in_features: ${....hidden_layer.out_features}
+      out_features: ${data.stage.train.variables.bt_crtm.n}
+      n_blocks: 1
+      activation:
+        _target_: torch.nn.Softplus
+      post_process:
+        _target_: code.architecture.layer.AffineLayer
+        factor: 1.0
+        factor_learnable: true
+        value: 0.001
+        value_learnable: false
+        inverse_transform: true
+
+# Skip connections
+hidden_skip: false
+output_skip: false
+inject_encoding_hidden: false
+inject_encoding_output: false

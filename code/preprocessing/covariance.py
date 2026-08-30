@@ -227,7 +227,7 @@ def prior_from_bounded_perturbations(input: DictConfig, output: DictConfig | Non
         logger.info(f"Iteration {iteration}: Processing/Resampling {n_to_resample} profiles...")
 
         # Generate perturbations ONLY for the remaining invalid profiles
-        p = rng.normal(0, 1, size=(cov_cholesky.shape[1], n_to_resample))
+        p = 0.1*rng.normal(0, 1, size=(cov_cholesky.shape[1], n_to_resample))
         dx_transformed = (cov_cholesky @ p).T
 
         # Compute (transformed) prior at the perturbed locations, accounting for the pressure filter
@@ -247,11 +247,11 @@ def prior_from_bounded_perturbations(input: DictConfig, output: DictConfig | Non
         out_of_min = x_prior_physical_samples < x_min_physical
         out_of_max = x_prior_physical_samples > x_max_physical
         out_of_bounds = out_of_min | out_of_max
-        logger.info(f"        {out_of_min.sum()} {out_of_max.sum()}...")
 
         # Collapse dimensions to find which specific profiles failed anywhere in their column
         profile_failed = np.any(out_of_bounds, axis=(1, 2))
         profile_passed = ~profile_failed
+        logger.info(f"        Failed: {profile_failed.sum()}...")
 
         # For the profiles that passed, lock them into the final output array
         if np.any(profile_passed):
@@ -431,12 +431,12 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
     del data
 
     # Apply regularization
-    std = np.sqrt(np.diag(cov['matrix']))
     if regularization_factor > 0:
         logger.info("Applying regularization factor...")
         cov['matrix'] += regularization_factor * float(np.mean(np.diag(cov['matrix']))) * np.eye(cov['matrix'].shape[0])
     # Compute correlation matrix
     if hasattr(output, 'correlation'):
+        std = np.sqrt(np.diag(cov['matrix']))
         cov['correlation'] = cov['matrix'] / (std[:, None] @ std[None, :])
     # Compute Cholesky decomposition
     if hasattr(output, 'matrix_cholesky'):
@@ -474,7 +474,7 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
                save_func = instantiate(output[key].save)
                save_func(cov[key])
             # Plot covariance matrix if requested
-            if plot_flag and key in ['matrix', 'matrix_inverse', 'matrix_pseudo_inverse',
+            if plot_flag and key in ['matrix', 'matrix_cholesky', 'matrix_inverse', 'matrix_pseudo_inverse',
                                      'correlation', 'correlation_inverse', 'correlation_pseudo_inverse']:
                 logger.info(f"Plotting {key} matrix...")
                 fig, get_axes = flexible_gridspec(cell_widths=[4.0], cell_heights=[4.0],
@@ -697,7 +697,7 @@ def climatological_matrix2(input: DictConfig, output: DictConfig, scaling_factor
                 save_func = instantiate(output[key].save)
                 save_func(cov[key])
             # Plot covariance matrix if requested
-            if plot_flag and key in ['matrix', 'matrix_inverse', 'matrix_pseudo_inverse',
+            if plot_flag and key in ['matrix', 'matrix_cholesky', 'matrix_inverse', 'matrix_pseudo_inverse',
                                      'correlation', 'correlation_inverse', 'correlation_pseudo_inverse']:
                 logger.info(f"Plotting {key} matrix...")
                 fig, get_axes = flexible_gridspec(cell_widths=[4.0], cell_heights=[4.0],

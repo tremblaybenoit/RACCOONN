@@ -15,7 +15,7 @@ defaults:
   - override /model: inverse_default
   - override /callbacks: inverse_default
   - override /logger: default
-  - override /trainer: cpu
+  - override /trainer: gpu
 
 # All parameters below will be merged with parameters from default configurations set above.
 # This allows you to overwrite only specified parameters
@@ -70,6 +70,22 @@ data:
       dir: ../synthetic_float32_clear/Train2
       # Variables
       variables:
+        # Atmospheric profiles
+        prof:
+          # Types of profiles for clear skies
+          type: [ 'Air temperature', 'Humidity mixing ratio', 'Ozone mixing ratio' ]
+          # Transformations
+          transformations:
+            # Normalization function and parameters
+            normalization:
+              _target_: code.data.transformations.identity
+              _partial_: true
+              stats:
+                _target_: code.preprocessing.statistics.read_statistics_var
+                load: ${preprocessing.statistics.output.load}
+                key: 'prof'
+                dtype: ${data.dtype}
+              axis: 1
         # Radiances
         bt_crtm:
           # Channels
@@ -92,7 +108,7 @@ data:
         # Radiances
         bt_forward:
           # Path to the prediction data
-          path: '../forward_outputs/forward_clear/runs/modular2/bt_forward_predict.npy'
+          path: '../forward_outputs/forward_clear/runs/default/bt_forward_predict.npy'
 
   # Split ratios for training, validation, and test sets
   stage:
@@ -100,6 +116,22 @@ data:
     train:
       # Variables
       variables:
+        # Atmospheric profiles
+        prof:
+          # Types of profiles for clear skies
+          type: [ 'Air temperature', 'Humidity mixing ratio', 'Ozone mixing ratio' ]
+          # Transformations
+          transformations:
+            # Normalization function and parameters
+            normalization:
+              _target_: code.data.transformations.identity
+              _partial_: true
+              stats:
+                _target_: code.preprocessing.statistics.read_statistics_var
+                load: ${preprocessing.statistics.output.load}
+                key: 'prof'
+                dtype: ${data.dtype}
+              axis: 1
         # Atmospheric profiles
         prof_inverse:
           # Transformations
@@ -110,8 +142,8 @@ data:
               _partial_: true
               stats:
                 _target_: code.preprocessing.statistics.read_statistics_var
-                path: ${preprocessing.statistics.output.path}
-                var: 'prof'
+                load: ${preprocessing.statistics.output.load}
+                key: 'prof'
                 dtype: ${data.dtype}
               axis: 1
         # Radiances
