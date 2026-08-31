@@ -193,7 +193,6 @@ class ForwardModel(LightningModule):
         # _infer() includes post-processing to physical space
         training_flag = (stage in ('train', 'valid', 'test'))
         step = self._infer(batch, training_flag=training_flag)
-
         # Stage-dependent operation: Loss
         if training_flag and self.loss is not None:
             # Compute loss on post-processed outputs in physical space

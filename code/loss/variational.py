@@ -69,7 +69,7 @@ class QuadraticForm(torch.nn.Module):
         -------
         torch.Tensor. Quadratic form of the difference between predicted and target tensors.
         """
-        return quadratic_form(pred.view(pred.shape[0], -1), target.view(pred.shape[0], -1),
+        return quadratic_form(pred.reshape(pred.shape[0], -1), target.reshape(pred.shape[0], -1),
                               self.matrix)
 
 

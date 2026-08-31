@@ -334,6 +334,6 @@ class LossTerms(torch.nn.Module):
             total = total + weight * term_scalar
 
         # Add total to output
-        loss_dict['total'] = total.detach().cpu().numpy() if isinstance(total, torch.Tensor) else total
+        loss_dict['total'] = total
 
         return loss_dict

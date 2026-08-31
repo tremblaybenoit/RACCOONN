@@ -6,7 +6,7 @@ config:
   bt_crtm:
     weight: 1.0
     instance:
-      _target_: code.wrapper.LossTerm
+      _target_: code.loss.wrapper.LossTerm
       function:
         _target_: code.loss.variational.QuadraticForm
         matrix: ${preprocessing.covariance.R.output.matrix_inverse.load}
@@ -17,7 +17,7 @@ config:
   prof:
     weight: 1.0
     instance:
-      _target_: code.wrapper.LossTerm
+      _target_: code.loss.wrapper.LossTerm
       function:
         _target_: code.loss.variational.QuadraticForm
         matrix: ${preprocessing.covariance.B.output.matrix_inverse.load}
@@ -29,7 +29,7 @@ config:
   # bcs:
   #   weight: 1.0
   #   instance:
-  #     _target_: code.wrapper.LossTerm
+  #     _target_: code.loss.wrapper.LossTerm
   #     function:
   #       _target_: code.loss.basic.MSE
   #     output_keys: 'prof_inverse'

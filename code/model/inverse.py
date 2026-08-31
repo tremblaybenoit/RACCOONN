@@ -123,13 +123,13 @@ class InverseModel(ForwardModel):
         inputs = torch.cat(tensors, dim=-1).view(-1, len(tensors))
 
         # Inference through architecture
-        output_dict = {'prof': self.architecture(inputs)}
+        output_dict = {'prof_inverse': self.architecture(inputs)}
 
         # Reshape back to (Batch, n_prof, n_levels)
         # Assuming output shape is (Batch * n_levels, n_prof)
         batch_size = list(input_dict.values())[0].shape[0]
-        n_prof = output_dict['prof'].shape[-1] if output_dict['prof'].ndim > 1 else 1
-        output_dict['prof'] = output_dict['prof'].view(batch_size, n_levels, n_prof).transpose(1, 2)
+        n_prof = output_dict['prof_inverse'].shape[-1] if output_dict['prof_inverse'].ndim > 1 else 1
+        output_dict['prof_inverse'] = output_dict['prof_inverse'].view(batch_size, n_levels, n_prof).transpose(1, 2)
 
         # Apply post-processing to transform outputs to physical space
         if self.post_process is not None:
@@ -167,7 +167,7 @@ class InverseModel(ForwardModel):
             if all(k in batch['context'] for k in ['surf', 'meta']):
                 forward_model_output = self.forward_model(
                     {
-                        'prof': output_dict['output']['prof'],
+                        'prof': output_dict['output']['prof_inverse'],
                         'surf': batch['context']['surf'],
                         'meta': batch['context']['meta']
                     }

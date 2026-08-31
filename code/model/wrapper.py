@@ -1,11 +1,13 @@
-from omegaconf import DictConfig, ListConfig, OmegaConf
+from omegaconf import OmegaConf
+from utilities.instantiators import instantiate
+import torch
 import logging
 
 
 # Initialize logger
 logger = logging.getLogger(__name__)
 
-def load_model_from_config(path: str) -> DictConfig | ListConfig:
+def load_model_from_config(path: str) -> torch.nn.Module:
     """
     Load model configuration from a saved, resolved YAML file.
 
@@ -20,8 +22,8 @@ def load_model_from_config(path: str) -> DictConfig | ListConfig:
 
     Returns
     -------
-    DictConfig | ListConfig
-        Configuration that will be instantiated by ForwardModel.__init__
+    torch.nn.Module
+        Instantiated model.
     """
 
     # Load model configuration
@@ -30,4 +32,4 @@ def load_model_from_config(path: str) -> DictConfig | ListConfig:
     OmegaConf.update(config, "optimizer", None)
     OmegaConf.update(config, "scheduler", None)
     OmegaConf.update(config, "loss", None)
-    return config
+    return instantiate(config)

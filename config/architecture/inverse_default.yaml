@@ -48,10 +48,6 @@ output_layer:
   norm_type: none
   dropout_rate: 0.
   residual: false
-  post_process:
-    _target_: code.architecture.layer.TransformationsLayer
-    transformations: ${data.stage.train.variables.prof_inverse.transformations}
-    inverse_transform: true
 
 # Skip connections
 hidden_skip: false

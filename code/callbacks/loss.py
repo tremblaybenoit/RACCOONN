@@ -159,7 +159,7 @@ class LossLogger(Callback):
 
             # Key associated with current stage's loss
             loss_key = f'{stage}_loss'
-            pl_module.log(loss_key, outputs['loss'], on_epoch=True, prog_bar=True, logger=True)
+            pl_module.log(loss_key, outputs['loss'].item(), on_epoch=True, prog_bar=True, logger=True)
 
             # If the loss wasn't computed from multiple terms
             # or multidimensional losses, then skip further logging
@@ -193,7 +193,7 @@ class LossLogger(Callback):
                         )
 
             # Multiple loss terms
-            elif not isinstance(loss, dict):
+            elif isinstance(loss, dict):
 
                 # Log each loss component
                 for key, value in loss.items():

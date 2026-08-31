@@ -702,7 +702,7 @@ class InverseLogger(ArtifactLogger):
         if self.runners_static:
             # Target
             prof_target = batch.get('target', {}).get('prof', None)
-            if prof_target:
+            if prof_target is not None:
                 # Convert tensors to numpy if needed
                 if isinstance(prof_target, torch.Tensor):
                     prof_target = prof_target.detach().cpu().numpy()
@@ -714,7 +714,7 @@ class InverseLogger(ArtifactLogger):
                 )
             # Prior
             prof_prior = batch.get('target', {}).get('prof_prior', None)
-            if prof_prior:
+            if prof_prior is not None:
                 # Convert tensors to numpy if needed
                 if isinstance(prof_prior, torch.Tensor):
                     prof_prior = prof_prior.detach().cpu().numpy()
@@ -768,10 +768,10 @@ class InverseLogger(ArtifactLogger):
         """
 
         # Extract profile metrics
-        if 'prof' not in self.metrics:
+        if 'prof_inverse' not in self.metrics:
             logger.warning("No profile metrics computed for this epoch")
             return
-        prof_stats = self.metrics['prof']
+        prof_stats = self.metrics['prof_inverse']
         prof_prior_stats = self.metrics.get('prof_prior', {})
         prof_target_stats = self.metrics.get('prof_target', {})
 
@@ -800,6 +800,7 @@ class InverseLogger(ArtifactLogger):
             prof_labels = [f"Var_{i}" for i in range(n_vars)]
 
         # Create profile mean figure
+        breakpoint()
         if prof_mean is not None or prof_target_mean is not None or prof_prior_mean is not None:
             data = []
             stdev = []

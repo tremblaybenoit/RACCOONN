@@ -825,6 +825,9 @@ class MLPModular(nn.Module):
 
         # Input Layer
         if isinstance(input_layer, DictConfig):
+            # Adjust in_features to account for positional encoding
+            if hasattr(input_layer, 'in_features') and input_layer.in_features is None:
+                input_layer.in_features = self.d_encoding
             self.input_layer = instantiate(input_layer)
         elif isinstance(input_layer, nn.Module):
             self.input_layer = input_layer
