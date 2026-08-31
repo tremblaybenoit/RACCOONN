@@ -249,19 +249,22 @@ class Operator:
         if ckpt_resume and os.path.exists(ckpt_resume):
             logger.info(f"Resuming training from checkpoint: {ckpt_resume}")
             self._init_model()  # Fresh model, trainer will restore state
-            self.model = torch.compile(self.model, mode="reduce-overhead")
+            if self.config.trainer.accelerator == 'gpu':
+                self.model = torch.compile(self.model, mode="reduce-overhead")
             self.trainer.fit(self.model, self.loader, ckpt_path=ckpt_resume)
         # Init: Load weights only for transfer learning (new optimizer + scheduler)
         elif ckpt_init and os.path.exists(ckpt_init):
             logger.info(f"Initializing model from checkpoint: {ckpt_init}")
             self._init_model(ckpt_path=ckpt_init, strict=True)  # Load weights + set dtype
-            self.model = torch.compile(self.model, mode="reduce-overhead")
+            if self.config.trainer.accelerator == 'gpu':
+                self.model = torch.compile(self.model, mode="reduce-overhead")
             self.trainer.fit(self.model, self.loader)
         # Scratch: Train from random initialization
         else:
             logger.info("Training model from scratch...")
             self._init_model()  # Fresh model
-            self.model = torch.compile(self.model, mode="reduce-overhead")
+            if self.config.trainer.accelerator == 'gpu':
+                self.model = torch.compile(self.model, mode="reduce-overhead")
             self.trainer.fit(self.model, self.loader)
         logger.info("Done!")
 

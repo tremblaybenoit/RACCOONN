@@ -790,7 +790,7 @@ class InverseLogger(ArtifactLogger):
         prof_labels = None
         try:
             if hasattr(trainer, 'datamodule') and trainer.datamodule is not None:
-                prof_labels = trainer.datamodule.valid.target_datasets.get('prof', {}).type
+                prof_labels = trainer.datamodule.valid.target.datasets.get('prof', {}).type
         except Exception as e:
             logger.warning(f"Could not retrieve profile labels: {e}")
 
@@ -800,7 +800,6 @@ class InverseLogger(ArtifactLogger):
             prof_labels = [f"Var_{i}" for i in range(n_vars)]
 
         # Create profile mean figure
-        breakpoint()
         if prof_mean is not None or prof_target_mean is not None or prof_prior_mean is not None:
             data = []
             stdev = []

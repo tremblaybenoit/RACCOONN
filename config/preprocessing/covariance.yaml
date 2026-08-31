@@ -19,11 +19,11 @@ covariance:
       # Variant mask: Consider only profile pressure levels with non-zero variance
       variant_mask: ${data.source.all.variables.variant_mask}
     # Univariate or multivariate
-    univariate: true
+    univariate: false
     # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
     scaling_factor: 1.0
     # Regularization parameter to ensure numerical stability
-    regularization_factor: 1e-5
+    regularization_factor: 1e-3
     # Plot flag
     plot_flag: true
     # Recentering

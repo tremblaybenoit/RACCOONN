@@ -15,7 +15,7 @@ defaults:
   - override /model: inverse_default
   - override /callbacks: inverse_default
   - override /logger: default
-  - override /trainer: gpu
+  - override /trainer: cpu
 
 # All parameters below will be merged with parameters from default configurations set above.
 # This allows you to overwrite only specified parameters
@@ -183,3 +183,15 @@ logger:
   # MLflow logger
   ports:
     mlflow: 5003
+
+# Trainer configuration
+trainer:
+  # Maximum number of epochs
+  max_epochs: 96
+
+# Loader configuration
+loader:
+  # Batch size for training, validation, and test sets
+  batch_size: 32
+  # Number of workers for data loading
+  num_workers: 8

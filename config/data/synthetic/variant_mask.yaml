@@ -25,7 +25,7 @@ all:
           key: 'prof'
           dtype: ${data.dtype}
         # Ratio threshold to determine constant profile levels
-        threshold: 0.005
+        threshold: 0.00000005
 # Training set
 train:
   # Variable-specific configuration, keyed by variable name for potential multi-variable support.

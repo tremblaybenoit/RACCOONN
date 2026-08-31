@@ -71,9 +71,17 @@ class InverseModel(ForwardModel):
                 self.forward_model = forward_model
             else:
                 raise ValueError("forward_model must be a DictConfig or a ForwardModel instance.")
+
             # Load checkpoint if ckpt_path is provided
             if hasattr(self.forward_model, 'ckpt_path') and self.forward_model.ckpt_path:
                 self.forward_model.load_ckpt(freeze=True)  # type: ignore
+
+            # Explicitly freeze all forward model parameters (no gradients)
+            for param in self.forward_model.parameters():
+                param.requires_grad = False
+
+            # Set to eval mode for batch norm / dropout
+            self.forward_model.eval()
         else:
             self.forward_model = None
 
@@ -131,6 +139,9 @@ class InverseModel(ForwardModel):
         n_prof = output_dict['prof_inverse'].shape[-1] if output_dict['prof_inverse'].ndim > 1 else 1
         output_dict['prof_inverse'] = output_dict['prof_inverse'].view(batch_size, n_levels, n_prof).transpose(1, 2)
 
+        # Keep a copy of raw profiles BEFORE post-processing (for loss computation if needed)
+        output_dict['prof'] = output_dict['prof_inverse'].clone()
+
         # Apply post-processing to transform outputs to physical space
         if self.post_process is not None:
             output_dict = self.post_process(output_dict)
@@ -161,10 +172,11 @@ class InverseModel(ForwardModel):
 
         # Inversion of atmospheric profiles
         output_dict = {'output': self.forward(batch['input'], training_flag=training_flag)}
-
         # Forward-modeled observations (requires batch['context'])
+        # Use 'prof_inverse' which contains the post-processed profiles (physical space)
         if self.forward_model is not None and 'context' in batch:
             if all(k in batch['context'] for k in ['surf', 'meta']):
+                # Forward model is frozen (no weight updates), but gradients flow through
                 forward_model_output = self.forward_model(
                     {
                         'prof': output_dict['output']['prof_inverse'],

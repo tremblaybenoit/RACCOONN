@@ -18,7 +18,7 @@ loss: ${loss}
 pre_process:
   _target_: code.architecture.layer.TransformationsLayers
   _recursive_: false
-  transformations: ${extract_nested:${loader.stage.train.input},'transformations'}
+  transformations: ${extract_nested:${loader.stage.train.input.variables},'transformations'}
 
 # Architecture - reference external config
 architecture: ${architecture}
@@ -27,7 +27,7 @@ architecture: ${architecture}
 post_process:
   _target_: code.architecture.layer.TransformationsLayers
   _recursive_: false
-  transformations: ${extract_nested:${loader.stage.train.output},'transformations'}
+  transformations: ${extract_nested:${loader.stage.train.output.variables},'transformations'}
   inverse_transform: true
 
 # Forward model - reference external config

@@ -27,7 +27,8 @@ dtype: 'float32'
 # Variables to use as input/output
 select_input: ['lat', 'lon', 'scans', 'pressure']
 select_target: ['prof', 'prof_prior', 'bt_crtm']
-select_context: ['meta', 'surf', 'clear_mask', 'cloud_mask', 'daytime_mask', 'nighttime_mask',
+select_context: ['meta', 'surf', 'pressure',
+                 'clear_mask', 'cloud_mask', 'daytime_mask', 'nighttime_mask',
                  'variant_mask', 'invariant_mask']
 select_output: ['bt_inverse', 'bt_inverse_stdev', 'prof_inverse']
 
@@ -76,18 +77,20 @@ stage:
     # Variables
     variables:
       # Atmospheric profiles
-      prof_inverse:
-        # Transformations to apply
-        transformations:
-          # Per-variable normalization
-          normalization:
-            _target_: code.data.transformations.min_max
-            _partial_: true
-            stats:
-              _target_: code.preprocessing.statistics.read_statistics_var
-              path: ${preprocessing.statistics.output.path}
-              key: 'prof'
-              dtype: ${data.dtype}
+       prof_inverse:
+         # Transformations to apply
+         transformations:
+           # Per-variable normalization
+           normalization:
+             _target_: code.data.transformations.min_max
+             _partial_: true
+             stats:
+               _target_: code.preprocessing.statistics.read_statistics_var
+               load:
+                 _target_: code.data.io.load_pkl
+                 path: ${preprocessing.statistics.output.path}
+               key: 'prof'
+               dtype: ${data.dtype}
   # Validation set
   valid:
     # Path to validation data
