@@ -1,10 +1,12 @@
 import torch
 import torch.nn as nn
+from omegaconf import DictConfig
+from utilities.instantiators import instantiate
 
 
 class IdentityPositionalEncoding(nn.Module):
     """ Identity Positional Encoding. This is a simple positional encoding that does not change the input."""
-    def __init__(self, d_input: int) -> None:
+    def __init__(self, d_input: int | DictConfig) -> None:
         """ Initialize Identity Positional Encoding.
 
         Parameters
@@ -20,6 +22,8 @@ class IdentityPositionalEncoding(nn.Module):
         super().__init__()
 
         # Output dimensions
+        if isinstance(d_input, DictConfig):
+            d_input = instantiate(d_input)
         self.d_output = d_input
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -56,9 +60,9 @@ class GaussianPositionalEncoding(nn.Module):
     """ Gaussian Positional Encoding. Credit: Robert Jarolim, Momchil Molnar."""
     def __init__(
             self,
-            num_freqs: int,
-            d_input: int,
-            sigma: float = 1.0
+            d_input: int | DictConfig,
+            num_freqs: int | DictConfig = 20,
+            sigma: float | DictConfig = 1.0
     ) -> None:
         """ Initialize Gaussian Positional Encoding.
 
@@ -77,6 +81,12 @@ class GaussianPositionalEncoding(nn.Module):
         super().__init__()
 
         # Initialize frequencies
+        if isinstance(d_input, DictConfig):
+            d_input = instantiate(d_input)
+        if isinstance(num_freqs, DictConfig):
+            num_freqs = instantiate(num_freqs)
+        if isinstance(sigma, DictConfig):
+            sigma = instantiate(sigma)
         self.register_buffer("frequencies", torch.randn(num_freqs, d_input)*sigma)
         self.num_freqs= num_freqs
         # Output dimension

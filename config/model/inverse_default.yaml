@@ -33,4 +33,4 @@ post_process:
 # Forward model - reference external config
 forward_model:
   _target_: code.model.wrapper.load_model_from_config
-  path: ../forward_outputs/forward_clear/checkpoints/default/model.yaml
+  path: code/model/checkpoint/forward/default/model.yaml

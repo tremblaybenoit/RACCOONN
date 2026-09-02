@@ -8,7 +8,7 @@ defaults:
   - override /data: inverse_default
   - override /preprocessing: inverse_split
   - override /loader: default
-  - override /architecture: inverse_default
+  - override /architecture: inverse_multihead
   - override /loss: inverse_default
   - override /optimizer: default
   - override /scheduler: default
@@ -138,14 +138,14 @@ data:
           transformations:
             # Normalization function and parameters
             normalization:
-              _target_: code.data.transformations.min_max
+              _target_: code.data.transformations.mean_stdev
               _partial_: true
               stats:
                 _target_: code.preprocessing.statistics.read_statistics_var
                 load: ${preprocessing.statistics.output.load}
                 key: 'prof'
                 dtype: ${data.dtype}
-              axis: 1
+              axis: null
         # Radiances
         bt_crtm:
           # Channels
@@ -187,7 +187,19 @@ logger:
 # Trainer configuration
 trainer:
   # Maximum number of epochs
-  max_epochs: 96
+  max_epochs: 1960
+
+# Callbacks configuration
+callbacks:
+  # Early stopping callback
+  early_stopping:
+    # Monitor validation loss for early stopping
+    patience: 60
+
+# Scheduler configuration
+scheduler:
+  factor: 0.5
+  patience: 11
 
 # Loader configuration
 loader:

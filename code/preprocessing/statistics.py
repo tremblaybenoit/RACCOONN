@@ -205,7 +205,7 @@ def compute_statistics(input: DictConfig, output: DictConfig | None = None, excl
         stats[variable_name] = statistics_dataset(
             dataset=dataset,
             which=which,
-            axis=axis,
+            axis=axis if variable_name not in ['pressure', 'pressure_log'] else None,
             batch_size=batch_size,
             num_workers=num_workers
         )

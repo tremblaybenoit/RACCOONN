@@ -3,11 +3,11 @@ paths:
   run_id: default
   data_dir: ../synthetic_float32_clear
   task_dir: ../forward_outputs
-  log_dir: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/logs
-  checkpoint_dir: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/checkpoints/default
-  run_dir: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default
-  output_dir: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear
-  work_dir: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/RACCOONN
+  log_dir: ../forward_outputs/forward_clear/logs
+  checkpoint_dir: ../forward_outputs/forward_clear/checkpoints/default
+  run_dir: ../forward_outputs/forward_clear/runs/default
+  output_dir: ../forward_outputs/forward_clear
+  work_dir: '.'
 data:
   stage:
     train:
@@ -63,7 +63,7 @@ data:
         bt_forward:
           _target_: code.loader.dataset.EagerDataset
           _recursive_: false
-          path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_train.npy
+          path: ../forward_outputs/forward_clear/runs/default/bt_forward_train.npy
           type:
           - Channel 8
           - Channel 9
@@ -88,14 +88,14 @@ data:
               - Channel 16
           load:
             _target_: code.data.io.load_npy
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_train.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_train.npy
             split: null
             dtype: float32
           save:
             _target_: code.data.io.save_npy
             _partial_: true
             _args_:
-            - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_train.npy
+            - ../forward_outputs/forward_clear/runs/default/bt_forward_train.npy
             dtype: float32
           transformations:
             normalization:
@@ -111,7 +111,7 @@ data:
         bt_forward_stdev:
           _target_: code.loader.dataset.EagerDataset
           _recursive_: false
-          path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
+          path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
           type:
           - Channel 8
           - Channel 9
@@ -136,14 +136,14 @@ data:
               - Channel 16
           load:
             _target_: code.data.io.load_npy
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
             split: null
             dtype: float32
           save:
             _target_: code.data.io.save_npy
             _partial_: true
             _args_:
-            - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
+            - ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
             dtype: float32
           transformations: null
         bt_obs:
@@ -574,7 +574,7 @@ data:
         bt_forward:
           _target_: code.loader.dataset.EagerDataset
           _recursive_: false
-          path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
+          path: ../forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
           type:
           - Channel 8
           - Channel 9
@@ -599,14 +599,14 @@ data:
               - Channel 16
           load:
             _target_: code.data.io.load_npy
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
             split: null
             dtype: float32
           save:
             _target_: code.data.io.save_npy
             _partial_: true
             _args_:
-            - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
+            - ../forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
             dtype: float32
           transformations:
             normalization:
@@ -622,7 +622,7 @@ data:
         bt_forward_stdev:
           _target_: code.loader.dataset.EagerDataset
           _recursive_: false
-          path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
+          path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
           type:
           - Channel 8
           - Channel 9
@@ -647,14 +647,14 @@ data:
               - Channel 16
           load:
             _target_: code.data.io.load_npy
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
             split: null
             dtype: float32
           save:
             _target_: code.data.io.save_npy
             _partial_: true
             _args_:
-            - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
+            - ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
             dtype: float32
           transformations: null
         bt_obs:
@@ -1085,7 +1085,7 @@ data:
         bt_forward:
           _target_: code.loader.dataset.EagerDataset
           _recursive_: false
-          path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_test.npy
+          path: ../forward_outputs/forward_clear/runs/default/bt_forward_test.npy
           type:
           - Channel 8
           - Channel 9
@@ -1110,14 +1110,14 @@ data:
               - Channel 16
           load:
             _target_: code.data.io.load_npy
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_test.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_test.npy
             split: null
             dtype: float32
           save:
             _target_: code.data.io.save_npy
             _partial_: true
             _args_:
-            - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_test.npy
+            - ../forward_outputs/forward_clear/runs/default/bt_forward_test.npy
             dtype: float32
           transformations:
             normalization:
@@ -1133,7 +1133,7 @@ data:
         bt_forward_stdev:
           _target_: code.loader.dataset.EagerDataset
           _recursive_: false
-          path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
+          path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
           type:
           - Channel 8
           - Channel 9
@@ -1158,14 +1158,14 @@ data:
               - Channel 16
           load:
             _target_: code.data.io.load_npy
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
             split: null
             dtype: float32
           save:
             _target_: code.data.io.save_npy
             _partial_: true
             _args_:
-            - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
+            - ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
             dtype: float32
           transformations: null
         bt_obs:
@@ -1596,7 +1596,7 @@ data:
         bt_forward:
           _target_: code.loader.dataset.EagerDataset
           _recursive_: false
-          path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_predict.npy
+          path: ../forward_outputs/forward_clear/runs/default/bt_forward_predict.npy
           type:
           - Channel 8
           - Channel 9
@@ -1621,14 +1621,14 @@ data:
               - Channel 16
           load:
             _target_: code.data.io.load_npy
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_predict.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_predict.npy
             split: null
             dtype: float32
           save:
             _target_: code.data.io.save_npy
             _partial_: true
             _args_:
-            - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_predict.npy
+            - ../forward_outputs/forward_clear/runs/default/bt_forward_predict.npy
             dtype: float32
           transformations:
             normalization:
@@ -1644,7 +1644,7 @@ data:
         bt_forward_stdev:
           _target_: code.loader.dataset.EagerDataset
           _recursive_: false
-          path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_predict.npy
+          path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_predict.npy
           type:
           - Channel 8
           - Channel 9
@@ -1669,14 +1669,14 @@ data:
               - Channel 16
           load:
             _target_: code.data.io.load_npy
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_predict.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_predict.npy
             split: null
             dtype: float32
           save:
             _target_: code.data.io.save_npy
             _partial_: true
             _args_:
-            - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_predict.npy
+            - ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_predict.npy
             dtype: float32
           transformations: null
         bt_obs:
@@ -2166,15 +2166,15 @@ data:
             _target_: numpy.concatenate
             _args_:
             - - _target_: code.data.io.load_npy
-                path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_train.npy
+                path: ../forward_outputs/forward_clear/runs/default/bt_forward_train.npy
                 split: null
                 dtype: float32
               - _target_: code.data.io.load_npy
-                path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
+                path: ../forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
                 split: null
                 dtype: float32
               - _target_: code.data.io.load_npy
-                path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_test.npy
+                path: ../forward_outputs/forward_clear/runs/default/bt_forward_test.npy
                 split: null
                 dtype: float32
             - 0
@@ -2218,15 +2218,15 @@ data:
             _target_: numpy.concatenate
             _args_:
             - - _target_: code.data.io.load_npy
-                path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
+                path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
                 split: null
                 dtype: float32
               - _target_: code.data.io.load_npy
-                path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
+                path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
                 split: null
                 dtype: float32
               - _target_: code.data.io.load_npy
-                path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
+                path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
                 split: null
                 dtype: float32
             - 0
@@ -2748,7 +2748,7 @@ data:
         bt_forward:
           _target_: code.loader.dataset.EagerDataset
           _recursive_: false
-          path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_train.npy
+          path: ../forward_outputs/forward_clear/runs/default/bt_forward_train.npy
           type:
           - Channel 8
           - Channel 9
@@ -2773,14 +2773,14 @@ data:
               - Channel 16
           load:
             _target_: code.data.io.load_npy
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_train.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_train.npy
             split: null
             dtype: float32
           save:
             _target_: code.data.io.save_npy
             _partial_: true
             _args_:
-            - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_train.npy
+            - ../forward_outputs/forward_clear/runs/default/bt_forward_train.npy
             dtype: float32
           transformations:
             normalization:
@@ -2796,7 +2796,7 @@ data:
         bt_forward_stdev:
           _target_: code.loader.dataset.EagerDataset
           _recursive_: false
-          path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
+          path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
           type:
           - Channel 8
           - Channel 9
@@ -2821,14 +2821,14 @@ data:
               - Channel 16
           load:
             _target_: code.data.io.load_npy
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
             split: null
             dtype: float32
           save:
             _target_: code.data.io.save_npy
             _partial_: true
             _args_:
-            - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
+            - ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
             dtype: float32
           transformations: null
         bt_obs:
@@ -3279,7 +3279,7 @@ data:
         bt_forward:
           _target_: code.loader.dataset.EagerDataset
           _recursive_: false
-          path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
+          path: ../forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
           type:
           - Channel 8
           - Channel 9
@@ -3304,14 +3304,14 @@ data:
               - Channel 16
           load:
             _target_: code.data.io.load_npy
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
             split: null
             dtype: float32
           save:
             _target_: code.data.io.save_npy
             _partial_: true
             _args_:
-            - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
+            - ../forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
             dtype: float32
           transformations:
             normalization:
@@ -3327,7 +3327,7 @@ data:
         bt_forward_stdev:
           _target_: code.loader.dataset.EagerDataset
           _recursive_: false
-          path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
+          path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
           type:
           - Channel 8
           - Channel 9
@@ -3352,14 +3352,14 @@ data:
               - Channel 16
           load:
             _target_: code.data.io.load_npy
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
             split: null
             dtype: float32
           save:
             _target_: code.data.io.save_npy
             _partial_: true
             _args_:
-            - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
+            - ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
             dtype: float32
           transformations: null
         bt_obs:
@@ -3810,7 +3810,7 @@ data:
         bt_forward:
           _target_: code.loader.dataset.EagerDataset
           _recursive_: false
-          path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_test.npy
+          path: ../forward_outputs/forward_clear/runs/default/bt_forward_test.npy
           type:
           - Channel 8
           - Channel 9
@@ -3835,14 +3835,14 @@ data:
               - Channel 16
           load:
             _target_: code.data.io.load_npy
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_test.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_test.npy
             split: null
             dtype: float32
           save:
             _target_: code.data.io.save_npy
             _partial_: true
             _args_:
-            - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_test.npy
+            - ../forward_outputs/forward_clear/runs/default/bt_forward_test.npy
             dtype: float32
           transformations:
             normalization:
@@ -3858,7 +3858,7 @@ data:
         bt_forward_stdev:
           _target_: code.loader.dataset.EagerDataset
           _recursive_: false
-          path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
+          path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
           type:
           - Channel 8
           - Channel 9
@@ -3883,14 +3883,14 @@ data:
               - Channel 16
           load:
             _target_: code.data.io.load_npy
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
             split: null
             dtype: float32
           save:
             _target_: code.data.io.save_npy
             _partial_: true
             _args_:
-            - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
+            - ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
             dtype: float32
           transformations: null
         bt_obs:
@@ -4390,15 +4390,15 @@ data:
             _target_: numpy.concatenate
             _args_:
             - - _target_: code.data.io.load_npy
-                path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_train.npy
+                path: ../forward_outputs/forward_clear/runs/default/bt_forward_train.npy
                 split: null
                 dtype: float32
               - _target_: code.data.io.load_npy
-                path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
+                path: ../forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
                 split: null
                 dtype: float32
               - _target_: code.data.io.load_npy
-                path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_test.npy
+                path: ../forward_outputs/forward_clear/runs/default/bt_forward_test.npy
                 split: null
                 dtype: float32
             - 0
@@ -4442,15 +4442,15 @@ data:
             _target_: numpy.concatenate
             _args_:
             - - _target_: code.data.io.load_npy
-                path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
+                path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
                 split: null
                 dtype: float32
               - _target_: code.data.io.load_npy
-                path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
+                path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
                 split: null
                 dtype: float32
               - _target_: code.data.io.load_npy
-                path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
+                path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
                 split: null
                 dtype: float32
             - 0
@@ -7387,15 +7387,15 @@ preprocessing:
           _target_: numpy.concatenate
           _args_:
           - - _target_: code.data.io.load_npy
-              path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_train.npy
+              path: ../forward_outputs/forward_clear/runs/default/bt_forward_train.npy
               split: null
               dtype: float32
             - _target_: code.data.io.load_npy
-              path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
+              path: ../forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
               split: null
               dtype: float32
             - _target_: code.data.io.load_npy
-              path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_test.npy
+              path: ../forward_outputs/forward_clear/runs/default/bt_forward_test.npy
               split: null
               dtype: float32
           - 0
@@ -7439,15 +7439,15 @@ preprocessing:
           _target_: numpy.concatenate
           _args_:
           - - _target_: code.data.io.load_npy
-              path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
+              path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
               split: null
               dtype: float32
             - _target_: code.data.io.load_npy
-              path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
+              path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
               split: null
               dtype: float32
             - _target_: code.data.io.load_npy
-              path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
+              path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
               split: null
               dtype: float32
           - 0
@@ -8201,7 +8201,7 @@ loader:
           bt_forward:
             _target_: code.loader.dataset.EagerDataset
             _recursive_: false
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_train.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_train.npy
             type:
             - Channel 8
             - Channel 9
@@ -8226,14 +8226,14 @@ loader:
                 - Channel 16
             load:
               _target_: code.data.io.load_npy
-              path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_train.npy
+              path: ../forward_outputs/forward_clear/runs/default/bt_forward_train.npy
               split: null
               dtype: float32
             save:
               _target_: code.data.io.save_npy
               _partial_: true
               _args_:
-              - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_train.npy
+              - ../forward_outputs/forward_clear/runs/default/bt_forward_train.npy
               dtype: float32
             transformations:
               normalization:
@@ -8249,7 +8249,7 @@ loader:
           bt_forward_stdev:
             _target_: code.loader.dataset.EagerDataset
             _recursive_: false
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
             type:
             - Channel 8
             - Channel 9
@@ -8274,14 +8274,14 @@ loader:
                 - Channel 16
             load:
               _target_: code.data.io.load_npy
-              path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
+              path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
               split: null
               dtype: float32
             save:
               _target_: code.data.io.save_npy
               _partial_: true
               _args_:
-              - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
+              - ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_train.npy
               dtype: float32
             transformations: null
     valid:
@@ -8559,7 +8559,7 @@ loader:
           bt_forward:
             _target_: code.loader.dataset.EagerDataset
             _recursive_: false
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
             type:
             - Channel 8
             - Channel 9
@@ -8584,14 +8584,14 @@ loader:
                 - Channel 16
             load:
               _target_: code.data.io.load_npy
-              path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
+              path: ../forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
               split: null
               dtype: float32
             save:
               _target_: code.data.io.save_npy
               _partial_: true
               _args_:
-              - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
+              - ../forward_outputs/forward_clear/runs/default/bt_forward_valid.npy
               dtype: float32
             transformations:
               normalization:
@@ -8607,7 +8607,7 @@ loader:
           bt_forward_stdev:
             _target_: code.loader.dataset.EagerDataset
             _recursive_: false
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
             type:
             - Channel 8
             - Channel 9
@@ -8632,14 +8632,14 @@ loader:
                 - Channel 16
             load:
               _target_: code.data.io.load_npy
-              path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
+              path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
               split: null
               dtype: float32
             save:
               _target_: code.data.io.save_npy
               _partial_: true
               _args_:
-              - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
+              - ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_valid.npy
               dtype: float32
             transformations: null
     test:
@@ -8917,7 +8917,7 @@ loader:
           bt_forward:
             _target_: code.loader.dataset.EagerDataset
             _recursive_: false
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_test.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_test.npy
             type:
             - Channel 8
             - Channel 9
@@ -8942,14 +8942,14 @@ loader:
                 - Channel 16
             load:
               _target_: code.data.io.load_npy
-              path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_test.npy
+              path: ../forward_outputs/forward_clear/runs/default/bt_forward_test.npy
               split: null
               dtype: float32
             save:
               _target_: code.data.io.save_npy
               _partial_: true
               _args_:
-              - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_test.npy
+              - ../forward_outputs/forward_clear/runs/default/bt_forward_test.npy
               dtype: float32
             transformations:
               normalization:
@@ -8965,7 +8965,7 @@ loader:
           bt_forward_stdev:
             _target_: code.loader.dataset.EagerDataset
             _recursive_: false
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
             type:
             - Channel 8
             - Channel 9
@@ -8990,14 +8990,14 @@ loader:
                 - Channel 16
             load:
               _target_: code.data.io.load_npy
-              path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
+              path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
               split: null
               dtype: float32
             save:
               _target_: code.data.io.save_npy
               _partial_: true
               _args_:
-              - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
+              - ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_test.npy
               dtype: float32
             transformations: null
     predict:
@@ -9164,7 +9164,7 @@ loader:
           bt_forward:
             _target_: code.loader.dataset.EagerDataset
             _recursive_: false
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_predict.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_predict.npy
             type:
             - Channel 8
             - Channel 9
@@ -9189,14 +9189,14 @@ loader:
                 - Channel 16
             load:
               _target_: code.data.io.load_npy
-              path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_predict.npy
+              path: ../forward_outputs/forward_clear/runs/default/bt_forward_predict.npy
               split: null
               dtype: float32
             save:
               _target_: code.data.io.save_npy
               _partial_: true
               _args_:
-              - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_predict.npy
+              - ../forward_outputs/forward_clear/runs/default/bt_forward_predict.npy
               dtype: float32
             transformations:
               normalization:
@@ -9212,7 +9212,7 @@ loader:
           bt_forward_stdev:
             _target_: code.loader.dataset.EagerDataset
             _recursive_: false
-            path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_predict.npy
+            path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_predict.npy
             type:
             - Channel 8
             - Channel 9
@@ -9237,14 +9237,14 @@ loader:
                 - Channel 16
             load:
               _target_: code.data.io.load_npy
-              path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_predict.npy
+              path: ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_predict.npy
               split: null
               dtype: float32
             save:
               _target_: code.data.io.save_npy
               _partial_: true
               _args_:
-              - /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/runs/default/bt_forward_stdev_predict.npy
+              - ../forward_outputs/forward_clear/runs/default/bt_forward_stdev_predict.npy
               dtype: float32
             transformations: null
 architecture:
@@ -9399,7 +9399,7 @@ scheduler:
 model:
   _target_: code.model.forward.ForwardModel
   _recursive_: false
-  ckpt_path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/checkpoints/default/model.ckpt
+  ckpt_path: ../forward_outputs/forward_clear/checkpoints/default/model.ckpt
   optimizer:
     _target_: torch.optim.Adam
     lr: 0.0005
@@ -9596,7 +9596,7 @@ model:
 callbacks:
   model_checkpoint:
     _target_: pytorch_lightning.callbacks.ModelCheckpoint
-    dirpath: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/checkpoints/default
+    dirpath: ../forward_outputs/forward_clear/checkpoints/default
     filename: model
     monitor: valid_loss
     save_top_k: true
@@ -9624,7 +9624,7 @@ callbacks:
 logger:
   mlflow:
     _target_: lightning.pytorch.loggers.mlflow.MLFlowLogger
-    save_dir: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/logs/mlflow
+    save_dir: ../forward_outputs/forward_clear/logs/mlflow
     experiment_name: forward_clear
     run_name: default
     tags:

@@ -693,6 +693,8 @@ class HomogeneousPredictionHeads(nn.Module):
         self.out_concat = out_concat
 
         # Create n_heads independent head instances
+        if isinstance(n_heads, DictConfig):
+            n_heads = instantiate(n_heads)
         if isinstance(head, DictConfig):
             # Each instantiate() call creates independent head with fresh weights
             self.heads = nn.ModuleList([instantiate(head) for _ in range(n_heads)])

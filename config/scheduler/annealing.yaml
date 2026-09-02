@@ -1,0 +1,5 @@
+# CosineAnnealingLR scheduler
+_target_: torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
+T_0: 100          # First restart period (epochs)
+T_mult: 1         # Multiply T by this after each restart (keep at 1 for constant cycles)
+eta_min: 1.0e-6

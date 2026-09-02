@@ -567,6 +567,9 @@ class ForwardLogger(ArtifactLogger):
             )
         )
 
+        # Close all figures to free memory
+        plt.close('all')
+
 
 class InverseLogger(ArtifactLogger):
     """
@@ -866,3 +869,6 @@ class InverseLogger(ArtifactLogger):
                         title=[f"RMSE: {label}" for label in prof_labels]
                     )
                 )
+
+        # Close all figures to free memory
+        plt.close('all')

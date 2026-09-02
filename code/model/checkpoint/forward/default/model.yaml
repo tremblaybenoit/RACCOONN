@@ -1,6 +1,6 @@
 _target_: code.model.forward.ForwardModel
 _recursive_: false
-ckpt_path: /mnt/c/Users/benoi/Documents/Projects/RACCOONN/forward_outputs/forward_clear/checkpoints/default/model.ckpt
+ckpt_path: code/model/checkpoint/forward/default/model.ckpt
 optimizer:
   _target_: torch.optim.Adam
   lr: 0.0005
