@@ -8,7 +8,7 @@ defaults:
   - override /data: inverse_default
   - override /preprocessing: inverse_split
   - override /loader: default
-  - override /architecture: inverse_multihead
+  - override /architecture: inverse_multihead2
   - override /loss: inverse_default
   - override /optimizer: default
   - override /scheduler: default
@@ -26,7 +26,7 @@ task_name: "inverse_clear_split"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "default"
+  run_id: "default2"
   data_dir: ../synthetic_${data.dtype}_clear_split
   # checkpoint_dir: "code/model/checkpoints/checkpoint"
 
@@ -138,7 +138,7 @@ data:
           transformations:
             # Normalization function and parameters
             normalization:
-              _target_: code.data.transformations.mean_stdev
+              _target_: code.data.transformations.min_max
               _partial_: true
               stats:
                 _target_: code.preprocessing.statistics.read_statistics_var
@@ -198,7 +198,7 @@ callbacks:
 
 # Scheduler configuration
 scheduler:
-  factor: 0.5
+  factor: 0.99
   patience: 11
 
 # Loader configuration
