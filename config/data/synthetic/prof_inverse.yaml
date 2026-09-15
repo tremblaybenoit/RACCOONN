@@ -18,7 +18,10 @@ train:
       # Profile types
       type: ${..prof.type}
       # Number of variables
-      n: ${..prof.n}
+      n:
+        _target_: builtins.len
+        _args_:
+          - ${...type}
       # Loading function
       load:
         _target_: code.data.io.load_npy

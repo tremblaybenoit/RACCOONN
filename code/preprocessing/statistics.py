@@ -76,7 +76,7 @@ def read_statistics_var(load: DictConfig, key: str, tensor: bool = False, dtype:
     if split is not None:
         if isinstance(split, DictConfig):
             split = instantiate(split)
-        stats = {key: value[split] if isinstance(value, np.ndarray) else value for key, value in stats.items()}
+        stats = {key: value[split] if isinstance(value, (np.ndarray, torch.Tensor)) else value for key, value in stats.items()}
 
     # Return statistics for the specified variable
     return stats

@@ -191,3 +191,116 @@ class InverseModel(ForwardModel):
                     output_dict['output']['bt_inverse_stdev'] = forward_model_output['bt_forward_stdev']
 
         return output_dict
+
+
+class InverseModel1(InverseModel):
+
+    """
+    Inverse model for atmospheric retrievals.
+
+    This model implements:
+    - Coordinate expansion: expands spatial/atmospheric inputs across pressure levels.
+    """
+
+    def __init__(
+        self,
+        ckpt_path: str | DictConfig,
+        architecture: DictConfig,
+        optimizer: DictConfig | None = None,
+        scheduler: DictConfig | None = None,
+        loss: DictConfig | Callable | None = None,
+        pre_process: DictConfig | None = None,
+        post_process: DictConfig | None = None,
+        forward_model: DictConfig | ForwardModel | None = None,
+        prof_index: int = 0,
+        # prof_weight: list[float] | None = None,
+    ) -> None:
+        """
+        Initialize InverseModel.
+
+        Parameters
+        ----------
+        ckpt_path: str | DictConfig
+            Path to the checkpoint file or DictConfig containing checkpoint info.
+        architecture : DictConfig
+            Configuration for the model architecture.
+        optimizer : DictConfig, optional
+            Optimizer configuration
+        scheduler : DictConfig, optional
+            Learning rate scheduler configuration
+        loss : DictConfig | Callable, optional
+            Loss function configuration
+        post_process : DictConfig, optional
+            Post-processing layer configuration to transform outputs to physical space.
+        pre_process : DictConfig, optional
+            Pre-processing layer configuration to transform inputs to model space.
+        forward_model : DictConfig | ForwardModel, optional
+            Configuration for the forward model used in physics-informed loss computation.
+            If DictConfig, can include 'ckpt_path' key to load pre-trained weights.
+        """
+
+        # Class inheritance
+        super().__init__(
+            ckpt_path=ckpt_path,
+            architecture=architecture,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            loss=loss,
+            pre_process=pre_process,
+            post_process=post_process,
+            forward_model=forward_model
+        )
+
+        # Store profile index and weights for combination
+        self.prof_index = prof_index
+        # self.prof_weight = prof_weight
+
+    def _infer(self, batch: dict, training_flag: bool = False) -> dict:
+        """ Build output structure for inverse model with post-processing.
+
+        Performs profile inversion and optionally applies forward model
+        to compute observation consistency. Applies post-processing to transform
+        outputs to physical space.
+
+        Receives full batch to enable access to batch['context'] for forward model evaluation.
+
+        Parameters
+        ----------
+        batch : dict
+            Full batch containing 'input', 'context', and other batch data.
+        training_flag : bool, optional
+            Flag indicating whether the model is in training mode. Default is False.
+
+        Returns
+        -------
+        dict
+            Dictionary with 'output' key containing post-processed predictions in physical space.
+        """
+
+        # Inversion of atmospheric profiles
+        output_dict = {'output': self.forward(batch['input'], training_flag=training_flag)}
+
+        # Create a new tensor to hold the combined profiles
+        combined_prof = batch['target']['prof'].clone()  # Start with prior profiles
+        combined_prof[:, self.prof_index:self.prof_index+1] = output_dict['output']['prof_inverse']
+        output_dict['output']['prof_inverse'] = combined_prof
+
+        # Forward-modeled observations (requires batch['context'])
+        # Use 'prof_inverse' which contains the post-processed profiles (physical space)
+        if self.forward_model is not None and 'context' in batch:
+            if all(k in batch['context'] for k in ['surf', 'meta']):
+                # Forward model is frozen (no weight updates), but gradients flow through
+                forward_model_output = self.forward_model(
+                    {
+                        'prof': output_dict['output']['prof_inverse'],
+                        'surf': batch['context']['surf'],
+                        'meta': batch['context']['meta']
+                    }
+                )
+                # Switch keys ('bt_forward' → 'bt_inverse') for clarity in output
+                if 'bt_forward' in forward_model_output:
+                    output_dict['output']['bt_inverse'] = forward_model_output['bt_forward']
+                if 'bt_forward_stdev' in forward_model_output:
+                    output_dict['output']['bt_inverse_stdev'] = forward_model_output['bt_forward_stdev']
+
+        return output_dict
