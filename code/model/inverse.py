@@ -112,7 +112,7 @@ class InverseModel(ForwardModel):
             input_dict = self.pre_process(input_dict)
 
         # Get n_levels from architecture if available, otherwise assume 1
-        n_levels = input_dict['pressure'].shape[-1]
+        n_levels = input_dict['pressure_log'].shape[-1]
 
         # Vectorized expansion: Create list of tensors all shaped (Batch, n_levels, 1)
         tensors = []

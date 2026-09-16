@@ -125,16 +125,16 @@ class MultiScaleGaussianEncoding(nn.Module):
 
     def __init__(
             self,
-            num_freqs: int,
-            d_input: int,
-            sigma_per_dim: list | None = None
+            d_input: int | DictConfig,
+            num_freqs: int | DictConfig = 20,
+            sigma_per_dim: list | DictConfig | None = None
     ) -> None:
         """ Initialize Multi-Scale Gaussian Positional Encoding.
 
         Parameters
         ----------
-        num_freqs : int. Number of frequencies.
         d_input : int. Input dimension.
+        num_freqs : int. Number of frequencies.
         sigma_per_dim : list. Standard deviation per dimension. If None, defaults to 1.0 for all dimensions.
 
         Returns
@@ -144,6 +144,14 @@ class MultiScaleGaussianEncoding(nn.Module):
 
         # Class inheritance
         super().__init__()
+
+        # Initialize frequencies
+        if isinstance(d_input, DictConfig):
+            d_input = instantiate(d_input)
+        if isinstance(num_freqs, DictConfig):
+            num_freqs = instantiate(num_freqs)
+        if isinstance(sigma_per_dim, DictConfig):
+            sigma_per_dim = instantiate(sigma_per_dim)
 
         # Set default sigmas if not provided
         if sigma_per_dim is None:

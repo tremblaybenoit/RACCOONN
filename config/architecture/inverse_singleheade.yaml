@@ -1,0 +1,61 @@
+_target_: code.architecture.mlp.MLPModular
+_recursive_: false
+
+# Positional encoding
+positional_encoding:
+  _target_: code.architecture.encoding.MultiScaleGaussianEncoding
+  _recursive_: true
+  # sigma: 1.
+  d_input:
+    _target_: builtins.len
+    _args_:
+      - ${data.select_input}
+  sigma_per_dim: [1., 1., 1., 5.]
+
+# Input layer
+input_layer:
+  _target_: code.architecture.mlp.MLPBlock
+  _recursive_: false
+  in_features: null  # Set by positional encoding output
+  out_features: 128
+  activation:
+    _target_: code.architecture.activation.Swish
+  norm_type: none
+  dropout_rate: 0.1
+  residual: true
+
+# Hidden layers
+hidden_layer:
+  _target_: code.architecture.mlp.MLPBlocks
+  _recursive_: false
+  in_features: ${.hidden_features}
+  out_features: ${.hidden_features}
+  hidden_features: 128
+  n_blocks: 3
+  activation:
+    _target_: code.architecture.activation.Swish
+  norm_type: none
+  dropout_rate: 0.1
+  residual: true
+
+# Output layer
+output_layer:
+  _target_: code.architecture.mlp.PredictionHead
+  _recursive_: false
+  in_features: ${..hidden_layer.out_features}
+  hidden_features: ${..hidden_layer.out_features}
+  out_features: 1
+  n_blocks: 1
+  activation:
+    _target_: code.architecture.activation.Swish
+  final_activation:
+    _target_: torch.nn.Sigmoid
+  norm_type: none
+  dropout_rate: 0.
+  residual: false
+
+# Skip connections
+hidden_skip: true
+output_skip: false
+inject_encoding_hidden: false
+inject_encoding_output: false
