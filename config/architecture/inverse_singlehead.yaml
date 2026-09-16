@@ -15,9 +15,9 @@ input_layer:
   _target_: code.architecture.mlp.MLPBlock
   _recursive_: false
   in_features: null  # Set by positional encoding output
-  out_features: 128
+  out_features: 64
   activation:
-    _target_: code.architecture.activation.Sine
+    _target_: code.architecture.activation.Swish
   norm_type: none
   dropout_rate: 0.1
   residual: false
@@ -28,10 +28,10 @@ hidden_layer:
   _recursive_: false
   in_features: ${.hidden_features}
   out_features: ${.hidden_features}
-  hidden_features: 128
+  hidden_features: 64
   n_blocks: 2
   activation:
-    _target_: code.architecture.activation.Sine
+    _target_: code.architecture.activation.Swish
   norm_type: none
   dropout_rate: 0.1
   residual: false
@@ -45,8 +45,7 @@ output_layer:
   out_features: 1
   n_blocks: 2
   activation:
-    _target_: code.architecture.activation.Sine
-    w0: 1.
+    _target_: code.architecture.activation.Swish
   final_activation:
     _target_: torch.nn.Sigmoid
   norm_type: none

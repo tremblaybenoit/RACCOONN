@@ -1,0 +1,6 @@
+defaults:
+  - model_checkpoint
+  - loss_logger
+  - inverse_logger
+  - early_stopping
+  - _self_

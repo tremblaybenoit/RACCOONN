@@ -88,7 +88,7 @@ def prior_from_bounded_perturbations(input: DictConfig, output: DictConfig | Non
     if input.get('variant_mask', None) is not None:
         variant_mask = instantiate(input.variant_mask.load)
         if x_dims[1] != variant_mask.shape[0]:
-            variant_mask = np.take(variant_mask, [0, 4, 8], axis=0)
+            variant_mask = np.take(variant_mask, [0], axis=0)
 
     # Single-pass perturbation generation (avoiding while-loop rejection bottlenecks)
     n_samples = x_dims[0]
@@ -228,7 +228,7 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
         # Load filter
         variant_mask = instantiate(input.variant_mask.load)
         if n_vars != variant_mask.shape[0]:
-            variant_mask = np.take(variant_mask, [0, 4, 8], axis=0)
+            variant_mask = np.take(variant_mask, [0], axis=0)
     else:
         variant_mask = None
 
