@@ -1,0 +1,387 @@
+# @package _global_
+# Experiment-specific Hydra structure
+
+# Overriding default structure
+defaults:
+  - override /paths: default
+  - override /hydra: default
+  - override /data: inverse_default
+  - override /preprocessing: inverse_split
+  - override /loader: default
+  - override /architecture: inverse_singleheadf
+  - override /loss: var_proff  #var6
+  - override /optimizer: default
+  - override /scheduler: default
+  - override /model: inverse_default
+  - override /callbacks: inverse_default0
+  - override /logger: default
+  - override /trainer: cpu
+
+# All parameters below will be merged with parameters from default configurations set above.
+# This allows you to overwrite only specified parameters
+
+# Task name. Note that it determines the output directory path
+task_name: "inverse_clear_split_i"  # Experiment
+
+# Run id (unique identifier for the run)
+paths:
+  task_dir: "../inverse_outputs"
+  run_id: "default_1f"
+  data_dir: ../synthetic_${data.dtype}_clear_split
+  # checkpoint_dir: "code/model/checkpoints/checkpoint"
+
+# Preprocessing
+preprocessing:
+  # Recast data to new format, spatiotemporal distribution
+  recast:
+    # What the method needs as input
+    input:
+      # Mask to apply
+      mask:
+        # Spatial domain:
+        spatial_domain:
+          lat_min: -15.0
+          lat_max: 2.0
+          lon_min: -70.0
+          lon_max: -30.0
+        # Temporal domain:
+        temporal_window:
+          scans_min: 170.0
+          scans_max: 170.0
+        # Cloud/clear sky
+        cloud_mask: false
+        clear_mask: true
+  # Statistics of the dataset
+  statistics:
+    # What the method produces as output (pickle file)
+    output:
+      # Path to statistics file
+      path: code/data/statistics/synthetic_clear.pkl
+
+# Data configuration
+data:
+  select_input: ['lat', 'lon', 'scans', 'pressure_log']
+  # Precision
+  dtype: 'float32'
+  # Source data
+  source:
+    # Training set
+    train:
+      # Path to the training data
+      dir: ../synthetic_float32_clear/Train2
+      # Variables
+      variables:
+        # Atmospheric profiles
+        prof:
+          # Types of profiles for clear skies
+          type: [ 'Humidity mixing ratio', ]
+          # Loading function
+          load:
+            # Split
+            split:
+              _target_: code.data.io.split_slice
+              _args_:
+                - _target_: builtins.slice
+                  _args_: [ null ]  # Equivalent to :
+                - _target_: builtins.slice
+                  _args_: [ 1, 2 ]  # Equivalent to 1:10
+                - _target_: builtins.slice
+                  _args_: [ null ]  # Equivalent to :
+          # Transformations
+          transformations:
+            # Normalization function and parameters
+            normalization:
+              _target_: code.data.transformations.identity
+              _partial_: true
+              stats:
+                _target_: code.preprocessing.statistics.read_statistics_var
+                load: ${preprocessing.statistics.output.load}
+                key: 'prof'
+                dtype: ${data.dtype}
+                # Split
+                split:
+                  _target_: code.data.io.split_slice
+                  _args_:
+                    - _target_: builtins.slice
+                      _args_: [ 1, 2 ]  # Equivalent to 1:10
+                    - _target_: builtins.slice
+                      _args_: [ null ]  # Equivalent to :
+              axis: 1
+        # Radiances
+        bt_crtm:
+          # Channels
+          type: [
+            'Channel 8', 'Channel 9', 'Channel 10', 'Channel 11', 'Channel 12',
+            'Channel 13', 'Channel 14', 'Channel 15', 'Channel 16'
+          ]
+    # Validation set
+    valid:
+      # Path to the validation data
+      dir: ../synthetic_float32_clear/Val2
+      # Variables
+      variables:
+        # Atmospheric profiles
+        prof:
+          # Loading function
+          load:
+            # Split
+            split: ${data.source.train.variables.prof.load.split}
+          # Transformations
+          transformations: ${data.source.train.variables.prof.transformations}
+    # Test set
+    test:
+      # Path to the test data
+      dir: ../synthetic_float32_clear/Test2
+      # Variables
+      variables:
+        # Atmospheric profiles
+        prof:
+          # Loading function
+          load:
+            # Split
+            split: ${data.source.train.variables.prof.load.split}
+          # Transformations
+          transformations: ${data.source.train.variables.prof.transformations}
+    # Prediction set
+    predict:
+      # Variables
+      variables:
+        # Radiances
+        bt_forward:
+          # Path to the prediction data
+          path: '../forward_outputs/forward_clear/runs/default/bt_forward_predict.npy'
+        # Atmospheric profiles
+        prof:
+          # Loading function
+          load:
+            # Split
+            split: ${data.source.train.variables.prof.load.split}
+          # Transformations
+          transformations: ${data.source.train.variables.prof.transformations}
+
+  # Split ratios for training, validation, and test sets
+  stage:
+    # Training set
+    train:
+      # Variables
+      variables:
+        # Atmospheric profiles
+        prof:
+          # Types of profiles for clear skies
+          type: [ 'Humidity mixing ratio', ]
+          # Loading function
+          load:
+            # Split
+            split:
+              _target_: code.data.io.split_slice
+              _args_:
+                - _target_: builtins.slice
+                  _args_: [ null ]  # Equivalent to :
+                - _target_: builtins.slice
+                  _args_: [ 1, 2 ]  # Equivalent to 1:10
+                - _target_: builtins.slice
+                  _args_: [ null ]  # Equivalent to :
+          # Transformations
+          transformations:
+            # Normalization function and parameters
+            normalization:
+              _target_: code.data.transformations.identity
+              _partial_: true
+              stats:
+                _target_: code.preprocessing.statistics.read_statistics_var
+                load: ${preprocessing.statistics.output.load}
+                key: 'prof'
+                dtype: ${data.dtype}
+                # Split
+                split:
+                  _target_: code.data.io.split_slice
+                  _args_:
+                    - _target_: builtins.slice
+                      _args_: [ 1, 2 ]  # Equivalent to 1:10
+                    - _target_: builtins.slice
+                      _args_: [ null ]  # Equivalent to :
+              axis: 0
+        # Atmospheric profiles
+        prof_inverse:
+          # Types of profiles for clear skies
+          type: [ 'Humidity mixing ratio', ]
+          # Loading function
+          load:
+            # Split
+            split:
+              _target_: code.data.io.split_slice
+              _args_:
+                - _target_: builtins.slice
+                  _args_: [ null ]  # Equivalent to :
+                - _target_: builtins.slice
+                  _args_: [ 1, 2 ]  # Equivalent to 1:10
+                - _target_: builtins.slice
+                  _args_: [ null ]  # Equivalent to :
+          # Transformations
+          transformations:
+            # Normalization function and parameters
+            normalization:
+              _target_: code.data.transformations.mean_stdev
+              _partial_: true
+              stats:
+                _target_: code.preprocessing.statistics.read_statistics_var
+                load: ${preprocessing.statistics.output.load}
+                key: 'prof'
+                dtype: ${data.dtype}
+                # Split
+                split:
+                  _target_: code.data.io.split_slice
+                  _args_:
+                    - _target_: builtins.slice
+                      _args_: [ 1, 2 ]  # Equivalent to 1:10
+                    - _target_: builtins.slice
+                      _args_: [ null ]  # Equivalent to :
+              axis: null
+        # Atmospheric profiles
+        prof_prior:
+          # Loading function
+          load:
+            # What the method needs as input
+            input:
+              # Stats
+              stats:
+                # Split
+                split:
+                  _target_: code.data.io.split_slice
+                  _args_:
+                    - _target_: builtins.slice
+                      _args_: [ 1, 2 ]  # Equivalent to 1:10
+                    - _target_: builtins.slice
+                      _args_: [ null ]  # Equivalent to :
+        # Radiances
+        bt_crtm:
+          # Channels
+          type: [
+            'Channel 8', 'Channel 9', 'Channel 10', 'Channel 11', 'Channel 12',
+            'Channel 13', 'Channel 14', 'Channel 15', 'Channel 16'
+          ]
+    # Validation set
+    valid:
+      # Variables
+      variables:
+        # Atmospheric profiles
+        prof:
+          # Loading function
+          load:
+            # Split
+            split: ${data.stage.train.variables.prof.load.split}
+          # Transformations
+          transformations: ${data.stage.train.variables.prof.transformations}
+        # Atmospheric profiles
+        prof_inverse:
+          # Loading function
+          load:
+            # Split
+            split: ${data.stage.train.variables.prof_inverse.load.split}
+          # Transformations
+          transformations: ${data.stage.train.variables.prof_inverse.transformations}
+        # Atmospheric profiles
+        prof_prior:
+          # Loading function
+          load:
+            # What the method needs as input
+            input:
+              # Stats
+              stats:
+                # Split
+                split: ${data.stage.train.variables.prof_prior.load.input.stats.split}
+    # Test set
+    test:
+      # Variables
+      variables:
+        # Atmospheric profiles
+        prof:
+          # Loading function
+          load:
+            # Split
+            split: ${data.stage.train.variables.prof.load.split}
+          # Transformations
+          transformations: ${data.stage.train.variables.prof.transformations}
+        # Atmospheric profiles
+        prof_inverse:
+          # Loading function
+          load:
+            # Split
+            split: ${data.stage.train.variables.prof_inverse.load.split}
+          # Transformations
+          transformations: ${data.stage.train.variables.prof_inverse.transformations}
+        # Atmospheric profiles
+        prof_prior:
+          # Loading function
+          load:
+            # What the method needs as input
+            input:
+              # Stats
+              stats:
+                # Split
+                split: ${data.stage.train.variables.prof_prior.load.input.stats.split}
+    # Prediction set
+    predict:
+      # Variables
+      variables:
+        # Atmospheric profiles
+        prof:
+          # Loading function
+          load:
+            # Split
+            split: ${data.stage.train.variables.prof.load.split}
+          # Transformations
+          transformations: ${data.stage.train.variables.prof.transformations}
+        # Atmospheric profiles
+        prof_inverse:
+          # Loading function
+          load:
+            # Split
+            split: ${data.stage.train.variables.prof_inverse.load.split}
+          # Transformations
+          transformations: ${data.stage.train.variables.prof_inverse.transformations}
+        # Atmospheric profiles
+        prof_prior:
+          # Loading function
+          load:
+            # What the method needs as input
+            input:
+              # Stats
+              stats:
+                # Split
+                split: ${data.stage.train.variables.prof_prior.load.input.stats.split}
+
+# Logger configuration
+logger:
+  # MLflow logger
+  ports:
+    mlflow: 5004
+
+# Trainer configuration
+trainer:
+  # Maximum number of epochs
+  max_epochs: 1960
+
+# Callbacks configuration
+callbacks:
+  # Early stopping callback
+  early_stopping:
+    # Monitor validation loss for early stopping
+    patience: 60
+
+# Model configuration
+model:
+  # Forward model configuration
+  forward_model: null
+
+# Scheduler configuration
+scheduler:
+  factor: 0.75
+  patience: 11
+
+# Loader configuration
+loader:
+  # Batch size for training, validation, and test sets
+  batch_size: 32
+  # Number of workers for data loading
+  num_workers: 8

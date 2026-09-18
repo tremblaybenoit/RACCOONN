@@ -888,7 +888,6 @@ class MLPModular(nn.Module):
             current_dim = input_out_dim
 
         # Output Layer Input Dimension
-        self.output_skip = output_skip
         if output_skip:
             # Concatenate hidden output with input output
             output_in_dim = current_dim + input_out_dim
@@ -901,16 +900,22 @@ class MLPModular(nn.Module):
 
         # Output Layer
         if output_layer is not None:
+            # Set in_features in config BEFORE instantiation (important for nested layers)
+            if isinstance(output_layer, DictConfig) and hasattr(output_layer, 'in_features'):
+                output_layer.in_features = output_in_dim
+
             self.output_layer = instantiate(output_layer) if isinstance(output_layer, DictConfig) else output_layer
-            # Update input dimension if layer supports it
-            if hasattr(self.output_layer, 'in_features'):
+
+            # Fallback: also try to set on instantiated layer (for modules that support it)
+            if hasattr(self.output_layer, 'in_features') and isinstance(output_layer, DictConfig) is False:
                 self.output_layer.in_features = output_in_dim
         else:
             self.output_layer = nn.Identity()
 
-        # Store dimensions for skip concatenation in forward pass
+        # Store dimensions for forward pass
         self.input_out_dim = input_out_dim
         self.hidden_out_dim = current_dim
+        self.output_skip = output_skip
 
     def forward(self, x: torch.Tensor | dict) -> torch.Tensor | tuple[torch.Tensor, ...]:
         """
@@ -961,7 +966,7 @@ class MLPModular(nn.Module):
 
         # Prepare Output Layer Input
         if self.output_skip:
-            # Concatenate hidden and input features
+            # Concatenate hidden layer output with input layer output
             x_out = torch.cat([x_hidden, x_input], dim=-1)
         else:
             x_out = x_hidden

@@ -3,15 +3,15 @@ _target_: code.loss.wrapper.LossTerms
 
 config:
   # Observation loss term: forward-modeled radiance vs. observations
-  bt_crtm:
-    weight: 0.0
-    instance:
-      _target_: code.loss.wrapper.LossTerm
-      function:
-        _target_: code.loss.variational.QuadraticForm
-        matrix: ${preprocessing.covariance.R.output.matrix_inverse.load}
-      output_keys: 'bt_inverse'
-      target_keys: 'bt_crtm'
+  # bt_crtm:
+  #   weight: 0.0
+  #   instance:
+  #     _target_: code.loss.wrapper.LossTerm
+  #     function:
+  #       _target_: code.loss.variational.QuadraticForm
+  #       matrix: ${preprocessing.covariance.R.output.matrix_inverse.load}
+  #     output_keys: 'bt_inverse'
+  #     target_keys: 'bt_crtm'
 
   # Model constraint: inverted profile vs. prior with pressure mask
   prof:
@@ -19,8 +19,8 @@ config:
     instance:
       _target_: code.loss.wrapper.LossTerm
       function:
-        _target_: code.loss.variational.QuadraticForm
-        matrix: ${preprocessing.covariance.B.output.matrix_pseudo_inverse.load}
+        _target_: code.loss.basic.MSE #variational.QuadraticForm
+        # matrix: ${preprocessing.covariance.B.output.matrix_pseudo_inverse.load}
       output_keys: 'prof_inverse'
       target_keys: 'prof'
       # context_keys: 'variant_mask'

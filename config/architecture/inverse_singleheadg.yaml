@@ -3,20 +3,18 @@ _recursive_: false
 
 # Positional encoding
 positional_encoding:
-  _target_: code.architecture.encoding.GaussianPositionalEncoding
-  _recursive_: true
-  sigma: 1.
-  d_input:
-    _target_: builtins.len
-    _args_:
-      - ${data.select_input}
+  _target_: code.architecture.encoding.HarmonicEncoding
+  d_input: 4  # [lat, lon, scans, pressure_log]
+  num_freqs: 8  # 8 sine/cosine pairs per dimension
+  freq_mode: "exponential"  # Capture fine pressure variations
+  include_input: true  # Keep original coordinates too
 
 # Input layer
 input_layer:
   _target_: code.architecture.mlp.MLPBlock
   _recursive_: false
   in_features: null  # Set by positional encoding output
-  out_features: 64
+  out_features: 128
   activation:
     _target_: code.architecture.activation.Swish
   norm_type: none
@@ -29,7 +27,7 @@ hidden_layer:
   _recursive_: false
   in_features: ${.hidden_features}
   out_features: ${.hidden_features}
-  hidden_features: 64
+  hidden_features: 128
   n_blocks: 3
   activation:
     _target_: code.architecture.activation.Swish

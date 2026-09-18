@@ -25,7 +25,7 @@ defaults:
 dtype: 'float32'
 
 # Variables to use as input/output
-select_input: ['lat', 'lon', 'scans', 'pressure']
+select_input: ['lat', 'lon', 'scans', 'pressure_log']
 select_target: ['prof', 'prof_prior', 'bt_crtm']
 select_context: ['meta', 'surf', 'pressure',
                  'clear_mask', 'cloud_mask', 'daytime_mask', 'nighttime_mask',

@@ -18,7 +18,7 @@ class LossLogger(Callback):
         train_loss_model_var_0, train_loss_model_var_1, ...
     """
 
-    def __init__(self, log_per_variable: bool = True):
+    def __init__(self, log_per_variable: bool = True, log_grad_norm: bool = True):
         """
         Initialize LossLogger callbacks.
 
@@ -29,6 +29,8 @@ class LossLogger(Callback):
             Expects shapes like [batch, var] or [batch, var, level] where
             loss will be averaged over batch and level (if present) to produce
             per-variable metrics.
+        log_grad_norm : bool
+            If True, log the global L2 norm of gradients before each optimizer step.
         """
 
         # Class inheritance
@@ -36,6 +38,30 @@ class LossLogger(Callback):
 
         # Store flag for per-variable logging
         self.log_per_variable = log_per_variable
+        self.log_grad_norm = log_grad_norm
+
+    def on_before_optimizer_step(self, trainer: pl.Trainer, pl_module: pl.LightningModule, optimizer) -> None:
+        """
+        Log the global L2 norm of the gradients right before the optimizer step.
+        This is the correct hook because gradients exist here and haven't been zeroed out yet.
+        """
+        if not self.log_grad_norm:
+            return
+
+        with torch.no_grad():
+            # Compute total L2 norm across all parameter gradients
+            grad_norm = sum(
+                p.grad.pow(2).sum() for p in pl_module.parameters() if p.grad is not None
+            ).sqrt().item()
+
+        pl_module.log(
+            'train_grad_norm',
+            grad_norm,
+            on_step=True,
+            on_epoch=True,
+            prog_bar=False,
+            logger=True
+        )
 
     def on_train_batch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule, outputs: Any,
                            batch: Any, batch_idx: int) -> None:
