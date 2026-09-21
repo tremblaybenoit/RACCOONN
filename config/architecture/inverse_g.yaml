@@ -47,7 +47,7 @@ output_layer:
     in_features: ${...hidden_layer.out_features}
     hidden_features: ${...hidden_layer.out_features}
     out_features: 1
-    n_blocks: 2
+    n_blocks: 3
     activation:
       _target_: code.architecture.activation.Swish
     final_activation:

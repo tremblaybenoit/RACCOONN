@@ -184,6 +184,14 @@ class InverseModel(ForwardModel):
                         'meta': batch['context']['meta']
                     }
                 )
+                forward_model_output2 = self.forward_model(
+                    {
+                        'prof': batch['target']['prof'],
+                        'surf': batch['context']['surf'],
+                        'meta': batch['context']['meta']
+                    }
+                )
+                batch['target']['bt_forward'] = forward_model_output2['bt_forward']
                 # Switch keys ('bt_forward' → 'bt_inverse') for clarity in output
                 if 'bt_forward' in forward_model_output:
                     output_dict['output']['bt_inverse'] = forward_model_output['bt_forward']
