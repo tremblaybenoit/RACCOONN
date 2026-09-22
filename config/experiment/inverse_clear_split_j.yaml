@@ -8,25 +8,25 @@ defaults:
   - override /data: inverse_default
   - override /preprocessing: inverse_split
   - override /loader: default
-  - override /architecture: inverse_f
-  - override /loss: varh
+  - override /architecture: inverse_j
+  - override /loss: varj
   - override /optimizer: default
   - override /scheduler: default
   - override /model: inverse_default
   - override /callbacks: inverse_default
   - override /logger: default
-  - override /trainer: cpu
+  - override /trainer: gpu
 
 # All parameters below will be merged with parameters from default configurations set above.
 # This allows you to overwrite only specified parameters
 
 # Task name. Note that it determines the output directory path
-task_name: "inverse_clear_split_n"  # Experiment
+task_name: "inverse_clear_split_j"  # Experiment
 
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "h"
+  run_id: "i"
   data_dir: ../synthetic_${data.dtype}_clear_split
   # checkpoint_dir: "code/model/checkpoints/checkpoint"
 
@@ -171,7 +171,7 @@ data:
                 load: ${preprocessing.statistics.output.load}
                 key: 'prof'
                 dtype: ${data.dtype}
-              axis: null
+              axis: 1
         # Radiances
         bt_crtm:
           # Channels

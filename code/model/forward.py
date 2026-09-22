@@ -376,7 +376,7 @@ class ForwardModel(LightningModule):
             self.post_process = self.post_process.to(device)
         return self
 
-    def load_ckpt(self, ckpt_path: str | None = None, strict: bool = False, freeze: bool = False) -> 'ForwardModel':
+    def load_ckpt(self, ckpt_path: str | None = None, strict: bool = False, freeze: bool = True) -> 'ForwardModel':
         """Load model weights from a checkpoint file.
 
         Parameters
@@ -388,7 +388,7 @@ class ForwardModel(LightningModule):
             missing or extra keys. Default False (useful for test/predict).
         freeze: bool
             If True, sets the model to eval mode after loading.
-            Default False. Set to True for pre-trained models to use running
+            Default True. Set to True for pre-trained models to use running
             batch norm statistics without accumulating new ones. Note: To prevent
             weight updates, exclude model from optimizer (gradients still flow).
 
@@ -429,4 +429,3 @@ class ForwardModel(LightningModule):
             logger.info("Model set to eval mode (running batch norm stats, gradients enabled)")
 
         return self
-

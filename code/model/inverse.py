@@ -177,21 +177,22 @@ class InverseModel(ForwardModel):
         if self.forward_model is not None and 'context' in batch:
             if all(k in batch['context'] for k in ['surf', 'meta']):
                 # Forward model is frozen (no weight updates), but gradients flow through
-                forward_model_output = self.forward_model(
+                # Call .forward() directly with training_flag=False to bypass stage routing
+                forward_model_output = self.forward_model.forward(
                     {
                         'prof': output_dict['output']['prof_inverse'],
+                        'meta': batch['context']['meta'],
                         'surf': batch['context']['surf'],
-                        'meta': batch['context']['meta']
                     }
                 )
-                forward_model_output2 = self.forward_model(
-                    {
-                        'prof': batch['target']['prof'],
-                        'surf': batch['context']['surf'],
-                        'meta': batch['context']['meta']
-                    }
-                )
-                batch['target']['bt_forward'] = forward_model_output2['bt_forward']
+                # forward_model_output2 = self.forward_model.forward(
+                #     {
+                #         'prof': batch['target']['prof'],
+                #         'meta': batch['context']['meta'],
+                #         'surf': batch['context']['surf'],
+                #     }
+                #  )
+                # batch['target']['bt_forward'] = forward_model_output2['bt_forward']
                 # Switch keys ('bt_forward' → 'bt_inverse') for clarity in output
                 if 'bt_forward' in forward_model_output:
                     output_dict['output']['bt_inverse'] = forward_model_output['bt_forward']
@@ -298,12 +299,14 @@ class InverseModel1(InverseModel):
         if self.forward_model is not None and 'context' in batch:
             if all(k in batch['context'] for k in ['surf', 'meta']):
                 # Forward model is frozen (no weight updates), but gradients flow through
-                forward_model_output = self.forward_model(
+                # Call .forward() directly with training_flag=False to bypass stage routing
+                forward_model_output = self.forward_model.forward(
                     {
                         'prof': output_dict['output']['prof_inverse'],
                         'surf': batch['context']['surf'],
                         'meta': batch['context']['meta']
-                    }
+                    },
+                    training_flag=False
                 )
                 # Switch keys ('bt_forward' → 'bt_inverse') for clarity in output
                 if 'bt_forward' in forward_model_output:

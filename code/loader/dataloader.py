@@ -75,7 +75,7 @@ class BaseDataloader(pl.LightningDataModule):
 
         """
         return DataLoader(self.valid, batch_size=self.batch_size, num_workers=self.num_workers,
-                          pin_memory=self.pin_memory, persistent_workers=self.persistent_workers)
+                          pin_memory=self.pin_memory, persistent_workers=self.persistent_workers, shuffle=False)
 
     def test_dataloader(self) -> DataLoader:
         """ Load test set.
@@ -90,7 +90,7 @@ class BaseDataloader(pl.LightningDataModule):
 
         """
         return DataLoader(self.test, batch_size=self.batch_size, num_workers=self.num_workers,
-                          pin_memory=self.pin_memory, persistent_workers=self.persistent_workers)
+                          pin_memory=self.pin_memory, persistent_workers=self.persistent_workers, shuffle=False)
 
     def predict_dataloader(self) -> DataLoader:
         """ Load prediction set.
@@ -105,7 +105,7 @@ class BaseDataloader(pl.LightningDataModule):
 
         """
         return DataLoader(self.predict, batch_size=self.batch_size, num_workers=self.num_workers,
-                          pin_memory=self.pin_memory, persistent_workers=self.persistent_workers)
+                          pin_memory=self.pin_memory, persistent_workers=self.persistent_workers, shuffle=False)
 
 
 class Dataloader(BaseDataloader):
