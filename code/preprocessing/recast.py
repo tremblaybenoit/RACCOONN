@@ -139,6 +139,7 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
         mask = None
         cloud_keep = True
         clear_keep = True
+        log_keep = False
         if hasattr(input, 'mask'):
 
             # Spatial extent
@@ -220,6 +221,28 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
                     else:
                         mask &= ~daytime_mask
                 del daytime_mask
+
+            # Remove samples with null profiles
+            log_keep = input.mask.get('log_mask', False)
+            if log_keep:
+                logger.info(f"Removing samples with null profiles...")
+                # Load profiles
+                if 'prof' not in data_stage:
+                    data_stage['prof'] = instantiate(config_stage.variables['prof'].load)
+                if clear_keep and not cloud_keep:
+                    if data_stage['prof'].shape[1] > 3:
+                        data_stage['prof'] = np.take(data_stage['prof'], [0, 4, 8], axis=1)
+                    # Compute min profile value for each sample
+                    min_prof = np.min(data_stage['prof'], axis=(1,2))
+                    # Apply mask
+                    if mask is None:
+                        mask = ~(min_prof == 0)
+                    else:
+                        mask &= ~(min_prof == 0)
+                    # Convert second and third profile types to log10
+                    logger.info("Converting second and third profile types to log10...")
+                    data_stage['prof'][:, 1, :] = np.log10(data_stage['prof'][:, 1, :])
+                    data_stage['prof'][:, 2, :] = np.log10(data_stage['prof'][:, 2, :])
 
         # Shuffle or maintain distribution
         if hasattr(input, 'split') and input.split is not None:
