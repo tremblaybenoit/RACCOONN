@@ -232,13 +232,16 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
     else:
         variant_mask = None
 
+    # Covariance matrix initialization
+    cov = {}
     # Univariate matrix computation steps
     if univariate:
         # Check dimensions
         if data.ndim <=2:
             raise ValueError("Univariate covariance matrix computation requires data with more than 2 dimensions.")
-        # Initialize empty matrix
-        m = []
+        # Initialize empty lists for matrices
+        m_cov = []
+        m_corr = []
         # Loop over variables
         for i in range(n_vars):
             # Compute sub-matrix
@@ -248,38 +251,111 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
                 logger.info(f"Applying variant mask for variable {i}...")
                 # Remove constant pressure levels from the data
                 data_i = np.take(data_i, np.flatnonzero(variant_mask[i]), axis=1)
-            # Store diagonal block
+            # Compute covariance block
             logger.info(f"Computing univariate covariance matrix for variable {i}...")
-            m.append(scaling_factor*(data_i.T @ data_i)/denom)
-        # Assemble
-        del data_i
-        cov = {'matrix': block_diag(*m)}
+            sub_cov = scaling_factor*(data_i.T @ data_i)/denom
+
+            # Compute correlation block from unregularized covariance
+            if hasattr(output, 'correlation'):
+                std_i = np.sqrt(np.diag(sub_cov))
+                sub_corr = sub_cov / (std_i[:, None] @ std_i[None, :])
+                m_corr.append(sub_corr)
+
+            # Apply per-variable regularization to covariance block
+            if regularization_factor > 0:
+                var_mean_diag = float(np.mean(np.diag(sub_cov)))
+                logger.info(f"Applying per-variable regularization for variable {i} (mean_diag={var_mean_diag:.6e})...")
+                sub_cov = sub_cov + regularization_factor * var_mean_diag * np.eye(sub_cov.shape[0])
+
+            m_cov.append(sub_cov)
+
+        # Assemble into block-diagonal matrices
+        del data_i, data
+        cov['matrix'] = block_diag(*m_cov)
+        if hasattr(output, 'correlation'):
+            cov['correlation'] = block_diag(*m_corr)
+
     # Multivariate matrix computation steps
     else:
-        # Flatten data
-        data = data.reshape(n_samples, -1)
-        # Apply variant mask
+        # Keep track of variable boundaries for per-variable regularization
+        # Reshape to (n_samples, n_vars, -1) to preserve variable dimension
+        data_reshaped = data.reshape(n_samples, n_vars, -1)  # (n_samples, n_vars, total_features_per_var)
+
+        # Apply variant mask BEFORE flattening to track per-variable feature counts
         if variant_mask is not None:
             logger.info("Applying pressure mask...")
-            # Remove constant pressure levels from the data
-            data = np.take(data, np.flatnonzero(variant_mask), axis=1)
-        # Compute matrix
-        logger.info("Computing covariance matrix...")
-        cov = {'matrix': scaling_factor*(data.T @ data)/denom}
-    # Release memory
-    del data
+            # variant_mask shape: (n_vars, n_features_per_var) or similar
+            # Need to apply per-variable masking
+            data_masked_list = []
+            features_per_var_list = []  # Track features per variable AFTER masking
 
-    # Apply regularization
-    if regularization_factor > 0:
-        logger.info("Applying regularization factor...")
-        cov['matrix'] += regularization_factor * float(np.mean(np.diag(cov['matrix']))) * np.eye(cov['matrix'].shape[0])
-    # Compute correlation matrix
-    if hasattr(output, 'correlation'):
-        std = np.sqrt(np.diag(cov['matrix']))
-        cov['correlation'] = cov['matrix'] / (std[:, None] @ std[None, :])
+            for i in range(n_vars):
+                data_i = data_reshaped[:, i, :]  # (n_samples, n_features)
+
+                # Apply variable-specific mask if available
+                if isinstance(variant_mask, np.ndarray):
+                    if variant_mask.ndim == 2:
+                        # variant_mask shape: (n_vars, n_features_per_var)
+                        mask_i = np.flatnonzero(variant_mask[i])
+                    elif variant_mask.ndim == 1:
+                        # variant_mask shape: (n_features_total,) - single mask for all
+                        mask_i = np.flatnonzero(variant_mask)
+                    else:
+                        raise ValueError(f"Unexpected variant_mask shape: {variant_mask.shape}")
+
+                    data_i_masked = np.take(data_i, mask_i, axis=1)
+                else:
+                    data_i_masked = data_i
+
+                data_masked_list.append(data_i_masked)
+                features_per_var_list.append(data_i_masked.shape[1])
+                logger.info(f"Variable {i} features after masking: {data_i_masked.shape[1]}")
+
+            # Flatten concatenated data
+            data = np.concatenate(data_masked_list, axis=1)  # (n_samples, total_features)
+
+            # Free up memory
+            del data_i, data_i_masked, data_masked_list
+        else:
+            # No masking: all variables have same number of features
+            data = data_reshaped.reshape(n_samples, -1)
+            features_per_var_list = [data_reshaped.shape[2]] * n_vars
+
+        # Compute full covariance matrix (before regularization)
+        logger.info("Computing covariance matrix...")
+        cov['matrix'] = scaling_factor*(data.T @ data)/denom
+
+        # Free up memory
+        del data, data_reshaped
+
+        # Compute correlation matrix from ORIGINAL (unregularized) covariance
+        if hasattr(output, 'correlation'):
+            logger.info("Computing correlation matrix from covariance matrix...")
+            std = np.sqrt(np.diag(cov['matrix']))
+            cov['correlation'] = cov['matrix'] / (std[:, None] @ std[None, :])
+
+        # Apply per-variable regularization to covariance matrix
+        if regularization_factor > 0:
+            logger.info("Applying per-variable regularization to covariance matrix...")
+
+            # Loop over variables with their specific feature counts
+            start_idx = 0
+            for i, features_per_var in enumerate(features_per_var_list):
+                end_idx = start_idx + features_per_var
+
+                # Extract diagonal for this variable's block
+                var_diag = np.diag(cov['matrix'])[start_idx:end_idx]
+                var_mean_diag = float(np.mean(var_diag))
+
+                logger.info(f"Applying regularization for variable {i} (features={features_per_var}, mean_diag={var_mean_diag:.6e})...")
+
+                # Add regularization to the diagonal block of this variable
+                cov['matrix'][start_idx:end_idx, start_idx:end_idx] += regularization_factor * var_mean_diag * np.eye(features_per_var)
+                start_idx = end_idx
+
     # Compute Cholesky decomposition
     if hasattr(output, 'matrix_cholesky'):
-        logger.info("Computing Cholesky decomposition...")
+        logger.info("Computing Cholesky decomposition of the covariance matrix...")
         cov['matrix_cholesky'] = np.linalg.cholesky(cov['matrix'])
     # Compute matrix inverse
     if hasattr(output, 'matrix_inverse'):
@@ -292,7 +368,7 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
         cov['matrix_pseudo_inverse'] = np.linalg.pinv(cov['matrix'], rcond=rcond)
     # Compute Cholesky decomposition
     if hasattr(output, 'correlation_cholesky'):
-        logger.info("Computing Cholesky decomposition...")
+        logger.info("Computing Cholesky decomposition of the correlation matrix...")
         cov['correlation_cholesky'] = np.linalg.cholesky(cov['correlation'])
     # Compute inverse of the correlation matrix
     if hasattr(output, 'correlation_inverse') and 'correlation' in cov:

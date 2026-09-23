@@ -278,7 +278,7 @@ class ArtifactLogger(Callback):
             elif logger_inst.__class__.__name__.lower().startswith("mlflow"):
                 for tag, fig in zip(tags, self.figs):
                     with tempfile.TemporaryDirectory() as tmpdir:
-                        filename = os.path.join(tmpdir, f"{tag}.png")
+                        filename = os.path.join(tmpdir, f"{current_epoch:04d}_{tag}.png")
                         fig.savefig(filename)
                         logger_inst.experiment.log_artifact(logger_inst.run_id, filename, artifact_path="figures")
 

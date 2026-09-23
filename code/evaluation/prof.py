@@ -27,47 +27,44 @@ def main(config: DictConfig) -> None:
         None.
     """
 
-    keys = ['pressure_log', 'scans', 'surf']
-    stages = ['train', 'valid', 'test', 'predict', 'all']
-    breakpoint()
-    for key in tqdm(keys, desc="Loading variables"):
-        for stage in tqdm(stages, desc="Loading stages"):
-            var = instantiate(config.data.stage[stage].variables[key].load)
-    breakpoint()
-    var_train = instantiate(config.data.stage.train.variables[key].load)
-    var_valid = instantiate(config.data.stage.valid.variables[key].load)
-    var_test = instantiate(config.data.stage.test.variables[key].load)
-    var_predict = instantiate(config.data.stage.predict.variables[key].load)
-    var_all = instantiate(config.data.stage.all.variables[key].load)
-    breakpoint()
-
     # Load profiles with different normalization methods
     logger.info("Loading profiles with different normalization methods...")
-    config0 = config.data.stage.train.vars.prof
+    config0 = config.data.stage.train.variables.prof
     prof_train0 = load_variable(config0)
-    config1 = config.data.stage.train.vars.prof
-    config1.normalization._target_ = 'data.transformations.min_max'
-    config1.normalization.axis = 1
+    #config1 = config.data.stage.train.variables.prof
+    #prof_train1 = load_variable(config1)
+    #prof_train1[:, 0] = np.log10(prof_train1[:, 0])  # Convert to log10
+    #prof_train1[:, 1] = np.log10(prof_train1[:, 1])  # Convert to log10
+    #prof_train1[:, 2] = np.log10(prof_train1[:, 2])  # Convert to log10
+    #config2 = config.data.stage.train.variables.prof
+    #prof_train2 = load_variable(config2)
+    #prof_train2[:, 0] = np.log(prof_train2[:, 0])  # Convert to log10
+    #prof_train2[:, 1] = np.log(prof_train2[:, 1])  # Convert to log10
+    #prof_train2[:, 2] = np.log(prof_train2[:, 2])  # Convert to log10
+    config1 = config.data.stage.train.variables.prof
+    config1.transformations.normalization._target_ = 'code.data.transformations.min_max'
+    config1.transformations.normalization.axis = 1
     prof_train1 = load_variable(config1, apply_transform=True)
-    config2 = config.data.stage.train.vars.prof
-    config2.normalization._target_ = 'data.transformations.min_max'
-    config2.normalization.axis = None
+    config2 = config.data.stage.train.variables.prof
+    config2.transformations.normalization._target_ = 'code.data.transformations.min_max'
+    config2.transformations.normalization.axis = None
     prof_train2 = load_variable(config2, apply_transform=True)
-    config3 = config.data.stage.train.vars.prof
-    config3.normalization._target_ = 'data.transformations.mean_stdev'
-    config3.normalization.axis = None
+    print(prof_train2.max())
+    config3 = config.data.stage.train.variables.prof
+    config3.transformations.normalization._target_ = 'code.data.transformations.mean_stdev'
+    config3.transformations.normalization.axis = None
     prof_train3 = load_variable(config3, apply_transform=True)
     # Stack profiles and compute statistics
     logger.info("Computing profile statistics...")
     prof = np.concatenate([prof_train0, prof_train1, prof_train2, prof_train3], axis=1)
     prof_mean = np.mean(prof, axis=0)
     prof_stdev = np.std(prof, axis=0)
-    prof_types = config.data.stage.test.vars.prof.type
+    prof_types = config.data.stage.test.variables.prof.type
     prof_labels = ([f'No norm. - {prof_label}' for prof_label in prof_types] +
                    [f'Min-Max norm. 1 - {prof_label}' for prof_label in prof_types] +
                    [f'Min-Max norm. N - {prof_label}' for prof_label in prof_types] +
                    [f'Standardized. N - {prof_label}' for prof_label in prof_types])
-    pressure_levels = (10**load_variable(config.data.stage.train.vars.pressure))/100.0  # Convert to hPa
+    pressure_levels = load_variable(config.data.stage.train.variables.pressure)
 
     # Plot profiles
     logger.info("Plotting profiles...")
@@ -75,7 +72,7 @@ def main(config: DictConfig) -> None:
                                  y=pressure_levels, y_label='Pressure (hPa)',
                                  x_label='Normalized profile value (no units)',
                                  title=prof_labels)
-    save_plot(fig0, os.path.join(config.paths.data_dir, 'normalization/prof.png'))
+    save_plot(fig0, 'prof.png')
 
 
 if __name__ == '__main__':
