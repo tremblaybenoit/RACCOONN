@@ -185,7 +185,7 @@ covariance:
     # Plot flag
     plot_flag: true
     # Re-centering
-    recenter: true
+    recenter: false
     mean_type: 'spatiotemporal'
     # Apply data transformations to the input data before computing the covariance matrix
     apply_transform: true

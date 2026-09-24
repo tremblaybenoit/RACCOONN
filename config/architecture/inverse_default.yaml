@@ -14,7 +14,7 @@ input_layer:
   _target_: code.architecture.mlp.MLPBlock
   _recursive_: false
   in_features: null  # Set by positional encoding output
-  out_features: 128
+  out_features: 256
   activation:
     _target_: code.architecture.activation.Swish
   norm_type: none
@@ -27,7 +27,7 @@ hidden_layer:
   _recursive_: false
   in_features: ${.hidden_features}
   out_features: ${.hidden_features}
-  hidden_features: 128
+  hidden_features: 256
   n_blocks: 2
   activation:
     _target_: code.architecture.activation.Swish
@@ -40,12 +40,17 @@ output_layer:
   _target_: code.architecture.mlp.PredictionHead
   _recursive_: false
   in_features: ${..hidden_layer.out_features}
+  hidden_features: ${.in_features}
   out_features: ${data.stage.train.variables.prof_inverse.n}
   n_blocks: 1
   activation:
+    _target_: code.architecture.activation.Swish
+  final_activation:
     _target_: torch.nn.Sigmoid
   norm_type: none
-  dropout_rate: 0.
+  final_norm_type: none
+  dropout_rate: 0.1
+  final_dropout_rate: 0.
   residual: false
 
 # Skip connections
