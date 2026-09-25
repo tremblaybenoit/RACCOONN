@@ -1,0 +1,60 @@
+_target_: code.architecture.mlp.MLPModular
+_recursive_: false
+
+# Positional encoding
+positional_encoding:
+  _target_: code.architecture.encoding.HarmonicEncoding
+  d_input: 4  # [lat, lon, scans, pressure_log]
+  num_freqs: 8  # 8 sine/cosine pairs per dimension
+  freq_mode: "exponential"  # Capture fine pressure variations
+  include_input: true  # Keep original coordinates too
+
+# Input layer
+input_layer:
+  _target_: code.architecture.mlp.MLPBlock
+  _recursive_: false
+  in_features: null  # Set by positional encoding output
+  out_features: 256
+  activation:
+    _target_: code.architecture.activation.Sine
+  norm_type: none
+  dropout_rate: 0.1
+  residual: true
+
+# Hidden layers
+hidden_layer:
+  _target_: code.architecture.mlp.MLPBlocks
+  _recursive_: false
+  in_features: ${.hidden_features}
+  out_features: ${.hidden_features}
+  hidden_features: 256
+  n_blocks: 2
+  activation:
+    _target_: code.architecture.activation.Sine
+  norm_type: none
+  dropout_rate: 0.1
+  residual: true
+
+# Output layer
+output_layer:
+  _target_: code.architecture.mlp.PredictionHead
+  _recursive_: false
+  in_features: ${..hidden_layer.out_features}
+  hidden_features: ${.in_features}
+  out_features: ${data.stage.train.variables.prof_inverse.n}
+  n_blocks: 1
+  activation:
+    _target_: code.architecture.activation.Sine
+  final_activation:
+    _target_: torch.nn.Sigmoid
+  norm_type: none
+  final_norm_type: none
+  dropout_rate: 0.1
+  final_dropout_rate: 0.
+  residual: false
+
+# Skip connections
+hidden_skip: true
+output_skip: false
+inject_encoding_hidden: false
+inject_encoding_output: false
