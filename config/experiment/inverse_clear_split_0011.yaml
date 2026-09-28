@@ -8,7 +8,7 @@ defaults:
   - override /data: inverse_default
   - override /preprocessing: inverse_split
   - override /loader: default
-  - override /architecture: inverse_default_0010
+  - override /architecture: inverse_default_0011
   - override /loss: mse2
   - override /optimizer: default
   - override /scheduler: default
@@ -26,7 +26,7 @@ task_name: "inverse_clear_split_XXXX"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "0010"
+  run_id: "0011"
   data_dir: ../synthetic_${data.dtype}_clear_split
   # checkpoint_dir: "code/model/checkpoints/checkpoint"
 

@@ -6,10 +6,10 @@ defaults:
   - override /paths: default
   - override /hydra: default
   - override /data: inverse_default
-  - override /preprocessing: inverse_split
+  - override /preprocessing: inverse_split2
   - override /loader: default
-  - override /architecture: inverse_default_0010
-  - override /loss: mse2
+  - override /architecture: inverse_default
+  - override /loss: inverse_default
   - override /optimizer: default
   - override /scheduler: default
   - override /model: inverse_default
@@ -26,7 +26,7 @@ task_name: "inverse_clear_split_XXXX"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "0010"
+  run_id: "0012"
   data_dir: ../synthetic_${data.dtype}_clear_split
   # checkpoint_dir: "code/model/checkpoints/checkpoint"
 
@@ -62,23 +62,25 @@ preprocessing:
     # B matrix
     B:
       # Function
-      _target_: code.preprocessing.covariance.climatological_matrix
+      _target_: code.preprocessing.covariance.persistent_matrix
       # Univariate or multivariate
       univariate: false
       # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
       scaling_factor: 1.0
       # Regularization parameter to ensure numerical stability
-      regularization_factor: 0.001
+      regularization_factor: 0.05
+      method: 'persistence'
+      expected_scan_step: 1
     # R matrix
     R:
       # Function
-      _target_: code.preprocessing.covariance.climatological_matrix
+      _target_: code.preprocessing.covariance.climatological_matrix00
       # Univariate or multivariate
       univariate: false
       # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
       scaling_factor: 1.0
       # Regularization parameter to ensure numerical stability
-      regularization_factor: 0.
+      regularization_factor: 0.01
 
 # Loss configuration
 loss:
@@ -90,14 +92,14 @@ loss:
     prof:
       weight: 1.0
       instance:
-        # function:
-        #  matrix: ${preprocessing.covariance.B.output.matrix_inverse.load}
+        function:
+          matrix: ${preprocessing.covariance.B.output.matrix_pseudo_inverse.load}
         target_keys: 'prof_prior'
 
 # Model configuration
 model:
-  _target_: code.model.inverse.InverseModelW
-  cholesky: ${preprocessing.covariance.B.output.matrix_cholesky.load}
+  # _target_: code.model.inverse.InverseModelW
+  # cholesky: ${preprocessing.covariance.B.output.matrix_cholesky.load}
   # Forward model - reference external config
   forward_model:
     path: code/model/checkpoint/forward/default/model.yaml
@@ -129,7 +131,7 @@ data:
                 load: ${preprocessing.statistics.output.load}
                 key: 'prof'
                 dtype: ${data.dtype}
-              axis: 1
+              axis: null
         # Radiances
         bt_crtm:
           # Channels
@@ -182,7 +184,7 @@ data:
           transformations:
             # Normalization function and parameters
             normalization:
-              _target_: code.data.transformations.identity
+              _target_: code.data.transformations.min_max
               _partial_: true
               stats:
                 _target_: code.preprocessing.statistics.read_statistics_var

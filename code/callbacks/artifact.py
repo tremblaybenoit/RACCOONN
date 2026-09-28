@@ -678,7 +678,7 @@ class InverseLogger(ArtifactLogger):
 
         # Extract predictions and targets
         predictions = outputs.get('output', {})
-        targets = batch.get('target', {})
+        targets = batch.get('context', {})  #batch.get('target', {})
 
         # Process prof (the only variable InverseLogger cares about)
         if 'prof_inverse' in predictions:
@@ -704,7 +704,7 @@ class InverseLogger(ArtifactLogger):
         # Only compute once as background doesn't change across epochs
         if self.runners_static:
             # Target
-            prof_target = batch.get('target', {}).get('prof', None)
+            prof_target = targets.get('prof', None)
             if prof_target is not None:
                 # Convert tensors to numpy if needed
                 if isinstance(prof_target, torch.Tensor):
@@ -716,7 +716,7 @@ class InverseLogger(ArtifactLogger):
                     axis=0
                 )
             # Prior
-            prof_prior = batch.get('target', {}).get('prof_prior', None)
+            prof_prior =  targets.get('prof_prior', None)
             if prof_prior is not None:
                 # Convert tensors to numpy if needed
                 if isinstance(prof_prior, torch.Tensor):
