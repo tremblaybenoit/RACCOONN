@@ -132,16 +132,15 @@ class InverseModel(ForwardModel):
         inputs = torch.cat(tensors, dim=-1).view(-1, len(tensors))
 
         # Inference through architecture
-        output_dict = {'prof_inverse_transformed': self.architecture(inputs)}
+        output_dict = {'prof_inverse': self.architecture(inputs)}
 
         # Reshape back to (Batch, n_prof, n_levels)
         # Assuming output shape is (Batch * n_levels, n_prof)
         batch_size = list(input_dict.values())[0].shape[0]
-        n_prof = output_dict['prof_inverse_transformed'].shape[-1] if output_dict['prof_inverse_transformed'].ndim > 1 else 1
-        output_dict['prof_inverse_transformed'] = output_dict['prof_inverse_transformed'].view(batch_size, n_levels, n_prof).transpose(1, 2)
+        n_prof = output_dict['prof_inverse'].shape[-1] if output_dict['prof_inverse'].ndim > 1 else 1
+        output_dict['prof_inverse'] = output_dict['prof_inverse'].view(batch_size, n_levels, n_prof).transpose(1, 2)
 
         # Apply post-processing to transform outputs to physical space
-        output_dict['prof_inverse'] = output_dict['prof_inverse_transformed']
         if self.post_process is not None:
             output_dict = self.post_process(output_dict)
 
@@ -257,10 +256,9 @@ class InverseModelT(InverseModel):
         output_dict['prof_inverse_transformed'] = output_dict['prof_inverse_transformed'].view(batch_size, n_levels, n_prof).transpose(1, 2)
 
         # Apply post-processing to transform outputs to physical space
+        output_dict['prof_inverse'] = output_dict['prof_inverse_transformed'].clone()
         if self.post_process is not None:
-            output_dict['prof_inverse'] = self.post_process(output_dict)
-        else:
-            output_dict['prof_inverse'] = output_dict['prof_inverse_transformed']
+            output_dict = self.post_process(output_dict)
 
         return output_dict
 
