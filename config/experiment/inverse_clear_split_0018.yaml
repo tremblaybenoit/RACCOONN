@@ -6,7 +6,7 @@ defaults:
   - override /paths: default
   - override /hydra: default
   - override /data: inverse_default
-  - override /preprocessing: inverse_split2
+  - override /preprocessing: inverse_split
   - override /loader: default
   - override /architecture: inverse_default
   - override /loss: inverse_default
@@ -26,7 +26,7 @@ task_name: "inverse_clear_split_XXXX"  # Experiment
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "0014"
+  run_id: "0018"
   data_dir: ../synthetic_${data.dtype}_clear_split
   # checkpoint_dir: "code/model/checkpoints/checkpoint"
 
@@ -62,16 +62,15 @@ preprocessing:
     # B matrix
     B:
       # Function
-      _target_: code.preprocessing.covariance.persistent_matrix
+      _target_: code.preprocessing.covariance.climatological_matrix
       # Univariate or multivariate
       univariate: false
-      apply_transform: true
       # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
       scaling_factor: 1.0
       # Regularization parameter to ensure numerical stability
-      regularization_factor: 0.05
-      method: 'persistence'
-      expected_scan_step: 1
+      regularization_factor: 0.001
+      # method: 'persistence'
+      # expected_scan_step: 1
     # R matrix
     R:
       # Function
@@ -94,13 +93,12 @@ loss:
       weight: 1.0
       instance:
         function:
-          matrix: ${preprocessing.covariance.B.output.matrix_inverse.load}
-        output_keys: 'prof_inverse_transformed'
+          matrix: ${preprocessing.covariance.B.output.matrix_pseudo_inverse.load}
         target_keys: 'prof_prior'
 
 # Model configuration
 model:
-  _target_: code.model.inverse.InverseModelT
+  # _target_: code.model.inverse.InverseModelW
   # cholesky: ${preprocessing.covariance.B.output.matrix_cholesky.load}
   # Forward model - reference external config
   forward_model:
@@ -126,7 +124,7 @@ data:
           transformations:
             # Normalization function and parameters
             normalization:
-              _target_: code.data.transformations.min_max
+              _target_: code.data.transformations.identity
               _partial_: true
               stats:
                 _target_: code.preprocessing.statistics.read_statistics_var
@@ -172,14 +170,14 @@ data:
           transformations:
             # Normalization function and parameters
             normalization:
-              _target_: code.data.transformations.min_max
+              _target_: code.data.transformations.identity
               _partial_: true
               stats:
                 _target_: code.preprocessing.statistics.read_statistics_var
                 load: ${preprocessing.statistics.output.load}
                 key: 'prof'
                 dtype: ${data.dtype}
-              axis: null
+              axis: 1
         # Atmospheric profiles
         prof_inverse:
           # Transformations

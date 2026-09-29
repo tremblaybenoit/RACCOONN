@@ -21,10 +21,12 @@ stage:
       _target_: code.loader.dataset.MultivariateDataset
       _recursive_: false
       variables: ${extract:${data.stage.train.variables},${data.select_target}}
+      apply_transformations: true
     context:
       _target_: code.loader.dataset.MultivariateDataset
       _recursive_: false
       variables: ${extract:${data.stage.train.variables},${data.select_context}}
+      apply_transformations: false
     output:
       _target_: code.loader.dataset.MultivariateDataset
       _recursive_: false
@@ -42,10 +44,12 @@ stage:
       _target_: ${loader.stage.train.target._target_}
       _recursive_: false
       variables: ${extract:${data.stage.valid.variables},${data.select_target}}
+      apply_transformations: true
     context:
       _target_: ${loader.stage.train.context._target_}
       _recursive_: false
       variables: ${extract:${data.stage.valid.variables},${data.select_context}}
+      apply_transformations: false
     output:
       _target_: ${loader.stage.train.output._target_}
       _recursive_: false
@@ -63,10 +67,12 @@ stage:
       _target_: ${loader.stage.train.target._target_}
       _recursive_: false
       variables: ${extract:${data.stage.test.variables},${data.select_target}}
+      apply_transformations: false
     context:
       _target_: ${loader.stage.train.context._target_}
       _recursive_: false
       variables: ${extract:${data.stage.test.variables},${data.select_context}}
+      apply_transformations: false
     output:
       _target_: ${loader.stage.train.output._target_}
       _recursive_: false

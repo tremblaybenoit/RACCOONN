@@ -139,6 +139,37 @@ covariance:
         lat_max: ${preprocessing.recast.input.mask.spatial_domain.lat_max}
         lon_min: ${preprocessing.recast.input.mask.spatial_domain.lon_min}
         lon_max: ${preprocessing.recast.input.mask.spatial_domain.lon_max}
+    output:
+      # Covariance matrix
+      diagonal:
+        # File path to save/load the covariance matrix
+        path: code/data/statistics/B_diagonal.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.B.output.diagonal.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.B.output.diagonal.path}
+      # Inverse of the covariance matrix
+      diagonal_inverse:
+        # File path to save/load the inverse of the covariance matrix
+        path: code/data/statistics/B_diagonal_inverse.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.B.output.diagonal_inverse.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.B.output.diagonal_inverse.path}
 
   # Error covariance matrix in observation space
   R:
@@ -166,3 +197,34 @@ covariance:
         lat_max: ${preprocessing.recast.input.mask.spatial_domain.lat_max}
         lon_min: ${preprocessing.recast.input.mask.spatial_domain.lon_min}
         lon_max: ${preprocessing.recast.input.mask.spatial_domain.lon_max}
+    output:
+      # Covariance matrix
+      diagonal:
+        # File path to save/load the covariance matrix
+        path: code/data/statistics/R_diagonal.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.R.output.diagonal.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.R.output.diagonal.path}
+      # Inverse of the covariance matrix
+      diagonal_inverse:
+        # File path to save/load the inverse of the covariance matrix
+        path: code/data/statistics/R_diagonal_inverse.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.R.output.diagonal_inverse.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.R.output.diagonal_inverse.path}

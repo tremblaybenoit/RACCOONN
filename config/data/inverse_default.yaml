@@ -27,7 +27,7 @@ dtype: 'float32'
 # Variables to use as input/output
 select_input: ['lat', 'lon', 'scans', 'pressure_log']
 select_target: ['prof', 'prof_prior', 'bt_crtm']
-select_context: ['meta', 'surf', 'pressure',
+select_context: ['meta', 'surf', 'pressure', 'prof', 'prof_prior',
                  'clear_mask', 'cloud_mask', 'daytime_mask', 'nighttime_mask',
                  'variant_mask', 'invariant_mask']
 select_output: ['bt_inverse', 'bt_inverse_stdev', 'prof_inverse']
