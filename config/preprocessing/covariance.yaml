@@ -34,6 +34,33 @@ covariance:
     apply_transform: true
     # What the method produces as output
     output:
+      # Mu
+      mu:
+        path: code/data/statistics/B_mu.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.B.output.mu.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.B.output.mu.path}
+      unique_coords:
+        path: code/data/statistics/B_unique_coords.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.B.output.unique_coords.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.B.output.unique_coords.path}
       # Covariance matrix
       matrix:
         # File path to save/load the covariance matrix

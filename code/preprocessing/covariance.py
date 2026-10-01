@@ -107,14 +107,9 @@ def prior_from_bounded_perturbations(input: DictConfig, output: DictConfig | Non
 
     # Apply safe boundary enforcement (clipping) instead of rejection sampling loops
     # to maintain unbiased bulk statistics and prevent infinite hanging.
-    # min_val = np.array([(x_prior_physical[i] < x_min_physical).sum() > 0 for i in range(x_prior_physical.shape[0])])
-    # max_val = np.array([(x_prior_physical[i] > x_max_physical).sum() > 0 for i in range(x_prior_physical.shape[0])])
-    # min_val0 = np.array([(x_prior_physical[i] < x_min_physical).sum(axis=1)[0].item() for i in range(x_prior_physical.shape[0])])
-    # max_val0 = np.array([(x_prior_physical[i] > x_max_physical).sum(axis=1)[0].item() for i in range(x_prior_physical.shape[0])])
-    # min_val1 = np.array([(x_prior_physical[i] < x_min_physical).sum(axis=1)[1].item() for i in range(x_prior_physical.shape[0])])
-    # max_val1 = np.array([(x_prior_physical[i] > x_max_physical).sum(axis=1)[1].item() for i in range(x_prior_physical.shape[0])])
-    # min_val2 = np.array([(x_prior_physical[i] < x_min_physical).sum(axis=1)[2].item() for i in range(x_prior_physical.shape[0])])
-    # max_val2 = np.array([(x_prior_physical[i] > x_max_physical).sum(axis=1)[2].item() for i in range(x_prior_physical.shape[0])])
+    # Count samples with any out-of-bounds values using vectorized operations
+    nval = ((x_prior_physical < x_min_physical) | (x_prior_physical > x_max_physical)).any(axis=(1, 2)).sum()
+    logger.info(f"Number of samples outside physical bounds: {nval} out of {n_samples}")
     x_prior_physical = np.clip(x_prior_physical, x_min_physical, x_max_physical)
 
     # Save to file
@@ -125,6 +120,113 @@ def prior_from_bounded_perturbations(input: DictConfig, output: DictConfig | Non
         return None
     else:
         return x_prior_physical
+
+
+def prior_from_mean(input: DictConfig, output: DictConfig | None = None, 
+                    seed: int | None = None, apply_transform: bool = False) -> np.ndarray | None:
+    """ Compute prior from climatological mean at specified coordinates.
+    
+    Loads climatological mean matrix (computed by climatological_matrix with mean_type='temporal'),
+    then maps input (lat, lon) coordinates to their corresponding mean values.
+    
+    For each input sample, finds the matching (lat, lon) in the stored unique coordinates
+    and returns the associated climatological mean profile.
+    
+    Parameters
+    ----------
+    input: DictConfig with keys:
+        - mean_data: Load config for climatological mean matrix (shape: [n_unique_coords, n_vars, n_levels])
+        - unique_coords: Load config for unique coordinate array (shape: [n_unique_coords, 2])
+        - lat: Latitude array/file for input samples (shape: [n_samples])
+        - lon: Longitude array/file for input samples (shape: [n_samples])
+        - prof: Configuration for profile structure/transformations
+        - stats: Physical bounds (min/max)
+        - spatial_mask: Optional spatial mask for input coordinates
+        - temporal_mask: Optional temporal mask for input coordinates
+        - variant_mask: Optional pressure level mask
+    output: DictConfig for saving
+    seed: Optional random seed for reproducibility
+    apply_transform: bool. If True, apply normalization transform to the data before computing covariance.
+    
+    Returns
+    -------
+    np.ndarray or None: Prior with shape [n_samples, n_vars, n_levels]
+    """
+    
+    # Load climatological mean and unique coordinates
+    logger.info("Loading climatological mean and unique coordinates...")
+    mu_all = instantiate(input.mean_data.load)
+    unique_coords = instantiate(input.unique_coords.load)
+    
+    # Load input coordinates
+    lat = load_variable(input.lat)
+    lon = load_variable(input.lon)
+    
+    # Build sample mask (spatial + temporal)
+    mask = np.ones(lat.shape[0], dtype=bool)
+    
+    # Spatial mask
+    if hasattr(input, 'spatial_mask') and input.spatial_mask is not None:
+        logger.info("Applying spatial mask...")
+        mask &= instantiate(input.spatial_mask)
+    
+    # Temporal mask
+    if hasattr(input, 'temporal_mask') and input.temporal_mask is not None:
+        logger.info("Applying temporal mask...")
+        mask &= instantiate(input.temporal_mask)
+    
+    # Apply mask to coordinates
+    lat = lat[mask]
+    lon = lon[mask]
+    n_samples = len(lat)
+    
+    # Create input coordinates array
+    input_coords = np.column_stack((lat, lon))
+    
+    # Map input coordinates to unique_coords using structured lookup
+    # unique_coords shape: [n_unique_coords, 2]
+    # input_coords shape: [n_samples, 2]
+    logger.info("Mapping input coordinates to unique coordinate set...")
+    
+    # Create a dictionary for O(1) lookup: (lat, lon) -> index in mu_all
+    coord_to_idx = {tuple(coord): i for i, coord in enumerate(unique_coords)}
+    
+    # Build prior by looking up each input coordinate
+    n_unique, n_vars, n_levels = mu_all.shape
+    x_prior = np.zeros((n_samples, n_vars, n_levels), dtype=mu_all.dtype)
+    
+    n_found = 0
+    for i, coord in enumerate(input_coords):
+        coord_tuple = tuple(coord)
+        if coord_tuple in coord_to_idx:
+            idx = coord_to_idx[coord_tuple]
+            x_prior[i] = mu_all[idx]
+            n_found += 1
+        else:
+            logger.warning(f"Sample {i} with coordinate {coord} not found in unique coordinate set")
+    
+    logger.info(f"Found {n_found}/{n_samples} samples in unique coordinate set")
+    
+    # Apply variant mask if specified
+    if hasattr(input, 'variant_mask') and input.variant_mask is not None:
+        logger.info("Applying variant mask...")
+        variant_mask = instantiate(input.variant_mask.load)
+        if n_vars != variant_mask.shape[0]:
+            variant_mask = np.take(variant_mask, [0], axis=0)
+        
+        # Zero out masked levels for each variable
+        for i in range(n_vars):
+            masked_levels = np.where(~variant_mask[i])[0]
+            x_prior[:, i, masked_levels] = 0
+
+    # Save to file
+    if output is not None and hasattr(output, 'save'):
+        logger.info(f"Saving prior from mean to {output.path}...")
+        save_func = instantiate(output.save)
+        save_func(x_prior)
+        return None
+    else:
+        return x_prior
 
 
 def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor: float = 1.0,
@@ -226,6 +328,24 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
                 # Compute the local temporal mean for each unique coordinate
                 group_means = group_sums / group_counts  # Shape: (n_unique_coords, n_features)
 
+                # Save mean and unique coordinates for prior_from_mean function
+                if hasattr(output, 'mu') and hasattr(output.mu, 'save'):
+                    logger.info("Saving climatological mean to file...")
+                    # Reshape means back to original dimensions (excluding batch axis)
+                    inverse_transform_fn = (
+                        Compose(transformations=input.data.get('transformations', None), inverse_transform=True)
+                        if apply_transform and input.data.get('transformations') is not None
+                        else identity
+                    )
+                    mu_to_save = inverse_transform_fn(group_means.reshape(n_unique_coords, *data_shape[1:]))
+                    save_func_mean = instantiate(output.mu.save)
+                    save_func_mean(mu_to_save)
+                
+                if hasattr(output, 'unique_coords') and hasattr(output.unique_coords, 'save'):
+                    logger.info("Saving unique coordinates to file...")
+                    save_func_coords = instantiate(output.unique_coords.save)
+                    save_func_coords(unique_coords)
+
                 # Compute anomalies (truth - climatological mean)
                 data -= group_means[inverse_indices]  # Shape: (n_samples, n_features)
                 # Broadcast the means back out to match the original sample layout
@@ -260,7 +380,8 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
     if univariate:
         # Check dimensions
         if data.ndim <=2:
-            raise ValueError("Univariate covariance matrix computation requires data with more than 2 dimensions.")
+            # raise ValueError("Univariate covariance matrix computation requires data with more than 2 dimensions.")
+           data = data[..., None]  # Add a singleton dimension for levels if not present
         # Initialize empty lists for matrices
         m_cov = []
         m_corr = []
