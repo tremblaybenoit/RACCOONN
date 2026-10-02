@@ -345,7 +345,7 @@ class InverseModelW(ForwardModel):
         else:
             self.forward_model = None
 
-    def forward(self, input_dict: dict, training_flag: bool = False) -> dict:
+    def forward(self, input_dict: dict, training_flag: bool = False, prior: torch.Tensor = None) -> dict:
         """ Perform forward pass with coordinate expansion.
 
         Expands input variables across pressure levels before passing to architecture.
@@ -360,6 +360,8 @@ class InverseModelW(ForwardModel):
             - Variables with shape (Batch, n_levels) which get reshaped to (Batch, n_levels, 1)
         training_flag : bool, optional
             Flag indicating whether the model is in training mode. Default is False.
+        prior : torch.Tensor, optional
+            Optional prior tensor to be added to the output before post-processing.
 
         Returns
         -------
@@ -402,14 +404,12 @@ class InverseModelW(ForwardModel):
         dprof_reshaped = output_dict['dprof_inverse'].view(batch_size, -1, 1)
         
         # Apply Cholesky transform per profile variable: [n_levels, n_levels] @ [Batch, n_levels, n_prof]
-        # Using einsum 'ij,bij->bij' to apply cholesky to level dimension for each batch and profile variable
         output_dict['dprof_inverse'] = dprof_reshaped
         output_dict['prof_inverse'] = torch.matmul(self.cholesky, output_dict['dprof_inverse'])
+        output_dict['dprof_inverse'] = output_dict['dprof_inverse'].view(batch_size, n_levels, n_prof).transpose(1, 2)
         output_dict['prof_inverse'] = output_dict['prof_inverse'].view(batch_size, n_levels, n_prof).transpose(1, 2)
-        # output_dict['prof_inverse'] = torch.einsum('ij,bij->bij', self.cholesky, dprof_reshaped).transpose(1, 2)
-
-        # Keep a copy of raw profiles BEFORE post-processing (for loss computation if needed)
-        # output_dict['dprof'] = output_dict['dprof_inverse'].clone()
+        if prior is not None:
+            output_dict['prof_inverse'] += prior
 
         # Apply post-processing to transform outputs to physical space
         if self.post_process is not None:
@@ -440,8 +440,9 @@ class InverseModelW(ForwardModel):
         """
 
         # Inversion of atmospheric profiles
-        output_dict = {'output': self.forward(batch['input'], training_flag=training_flag)}
-        output_dict['output']['prof_inverse'] = F.softplus(output_dict['output']['prof_inverse'] + batch['target']['prof_prior'])
+        output_dict = {'output': self.forward(batch['input'], training_flag=training_flag, prior=batch['target']['prof_prior'])}
+        output_dict['output']['prof_inverse'] = F.relu(output_dict['output']['prof_inverse'])
+
         # Forward-modeled observations (requires batch['context'])
         # Use 'prof_inverse' which contains the post-processed profiles (physical space)
         if self.forward_model is not None and 'context' in batch:
@@ -455,14 +456,6 @@ class InverseModelW(ForwardModel):
                         'surf': batch['context']['surf'],
                     }
                 )
-                # forward_model_output2 = self.forward_model.forward(
-                #     {
-                #         'prof': batch['target']['prof'],
-                #         'meta': batch['context']['meta'],
-                #         'surf': batch['context']['surf'],
-                #     }
-                #  )
-                # batch['target']['bt_forward'] = forward_model_output2['bt_forward']
                 # Switch keys ('bt_forward' → 'bt_inverse') for clarity in output
                 if 'bt_forward' in forward_model_output:
                     output_dict['output']['bt_inverse'] = forward_model_output['bt_forward']

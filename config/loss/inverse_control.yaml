@@ -19,10 +19,8 @@ config:
     instance:
       _target_: code.loss.wrapper.LossTerm
       function:
-        _target_: code.loss.variational.QuadraticForm
-        matrix: ${preprocessing.covariance.B.output.matrix_pseudo_inverse.load}
-      output_keys: 'prof_inverse'
-      target_keys: 'prof'
+        _target_: code.loss.basic.L2
+      output_keys: 'dprof_inverse'
       # context_keys: 'variant_mask'
 
   # Boundary conditions: fixed profile levels (no masking)

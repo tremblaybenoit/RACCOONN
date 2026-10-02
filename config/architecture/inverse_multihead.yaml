@@ -28,7 +28,7 @@ hidden_layer:
   in_features: ${.hidden_features}
   out_features: ${.hidden_features}
   hidden_features: 128
-  n_blocks: 1
+  n_blocks: 2
   activation:
     _target_: code.architecture.activation.Swish
   norm_type: none
@@ -45,9 +45,9 @@ output_layer:
     _target_: code.architecture.mlp.PredictionHead
     _recursive_: false
     in_features: ${...hidden_layer.out_features}
-    hidden_features: ${...hidden_layer.out_features}
+    hidden_features: 64
     out_features: 1
-    n_blocks: 2
+    n_blocks: 3
     activation:
       _target_: code.architecture.activation.Swish
     final_activation:

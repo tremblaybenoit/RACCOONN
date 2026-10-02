@@ -75,7 +75,7 @@ class LossTerm(torch.nn.Module):
         self,
         function: DictConfig | nn.Module,
         output_keys: str | list[str],
-        target_keys: str | list[str],
+        target_keys: str | list[str] | None = None,
         context_keys: str | list[str] | None = None,
     ) -> None:
         """
@@ -108,7 +108,7 @@ class LossTerm(torch.nn.Module):
 
         # Input, target, and context variables
         self.output_keys = instantiate(output_keys)
-        self.target_keys = instantiate(target_keys)
+        self.target_keys = instantiate(target_keys) if target_keys else None
         self.context_keys = instantiate(context_keys) if context_keys else None
 
     def forward(
@@ -139,46 +139,54 @@ class LossTerm(torch.nn.Module):
         )
 
         # Extract target tensors
-        target_values = extract_values(
-            batch['target'],
-            self.target_keys
-        )
-
-        # Apply optional context masks
-        if self.context_keys:
-            # Extract all masks
-            masks = extract_values(
-                batch['context'],
-                self.context_keys
+        if self.target_keys is not None:
+            target_values = extract_values(
+                batch['target'],
+                self.target_keys
             )
 
-            # Convert to tuple for uniform handling
-            if not isinstance(masks, tuple):
-                masks = (masks,)
+            # Apply optional context masks
+            if self.context_keys is not None:
+                # Extract all masks
+                masks = extract_values(
+                    batch['context'],
+                    self.context_keys
+                )
 
-            # Apply each mask sequentially
-            for mask in masks:
-                if isinstance(output_values, tuple):
-                    output_values = tuple(v[mask] for v in output_values)
-                else:
-                    output_values = output_values[mask]
+                # Convert to tuple for uniform handling
+                if not isinstance(masks, tuple):
+                    masks = (masks,)
 
+                # Apply each mask sequentially
+                for mask in masks:
+                    if isinstance(output_values, tuple):
+                        output_values = tuple(v[mask] for v in output_values)
+                    else:
+                        output_values = output_values[mask]
+
+                    if isinstance(target_values, tuple):
+                        target_values = tuple(v[mask] for v in target_values)
+                    else:
+                        target_values = target_values[mask]
+
+            # Compute loss
+            if isinstance(output_values, tuple):
                 if isinstance(target_values, tuple):
-                    target_values = tuple(v[mask] for v in target_values)
+                    loss = self.loss_term(*output_values, *target_values)
                 else:
-                    target_values = target_values[mask]
+                    loss = self.loss_term(*output_values, target_values)
+            else:
+                if isinstance(target_values, tuple):
+                    loss = self.loss_term(output_values, *target_values)
+                else:
+                    loss = self.loss_term(output_values, target_values)
 
-        # Compute loss
-        if isinstance(output_values, tuple):
-            if isinstance(target_values, tuple):
-                loss = self.loss_term(*output_values, *target_values)
-            else:
-                loss = self.loss_term(*output_values, target_values)
         else:
-            if isinstance(target_values, tuple):
-                loss = self.loss_term(output_values, *target_values)
+            # No target values, just compute loss on outputs
+            if isinstance(output_values, tuple):
+                loss = self.loss_term(*output_values)
             else:
-                loss = self.loss_term(output_values, target_values)
+                loss = self.loss_term(output_values)
 
         return loss
 

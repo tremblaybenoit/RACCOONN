@@ -15,7 +15,7 @@ defaults:
   - override /model: forward_default
   - override /callbacks: forward_default
   - override /logger: default
-  - override /trainer: gpu
+  - override /trainer: cpu
 
 # All parameters below will be merged with parameters from default configurations set above.
 # This allows you to overwrite only specified parameters
@@ -172,7 +172,7 @@ data:
 logger:
   # MLflow logger
   ports:
-    mlflow: 5002
+    mlflow: 5003
 
 # Trainer configuration
 trainer:

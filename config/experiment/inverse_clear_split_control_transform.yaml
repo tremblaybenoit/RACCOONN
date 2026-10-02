@@ -8,25 +8,25 @@ defaults:
   - override /data: inverse_default
   - override /preprocessing: inverse_split
   - override /loader: default
-  - override /architecture: inverse_multihead3
-  - override /loss: var
+  - override /architecture: inverse_control
+  - override /loss: inverse_control
   - override /optimizer: default
   - override /scheduler: default
   - override /model: inverse_default
   - override /callbacks: inverse_default
   - override /logger: default
-  - override /trainer: gpu
+  - override /trainer: cpu
 
 # All parameters below will be merged with parameters from default configurations set above.
 # This allows you to overwrite only specified parameters
 
 # Task name. Note that it determines the output directory path
-task_name: "inverse_clear_split"  # Experiment
+task_name: "inverse_clear_split_control"  # Experiment
 
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "default4"
+  run_id: "transform"
   data_dir: ../synthetic_${data.dtype}_clear_split
   # checkpoint_dir: "code/model/checkpoints/checkpoint"
 
@@ -57,6 +57,53 @@ preprocessing:
     output:
       # Path to statistics file
       path: code/data/statistics/synthetic_clear.pkl
+  # Covariance
+  covariance:
+    # B matrix
+    B:
+      # Function
+      _target_: code.preprocessing.covariance.climatological_matrix
+      # Univariate or multivariate
+      univariate: true
+      # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
+      scaling_factor: 1.0
+      # Regularization parameter to ensure numerical stability
+      regularization_type: 'correlation_based'
+      regularization_factor: 0.0001
+    # R matrix
+    R:
+      # Function
+      _target_: code.preprocessing.covariance.climatological_matrix
+      # Univariate or multivariate
+      univariate: true
+      # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
+      scaling_factor: 1.0
+      # Regularization parameter to ensure numerical stability
+      regularization_type: 'correlation_based'
+      regularization_factor: 0.01
+
+# Loss configuration
+loss:
+  config:
+    # Observation loss term: forward-modeled radiance vs. observations
+    bt_crtm:
+      weight: 0.01
+      instance:
+        function:
+          matrix: ${preprocessing.covariance.R.output.matrix_inverse.load}
+    # Model constraint: inverted profile vs. prior with pressure mask
+    prof:
+      weight: 1.0
+      instance:
+        output_keys: 'dprof_inverse'
+
+# Model configuration
+model:
+  _target_: code.model.inverse.InverseModelW
+  cholesky: ${preprocessing.covariance.B.output.matrix_cholesky.load}
+  # Forward model - reference external config
+  forward_model:
+    path: code/model/checkpoint/forward/default/model.yaml
 
 # Data configuration
 data:
@@ -78,14 +125,14 @@ data:
           transformations:
             # Normalization function and parameters
             normalization:
-              _target_: code.data.transformations.identity
+              _target_: code.data.transformations.min_max
               _partial_: true
               stats:
                 _target_: code.preprocessing.statistics.read_statistics_var
                 load: ${preprocessing.statistics.output.load}
                 key: 'prof'
                 dtype: ${data.dtype}
-              axis: 1
+              axis: null
         # Radiances
         bt_crtm:
           # Channels
@@ -124,14 +171,14 @@ data:
           transformations:
             # Normalization function and parameters
             normalization:
-              _target_: code.data.transformations.identity
+              _target_: code.data.transformations.min_max
               _partial_: true
               stats:
                 _target_: code.preprocessing.statistics.read_statistics_var
                 load: ${preprocessing.statistics.output.load}
                 key: 'prof'
                 dtype: ${data.dtype}
-              axis: 1
+              axis: null
         # Atmospheric profiles
         prof_inverse:
           # Transformations
@@ -182,23 +229,23 @@ data:
 logger:
   # MLflow logger
   ports:
-    mlflow: 5003
+    mlflow: 5032
 
 # Trainer configuration
 trainer:
   # Maximum number of epochs
-  max_epochs: 19600
+  max_epochs: 1960
 
 # Callbacks configuration
 callbacks:
   # Early stopping callback
   early_stopping:
     # Monitor validation loss for early stopping
-    patience: 19600
+    patience: 60
 
 # Scheduler configuration
 scheduler:
-  factor: 0.9999
+  factor: 0.75
   patience: 11
 
 # Loader configuration

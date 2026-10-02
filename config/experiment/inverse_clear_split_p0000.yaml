@@ -9,7 +9,7 @@ defaults:
   - override /preprocessing: inverse_split
   - override /loader: default
   - override /architecture: inverse_default
-  - override /loss: inverse_mse
+  - override /loss: inverse_default
   - override /optimizer: default
   - override /scheduler: default
   - override /model: inverse_default
@@ -87,16 +87,16 @@ loss:
   config:
     # Observation loss term: forward-modeled radiance vs. observations
     bt_crtm:
-      weight: 1.0
-      #instance:
-      #  function:
-      #    matrix: ${preprocessing.covariance.R.output.matrix_inverse.load}
+      weight: 0.01
+      instance:
+        function:
+          matrix: ${preprocessing.covariance.R.output.matrix_inverse.load}
     # Model constraint: inverted profile vs. prior with pressure mask
     prof:
       weight: 1.0
       instance:
         function:
-          matrix: ${preprocessing.covariance.B.output.matrix_pseudo_inverse.load}
+          matrix: ${preprocessing.covariance.B.output.matrix_inverse.load}
         target_keys: 'prof' # 'prof_prior'
 
 # Model configuration

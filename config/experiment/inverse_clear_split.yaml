@@ -15,7 +15,7 @@ defaults:
   - override /model: inverse_default
   - override /callbacks: inverse_default
   - override /logger: default
-  - override /trainer: gpu
+  - override /trainer: cpu
 
 # All parameters below will be merged with parameters from default configurations set above.
 # This allows you to overwrite only specified parameters
@@ -57,6 +57,54 @@ preprocessing:
     output:
       # Path to statistics file
       path: code/data/statistics/synthetic_clear.pkl
+  # Covariance
+  covariance:
+    # B matrix
+    B:
+      # Function
+      _target_: code.preprocessing.covariance.climatological_matrix
+      # Univariate or multivariate
+      univariate: true
+      # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
+      scaling_factor: 1.0
+      # Regularization parameter to ensure numerical stability
+      regularization_type: 'correlation_based'
+      regularization_factor: 0.05
+    # R matrix
+    R:
+      # Function
+      _target_: code.preprocessing.covariance.climatological_matrix
+      # Univariate or multivariate
+      univariate: true
+      # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
+      scaling_factor: 1.0
+      # Regularization parameter to ensure numerical stability
+      regularization_type: 'correlation_based'
+      regularization_factor: 0.01
+
+# Loss configuration
+loss:
+  config:
+    # Observation loss term: forward-modeled radiance vs. observations
+    bt_crtm:
+      weight: 0.01
+      instance:
+        function:
+          matrix: ${preprocessing.covariance.R.output.matrix_inverse.load}
+    # Model constraint: inverted profile vs. prior with pressure mask
+    prof:
+      weight: 100.0
+      instance:
+        function:
+          matrix: ${preprocessing.covariance.B.output.matrix_inverse.load}
+        target_keys: 'prof_prior'
+
+# Model configuration
+model:
+  _target_: code.model.inverse.InverseModel
+  # Forward model - reference external config
+  forward_model:
+    path: code/model/checkpoint/forward/default/model.yaml
 
 # Data configuration
 data:
@@ -182,7 +230,7 @@ data:
 logger:
   # MLflow logger
   ports:
-    mlflow: 5005
+    mlflow: 5012
 
 # Trainer configuration
 trainer:

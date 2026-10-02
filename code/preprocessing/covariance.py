@@ -323,7 +323,7 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
                 np.add.at(group_sums, inverse_indices, data)
 
                 # Count how many times each unique coordinate appears across all timesteps
-                group_counts = np.bincount(inverse_indices)[:, None]  # Shape: (n_unique_coords, 1)
+                group_counts = np.bincount(inverse_indices)[:, None].astype(data.dtype)  # Shape: (n_unique_coords, 1)
 
                 # Compute the local temporal mean for each unique coordinate
                 group_means = group_sums / group_counts  # Shape: (n_unique_coords, n_features)
@@ -611,49 +611,6 @@ def persistent_matrix(
 
     The background profile is constructed independently at every latitude and
     longitude coordinate using atmospheric profiles from neighboring scans.
-
-    Two background-generation methods are supported:
-
-    1. ``persistence``:
-
-       .. math::
-
-           x_b(s_i) = x(s_i - \\Delta s)
-
-       and the corresponding background error is
-
-       .. math::
-
-           e(s_i) = x(s_i - \\Delta s) - x(s_i).
-
-    2. ``centered_average``:
-
-       .. math::
-
-           x_b(s_i)
-           =
-           \\frac{1}{2}
-           \\left[
-               x(s_i - \\Delta s)
-               +
-               x(s_i + \\Delta s)
-           \\right]
-
-       and the corresponding background error is
-
-       .. math::
-
-           e(s_i)
-           =
-           \\frac{1}{2}
-           \\left[
-               x(s_i - \\Delta s)
-               +
-               x(s_i + \\Delta s)
-           \\right]
-           -
-           x(s_i).
-
     All eligible location-scan background-error samples are pooled to estimate
     a climatological background-error covariance matrix. The covariance is
     assumed to be independent of latitude, longitude, and scan.
@@ -738,41 +695,9 @@ def persistent_matrix(
     errors from different temporal intervals.
     """
 
-    # Validate background-generation method
-    supported_methods = (
-        "persistence",
-        "centered_average",
-    )
-
-    if method not in supported_methods:
-        raise ValueError(
-            f"Unsupported persistence method '{method}'. "
-            f"Supported methods are {supported_methods}."
-        )
-
-    # Validate missing-timestep policy
-    supported_missing_timestep_policies = (
-        "reject",
-        "available",
-        "raise",
-    )
-
-    if (
-        missing_timestep_policy
-        not in supported_missing_timestep_policies
-    ):
-        raise ValueError(
-            f"Unsupported missing_timestep_policy "
-            f"'{missing_timestep_policy}'. Supported policies are "
-            f"{supported_missing_timestep_policies}."
-        )
-
     # Begin by loading the data
     logger.info("Loading atmospheric profiles...")
-    data = load_variable(
-        input.data,
-        apply_transform=apply_transform,
-    )
+    data = load_variable(input.data, apply_transform=apply_transform)
 
     # Read coordinates and scans
     lat = load_variable(input.lat)
@@ -793,26 +718,14 @@ def persistent_matrix(
 
     # Spatial mask: Consider only data within the specified latitude
     # and longitude bounds
-    if (
-        hasattr(input, "spatial_mask")
-        and input.spatial_mask is not None
-    ):
+    if (hasattr(input, "spatial_mask") and input.spatial_mask is not None):
         logger.info("Applying spatial mask...")
-        mask &= np.asarray(
-            instantiate(input.spatial_mask),
-            dtype=bool,
-        )
+        mask &= np.asarray(instantiate(input.spatial_mask), dtype=bool)
 
     # Temporal mask: Consider only data within the specified scan bounds
-    if (
-        hasattr(input, "temporal_mask")
-        and input.temporal_mask is not None
-    ):
+    if (hasattr(input, "temporal_mask") and input.temporal_mask is not None):
         logger.info("Applying temporal mask...")
-        mask &= np.asarray(
-            instantiate(input.temporal_mask),
-            dtype=bool,
-        )
+        mask &= np.asarray(instantiate(input.temporal_mask), dtype=bool)
 
     # Apply masks to data, coordinates, and scans
     data = data[mask]
@@ -822,72 +735,19 @@ def persistent_matrix(
 
     # Dimensions
     if data.ndim < 3:
-        raise ValueError(
-            "persistent_matrix expects profile data with shape "
-            "(n_samples, n_variables, n_levels), or an equivalent "
-            "shape with at least three dimensions."
-        )
-
+        data = data.reshape(data.shape[0], data.shape[1], 1)
     data_shape = data.shape
     n_samples = data_shape[0]
     n_vars = data_shape[1]
-
-    if n_samples < 2:
-        raise ValueError(
-            "At least two profile samples are required."
-        )
-
-    # Optional coordinate rounding
-    #
-    # np.unique requires coordinates representing the same physical point
-    # to have exactly equal values. Rounding can be enabled through
-    # input.coordinate_decimals if coordinates contain small floating-point
-    # differences.
-    coordinate_decimals = input.get(
-        "coordinate_decimals",
-        None,
-    )
-
-    if coordinate_decimals is not None:
-        logger.info(
-            "Rounding latitude and longitude to %d decimal places...",
-            coordinate_decimals,
-        )
-
-        lat_group = np.round(
-            lat,
-            decimals=coordinate_decimals,
-        )
-
-        lon_group = np.round(
-            lon,
-            decimals=coordinate_decimals,
-        )
-
-    else:
-        lat_group = lat
-        lon_group = lon
 
     # Identify unique horizontal coordinates and their mapping
     #
     # unique_coords contains the physical locations.
     # inverse_indices contains the location ID for every sample.
-    coords = np.column_stack(
-        (lat_group, lon_group)
-    )
-
-    unique_coords, inverse_indices = np.unique(
-        coords,
-        axis=0,
-        return_inverse=True,
-    )
-
+    coords = np.column_stack((lat, lon))
+    unique_coords, inverse_indices = np.unique(coords, axis=0, return_inverse=True)
     n_unique_coords = len(unique_coords)
-
-    logger.info(
-        "Found %d unique horizontal coordinates.",
-        n_unique_coords,
-    )
+    logger.info("Found %d unique horizontal coordinates.", n_unique_coords)
 
     # Flatten all profile feature dimensions temporarily
     #
@@ -935,32 +795,20 @@ def persistent_matrix(
     for location_id in range(n_unique_coords):
 
         # Find all samples available at this horizontal coordinate
-        location_sample_indices = np.flatnonzero(
-            inverse_indices == location_id
-        )
+        location_sample_indices = np.flatnonzero(inverse_indices == location_id)
 
         # Sort samples at this coordinate by scan index
         location_scans = scans[location_sample_indices]
-
-        order = np.argsort(
-            location_scans,
-            kind="stable",
-        )
-
+        order = np.argsort(location_scans, kind="stable")
         sorted_indices = location_sample_indices[order]
         sorted_scans = location_scans[order]
 
-        # Duplicate scans at the same coordinate make temporal pairing
-        # ambiguous.
+        # Duplicate scans at the same coordinate make temporal pairing ambiguous.
         if sorted_scans.shape[0] > 1:
-            duplicate_scan_mask = (
-                sorted_scans[1:] == sorted_scans[:-1]
-            )
+            duplicate_scan_mask = (sorted_scans[1:] == sorted_scans[:-1])
 
             if np.any(duplicate_scan_mask):
-                duplicate_scans = sorted_scans[1:][
-                    duplicate_scan_mask
-                ]
+                duplicate_scans = sorted_scans[1:][duplicate_scan_mask]
 
                 raise ValueError(
                     "Duplicate scans were found at coordinate "
@@ -976,36 +824,16 @@ def persistent_matrix(
                 continue
 
             # Every sample after the first is a candidate target.
-            for scan_index in range(
-                1,
-                sorted_indices.shape[0],
-            ):
+            for scan_index in range(1, sorted_indices.shape[0]):
                 n_candidate_targets += 1
 
-                previous_index = sorted_indices[
-                    scan_index - 1
-                ]
+                previous_index = sorted_indices[scan_index - 1]
+                target_index = sorted_indices[scan_index]
 
-                target_index = sorted_indices[
-                    scan_index
-                ]
-
-                previous_scan = sorted_scans[
-                    scan_index - 1
-                ]
-
-                target_scan = sorted_scans[
-                    scan_index
-                ]
-
-                previous_scan_step = int(
-                    target_scan - previous_scan
-                )
-
-                exact_previous_available = (
-                    previous_scan_step
-                    == expected_scan_step
-                )
+                previous_scan = sorted_scans[scan_index - 1]
+                target_scan = sorted_scans[scan_index]
+                previous_scan_step = int(target_scan - previous_scan)
+                exact_previous_available = (previous_scan_step == expected_scan_step)
 
                 # Treat a missing exact previous scan according to
                 # the selected policy.
@@ -1045,9 +873,7 @@ def persistent_matrix(
                 error_samples.append(x_error)
                 previous_indices.append(previous_index)
                 target_indices.append(target_index)
-                previous_scan_steps.append(
-                    previous_scan_step
-                )
+                previous_scan_steps.append(previous_scan_step)
 
                 n_accepted += 1
 
@@ -1058,58 +884,21 @@ def persistent_matrix(
                 continue
 
             # The first and last samples cannot be candidate targets.
-            for scan_index in range(
-                1,
-                sorted_indices.shape[0] - 1,
-            ):
+            for scan_index in range(1, sorted_indices.shape[0] - 1):
                 n_candidate_targets += 1
 
-                previous_index = sorted_indices[
-                    scan_index - 1
-                ]
+                previous_index = sorted_indices[scan_index - 1]
+                target_index = sorted_indices[scan_index]
+                next_index = sorted_indices[scan_index + 1]
 
-                target_index = sorted_indices[
-                    scan_index
-                ]
-
-                next_index = sorted_indices[
-                    scan_index + 1
-                ]
-
-                previous_scan = sorted_scans[
-                    scan_index - 1
-                ]
-
-                target_scan = sorted_scans[
-                    scan_index
-                ]
-
-                next_scan = sorted_scans[
-                    scan_index + 1
-                ]
-
-                previous_scan_step = int(
-                    target_scan - previous_scan
-                )
-
-                next_scan_step = int(
-                    next_scan - target_scan
-                )
-
-                exact_previous_available = (
-                    previous_scan_step
-                    == expected_scan_step
-                )
-
-                exact_next_available = (
-                    next_scan_step
-                    == expected_scan_step
-                )
-
-                exact_neighbors_available = (
-                    exact_previous_available
-                    and exact_next_available
-                )
+                previous_scan = sorted_scans[scan_index - 1]
+                target_scan = sorted_scans[scan_index]
+                next_scan = sorted_scans[scan_index + 1]
+                previous_scan_step = int(target_scan - previous_scan)
+                next_scan_step = int(next_scan - target_scan)
+                exact_previous_available = (previous_scan_step == expected_scan_step)
+                exact_next_available = (next_scan_step == expected_scan_step)
+                exact_neighbors_available = (exact_previous_available and exact_next_available)
 
                 # Treat missing exact neighbors according to
                 # the selected policy.
@@ -1149,9 +938,7 @@ def persistent_matrix(
                 # Background definition:
                 # x_b(s_i) =
                 # 0.5 * [x(s_previous) + x(s_next)]
-                x_background = 0.5 * (
-                    x_previous + x_next
-                )
+                x_background = 0.5 * (x_previous + x_next)
 
                 # Background error:
                 # e(s_i) = x_b(s_i) - x_true(s_i)
@@ -1161,12 +948,8 @@ def persistent_matrix(
                 previous_indices.append(previous_index)
                 target_indices.append(target_index)
                 next_indices.append(next_index)
-                previous_scan_steps.append(
-                    previous_scan_step
-                )
-                next_scan_steps.append(
-                    next_scan_step
-                )
+                previous_scan_steps.append(previous_scan_step)
+                next_scan_steps.append(next_scan_step)
 
                 n_accepted += 1
 
@@ -1182,39 +965,16 @@ def persistent_matrix(
     #
     # Shape:
     #   (n_error_samples, n_variables * n_levels)
-    error_samples = np.stack(
-        error_samples,
-        axis=0,
-    )
-
+    error_samples = np.stack(error_samples, axis=0)
     n_error_samples = error_samples.shape[0]
 
     # Convert diagnostics to arrays
-    target_indices = np.asarray(
-        target_indices,
-        dtype=np.int64,
-    )
-
-    previous_indices = np.asarray(
-        previous_indices,
-        dtype=np.int64,
-    )
-
-    previous_scan_steps = np.asarray(
-        previous_scan_steps,
-        dtype=np.int64,
-    )
-
+    target_indices = np.asarray(target_indices, dtype=np.int64)
+    previous_indices = np.asarray(previous_indices, dtype=np.int64)
+    previous_scan_steps = np.asarray(previous_scan_steps, dtype=np.int64)
     if method == "centered_average":
-        next_indices = np.asarray(
-            next_indices,
-            dtype=np.int64,
-        )
-
-        next_scan_steps = np.asarray(
-            next_scan_steps,
-            dtype=np.int64,
-        )
+        next_indices = np.asarray(next_indices, dtype=np.int64)
+        next_scan_steps = np.asarray(next_scan_steps, dtype=np.int64)
 
     logger.info(
         "Constructed %d background-error samples from %d "
@@ -1277,84 +1037,41 @@ def persistent_matrix(
     # A nonzero mean represents a systematic bias of the selected
     # background-generation method. B should normally describe
     # random errors around this mean rather than absorbing the bias.
-    error_mean = np.mean(
-        error_samples,
-        axis=0,
-        keepdims=True,
-    )
+    error_mean = np.mean(error_samples, axis=0, keepdims=True)
 
     # Apply recentering
     if recenter:
-        logger.info(
-            "Recentering background errors around their mean..."
-        )
-
-        error_samples = (
-            error_samples - error_mean
-        )
+        logger.info("Recentering background errors around their mean...")
+        error_samples = error_samples - error_mean
 
         # One mean background-error profile was estimated.
         denom = float(n_error_samples - 1)
 
     else:
-        logger.info(
-            "Computing second moments without error recentering..."
-        )
-
+        logger.info("Computing second moments without error recentering...")
         denom = float(n_error_samples)
 
     if denom <= 0.0:
-        raise ValueError(
-            "Insufficient background-error samples to estimate "
-            "the covariance matrix."
-        )
+        raise ValueError("Insufficient background-error samples to estimate the covariance matrix.")
 
     # Restore variable and profile-level dimensions
-    error_samples = error_samples.reshape(
-        n_error_samples,
-        *data_shape[1:],
-    )
+    error_samples = error_samples.reshape(n_error_samples, *data_shape[1:])
 
     # Variant filter
-    if (
-        hasattr(input, "variant_mask")
-        and input.variant_mask is not None
-    ):
-        variant_mask = instantiate(
-            input.variant_mask.load
-        )
-
-        variant_mask = np.asarray(
-            variant_mask
-        )
+    if hasattr(input, "variant_mask") and input.variant_mask is not None:
+        variant_mask = instantiate(input.variant_mask.load)
+        variant_mask = np.asarray(variant_mask)
 
         if variant_mask.ndim == 1:
             # Apply one shared level mask to every variable
-            variant_mask = np.repeat(
-                variant_mask[None, :],
-                n_vars,
-                axis=0,
-            )
+            variant_mask = np.repeat(variant_mask[None, :], n_vars, axis=0)
 
-        elif (
-            variant_mask.ndim == 2
-            and variant_mask.shape[0] == 1
-            and n_vars > 1
-        ):
-            variant_mask = np.repeat(
-                variant_mask,
-                n_vars,
-                axis=0,
-            )
+        elif variant_mask.ndim == 2 and variant_mask.shape[0] == 1 and n_vars > 1:
+            variant_mask = np.repeat(variant_mask, n_vars, axis=0)
 
-        elif (
-            variant_mask.ndim != 2
-            or variant_mask.shape[0] != n_vars
-        ):
+        elif variant_mask.ndim != 2 or variant_mask.shape[0] != n_vars:
             raise ValueError(
-                "variant_mask must have shape "
-                "(n_variables, n_levels), (1, n_levels), "
-                "or (n_levels,). "
+                "variant_mask must have shape (n_variables, n_levels), (1, n_levels), or (n_levels,). "
                 f"Received shape {variant_mask.shape}."
             )
 
@@ -1365,31 +1082,15 @@ def persistent_matrix(
     cov = {}
 
     # Store diagnostics that may optionally be saved through output
-    cov["error_mean"] = error_mean.reshape(
-        data_shape[1:]
-    )
-
-    cov["n_error_samples"] = np.asarray(
-        n_error_samples,
-        dtype=np.int64,
-    )
-
-    cov["samples_per_coordinate"] = (
-        samples_per_coordinate
-    )
-
-    cov["previous_scan_steps"] = (
-        previous_scan_steps
-    )
-
+    cov["error_mean"] = error_mean.reshape(data_shape[1:])
+    cov["n_error_samples"] = np.asarray(n_error_samples, dtype=np.int64)
+    cov["samples_per_coordinate"] = samples_per_coordinate
+    cov["previous_scan_steps"] = previous_scan_steps
     cov["target_indices"] = target_indices
     cov["previous_indices"] = previous_indices
 
     if method == "centered_average":
-        cov["next_scan_steps"] = (
-            next_scan_steps
-        )
-
+        cov["next_scan_steps"] = next_scan_steps
         cov["next_indices"] = next_indices
 
     # Univariate matrix computation steps
@@ -1397,10 +1098,7 @@ def persistent_matrix(
 
         # Check dimensions
         if error_samples.ndim <= 2:
-            raise ValueError(
-                "Univariate covariance matrix computation requires "
-                "background errors with more than two dimensions."
-            )
+            raise ValueError("Univariate covariance matrix computation requires background errors with more than two dimensions.")
 
         # Initialize empty lists for matrices
         m_cov = []
@@ -1413,144 +1111,74 @@ def persistent_matrix(
             error_i = error_samples[:, i]
 
             # Flatten any dimensions after the variable dimension
-            error_i = error_i.reshape(
-                n_error_samples,
-                -1,
-            )
+            error_i = error_i.reshape(n_error_samples, -1)
 
             # Apply variant mask
             if variant_mask is not None:
-                logger.info(
-                    "Applying variant mask for variable %d...",
-                    i,
-                )
+                logger.info("Applying variant mask for variable %d...",i)
 
-                mask_i = np.flatnonzero(
-                    variant_mask[i]
-                )
-
-                error_i = np.take(
-                    error_i,
-                    mask_i,
-                    axis=1,
-                )
+                mask_i = np.flatnonzero(variant_mask[i])
+                error_i = np.take(error_i, mask_i, axis=1)
 
             # Compute univariate covariance block
             logger.info(
-                "Computing univariate persistence covariance "
-                "matrix for variable %d...",
+                "Computing univariate persistence covariance matrix for variable %d...",
                 i,
             )
 
-            sub_cov = (
-                scaling_factor
-                * (error_i.T @ error_i)
-                / denom
-            )
+            sub_cov = scaling_factor * (error_i.T @ error_i) / denom
 
             # Ensure numerical symmetry
-            sub_cov = 0.5 * (
-                sub_cov + sub_cov.T
-            )
+            sub_cov = 0.5 * (sub_cov + sub_cov.T)
 
             # Compute pressure-dependent variances
-            variances_i = np.diag(
-                sub_cov
-            ).copy()
+            variances_i = np.diag(sub_cov).copy()
 
             if np.any(~np.isfinite(variances_i)):
-                raise ValueError(
-                    f"Variable {i} contains non-finite variances."
-                )
+                raise ValueError(f"Variable {i} contains non-finite variances.")
 
             if np.any(variances_i <= 0.0):
-                bad_indices = np.flatnonzero(
-                    variances_i <= 0.0
-                )
+                bad_indices = np.flatnonzero(variances_i <= 0.0)
 
-                raise ValueError(
-                    f"Variable {i} has non-positive variances "
-                    f"at indices {bad_indices.tolist()}."
-                )
+                raise ValueError(f"Variable {i} has non-positive variances at indices {bad_indices.tolist()}.")
 
-            std_i = np.sqrt(
-                variances_i
-            )
-
-            std_outer_i = np.outer(
-                std_i,
-                std_i,
-            )
+            std_i = np.sqrt(variances_i)
+            std_outer_i = np.outer(std_i, std_i)
 
             # Compute correlation block from unregularized covariance
             sub_corr = sub_cov / std_outer_i
 
             # Ensure numerical symmetry and exact unit diagonal
-            sub_corr = 0.5 * (
-                sub_corr + sub_corr.T
-            )
+            sub_corr = 0.5 * (sub_corr + sub_corr.T)
 
-            np.fill_diagonal(
-                sub_corr,
-                1.0,
-            )
+            np.fill_diagonal(sub_corr,1.0)
 
             # Apply per-variable regularization through the
             # correlation matrix
             if regularization_factor > 0.0:
                 logger.info(
-                    "Applying correlation regularization for "
-                    "variable %d with factor %.6g...",
-                    i,
-                    regularization_factor,
+                    "Applying correlation regularization for variable %d with factor %.6g...",
+                    i, regularization_factor,
                 )
 
-                sub_corr = (
-                    (1.0 - regularization_factor)
-                    * sub_corr
-                    + regularization_factor
-                    * np.eye(
-                        sub_corr.shape[0],
-                        dtype=sub_corr.dtype,
-                    )
-                )
+                sub_corr = ((1.0 - regularization_factor) * sub_corr +
+                            regularization_factor * np.eye(sub_corr.shape[0], dtype=sub_corr.dtype))
 
                 # Defensive numerical cleanup
-                sub_corr = 0.5 * (
-                    sub_corr + sub_corr.T
-                )
-
-                np.fill_diagonal(
-                    sub_corr,
-                    1.0,
-                )
+                sub_corr = 0.5 * (sub_corr + sub_corr.T)
+                np.fill_diagonal(sub_corr,1.0)
 
                 # Reconstruct covariance while preserving the original
                 # pressure-dependent variances
-                sub_cov = (
-                    std_outer_i * sub_corr
-                )
+                sub_cov = (std_outer_i * sub_corr)
+                sub_cov = 0.5 * (sub_cov + sub_cov.T)
 
-                sub_cov = 0.5 * (
-                    sub_cov + sub_cov.T
-                )
-
-            m_cov.append(
-                sub_cov
-            )
-
-            m_corr.append(
-                sub_corr
-            )
+            m_cov.append(sub_cov)
+            m_corr.append(sub_corr)
 
         # Assemble into block-diagonal matrices
-        cov["matrix"] = block_diag(
-            *m_cov
-        )
-
-        cov["correlation"] = block_diag(
-            *m_corr
-        )
+        cov["matrix"] = block_diag(*m_cov)
+        cov["correlation"] = block_diag(*m_corr)
 
         del error_i
         del error_samples
@@ -1559,11 +1187,7 @@ def persistent_matrix(
     else:
 
         # Reshape to preserve the variable dimension
-        error_reshaped = error_samples.reshape(
-            n_error_samples,
-            n_vars,
-            -1,
-        )
+        error_reshaped = error_samples.reshape(n_error_samples, n_vars, -1)
 
         # Apply variant mask before flattening
         if variant_mask is not None:
@@ -1573,37 +1197,15 @@ def persistent_matrix(
 
             for i in range(n_vars):
 
-                error_i = error_reshaped[
-                    :,
-                    i,
-                    :,
-                ]
+                error_i = error_reshaped[:, i, :]
+                mask_i = np.flatnonzero(variant_mask[i])
+                error_i_masked = np.take(error_i, mask_i, axis=1)
+                error_masked_list.append(error_i_masked)
 
-                mask_i = np.flatnonzero(
-                    variant_mask[i]
-                )
-
-                error_i_masked = np.take(
-                    error_i,
-                    mask_i,
-                    axis=1,
-                )
-
-                error_masked_list.append(
-                    error_i_masked
-                )
-
-                logger.info(
-                    "Variable %d features after masking: %d",
-                    i,
-                    error_i_masked.shape[1],
-                )
+                logger.info("Variable %d features after masking: %d",i, error_i_masked.shape[1],)
 
             # Flatten concatenated background errors
-            error_samples_flat = np.concatenate(
-                error_masked_list,
-                axis=1,
-            )
+            error_samples_flat = np.concatenate(error_masked_list, axis=1)
 
             del error_i
             del error_i_masked
@@ -1611,121 +1213,54 @@ def persistent_matrix(
 
         else:
             # No masking: retain all variables and pressure levels
-            error_samples_flat = error_reshaped.reshape(
-                n_error_samples,
-                -1,
-            )
+            error_samples_flat = error_reshaped.reshape(n_error_samples, -1)
 
         # Compute full covariance matrix
-        logger.info(
-            "Computing multivariate persistence "
-            "covariance matrix..."
-        )
-
-        cov["matrix"] = (
-            scaling_factor
-            * (
-                error_samples_flat.T
-                @ error_samples_flat
-            )
-            / denom
-        )
+        logger.info("Computing multivariate persistence covariance matrix...")
+        cov["matrix"] = scaling_factor * (error_samples_flat.T @ error_samples_flat)/ denom
 
         # Ensure numerical symmetry
-        cov["matrix"] = 0.5 * (
-            cov["matrix"]
-            + cov["matrix"].T
-        )
+        cov["matrix"] = 0.5 * (cov["matrix"] + cov["matrix"].T)
 
         # Compute component variances
-        variances = np.diag(
-            cov["matrix"]
-        ).copy()
+        variances = np.diag(cov["matrix"]).copy()
 
         if np.any(~np.isfinite(variances)):
-            raise ValueError(
-                "Covariance matrix contains non-finite variances."
-            )
+            raise ValueError("Covariance matrix contains non-finite variances.")
 
         if np.any(variances <= 0.0):
-            bad_indices = np.flatnonzero(
-                variances <= 0.0
-            )
+            bad_indices = np.flatnonzero(variances <= 0.0)
+            raise ValueError(f"Covariance matrix has non-positive variances at indices {bad_indices.tolist()}.")
 
-            raise ValueError(
-                "Covariance matrix has non-positive variances "
-                f"at indices {bad_indices.tolist()}."
-            )
-
-        std = np.sqrt(
-            variances
-        )
-
-        std_outer = np.outer(
-            std,
-            std,
-        )
+        std = np.sqrt(variances)
+        std_outer = np.outer(std, std)
 
         # Compute correlation matrix from covariance matrix
-        logger.info(
-            "Computing correlation matrix from covariance matrix..."
-        )
-
-        cov["correlation"] = (
-            cov["matrix"] / std_outer
-        )
+        logger.info("Computing correlation matrix from covariance matrix...")
+        cov["correlation"] = cov["matrix"] / std_outer
 
         # Ensure numerical symmetry and exact unit diagonal
-        cov["correlation"] = 0.5 * (
-            cov["correlation"]
-            + cov["correlation"].T
-        )
+        cov["correlation"] = 0.5 * (cov["correlation"] + cov["correlation"].T)
 
-        np.fill_diagonal(
-            cov["correlation"],
-            1.0,
-        )
+        np.fill_diagonal(cov["correlation"],1.0)
 
         # Apply regularization through the correlation matrix
         if regularization_factor > 0.0:
-            logger.info(
-                "Applying correlation regularization "
-                "with factor %.6g...",
+            logger.info("Applying correlation regularization with factor %.6g...",
                 regularization_factor,
             )
 
-            cov["correlation"] = (
-                (1.0 - regularization_factor)
-                * cov["correlation"]
-                + regularization_factor
-                * np.eye(
-                    cov["correlation"].shape[0],
-                    dtype=cov["correlation"].dtype,
-                )
-            )
+            cov["correlation"] = ((1.0 - regularization_factor) * cov["correlation"] +
+                                  regularization_factor * np.eye(cov["correlation"].shape[0], dtype=cov["correlation"].dtype))
 
             # Defensive numerical cleanup
-            cov["correlation"] = 0.5 * (
-                cov["correlation"]
-                + cov["correlation"].T
-            )
-
-            np.fill_diagonal(
-                cov["correlation"],
-                1.0,
-            )
+            cov["correlation"] = 0.5 * (cov["correlation"] + cov["correlation"].T)
+            np.fill_diagonal(cov["correlation"],1.0)
 
             # Reconstruct covariance while preserving the original
             # component variances
-            cov["matrix"] = (
-                std_outer
-                * cov["correlation"]
-            )
-
-            cov["matrix"] = 0.5 * (
-                cov["matrix"]
-                + cov["matrix"].T
-            )
+            cov["matrix"] = std_outer * cov["correlation"]
+            cov["matrix"] = 0.5 * (cov["matrix"] + cov["matrix"].T)
 
         del error_samples
         del error_samples_flat

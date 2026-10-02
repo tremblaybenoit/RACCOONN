@@ -23,7 +23,8 @@ covariance:
     # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
     scaling_factor: 1.0
     # Regularization parameter to ensure numerical stability
-    regularization_factor: 1e-3
+    regularization_type: 'correlation_based'
+    regularization_factor: 0.05
     # Plot flag
     plot_flag: true
     # Recentering
@@ -205,10 +206,13 @@ covariance:
       lon: ${data.stage.all.variables.lon}
       # Scans
       scans: ${data.stage.all.variables.scans}
+    # Univariate or multivariate
+    univariate: true
     # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
     scaling_factor: 1.0
     # Regularization parameter to ensure numerical stability
-    regularization_factor: 0.
+    regularization_type: 'correlation_based'
+    regularization_factor: 0.01
     # Plot flag
     plot_flag: true
     # Re-centering
