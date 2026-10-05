@@ -1,0 +1,18 @@
+# Forward Model Configuration (refactored to use separate configs)
+_target_: code.model.forward.ForwardModel
+_recursive_: false
+
+# Checkpoint path for saving and loading model weights
+ckpt_path: ${paths.checkpoint_dir}/${callbacks.model_checkpoint.filename}.ckpt
+
+# Optimizer - reference external config
+optimizer: ${optimizer}
+
+# Scheduler - reference external config
+scheduler: ${scheduler}
+
+# Loss function - reference external config
+loss: ${loss}
+
+# Architecture - reference external config
+architecture: ${architecture}

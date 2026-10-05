@@ -1,0 +1,140 @@
+# Format:
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Y coordinate (slant)
+    y_slant:
+      # Dataset class
+      _target_: code.loader.dataset.EagerDataset
+      _recursive_: false
+      # Path to the latitude slant data file
+      path: ${...dir}/y_slant.npy
+      # Type of data
+      type: 'y (km)'
+      # Loading function
+      load:
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: code.data.io.save_npy
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations:
+        # Per-variable normalization
+        normalization:
+          _target_: code.data.transformations.min_max
+          _partial_: true
+          stats:
+            _target_: code.preprocessing.statistics.read_statistics_var
+            load: ${preprocessing.statistics.output.load}
+            key: 'y_slant'
+            dtype: ${data.dtype}
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Y coordinate (slant)
+    y_slant:
+      # Dataset class
+      _target_: ${....train.variables.y_slant._target_}
+      _recursive_: false
+      # Path to the latitude slant data file
+      path: ${...dir}/y_slant.npy
+      # Type of data
+      type: ${....train.variables.y_slant.type}
+      # Loading function
+      load:
+        _target_: ${.....train.variables.y_slant.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: ${.....train.variables.y_slant.save._target_}
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${....train.variables.y_slant.transformations}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Y coordinate (slant)
+    y_slant:
+      # Dataset class
+      _target_: ${....train.variables.y_slant._target_}
+      _recursive_: false
+      # Path to the latitude slant data file
+      path: ${...dir}/y_slant.npy
+      # Type of data
+      type: ${....train.variables.y_slant.type}
+      # Loading function
+      load:
+        _target_: ${.....train.variables.y_slant.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: ${.....train.variables.y_slant.save._target_}
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${....train.variables.y_slant.transformations}
+# Predict set
+predict:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Y coordinate (slant)
+    y_slant:
+      # Dataset class
+      _target_: ${....train.variables.y_slant._target_}
+      _recursive_: false
+      # Type of data
+      type: ${....train.variables.y_slant.type}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......valid.variables.y_slant.load}
+            - ${.......test.variables.y_slant.load}
+          - 0
+      # Transformations to apply
+      transformations: ${....train.variables.y_slant.transformations}
+# All data (complete dataset)
+all:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Y coordinate (slant)
+    y_slant:
+      # Dataset class
+      _target_: ${....train.variables.y_slant._target_}
+      _recursive_: false
+      # Type of data
+      type: ${....train.variables.y_slant.type}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......train.variables.y_slant.load}
+            - ${.......valid.variables.y_slant.load}
+            - ${.......test.variables.y_slant.load}
+          - 0
+      # Transformations to apply
+      transformations: ${....train.variables.y_slant.transformations}

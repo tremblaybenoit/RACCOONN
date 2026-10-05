@@ -1,58 +1,70 @@
 defaults:
-  - variables/inverse_input@stage.train.vars
-  - variables/inverse_input@stage.valid.vars
-  - variables/inverse_input@stage.test.vars
-  - variables/inverse_input@stage.predict.vars
-  - variables/inverse_target@stage.train.vars
-  - variables/inverse_target@stage.valid.vars
-  - variables/inverse_target@stage.test.vars
-
-# Configuration to download the training and testing data
-download:
-  dir: ${paths.data_dir}
-  url: "https://zenodo.org/record/1482223/files/GOES-16_ML_Training_Testing_Data.zip?download=1"
+  - synthetic/default@stage
+  - synthetic/variant_mask@stage
+  - synthetic/invariant_mask@stage
+  - synthetic/prof_inverse@stage
+  - synthetic/prof_prior@stage
+  - synthetic/bt_inverse@stage
+  - synthetic/bt_inverse_stdev@stage
+  # - synthetic/lat_slant@stage
+  # - synthetic/lon_slant@stage
+  # - synthetic/x_slant@stage
+  # - synthetic/y_slant@stage
+  # - synthetic/z_slant@stage
+  - synthetic/default@source
+  - synthetic/bt_forward_err@source
+  - synthetic/variant_mask@source
+  - synthetic/invariant_mask@source
+  # - synthetic/lat_slant@source
+  # - synthetic/lon_slant@source
+  # - synthetic/x_slant@source
+  # - synthetic/y_slant@source
+  # - synthetic/z_slant@source
 
 # dtype
 dtype: 'float32'
 
-# Pressure filter
-pressure_filter:
-  load:
-    _target_: data.filters.pressure_filter
-    prof:
-      _target_: data.io.load_stack_and_normalize
-      _recursive_: false
-      stack:
-        - load: ${data.stage.train.vars.prof.load}
-          normalization:
-            _target_: data.transformations.min_max
-            _partial_: true
-            stats:
-              _target_: data.statistics.read_statistics_var
-              path: ${preparation.statistics.data.output.path}
-              var: 'prof'
-              dtype: ${data.dtype}
-            axis: null
-        - load: ${data.stage.valid.vars.prof.load}
-          normalization:
-            _target_: data.transformations.min_max
-            _partial_: true
-            stats:
-              _target_: data.statistics.read_statistics_var
-              path: ${preparation.statistics.data.output.path}
-              var: 'prof'
-              dtype: ${data.dtype}
-            axis: null
-        - load: ${data.stage.test.vars.prof.load}
-          normalization:
-            _target_: data.transformations.min_max
-            _partial_: true
-            stats:
-              _target_: data.statistics.read_statistics_var
-              path: ${preparation.statistics.data.output.path}
-              var: 'prof'
-              dtype: ${data.dtype}
-            axis: null
+# Variables to use as input/output
+select_input: ['lat', 'lon', 'scans', 'pressure_log']
+select_target: ['prof', 'prof_prior', 'bt_crtm']
+select_context: ['meta', 'surf', 'pressure', 'prof', 'prof_prior',
+                 'clear_mask', 'cloud_mask', 'daytime_mask', 'nighttime_mask',
+                 'variant_mask', 'invariant_mask']
+select_output: ['bt_inverse', 'bt_inverse_stdev', 'prof_inverse']
+
+# Original data - Split the data into training, validation, and test sets
+source:
+  # Training set
+  train:
+    # Path to training data
+    dir: ../synthetic_float32/Train2
+    # Split
+    split: null
+
+  # Validation set
+  valid:
+    # Path to validation data
+    dir: ../synthetic_float32/Val2
+    # Split
+    split: null
+
+  # Test set
+  test:
+    # Path to test data
+    dir: ../synthetic_float32/Test2
+    # Split
+    split: null
+
+  # Prediction set
+  predict:
+    # Split
+    split: null
+    # Variables
+    variables:
+      # Radiances
+      bt_forward:
+        # Path to the prediction data
+        path: '../forward_outputs/forward_clear/runs/modular/bt_forward_predict.npy'
 
 # Split the data into training, validation, and test sets
 stage:
@@ -61,38 +73,59 @@ stage:
     # Path to training data
     dir: ${paths.data_dir}/Train2
     # Split
-    split:
-      _target_: ${data.stage.train.vars.cloud_filter.load._target_}
-      _args_:
-        - _target_: ${data.stage.train.vars.prof.load._target_}
-          path: ${data.stage.train.vars.prof.load.path}
-
-
+    split: null
+    # Variables
+    variables:
+      # Atmospheric profiles
+       prof_inverse:
+         # Transformations to apply
+         transformations:
+           # Per-variable normalization
+           normalization:
+             _target_: code.data.transformations.min_max
+             _partial_: true
+             stats:
+               _target_: code.preprocessing.statistics.read_statistics_var
+               load:
+                 _target_: code.data.io.load_pkl
+                 path: ${preprocessing.statistics.output.path}
+               key: 'prof'
+               dtype: ${data.dtype}
   # Validation set
   valid:
     # Path to validation data
     dir: ${paths.data_dir}/Val2
     # Split
-    split:
-      _target_: ${data.stage.valid.vars.cloud_filter.load._target_}
-      _args_:
-        - _target_: ${data.stage.valid.vars.prof.load._target_}
-          path: ${data.stage.valid.vars.prof.load.path}
+    split: null
+    # Variables
+    variables:
+      # Atmospheric profiles
+      prof_inverse:
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.prof_inverse.transformations}
 
   # Test set
   test:
     # Path to test data
     dir: ${paths.data_dir}/Test2
     # Split
-    split:
-      _target_: ${data.stage.test.vars.cloud_filter.load._target_}
-      _args_:
-        - _target_: ${data.stage.test.vars.prof.load._target_}
-          path: ${data.stage.test.vars.prof.load.path}
+    split: null
+    # Variables
+    variables:
+      # Atmospheric profiles
+      prof_inverse:
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.prof_inverse.transformations}
 
   # Prediction set (NOTE: By default, we use the test set as the prediction set for demonstration purposes)
   predict:
     # Path to prediction data
-    dir: ${paths.data_dir}/Test2
+    dir: ${data.stage.test.dir}
     # Split
     split: ${data.stage.test.split}
+    # Variables
+    variables:
+      # Atmospheric profiles
+      prof_inverse:
+        # Transformations to apply
+        transformations: ${data.stage.train.variables.prof_inverse.transformations}

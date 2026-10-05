@@ -1,0 +1,154 @@
+# Format:
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    prof_inverse:
+      # Dataset class
+      _target_: code.loader.dataset.EagerDataset
+      _recursive_: false
+      # Path to the atmospheric profiles file
+      path: ${...dir}/prof_inverse.npy
+      # Profile types
+      type: ${..prof.type}
+      # Number of variables
+      n:
+        _target_: builtins.len
+        _args_:
+          - ${...type}
+      # Loading function
+      load:
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: code.data.io.save_npy
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations:
+        # Per-variable normalization
+        normalization: null
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    prof_inverse:
+      # Dataset class
+      _target_: ${....train.variables.prof_inverse._target_}
+      _recursive_: false
+      # Path to the atmospheric profiles file
+      path: ${...dir}/prof_inverse.npy
+      # Profile types
+      type: ${....train.variables.prof_inverse.type}
+      # Number of variables
+      n: ${....train.variables.prof_inverse.n}
+      # Loading function
+      load:
+        _target_: ${.....train.variables.prof_inverse.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: ${.....train.variables.prof_inverse.save._target_}
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${....train.variables.prof_inverse.transformations}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    prof_inverse:
+      # Dataset class
+      _target_: ${....train.variables.prof_inverse._target_}
+      _recursive_: false
+      # Path to the atmospheric profiles file
+      path: ${...dir}/prof_inverse_test.npy
+      # Profile types
+      type: ${....train.variables.prof_inverse.type}
+      # Number of variables
+      n: ${....train.variables.prof_inverse.n}
+      # Loading function
+      load:
+        _target_: ${.....train.variables.prof_inverse.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: ${.....train.variables.prof_inverse.save._target_}
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${....train.variables.prof_inverse.transformations}
+# Predict set
+predict:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    prof_inverse:
+      # Dataset class
+      _target_: ${....train.variables.prof_inverse._target_}
+      _recursive_: false
+      # Path to the atmospheric profiles file
+      path: ${paths.run_dir}/prof_inverse_predict.npy
+      # Profile types
+      type: ${....train.variables.prof_inverse.type}
+      # Number of variables
+      n: ${....train.variables.prof_inverse.n}
+      # Loading function
+      load:
+        _target_: ${.....train.variables.prof_inverse.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: ${.....train.variables.prof_inverse.save._target_}
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${....train.variables.prof_inverse.transformations}
+# All data (complete dataset)
+all:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    prof_inverse:
+      # Dataset class
+      _target_: ${....train.variables.prof_inverse._target_}
+      _recursive_: false
+      # Type of the atmospheric profiles
+      type: ${....train.variables.prof_inverse.type}
+      # Number of variables
+      n: ${....train.variables.prof_inverse.n}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......train.variables.prof_inverse.load}
+            - ${.......valid.variables.prof_inverse.load}
+            - ${.......test.variables.prof_inverse.load}
+          - 0
+      # Transformations to apply
+      transformations: ${....train.variables.prof_inverse.transformations}

@@ -1,0 +1,322 @@
+# Error covariance matrices
+covariance:
+
+  # Error covariance matrix in model space
+  B:
+    # Function
+    _target_: code.preprocessing.covariance.climatological_matrix
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Variables to consider for the covariance estimation
+      data: ${data.stage.all.variables.prof}
+      # Latitude
+      lat: ${data.stage.all.variables.lat}
+      # Longitude
+      lon: ${data.stage.all.variables.lon}
+      # Scans
+      scans: ${data.stage.all.variables.scans}
+      # Variant mask: Consider only profile pressure levels with non-zero variance
+      variant_mask: ${data.source.all.variables.variant_mask}
+    # Univariate or multivariate
+    univariate: true
+    # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
+    scaling_factor: 1.0
+    # Regularization parameter to ensure numerical stability
+    regularization_type: 'correlation_based'
+    regularization_factor: 0.05
+    # Plot flag
+    plot_flag: true
+    # Recentering
+    recenter: true
+    # Type of recentering:
+    mean_type: 'temporal'
+    # Apply data transformations to the input data before computing the covariance matrix
+    apply_transform: true
+    # What the method produces as output
+    output:
+      # Mu
+      mu:
+        path: code/data/statistics/B_mu.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.B.output.mu.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.B.output.mu.path}
+      unique_coords:
+        path: code/data/statistics/B_unique_coords.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.B.output.unique_coords.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.B.output.unique_coords.path}
+      # Covariance matrix
+      matrix:
+        # File path to save/load the covariance matrix
+        path: code/data/statistics/B_matrix.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.B.output.matrix.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.B.output.matrix.path}
+      # Cholesky decomposition of the covariance matrix
+      matrix_cholesky:
+        # File path to save/load the Cholesky decomposition of the covariance matrix
+        path: code/data/statistics/B_matrix_cholesky.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.B.output.matrix_cholesky.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.B.output.matrix_cholesky.path}
+      # Inverse of the covariance matrix
+      matrix_inverse:
+        # File path to save/load the inverse of the covariance matrix
+        path: code/data/statistics/B_matrix_inverse.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.B.output.matrix_inverse.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.B.output.matrix_inverse.path}
+      # Pseudo-inverse of the covariance matrix
+      matrix_pseudo_inverse:
+        # Parameters
+        params:
+          # Condition number threshold for the pseudo-inverse (e.g., to handle near-singular matrices)
+          rcond: 1e-3
+        # File path to save/load the pseudo-inverse of the covariance matrix
+        path: code/data/statistics/B_matrix_pseudo_inverse.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.B.output.matrix_pseudo_inverse.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.B.output.matrix_pseudo_inverse.path}
+      # Correlation matrix
+      correlation:
+        # File path to save/load the correlation matrix
+        path: code/data/statistics/B_correlation.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.B.output.correlation.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.B.output.correlation.path}
+      # Cholesky decomposition of the correlation matrix
+      # correlation_cholesky:
+      #   # File path to save/load the Cholesky decomposition of the covariance matrix
+      #   path: code/data/statistics/B_correlation_cholesky.npy
+      #   # Save function
+      #   save:
+      #     _target_: numpy.save
+      #     _partial_: true
+      #     _args_:
+      #       - ${preprocessing.covariance.B.output.correlation_cholesky.path}
+      #   # Load function
+      #   load:
+      #     _target_: numpy.load
+      #     _args_:
+      #       - ${preprocessing.covariance.B.output.correlation_cholesky.path}
+      # Inverse of the correlation matrix
+      correlation_inverse:
+        # File path to save/load the inverse of the correlation matrix
+        path: code/data/statistics/B_correlation_inverse.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.B.output.correlation_inverse.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.B.output.correlation_inverse.path}
+      # Pseudo-inverse of the correlation matrix
+      correlation_pseudo_inverse:
+        # Parameters
+        params:
+          # Condition number threshold for the pseudo-inverse (e.g., to handle near-singular matrices)
+          rcond: 1e-3
+        # File path to save/load the pseudo-inverse of the correlation matrix
+        path: code/data/statistics/B_correlation_pseudo_inverse.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.B.output.correlation_pseudo_inverse.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.B.output.correlation_pseudo_inverse.path}
+
+  # Error covariance matrix in observation space
+  R:
+    # Function
+    _target_: code.preprocessing.covariance.climatological_matrix
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Innovation estimates for the observation variables
+      data: ${data.stage.all.variables.bt_forward_err}
+      # Latitude
+      lat: ${data.stage.all.variables.lat}
+      # Longitude
+      lon: ${data.stage.all.variables.lon}
+      # Scans
+      scans: ${data.stage.all.variables.scans}
+    # Univariate or multivariate
+    univariate: true
+    # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
+    scaling_factor: 1.0
+    # Regularization parameter to ensure numerical stability
+    regularization_type: 'correlation_based'
+    regularization_factor: 0.01
+    # Plot flag
+    plot_flag: true
+    # Re-centering
+    recenter: true
+    mean_type: 'spatiotemporal'
+    # Apply data transformations to the input data before computing the covariance matrix
+    apply_transform: true
+    # What the method produces as output
+    output:
+      # Covariance matrix
+      matrix:
+        # File path to save/load the covariance matrix
+        path: code/data/statistics/R_matrix.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.R.output.matrix.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.R.output.matrix.path}
+      # Inverse of the covariance matrix
+      matrix_inverse:
+        # File path to save/load the inverse of the covariance matrix
+        path: code/data/statistics/R_matrix_inverse.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.R.output.matrix_inverse.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.R.output.matrix_inverse.path}
+      # Pseudo-inverse of the covariance matrix
+      matrix_pseudo_inverse:
+        # Parameters
+        params:
+          # Condition number threshold for the pseudo-inverse (e.g., to handle near-singular matrices)
+          rcond: 1e-3
+        # File path to save/load the pseudo-inverse of the covariance matrix
+        path: code/data/statistics/R_matrix_pseudo_inverse.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.R.output.matrix_pseudo_inverse.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.R.output.matrix_pseudo_inverse.path}
+      # Correlation matrix
+      correlation:
+        # File path to save/load the correlation matrix
+        path: code/data/statistics/R_correlation.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.R.output.correlation.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.R.output.correlation.path}
+      # Inverse of the correlation matrix
+      correlation_inverse:
+        # File path to save/load the inverse of the correlation matrix
+        path: code/data/statistics/R_correlation_inverse.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.R.output.correlation_inverse.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.R.output.correlation_inverse.path}
+      # Pseudo-inverse of the correlation matrix
+      correlation_pseudo_inverse:
+        # Parameters
+        params:
+          # Condition number threshold for the pseudo-inverse (e.g., to handle near-singular matrices)
+          rcond: 1e-3
+        # File path to save/load the pseudo-inverse of the correlation matrix
+        path: code/data/statistics/R_correlation_pseudo_inverse.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.R.output.correlation_pseudo_inverse.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.R.output.correlation_pseudo_inverse.path}

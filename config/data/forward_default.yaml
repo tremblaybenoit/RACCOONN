@@ -1,19 +1,41 @@
 defaults:
-  - variables/forward_input@stage.train.vars
-  - variables/forward_input@stage.valid.vars
-  - variables/forward_input@stage.test.vars
-  - variables/forward_input@stage.predict.vars
-  - variables/forward_target@stage.train.vars
-  - variables/forward_target@stage.valid.vars
-  - variables/forward_target@stage.test.vars
-
-# Configuration to download the training and testing data
-download:
-  dir: ${paths.data_dir}
-  url: "https://zenodo.org/record/1482223/files/GOES-16_ML_Training_Testing_Data.zip?download=1"
+  - synthetic/default@stage
+  - synthetic/default@source
 
 # dtype
 dtype: 'float32'
+
+# Variables to use as input/output
+select_input: ['prof', 'meta', 'surf']
+select_target: ['bt_crtm']
+select_context: ['clear_mask', 'cloud_mask', 'daytime_mask', 'nighttime_mask']
+select_output: ['bt_forward', 'bt_forward_stdev']
+
+# Original data - Split the data into training, validation, and test sets
+source:
+  # Training set
+  train:
+    # Path to training data
+    dir: ../synthetic_float32/Train2
+    # Split
+    split: null
+
+  # Validation set
+  valid:
+    # Path to validation data
+    dir: ../synthetic_float32/Val2
+    # Split
+    split: null
+
+  # Test set
+  test:
+    # Path to test data
+    dir: ../synthetic_float32/Test2
+    # Split
+    split: null
+
+  # Prediction set
+  predict: null
 
 # Split the data into training, validation, and test sets
 stage:
@@ -41,6 +63,6 @@ stage:
   # Prediction set (NOTE: By default, we use the test set as the prediction set for demonstration purposes)
   predict:
     # Path to prediction data
-    dir: ${paths.data_dir}/Test2
+    dir: ${data.stage.test.dir}
     # Split
-    split: null
+    split: ${data.stage.test.split}

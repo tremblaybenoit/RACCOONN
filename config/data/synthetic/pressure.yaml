@@ -1,0 +1,117 @@
+# Format:
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Pressure
+    pressure:
+      # Dataset class
+      _target_: code.loader.dataset.ConstantDataset
+      _recursive_: false
+      # Path to the pressure data file
+      path: ${...dir}/pressure.npy
+      # Type of pressure levels
+      type: 'Pressure (hPa)'
+      # Number of variables
+      n: 127
+      # Loading function
+      load:
+        _target_: code.data.io.load_npy
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: code.data.io.save_npy
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations:
+        # Per-variable normalization
+        normalization:
+          _target_: code.data.transformations.min_max
+          _partial_: true
+          stats:
+            _target_: code.preprocessing.statistics.read_statistics_var
+            load: ${preprocessing.statistics.output.load}
+            key: 'pressure'
+            dtype: ${data.dtype}
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Pressure
+    pressure:
+      # Dataset class
+      _target_: ${....train.variables.pressure._target_}
+      _recursive_: false
+      # Path to the pressure data file
+      path: ${...dir}/pressure.npy
+      # Type of pressure levels
+      type: ${....train.variables.pressure.type}
+      # Number of variables
+      n: ${....train.variables.pressure.n}
+      # Loading function
+      load:
+        _target_: ${.....train.variables.pressure.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: ${.....train.variables.pressure.save._target_}
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${....train.variables.pressure.transformations}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Pressure
+    pressure:
+      # Dataset class
+      _target_: ${....train.variables.pressure._target_}
+      _recursive_: false
+      # Path to the pressure data file
+      path: ${...dir}/pressure.npy
+      # Type of pressure levels
+      type: ${....train.variables.pressure.type}
+      # Number of variables
+      n: ${....train.variables.pressure.n}
+      # Loading function
+      load:
+        _target_: ${.....train.variables.pressure.load._target_}
+        path: ${..path}
+        split: ${....split}
+        dtype: ${data.dtype}
+      # Save function
+      save:
+        _target_: ${.....train.variables.pressure.save._target_}
+        _partial_: true
+        _args_:
+          - ${...path}
+        dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${....train.variables.pressure.transformations}
+# Predict set
+predict:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Pressure
+    pressure: ${...test.variables.pressure}
+# All data (complete dataset)
+all:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Pressure
+    pressure: ${...train.variables.pressure}

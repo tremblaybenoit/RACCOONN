@@ -1,0 +1,102 @@
+# Format:
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Pressure (log-transformed)
+    pressure_log:
+      # Dataset class
+      _target_: code.loader.dataset.ConstantDataset
+      _recursive_: false
+      # Path to the pressure data file
+      path: ${...dir}/pressure.npy
+      # Type of pressure levels
+      type: 'Log10(pressure)'
+      # Number of variables
+      n: 127
+      # Loading function
+      load:
+        _target_: numpy.log10
+        _args_:
+        - _target_: code.data.io.load_npy
+          path: ${....path}
+          split: ${......split}
+          dtype: ${data.dtype}
+      # Transformations to apply
+      transformations:
+        # Per-variable normalization with log transform
+        normalization:
+          _target_: code.data.transformations.min_max
+          _partial_: true
+          stats:
+            _target_: code.preprocessing.statistics.read_statistics_var
+            load: ${preprocessing.statistics.output.load}
+            key: 'pressure_log'
+            dtype: ${data.dtype}
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Pressure (log-transformed)
+    pressure_log:
+      # Dataset class
+      _target_: ${....train.variables.pressure_log._target_}
+      _recursive_: false
+      # Path to the pressure data file
+      path: ${...dir}/pressure.npy
+      # Type of pressure levels
+      type: ${....train.variables.pressure_log.type}
+      # Number of variables
+      n: ${....train.variables.pressure_log.n}
+      # Loading function
+      load:
+        _target_: numpy.log10
+        _args_:
+        - _target_: code.data.io.load_npy
+          path: ${....path}
+          split: ${......split}
+          dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${....train.variables.pressure_log.transformations}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Pressure (log-transformed)
+    pressure_log:
+      # Dataset class
+      _target_: ${....train.variables.pressure_log._target_}
+      _recursive_: false
+      # Path to the pressure data file
+      path: ${...dir}/pressure.npy
+      # Type of pressure levels
+      type: ${....train.variables.pressure_log.type}
+      # Number of variables
+      n: ${....train.variables.pressure_log.n}
+      # Loading function
+      load:
+        _target_: numpy.log10
+        _args_:
+        - _target_: code.data.io.load_npy
+          path: ${....path}
+          split: ${......split}
+          dtype: ${data.dtype}
+      # Transformations to apply
+      transformations: ${....train.variables.pressure_log.transformations}
+# Predict set
+predict:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Pressure (log-transformed)
+     pressure_log: ${...test.variables.pressure_log}
+# All data (complete dataset)
+all:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Pressure (log-transformed)
+    pressure_log: ${...train.variables.pressure_log}

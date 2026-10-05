@@ -1,12 +1,16 @@
 # Note: The order of defaults determines the order in which configs override each other.
 defaults:
-  - hydra: default
   - paths: default
-  - data: inverse_
-  - preparation: inverse_default
-  - loader: inverse_train  # Training only
-  - model: inverse_operator
-  - trainer: default
+  - hydra: default
+  - data: inverse_default
+  - preprocessing: inverse_default
+  - loader: default
+  - architecture: mlp_modular
+  - loss: var
+  - optimizer: default
+  - scheduler: default
+  - model: inverse_default
   - callbacks: inverse_default
   - logger: default
+  - trainer: cpu
   - _self_
