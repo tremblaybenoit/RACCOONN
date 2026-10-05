@@ -202,34 +202,68 @@ experiment configuration.
 ### Automated workflow (recommended)
 RACCOONN uses the [Snakemake workflow management system](https://snakemake.readthedocs.io/en/stable/) for reproducibility.
 
-To perform a dry-run (i.e., to check the workflow prior to execution) of the Snakefile rule [`predict`](Snakefile) with the [`forward_clear`](config/experiment/forward_clear.yaml) experiment configuration:
+To perform a dry-run (i.e., to check the workflow prior to execution) of the Snakefile rule [`predict`](Snakefile) with the [`inverse_clear_split`](config/experiment/inverse_clear_split.yaml) experiment configuration:
 
 ```bash
-snakemake --dry-run --verbose predict --config experiment=forward_clear
+snakemake --dry-run --verbose predict --config experiment=inverse_clear_split
 ```
 
 To account for missing dependencies, add the `--rerun-incomplete` flag:
 
 ```bash
-snakemake --dry-run --rerun-incomplete --verbose predict --config experiment=forward_clear
+snakemake --dry-run --rerun-incomplete --verbose predict --config experiment=inverse_clear_split
 ```
 
 To run the workflow, remove `--dry-run` and specify the number of `--cores` to use (type 'all' to use all available cores):
 
 ```bash
-snakemake --cores all --verbose predict --config experiment=forward_clear
+snakemake --cores all --verbose predict --config experiment=inverse_clear_split
 ```
 
-To draw a [directed acyclic graph (DAG)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) of the training workflow (e.g., [`config/experiment/forward_clear.svg`](config/experiment/forward_clear.svg) for Snakefile rule [`predict`](Snakefile)):
+To draw a [directed acyclic graph (DAG)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) of the training workflow (e.g., [`config/experiment/inverse_clear_split.mmd`](config/experiment/inverse_clear_split.mmd) for Snakefile rule [`predict`](Snakefile)):
 
 ```bash
-snakemake predict --rulegraph --config experiment=forward_clear | dot -Tsvg > config/experiment/forward_clear.svg
+snakemake predict --config experiment=inverse_clear_split --rulegraph mermaid-js > config/experiment/inverse_clear_split.mmd
 ```
 Replace `--rulegraph` with `--dag` to highlight completed rules with dashed boxes.
 
-**Example**: The following graph shows the workflow for the Snakefile rule [`predict`](Snakefile) for experiment [`forward_clear`](config/experiment/forward_clear.yaml).
+**Example**: The following graph shows the workflow for the Snakefile rule [`predict`](Snakefile) for experiment [`inverse_clear_split`](config/experiment/inverse_clear_split.yaml).
 
-<img src="config/experiment/forward_clear.svg" alt="Forward Model Prediction Workflow DAG" width="900">
+```mermaid
+---
+title: RACCOONN inverse model workflow
+---
+flowchart TB
+	id0[predict]
+	id1[recast]
+	id2[statistics]
+	id3[train]
+	id4[covariance_B]
+	id5[covariance_R]
+	id6[test]
+	style id0 fill:#C6D957,stroke-width:2px,color:#333333
+	style id1 fill:#7CD957,stroke-width:2px,color:#333333
+	style id2 fill:#57D97C,stroke-width:2px,color:#333333
+	style id3 fill:#57A1D9,stroke-width:2px,color:#333333
+	style id4 fill:#D95757,stroke-width:2px,color:#333333
+	style id5 fill:#D9A157,stroke-width:2px,color:#333333
+	style id6 fill:#57D9C6,stroke-width:2px,color:#333333
+	id2 --> id0
+	id6 --> id0
+	id3 --> id0
+	id1 --> id0
+	id2 --> id3
+	id5 --> id3
+	id4 --> id3
+	id1 --> id3
+	id2 --> id4
+	id2 --> id5
+	id4 --> id6
+	id2 --> id6
+	id3 --> id6
+	id5 --> id6
+	id1 --> id6
+```
 
 ## Documentation
 The RACCOON project documentation is available at https://raccoonn.readthedocs.io/.

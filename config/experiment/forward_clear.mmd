@@ -1,0 +1,18 @@
+---
+title: DAG
+---
+flowchart TB
+	id0[predict]
+	id1[statistics]
+	id2[train]
+	id3[test]
+	style id0 fill:#D95757,stroke-width:2px,color:#333333
+	style id1 fill:#8BD957,stroke-width:2px,color:#333333
+	style id2 fill:#57BFD9,stroke-width:2px,color:#333333
+	style id3 fill:#57D98B,stroke-width:2px,color:#333333
+	id1 --> id0
+	id3 --> id0
+	id2 --> id0
+	id1 --> id2
+	id1 --> id3
+	id2 --> id3

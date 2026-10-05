@@ -4,6 +4,7 @@ import hydra
 from omegaconf import DictConfig
 from scipy.spatial import cKDTree
 import logging
+from code.data.io import load_variable
 from utilities.logic import get_config_path
 from utilities.instantiators import instantiate
 
@@ -139,7 +140,6 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
         mask = None
         cloud_keep = True
         clear_keep = True
-        log_keep = False
         if hasattr(input, 'mask'):
 
             # Spatial extent
@@ -148,9 +148,9 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
                 logger.info(f"Spatial domain mask...")
                 # Load coordinates
                 if 'lat' not in data_stage:
-                    data_stage['lat'] = instantiate(config_stage.variables['lat'].load)
+                    data_stage['lat'] = load_variable(config_stage.variables['lat'])
                 if 'lon' not in data_stage:
-                    data_stage['lon'] = instantiate(config_stage.variables['lon'].load)
+                    data_stage['lon'] = load_variable(config_stage.variables['lon'])
                 # Apply mask
                 if mask is None:
                     mask = np.ones_like(data_stage['lat'], dtype=bool)
@@ -168,7 +168,7 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
                 logger.info(f"Temporal window mask...")
                 # Load coordinates
                 if 'scans' not in data_stage:
-                    data_stage['scans'] = instantiate(config_stage.variables['scans'].load)
+                    data_stage['scans'] = load_variable(config_stage.variables['scans'])
                 # Apply mask
                 if mask is None:
                     mask = np.ones_like(data_stage['scans'], dtype=bool)
@@ -183,44 +183,44 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
             clear_keep = input.mask.get('clear_mask', True)
             # If we keep one
             if cloud_keep != clear_keep:
-                cloud_mask = instantiate(config_stage.variables['cloud_mask'].load)
+                data_stage['cloud_mask'] = load_variable(config_stage.variables['cloud_mask'])
+                data_stage['clear_mask'] = ~data_stage['cloud_mask']
                 # Clouds only
                 if cloud_keep and not clear_keep:
                     logger.info(f"Cloud mask...")
                     if mask is None:
-                        mask = cloud_mask
+                        mask = data_stage['cloud_mask']
                     else:
-                        mask &= cloud_mask
+                        mask &= data_stage['cloud_mask']
                 # Clear sky only
                 elif clear_keep and not cloud_keep:
                     logger.info(f"Clear mask...")
                     if mask is None:
-                        mask = ~cloud_mask
+                        mask = data_stage['clear_mask']
                     else:
-                        mask &= ~cloud_mask
-                del cloud_mask
+                        mask &= data_stage['clear_mask']
 
             # Daytime or nighttime
             daytime_keep = input.mask.get('daytime_mask', True)
             nighttime_keep = input.mask.get('nighttime_mask', True)
             # If we keep one
             if daytime_keep != nighttime_keep:
-                daytime_mask = instantiate(config_stage.variables['daytime_mask'].load)
+                data_stage['daytime_mask'] = load_variable(config_stage.variables['daytime_mask'])
+                data_stage['nighttime_mask'] = ~data_stage['daytime_mask']
                 # Daytime only
                 if daytime_keep and not nighttime_keep:
                     logger.info(f"Daytime mask...")
                     if mask is None:
-                        mask = daytime_mask
+                        mask = data_stage['daytime_mask']
                     else:
-                        mask &= daytime_mask
+                        mask &= data_stage['daytime_mask']
                 # Nighttime only
                 elif nighttime_keep and not daytime_keep:
                     logger.info(f"Nighttime mask...")
                     if mask is None:
-                        mask = ~daytime_mask
+                        mask = data_stage['nighttime_mask']
                     else:
-                        mask &= ~daytime_mask
-                del daytime_mask
+                        mask &= data_stage['nighttime_mask']
 
             # Remove samples with null profiles
             log_keep = input.mask.get('log_mask', False)
@@ -228,7 +228,7 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
                 logger.info(f"Removing samples with null profiles...")
                 # Load profiles
                 if 'prof' not in data_stage:
-                    data_stage['prof'] = instantiate(config_stage.variables['prof'].load)
+                    data_stage['prof'] = load_variable(config_stage.variables['prof'])
                 if clear_keep and not cloud_keep:
                     if data_stage['prof'].shape[1] > 3:
                         data_stage['prof'] = np.take(data_stage['prof'], [0, 4, 8], axis=1)
@@ -252,7 +252,7 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
                 # Check that the variable is available
                 if variable not in data_stage:
                     logger.info(f"Loading variable '{variable}'")
-                    data_stage[variable] = instantiate(config_stage.variables[variable].load)
+                    data_stage[variable] = load_variable(config_stage.variables[variable])
                 # Apply mask
                 if variable not in ('pressure', 'variant_mask', 'invariant_mask') and mask is not None:
                     data_stage[variable] = data_stage[variable][mask]
@@ -277,7 +277,7 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
                 # Check that the variable is available
                 if variable not in data_stage:
                     logger.info(f"Loading variable '{variable}'")
-                    data_stage[variable] = instantiate(config_stage.variables[variable].load)
+                    data_stage[variable] = load_variable(config_stage.variables[variable])
                 # Save function
                 save_fn = instantiate(config_variable.save)
                 # Create directory if needed
@@ -372,4 +372,3 @@ if __name__ == '__main__':
     """
 
     main()
-

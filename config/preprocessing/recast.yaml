@@ -112,6 +112,10 @@ recast:
       train:
         # Variables
         variables:
+          # Cloud mask
+          cloud_mask: ${data.stage.train.variables.cloud_mask}
+          # Daytime mask
+          daytime_mask: ${data.stage.train.variables.daytime_mask}
           # bt_crtm
           bt_crtm: ${data.stage.train.variables.bt_crtm}
           # Latitude
@@ -134,6 +138,10 @@ recast:
       valid:
         # Variables
         variables:
+          # Cloud mask
+          cloud_mask: ${data.stage.valid.variables.cloud_mask}
+          # Daytime mask
+          daytime_mask: ${data.stage.valid.variables.daytime_mask}
           # bt_crtm
           bt_crtm: ${data.stage.valid.variables.bt_crtm}
           # Latitude
@@ -156,6 +164,10 @@ recast:
       test:
         # Variables
         variables:
+          # Cloud mask
+          cloud_mask: ${data.stage.test.variables.cloud_mask}
+          # Daytime mask
+          daytime_mask: ${data.stage.test.variables.daytime_mask}
           # bt_crtm
           bt_crtm: ${data.stage.test.variables.bt_crtm}
           # Latitude
