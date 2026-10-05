@@ -1,0 +1,151 @@
+# Format:
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    prof_prior:
+      # Dataset class
+      _target_: code.loader.dataset.EagerDataset
+      _recursive_: false
+      # Path to the atmospheric profiles file
+      # path: null
+      # Profile types
+      type: ${..prof.type}
+      # Number of variables
+      n: ${..prof.n}
+      # Loading function
+      load:
+        _target_: code.preprocessing.covariance.prior_from_bounded_perturbations
+        _recursive_: false
+        # What the method needs as input
+        input:
+          # Atmospheric profiles
+          prof: ${....prof}
+          # Cholesky matrix
+          cholesky: ${preprocessing.covariance.B.output.matrix_cholesky}
+          # Statistics for lower/upper bounds
+          stats:
+            _target_: code.preprocessing.statistics.read_statistics_var
+            load: ${preprocessing.statistics.output.load}
+            key: 'prof'
+            dtype: ${data.dtype}
+        # Parameters
+        seed: 75
+        apply_transform: ${preprocessing.covariance.B.apply_transform}
+      # Transformations to apply
+      transformations: ${..prof.transformations}
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    prof_prior:
+      # Dataset class
+      _target_: ${....train.variables.prof_prior._target_}
+      _recursive_: false
+      # Path to the atmospheric profiles file
+      # path: null
+      # Profile types
+      type: ${....train.variables.prof_prior.type}
+      # Number of variables
+      n: ${....train.variables.prof_prior.n}
+      # Loading function
+      load:
+        _target_: ${.....train.variables.prof_prior.load._target_}
+        _recursive_: false
+        # What the method needs as input
+        input:
+          # Atmospheric profiles
+          prof: ${....prof}
+          # Cholesky matrix
+          cholesky: ${......train.variables.prof_prior.load.input.cholesky}
+          # Statistics for lower/upper bounds
+          stats: ${......train.variables.prof_prior.load.input.stats}
+        # Parameters
+        seed: 48
+        apply_transform: ${.....train.variables.prof_prior.load.apply_transform}
+      # Transformations to apply
+      transformations: ${..prof.transformations}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    prof_prior:
+      # Dataset class
+      _target_: ${....train.variables.prof_prior._target_}
+      _recursive_: false
+      # Path to the atmospheric profiles file
+      # path: null
+      # Profile types
+      type: ${....train.variables.prof_prior.type}
+      # Number of variables
+      n: ${....train.variables.prof_prior.n}
+      # Loading function
+      load:
+        _target_: ${.....train.variables.prof_prior.load._target_}
+        _recursive_: false
+        # What the method needs as input
+        input:
+          # Atmospheric profiles
+          prof: ${....prof}
+          # Cholesky matrix
+          cholesky: ${......train.variables.prof_prior.load.input.cholesky}
+          # Statistics for lower/upper bounds
+          stats: ${......train.variables.prof_prior.load.input.stats}
+        # Parameters
+        seed: 15
+        apply_transform: ${.....train.variables.prof_prior.load.apply_transform}
+      # Transformations to apply
+      transformations: ${..prof.transformations}
+# Predict set
+predict:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    prof_prior:
+      # Dataset class
+      _target_: ${....train.variables.prof_prior._target_}
+      _recursive_: false
+      # Type of the atmospheric profiles
+      type: ${....train.variables.prof_prior.type}
+      # Number of variables
+      n: ${....train.variables.prof_prior.n}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......valid.variables.prof_prior.load}
+            - ${.......test.variables.prof_prior.load}
+          - 0
+      # Transformations to apply
+      transformations: ${....train.variables.prof_prior.transformations}
+# All data (complete dataset)
+all:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    prof_prior:
+      # Dataset class
+      _target_: ${....train.variables.prof_prior._target_}
+      _recursive_: false
+      # Type of the atmospheric profiles
+      type: ${....train.variables.prof_prior.type}
+      # Number of variables
+      n: ${....train.variables.prof_prior.n}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......train.variables.prof_prior.load}
+            - ${.......valid.variables.prof_prior.load}
+            - ${.......test.variables.prof_prior.load}
+          - 0
+      # Transformations to apply
+      transformations: ${....train.variables.prof_prior.transformations}

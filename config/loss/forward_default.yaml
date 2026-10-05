@@ -1,0 +1,3 @@
+# Default loss
+defaults:
+  - crps

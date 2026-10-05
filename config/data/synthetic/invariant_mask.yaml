@@ -1,0 +1,46 @@
+# Format:
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+
+# All data (complete dataset)
+all:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Prof mask
+    invariant_mask:
+      # Dataset class
+      _target_: code.loader.dataset.ConstantDataset
+      _recursive_: false
+      # Type of data
+      type: 'Invariant mask'
+      # Loading function
+      load:
+        _target_: numpy.logical_not
+        _args_:
+          - ${....variant_mask.load}
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Invariant mask
+    invariant_mask: ${...all.variables.invariant_mask}
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Invariant mask
+    invariant_mask: ${...all.variables.invariant_mask}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Invariant mask
+    invariant_mask: ${...all.variables.invariant_mask}
+# Predict set
+predict:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Invariant mask
+    invariant_mask: ${...all.variables.invariant_mask}

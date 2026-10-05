@@ -1,0 +1,230 @@
+# Configuration to load multiple preprocessing methods
+defaults:
+  - inverse_default
+  - _self_
+
+# Compute slant path coordinates
+#slant:
+#  # Training set
+#  source_train:
+#    # Function
+#    _target_: code.preprocessing.slant.compute_slant_path
+#    _recursive_: false  # Do not instantiate nested objects
+#    # What the method needs as input
+#    input:
+#      # Coordinates
+#      lat: ${data.source.train.variables.lat}
+#      lon: ${data.source.train.variables.lon}
+#      pressure: ${data.source.train.variables.pressure}
+#      # Meta data
+#      meta: ${data.source.train.variables.meta}
+#      # Profiles
+#      prof: ${data.source.train.variables.prof}
+#    output:
+#      # Coordinates
+#      lat: ${data.source.train.variables.lat_slant}
+#      lon: ${data.source.train.variables.lon_slant}
+#      z: ${data.source.train.variables.z_slant}
+#      x: ${data.source.train.variables.x_slant}
+#      y: ${data.source.train.variables.y_slant}
+#  # Validation set
+#  source_valid:
+#    # Function
+#    _target_: code.preprocessing.slant.compute_slant_path
+#    _recursive_: false  # Do not instantiate nested objects
+#    # What the method needs as input
+#    input:
+#      # Coordinates
+#      lat: ${data.source.valid.variables.lat}
+#      lon: ${data.source.valid.variables.lon}
+#      pressure: ${data.source.valid.variables.pressure}
+#      # Meta data
+#      meta: ${data.source.valid.variables.meta}
+#      # Profiles
+#      prof: ${data.source.valid.variables.prof}
+#    output:
+#      # Coordinates
+#      lat: ${data.source.valid.variables.lat_slant}
+#      lon: ${data.source.valid.variables.lon_slant}
+#      z: ${data.source.valid.variables.z_slant}
+#      x: ${data.source.valid.variables.x_slant}
+#      y: ${data.source.valid.variables.y_slant}
+#  # Test set
+#  source_test:
+#    # Function
+#    _target_: code.preprocessing.slant.compute_slant_path
+#    _recursive_: false  # Do not instantiate nested objects
+#    # What the method needs as input
+#    input:
+#      # Coordinates
+#      lat: ${data.source.test.variables.lat}
+#      lon: ${data.source.test.variables.lon}
+#      pressure: ${data.source.test.variables.pressure}
+#      # Meta data
+#      meta: ${data.source.test.variables.meta}
+#      # Profiles
+#      prof: ${data.source.test.variables.prof}
+#    output:
+#      # Coordinates
+#      lat: ${data.source.test.variables.lat_slant}
+#      lon: ${data.source.test.variables.lon_slant}
+#      z: ${data.source.test.variables.z_slant}
+#      x: ${data.source.test.variables.x_slant}
+#      y: ${data.source.test.variables.y_slant}
+
+# Recast data to new format, spatiotemporal distribution
+recast:
+  # What the method needs as input
+  input:
+    # Split
+    split:
+      # Ratio for split
+      ratio:
+        train: 0.6
+        valid: 0.2
+        test: 0.2
+      # Mask to apply
+      mask:
+        # Spatial domain:
+        spatial_domain:
+          lat_min: -90.0
+          lat_max: 90.0
+          lon_min: -180.0
+          lon_max: 180.0
+        # Temporal domain:
+        temporal_window:
+          scans_min: 0.0
+          scans_max: 181.0
+        # Cloud/clear sky
+        cloud_mask: true
+        clear_mask: true
+      # Seed
+      seed: 42
+      # Tolerance for edges (degrees)
+      tolerance: 0.75
+
+# Statistics of the ENTIRE dataset
+statistics:
+  # What the method needs as input
+  input: ${data.source.all.variables}
+
+# Error covariance matrices
+covariance:
+
+  # Error covariance matrix in model space
+  B:
+    # Function
+    _target_: code.preprocessing.covariance.climatological_matrix
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Variables to consider for the covariance estimation
+      data: ${data.source.all.variables.prof}
+      # Latitude
+      lat: ${data.source.all.variables.lat}
+      # Longitude
+      lon: ${data.source.all.variables.lon}
+      # Scans
+      scans: ${data.source.all.variables.scans}
+      # Variant mask: Consider only profile pressure levels with non-zero variance
+      variant_mask: ${data.source.all.variables.variant_mask}
+      # Variant mask: Consider only profile pressure levels with non-zero variance
+      # variant_mask: ${data.source.all.variables.variant_mask}
+      # Spatial domain: Consider only profiles within the specified latitude and longitude bounds
+      spatial_mask:
+        _target_: code.preprocessing.mask.spatial_mask
+        lat: ${..lat.load}
+        lon: ${..lon.load}
+        lat_min: ${preprocessing.recast.input.mask.spatial_domain.lat_min}
+        lat_max: ${preprocessing.recast.input.mask.spatial_domain.lat_max}
+        lon_min: ${preprocessing.recast.input.mask.spatial_domain.lon_min}
+        lon_max: ${preprocessing.recast.input.mask.spatial_domain.lon_max}
+    output:
+      # Covariance matrix
+      diagonal:
+        # File path to save/load the covariance matrix
+        path: code/data/statistics/B_diagonal.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.B.output.diagonal.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.B.output.diagonal.path}
+      # Inverse of the covariance matrix
+      diagonal_inverse:
+        # File path to save/load the inverse of the covariance matrix
+        path: code/data/statistics/B_diagonal_inverse.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.B.output.diagonal_inverse.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.B.output.diagonal_inverse.path}
+
+  # Error covariance matrix in observation space
+  R:
+    # Function
+    _target_: code.preprocessing.covariance.climatological_matrix
+    _recursive_: false  # Do not instantiate nested objects
+    # What the method needs as input
+    input:
+      # Innovation estimates for the observation variables
+      data: ${data.source.predict.variables.bt_forward_err}
+      # Latitude
+      lat: ${data.source.predict.variables.lat}
+      # Longitude
+      lon: ${data.source.predict.variables.lon}
+      # Scans
+      scans: ${data.source.predict.variables.scans}
+      # Variant mask: Consider only profile pressure levels with non-zero variance
+      # variant_mask: ${data.source.all.variables.variant_mask}
+      # Spatial domain: Consider only profiles within the specified latitude and longitude bounds
+      spatial_mask:
+        _target_: code.preprocessing.mask.spatial_mask
+        lat: ${..lat.load}
+        lon: ${..lon.load}
+        lat_min: ${preprocessing.recast.input.mask.spatial_domain.lat_min}
+        lat_max: ${preprocessing.recast.input.mask.spatial_domain.lat_max}
+        lon_min: ${preprocessing.recast.input.mask.spatial_domain.lon_min}
+        lon_max: ${preprocessing.recast.input.mask.spatial_domain.lon_max}
+    output:
+      # Covariance matrix
+      diagonal:
+        # File path to save/load the covariance matrix
+        path: code/data/statistics/R_diagonal.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.R.output.diagonal.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.R.output.diagonal.path}
+      # Inverse of the covariance matrix
+      diagonal_inverse:
+        # File path to save/load the inverse of the covariance matrix
+        path: code/data/statistics/R_diagonal_inverse.npy
+        # Save function
+        save:
+          _target_: numpy.save
+          _partial_: true
+          _args_:
+            - ${preprocessing.covariance.R.output.diagonal_inverse.path}
+        # Load function
+        load:
+          _target_: numpy.load
+          _args_:
+            - ${preprocessing.covariance.R.output.diagonal_inverse.path}

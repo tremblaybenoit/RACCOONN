@@ -1,0 +1,4 @@
+# Default scheduler - uses plateau
+defaults:
+  - plateau
+

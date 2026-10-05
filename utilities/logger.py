@@ -14,22 +14,31 @@ logger = logging.getLogger(__name__)
 
 def _open_url_wsl_fallback(url: str) -> bool:
     """Try webbrowser.open() then, if running under WSL, use Windows commands to open the URL.
-    Returns True if a launcher was started."""
-    # 1) Try webbrowser
+
+    Parameters
+    ----------
+    url: str. The URL to open in a web browser.
+
+    Returns
+    -------
+    bool. True if a launcher was successfully started, False otherwise.
+    """
+
+    # (a) Try webbrowser
     try:
         if webbrowser.open(url, new=2):
             return True
-    except Exception:
+    except OSError:
         pass
 
-    # 2) Detect WSL
+    # (b) Detect WSL
     is_wsl = False
     if sys.platform.startswith("linux"):
         try:
             with open("/proc/version", "r") as f:
                 text = f.read()
                 is_wsl = "Microsoft" in text or "microsoft" in text
-        except Exception:
+        except (OSError, FileNotFoundError):
             is_wsl = False
 
     if is_wsl:
@@ -42,29 +51,29 @@ def _open_url_wsl_fallback(url: str) -> bool:
             try:
                 subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 return True
-            except Exception:
+            except (OSError, FileNotFoundError):
                 continue
 
-    # 3) Generic fallbacks for non-WSL Linux/Win/macOS
+    # (c) Generic fallbacks for non-WSL Linux/Win/macOS
     if sys.platform.startswith("linux"):
         for cmd in (["xdg-open", url], ["gio", "open", url]):
             try:
                 subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 return True
-            except Exception:
+            except (OSError, FileNotFoundError):
                 continue
     elif sys.platform == "darwin":
         try:
             subprocess.Popen(["open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             return True
-        except Exception:
+        except (OSError, FileNotFoundError):
             pass
     elif os.name == "nt":
         for cmd in (["cmd", "/C", "start", "", url], ["powershell", "-NoProfile", "-Command", "Start-Process", url]):
             try:
                 subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 return True
-            except Exception:
+            except (OSError, FileNotFoundError):
                 continue
 
     logger.warning("Could not open browser programmatically; please open URL manually: %s", url)
@@ -85,8 +94,18 @@ class TrainerLogger:
         # Load config object and resolve paths
         self.config = config
 
-    def _fix_path(self, path: str) -> str:
-        """Converts a potential Windows path to a WSL path if running in WSL."""
+    @staticmethod
+    def _fix_path(path: str) -> str:
+        """Converts a potential Windows path to a WSL path if running in WSL.
+
+        Parameters
+        ----------
+        path: str. The file path to convert (Windows or Unix format).
+
+        Returns
+        -------
+        str. The converted path (WSL format if running in WSL, absolute path otherwise).
+        """
         # Check if we are in WSL
         if sys.platform.startswith("linux"):
             try:
@@ -96,17 +115,15 @@ class TrainerLogger:
                         if ":" in path or "\\" in path:
                             # Use the 'wslpath' utility to convert C:\ to /mnt/c/
                             return subprocess.check_output(["wslpath", "-u", path]).decode().strip()
-            except Exception:
+            except (OSError, FileNotFoundError, subprocess.CalledProcessError):
                 pass
         return os.path.abspath(path)
 
     def configure(self) -> None:
-        """Configure logger for offline mode if specified in the config.
+        """Configure logger(s) for offline mode and UI access if specified in the config.
 
-        Parameters
-        ----------
-        If "wandb" is in the config and "offline" is set to True, set WANDB_MODE to "offline".
-        If "mlflow" is in the config and "tracking_uri" is set, set MLFLOW_TRACKING_URI to the specified URI.
+        Sets up environment variables for wandb offline mode and MLflow tracking URI.
+        Optionally starts the logger UI(s) if configured.
 
         Returns
         -------

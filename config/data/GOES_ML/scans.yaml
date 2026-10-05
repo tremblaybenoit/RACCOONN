@@ -1,0 +1,96 @@
+# Format:
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Scans
+    scans:
+      # Dataset class
+      _target_: code.loader.dataset.EagerDataset
+      _recursive_: false
+      # Path to the scans data file
+      path: ${...dir}/scans.txt
+      # Type of scans
+      type: 'Time'
+      # Loading function
+      load:
+        _target_: code.data.io.load_scans
+        path: ${..path}
+        lat:
+          _target_: ${....lat.load._target_}
+          path: ${....lat.path}
+        split: ${....split}
+      # Transformations to apply
+      transformations: null
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Scans
+    scans:
+      # Dataset class
+      _target_: ${....train.variables.scans._target_}
+      _recursive_: false
+      # Path to the scans data file
+      path: ${...dir}/scans.txt
+      # Type of scans
+      type: ${....train.variables.scans.type}
+      # Loading function
+      load:
+        _target_: ${.....train.variables.scans.load._target_}
+        path: ${..path}
+        lat:
+          _target_: ${....lat.load._target_}
+          path: ${....lat.path}
+        split: ${....split}
+      # Transformations to apply
+      transformations: ${....train.variables.scans.transformations}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Scans
+    scans:
+      # Dataset class
+      _target_: ${....train.variables.scans._target_}
+      _recursive_: false
+      # Path to the scans data file
+      path: ${...dir}/scans.txt
+      # Type of scans
+      type: ${....train.variables.scans.type}
+      # Loading function
+      load:
+        _target_: ${.....train.variables.scans.load._target_}
+        path: ${..path}
+        lat:
+          _target_: ${....lat.load._target_}
+          path: ${....lat.path}
+        split: ${....split}
+      # Transformations to apply
+      transformations: ${....train.variables.scans.transformations}
+# All data (complete dataset)
+all:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Scans
+    scans:
+      # Dataset class
+      _target_: ${....train.variables.scans._target_}
+      _recursive_: false
+      # Type of scans
+      type: ${....train.variables.scans.type}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......train.variables.scans.load}
+            - ${.......valid.variables.scans.load}
+            - ${.......test.variables.scans.load}
+          - 0
+      # Transformations to apply
+      transformations: ${....train.variables.scans.transformations}

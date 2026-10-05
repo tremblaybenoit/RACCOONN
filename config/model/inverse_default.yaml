@@ -1,0 +1,36 @@
+# Inverse Model Configuration (refactored to use separate configs)
+_target_: code.model.inverse.InverseModel
+_recursive_: false
+
+# Checkpoint path for saving and loading model weights
+ckpt_path: ${paths.checkpoint_dir}/${callbacks.model_checkpoint.filename}.ckpt
+
+# Optimizer - reference external config
+optimizer: ${optimizer}
+
+# Scheduler - reference external config
+scheduler: ${scheduler}
+
+# Loss function - reference external config
+loss: ${loss}
+
+# Pre-processing - reference
+pre_process:
+  _target_: code.architecture.layer.TransformationsLayers
+  _recursive_: false
+  transformations: ${extract_nested:${loader.stage.train.input.variables},'transformations'}
+
+# Architecture - reference external config
+architecture: ${architecture}
+
+# Post-processing - reference
+post_process:
+  _target_: code.architecture.layer.TransformationsLayers
+  _recursive_: false
+  transformations: ${extract_nested:${loader.stage.train.output.variables},'transformations'}
+  inverse_transform: true
+
+# Forward model - reference external config
+forward_model:
+  _target_: code.model.wrapper.load_model_from_config
+  path: code/model/checkpoint/forward/default/model.yaml

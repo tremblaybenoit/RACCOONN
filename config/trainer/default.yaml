@@ -10,7 +10,7 @@ min_epochs: 1  # To prevent early stopping
 max_epochs: 1
 
 # Precision
-# precision: 32
+precision: 32
 
 # Perform a validation loop every N training epochs
 check_val_every_n_epoch: 1

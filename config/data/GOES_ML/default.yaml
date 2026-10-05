@@ -1,0 +1,14 @@
+defaults:
+  - bt_crtm
+  - bt_obs
+  - clear_mask
+  - cloud_mask
+  - daytime_mask
+  - lat
+  - lon
+  - meta
+  - nighttime_mask
+  - pressure
+  - prof
+  - scans
+  - surf
