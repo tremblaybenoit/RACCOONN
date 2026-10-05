@@ -140,126 +140,96 @@ flowchart LR
 Each step of the workflow can be run manually using the corresponding Python script and 
 experiment configuration.
 
-#### Forward model (e.g., [`experiment=forward_default`](config/experiment/forward_default.yaml))
+#### Forward model (e.g., [`experiment=forward_clear`](config/experiment/forward_clear.yaml))
 
 1. Configure directories:
 
     ```bash
-    python -m config.setup +experiment=forward_default
+    python -m config.setup +experiment=forward_clear
     ```
 
 2. Train the forward model:
 
     ```bash
-    python -m code.train +experiment=forward_default
+    python -m code.train +experiment=forward_clear
     ```
 
 3. Test and evaluate the forward model:
 
     ```bash
-    python -m code.test +experiment=forward_default
+    python -m code.test +experiment=forward_clear
     ```
 
 4. Predict using the forward model:
 
     ```bash
-    python -m code.predict +experiment=forward_default
+    python -m code.predict +experiment=forward_clear
     ```
 
-#### Inverse model (e.g., [`experiment=inverse_default`](config/experiment/inverse_default.yaml))
+#### Inverse model (e.g., [`experiment=inverse_clear_split`](config/experiment/inverse_clear_split.yaml))
 
 1. Configure directories:
 
     ```bash
-    python -m config.setup +experiment=inverse_default
+    python -m config.setup +experiment=inverse_clear_split
     ```
 
 2. Prepare data for the inverse model:
 
     ```bash
-    python -m code.data.statistics +experiment=inverse_default
-    python -m code.data.covariance +experiment=inverse_default
+    python -m code.data.statistics +experiment=inverse_clear_split
+    python -m code.data.covariance +experiment=inverse_clear_split
     ```
 
 3. Train the inverse model:
 
     ```bash
-    python -m code.train +experiment=inverse_default
+    python -m code.train +experiment=inverse_clear_split
     ```
 
 4. Test and evaluate the inverse model:
 
     ```bash
-    python -m code.test +experiment=inverse_default
+    python -m code.test +experiment=inverse_clear_split
     ```
 
 5. Predict using the inverse model:
 
     ```bash
-    python -m code.predict +experiment=inverse_default
+    python -m code.predict +experiment=inverse_clear_split
     ```
 
 ### Automated workflow (recommended)
 RACCOONN uses the [Snakemake workflow management system](https://snakemake.readthedocs.io/en/stable/) for reproducibility.
 
-To perform a dry-run (i.e., to check the workflow prior to execution) of the Snakefile rule [`test`](Snakefile) with the [`inverse_default`](config/experiment/inverse_default.yaml) experiment configuration:
+To perform a dry-run (i.e., to check the workflow prior to execution) of the Snakefile rule [`predict`](Snakefile) with the [`forward_clear`](config/experiment/forward_clear.yaml) experiment configuration:
 
 ```bash
-snakemake --dry-run --verbose test --config experiment=inverse_default
+snakemake --dry-run --verbose predict --config experiment=forward_clear
 ```
 
 To account for missing dependencies, add the `--rerun-incomplete` flag:
 
 ```bash
-snakemake --dry-run --rerun-incomplete --verbose test --config experiment=inverse_default
+snakemake --dry-run --rerun-incomplete --verbose predict --config experiment=forward_clear
 ```
 
 To run the workflow, remove `--dry-run` and specify the number of `--cores` to use (type 'all' to use all available cores):
 
 ```bash
-snakemake --cores all --verbose test --config experiment=inverse_default
+snakemake --cores all --verbose predict --config experiment=forward_clear
 ```
 
-To draw a [directed acyclic graph (DAG)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) of the training workflow (e.g., [`code/train_inverse.mmd`](code/train_inverse.mmd) for Snakefile rule [`test`](Snakefile)):
+To draw a [directed acyclic graph (DAG)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) of the training workflow (e.g., [`config/experiment/forward_clear.svg`](config/experiment/forward_clear.svg) for Snakefile rule [`predict`](Snakefile)):
 
 ```bash
-snakemake test --rulegraph mermaid-js --config experiment=inverse_default > code/train_inverse.mmd
+snakemake predict --rulegraph --config experiment=forward_clear | dot -Tsvg > config/experiment/forward_clear.svg
 ```
 Replace `--rulegraph` with `--dag` to highlight completed rules with dashed boxes.
 
-**Example**: The following graph shows the workflow for the Snakefile rule [`test`](Snakefile) for experiment [`inverse_default`](config/experiment/inverse_default.yaml). 
+**Example**: The following graph shows the workflow for the Snakefile rule [`predict`](Snakefile) for experiment [`forward_clear`](config/experiment/forward_clear.yaml).
 
-```mermaid
----
-title: RACCOONN training workflow - Inverse model
----
-flowchart TB
-	id0[test]
-	id1[data]
-	id2[statistics_data]
-	id3[covariance_R]
-	id4[covariance_B]
-	id5[train]
-	style id0 fill:#57CAD9,stroke-width:2px,color:#333333
-	style id1 fill:#D9CA57,stroke-width:2px,color:#333333
-	style id2 fill:#57D9AD,stroke-width:2px,color:#333333
-	style id3 fill:#D99157,stroke-width:2px,color:#333333
-	style id4 fill:#D95757,stroke-width:2px,color:#333333
-	style id5 fill:#5791D9,stroke-width:2px,color:#333333
-	id5 --> id0
-	id3 --> id0
-	id1 --> id0
-	id2 --> id0
-	id4 --> id0
-	id1 --> id2
-	id1 --> id3
-	id1 --> id4
-	id2 --> id4
-	id1 --> id5
-	id2 --> id5
-	id3 --> id5
-	id4 --> id5
-```
+<img src="config/experiment/forward_clear.svg" alt="Forward Model Prediction Workflow DAG" width="900">
 
 ## Documentation
 The RACCOON project documentation is available at https://raccoonn.readthedocs.io/.
