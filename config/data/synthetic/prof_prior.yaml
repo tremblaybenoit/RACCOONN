@@ -21,16 +21,12 @@ train:
       n: ${..prof.n}
       # Loading function
       load:
-        _target_: code.preprocessing.covariance.prior_from_mean
+        _target_: code.preprocessing.covariance.prior_from_bounded_perturbations
         _recursive_: false
         # What the method needs as input
         input:
           # Atmospheric profiles
           prof: ${....prof}
-          lat: ${....lat}
-          lon: ${....lon}
-          mean_data: ${preprocessing.covariance.B.output.mu}
-          unique_coords: ${preprocessing.covariance.B.output.unique_coords}
           # Cholesky matrix
           cholesky: ${preprocessing.covariance.B.output.matrix_cholesky}
           # Statistics for lower/upper bounds
@@ -67,10 +63,6 @@ valid:
         input:
           # Atmospheric profiles
           prof: ${....prof}
-          lat: ${....lat}
-          lon: ${....lon}
-          mean_data: ${preprocessing.covariance.B.output.mu}
-          unique_coords: ${preprocessing.covariance.B.output.unique_coords}
           # Cholesky matrix
           cholesky: ${......train.variables.prof_prior.load.input.cholesky}
           # Statistics for lower/upper bounds
@@ -103,10 +95,6 @@ test:
         input:
           # Atmospheric profiles
           prof: ${....prof}
-          lat: ${....lat}
-          lon: ${....lon}
-          mean_data: ${preprocessing.covariance.B.output.mu}
-          unique_coords: ${preprocessing.covariance.B.output.unique_coords}
           # Cholesky matrix
           cholesky: ${......train.variables.prof_prior.load.input.cholesky}
           # Statistics for lower/upper bounds

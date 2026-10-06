@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.linalg import block_diag
+from scipy.stats import truncnorm
 import hydra
 import torch
 from omegaconf import DictConfig, OmegaConf
@@ -93,6 +94,7 @@ def prior_from_bounded_perturbations(input: DictConfig, output: DictConfig | Non
     # Single-pass perturbation generation (avoiding while-loop rejection bottlenecks)
     n_samples = x_dims[0]
     p = rng.normal(0, 1, size=(cov_cholesky.shape[1], n_samples))
+    # p = truncnorm.rvs(-1, 1, size=(cov_cholesky.shape[1], n_samples), random_state=rng)
     dx_transformed = (cov_cholesky @ p).T
 
     x_prior_transformed = x_true_flat.copy()
@@ -110,7 +112,7 @@ def prior_from_bounded_perturbations(input: DictConfig, output: DictConfig | Non
     # Count samples with any out-of-bounds values using vectorized operations
     nval = ((x_prior_physical < x_min_physical) | (x_prior_physical > x_max_physical)).any(axis=(1, 2)).sum()
     logger.info(f"Number of samples outside physical bounds: {nval} out of {n_samples}")
-    x_prior_physical = np.clip(x_prior_physical, x_min_physical, x_max_physical)
+    # x_prior_physical = np.clip(x_prior_physical, x_min_physical, x_max_physical)
 
     # Save to file
     if output is not None and hasattr(output, 'save'):
@@ -120,6 +122,95 @@ def prior_from_bounded_perturbations(input: DictConfig, output: DictConfig | Non
         return None
     else:
         return x_prior_physical
+
+
+def prior_from_covariance(input: DictConfig, output: DictConfig | None = None,
+                 seed: int | None = None, apply_transform: bool = False) -> np.ndarray | None:
+    """ Compute the prior from the model error covariance matrix and perturbations.
+
+        Parameters
+        ----------
+        input: DictConfig. Main hydra configuration file containing all model hyperparameters.
+        output: DictConfig. Output configuration.
+        seed: int. Seed to ensure reproducibility.
+        apply_transform: bool. If True, apply normalization transform to the data before computing covariance.
+
+
+        Returns
+        -------
+        None.
+    """
+
+    # Load Cholesky matrix (L)
+    cov_cholesky = load_variable(input.cholesky)
+    # Load physical bounds
+    prof_stats = instantiate(input.stats)
+    x_min_physical, x_max_physical = prof_stats['min'], prof_stats['max']
+    del prof_stats
+
+    # Loop over stages
+    for stage, config_stage in input.stage.keys():
+        logger.info(f"Loading stage '{stage}'")
+
+        # Load atmospheric profiles
+        if hasattr(config_stage, 'variables') and config_stage.variables is not None:
+
+            if hasattr(config_stage.variables, 'prof') and config_stage.variables.prof is not None:
+                logger.info(f"Loading profile variable 'prof'")
+                x_true_transformed = load_variable(config_stage.variables.prof.load, apply_transform=apply_transform)
+                x_inverse_transform_fn = (
+                    Compose(transformations=input.prof.get('transformations', None), inverse_transform=True)
+                    if apply_transform and input.prof.get('transformations') is not None
+                    else identity
+                )
+                x_dims = x_true_transformed.shape
+                x_true_flat = x_true_transformed.reshape(x_dims[0], -1)
+                x_prior_transformed = x_true_flat.copy()
+
+                # Optional variant mask setup
+                variant_mask = None
+                if config_stage.variables.get('variant_mask', None) is not None:
+                    variant_mask = instantiate(config_stage.variables.variant_mask.load)
+                    if x_dims[1] != variant_mask.shape[0]:
+                        variant_mask = np.take(variant_mask, [0], axis=0)
+
+                # Single-pass perturbation generation (avoiding while-loop rejection bottlenecks)
+                n_samples = x_dims[0]
+                rng = np.random.default_rng(seed)
+                p = rng.normal(0, 1, size=(cov_cholesky.shape[1], n_samples))
+                dx_transformed = (cov_cholesky @ p).T
+                if variant_mask is not None:
+                    x_prior_transformed[:, np.flatnonzero(variant_mask)] += dx_transformed
+                else:
+                    x_prior_transformed += dx_transformed
+
+                # Reshape and map back to physical space
+                x_prior_transformed = x_prior_transformed.reshape(n_samples, x_dims[1], x_dims[2])
+                x_prior_physical = x_inverse_transform_fn(x_prior_transformed)
+
+                # Apply safe boundary enforcement (clipping) instead of rejection sampling loops
+                # to maintain unbiased bulk statistics and prevent infinite hanging.
+                # Count samples with any out-of-bounds values using vectorized operations
+                nval = ((x_prior_physical < x_min_physical) | (x_prior_physical > x_max_physical)).any(axis=(1, 2)).sum()
+                logger.info(f"Number of samples outside physical bounds: {nval} out of {n_samples}")
+                x_prior_physical = np.clip(x_prior_physical, x_min_physical, x_max_physical)
+
+                # Save to file
+                if output is not None and hasattr(output, stage):
+                    if hasattr(output[stage], 'variables') and hasattr(output[stage].variables, 'prof_prior'):
+                        if hasattr(output[stage].variables.prof_prior, 'save'):
+                            logger.info(f"Saving validated prior to {output[stage].variables.prof_prior.save.path}...")
+                            save_func = instantiate(output[stage].variables.prof_prior.save)
+                            save_func(x_prior_physical)
+                            return None
+                        else:
+                            return x_prior_physical
+                    else:
+                        logger.warning(f"No 'prof_prior' variable found in output for stage '{stage}'")
+            else:
+                logger.warning(f"No 'prof' variable found in stage '{stage}'")
+        else:
+            logger.warning(f"No 'variables' found in stage '{stage}'")
 
 
 def prior_from_mean(input: DictConfig, output: DictConfig | None = None, 
@@ -584,6 +675,828 @@ def climatological_matrix(input: DictConfig, output: DictConfig, scaling_factor:
             # Plot covariance matrix if requested
             if plot_flag and key in ['matrix', 'matrix_cholesky', 'matrix_inverse', 'matrix_pseudo_inverse',
                                      'correlation', 'correlation_inverse', 'correlation_pseudo_inverse', 'diagonal', 'diagonal_inverse']:
+                logger.info(f"Plotting {key} matrix...")
+                fig, get_axes = flexible_gridspec(cell_widths=[4.0], cell_heights=[4.0],
+                                                  lefts=[1.00], rights=[1.00], bottoms=[1.00], tops=[1.00])
+                ax = get_axes(0, 0)
+                plot_map(ax, cov[key], title=f"Covariance matrix: {key}", plt_origin='upper', cb_label=r'Values')
+                save_plot(fig, filename=os.path.splitext(output[key].path)[0] + '.png')
+
+    return
+
+
+def pressure_only_matrix(input: DictConfig, output: DictConfig, scaling_factor: float = 1.0,
+                         regularization_factor: float = 1.0, regularization_type: str = 'per_variable',
+                         plot_flag: bool = True, recenter: bool = False,
+                         univariate: bool = False, mean_type: str = 'spatiotemporal',
+                         apply_transform: bool = False) -> None:
+    """ Compute climatological covariance matrix of a given dataset.
+
+        Parameters
+        ----------
+        input: DictConfig. Main hydra configuration file containing all model hyperparameters.
+        output: DictConfig. Output configuration.
+        scaling_factor: float. Scaling factor for covariance matrix.
+        regularization_factor: float. Regularization factor for covariance matrix.
+        regularization_type: str. Type of regularization to apply.
+            Options:
+            - 'per_variable': Apply regularization per-variable block (recommended, current default)
+            - 'global': Apply global regularization to entire matrix using global mean diagonal
+            - 'correlation_based': Regularize via correlation matrix, then reconstruct covariance
+        plot_flag: bool. If True, plot the covariance matrix.
+        recenter: bool. If True, recenter by removing the mean.
+        univariate: bool. If True, compute univariate covariance matrix.
+        mean_type: str. Type of mean to compute ('spatiotemporal' or 'temporal').
+        apply_transform: bool. If True, apply normalization transform to the data before computing covariance.
+
+        Returns
+        -------
+        None.
+    """
+
+    # Begin by loading the data and normalizing it
+    logger.info("Loading data...")
+    data = load_variable(input.data, apply_transform=apply_transform)
+
+    # Build sample mask
+    mask = np.ones(data.shape[0], dtype=bool)
+    # Spatial mask: Consider only data within the specified latitude and longitude bounds
+    if hasattr(input, 'spatial_mask') and input.spatial_mask is not None:
+        logger.info("Applying spatial mask...")
+        mask &= instantiate(input.spatial_mask)
+    # Temporal mask: Consider only data within the specified time bounds
+    if hasattr(input, 'temporal_mask') and input.temporal_mask is not None:
+        logger.info("Applying temporal mask...")
+        mask &= instantiate(input.temporal_mask)
+    # Apply mask to data
+    data = data[mask]
+
+    # Dimensions
+    data_shape = data.shape
+    n_samples, n_vars = data_shape[0], data_shape[1]
+    # Denominator (computation of the mean)
+    denom = float(n_samples - 1)
+
+    # Apply recentering
+    if recenter:
+        logger.info("Recentering data around the mean...")
+        # Compute spatiotemporal mean
+        if mean_type == 'spatiotemporal':
+            mu = np.mean(data, axis=0)
+            # Compute anomalies (truth - mean)
+            data -= mu
+        # Compute temporal mean (but maintain coordinate dependency)
+        elif mean_type == 'temporal':
+            # Read coordinates
+            if hasattr(input, 'lat') and hasattr(input, 'lon'):
+                # Read coordinates
+                lat = load_variable(input.lat)
+                lon = load_variable(input.lon)
+                # Apply mask to coordinates
+                lat = lat[mask]
+                lon = lon[mask]
+
+                # For clearsky-only or cloud-only datasets, the available coordinates points.
+                # In other words, two consecutive timesteps may not have the same (lat, lon) pairs.
+                # To compute the temporal mean at every available (lat, lon) point,
+                # Identify unique coordinate pairs and their mapping
+                # coords shape: (n_samples, 2)
+                coords = np.column_stack((lat, lon))
+
+                # unique_coords: the actual list of physical locations available
+                # inverse_indices: an array of shape (n_samples,) containing the location ID (0 to N-1) for every sample
+                unique_coords, inverse_indices = np.unique(coords, axis=0, return_inverse=True)
+                n_unique_coords = len(unique_coords)
+
+                # To be completely safe against whether data is currently 2D or 3D,
+                # we flatten the feature/level dimensions temporarily
+                data = data.reshape(n_samples, -1)
+                n_features = data.shape[1]
+
+                # Allocate a destination array for the sums of each unique coordinate
+                group_sums = np.zeros((n_unique_coords, n_features), dtype=data.dtype)
+
+                # np.add.at performs unbuffered in-place addition for repeating indices
+                np.add.at(group_sums, inverse_indices, data)
+
+                # Count how many times each unique coordinate appears across all timesteps
+                group_counts = np.bincount(inverse_indices)[:, None].astype(data.dtype)  # Shape: (n_unique_coords, 1)
+
+                # Compute the local temporal mean for each unique coordinate
+                group_means = group_sums / group_counts  # Shape: (n_unique_coords, n_features)
+
+                # Save mean and unique coordinates for prior_from_mean function
+                if hasattr(output, 'mu') and hasattr(output.mu, 'save'):
+                    logger.info("Saving climatological mean to file...")
+                    # Reshape means back to original dimensions (excluding batch axis)
+                    inverse_transform_fn = (
+                        Compose(transformations=input.data.get('transformations', None), inverse_transform=True)
+                        if apply_transform and input.data.get('transformations') is not None
+                        else identity
+                    )
+                    mu_to_save = inverse_transform_fn(group_means.reshape(n_unique_coords, *data_shape[1:]))
+                    save_func_mean = instantiate(output.mu.save)
+                    save_func_mean(mu_to_save)
+
+                if hasattr(output, 'unique_coords') and hasattr(output.unique_coords, 'save'):
+                    logger.info("Saving unique coordinates to file...")
+                    save_func_coords = instantiate(output.unique_coords.save)
+                    save_func_coords(unique_coords)
+
+                # Compute anomalies (truth - climatological mean)
+                data -= group_means[inverse_indices]  # Shape: (n_samples, n_features)
+                # Broadcast the means back out to match the original sample layout
+                data = data.reshape(data_shape)
+                # Denominator (computation of the mean)
+                denom = float(n_samples - n_unique_coords)
+            else:
+                mu = np.mean(data)
+                # Compute anomalies (truth - mean)
+                data -= mu
+        else:
+            raise ValueError("mean_type not supported.")
+
+    # Guard against invalid degrees of freedom (e.g. n_samples <= n_groups)
+    if denom <= 0:
+        raise ValueError(
+            f"Insufficient degrees of freedom for covariance computation: denominator is {denom:.1f}. "
+            f"Ensure total samples ({n_samples}) exceed group count."
+        )
+
+    # Variant filter (prior only)
+    if hasattr(input, 'variant_mask') and input.variant_mask is not None:
+        # Load filter
+        variant_mask = instantiate(input.variant_mask.load)
+        if n_vars != variant_mask.shape[0]:
+            variant_mask = np.take(variant_mask, [0], axis=0)
+    else:
+        variant_mask = None
+
+    # Covariance matrix initialization
+    cov = {}
+
+    # Validate regularization_type
+    valid_reg_types = ['per_variable', 'global', 'correlation_based']
+    if regularization_type not in valid_reg_types:
+        raise ValueError(f"regularization_type must be one of {valid_reg_types}, got '{regularization_type}'")
+
+    # Univariate matrix computation steps
+    if univariate:
+        # Check dimensions
+        if data.ndim <= 2:
+            # raise ValueError("Univariate covariance matrix computation requires data with more than 2 dimensions.")
+            data = data[..., None]  # Add a singleton dimension for levels if not present
+        # Initialize empty lists for matrices
+        m_cov = []
+        m_corr = []
+        # Loop over variables
+        for i in range(n_vars):
+            # Compute sub-matrix
+            data_i = data[:, i]
+            # Apply variant mask
+            if variant_mask is not None:
+                logger.info(f"Applying variant mask for variable {i}...")
+                # Remove constant pressure levels from the data
+                data_i = np.take(data_i, np.flatnonzero(variant_mask[i]), axis=1)
+            # Compute covariance block
+            logger.info(f"Computing univariate covariance matrix for variable {i}...")
+            sub_cov = scaling_factor * (data_i.T @ data_i) / denom
+
+            # Apply per-variable regularization directly to sub_cov BEFORE computing correlation
+            if regularization_factor > 0 and regularization_type == 'per_variable':
+                var_mean_diag = float(np.mean(np.diag(sub_cov)))
+                logger.info(f"Applying per-variable regularization for variable {i} (mean_diag={var_mean_diag:.6e})...")
+                sub_cov = sub_cov + regularization_factor * var_mean_diag * np.eye(sub_cov.shape[0],
+                                                                                   dtype=sub_cov.dtype)
+
+            # Compute correlation block from regularized sub_cov (with zero-variance safety)
+            if hasattr(output, 'correlation'):
+                std_i = np.sqrt(np.maximum(np.diag(sub_cov), 1e-12))
+                sub_corr = sub_cov / (std_i[:, None] @ std_i[None, :])
+                m_corr.append(sub_corr)
+
+            m_cov.append(sub_cov)
+
+        # Assemble into block-diagonal matrices
+        del data_i, data
+        cov['matrix'] = block_diag(*m_cov)
+        if hasattr(output, 'correlation'):
+            cov['correlation'] = block_diag(*m_corr)
+
+        # Apply global regularization to assembled matrix if requested
+        if regularization_factor > 0 and regularization_type == 'global':
+            logger.info("Applying global regularization to univariate covariance matrix...")
+            cov['matrix'] += regularization_factor * float(np.mean(np.diag(cov['matrix']))) * np.eye(
+                cov['matrix'].shape[0], dtype=cov['matrix'].dtype)
+            # Recompute block correlation matrix after global regularization
+            if hasattr(output, 'correlation'):
+                std = np.sqrt(np.maximum(np.diag(cov['matrix']), 1e-12))
+                cov['correlation'] = cov['matrix'] / (std[:, None] @ std[None, :])
+
+        # Apply correlation-based regularization if requested
+        elif regularization_factor > 0 and regularization_type == 'correlation_based':
+            logger.info("Applying correlation-based regularization to univariate covariance matrix...")
+            # Recompute from correlation to ensure consistency
+            cov['matrix'] = 0.5 * (cov['matrix'] + cov['matrix'].T)  # Ensure symmetry
+            std = np.sqrt(np.maximum(np.diag(cov['matrix']), 1e-12))
+            cov['correlation'] = cov['matrix'] / (std[:, None] @ std[None, :])
+            cov['correlation'] = 0.5 * (cov['correlation'] + cov['correlation'].T)  # Ensure symmetry
+            # Regularize correlation
+            cov['correlation'] = (1. - regularization_factor) * cov['correlation'] + regularization_factor * np.eye(
+                cov['correlation'].shape[0], dtype=cov['correlation'].dtype)
+            # Reconstruct covariance from regularized correlation
+            cov['matrix'] = (std[:, None] @ std[None, :]) * cov['correlation']
+
+    # Multivariate matrix computation steps
+    else:
+        # Keep track of variable boundaries for per-variable regularization
+        # Reshape to (n_samples, n_vars, -1) to preserve variable dimension
+        data_reshaped = data.reshape(n_samples, n_vars, -1)  # (n_samples, n_vars, total_features_per_var)
+
+        # Apply variant mask BEFORE flattening to track per-variable feature counts
+        if variant_mask is not None:
+            logger.info("Applying pressure mask...")
+            # variant_mask shape: (n_vars, n_features_per_var) or similar
+            # Need to apply per-variable masking
+            data_masked_list = []
+            features_per_var_list = []  # Track features per variable AFTER masking
+
+            for i in range(n_vars):
+                data_i = data_reshaped[:, i, :]  # (n_samples, n_features)
+
+                # Apply variable-specific mask if available
+                if isinstance(variant_mask, np.ndarray):
+                    if variant_mask.ndim == 2:
+                        # variant_mask shape: (n_vars, n_features_per_var)
+                        mask_i = np.flatnonzero(variant_mask[i])
+                    elif variant_mask.ndim == 1:
+                        # variant_mask shape: (n_features_total,) - single mask for all
+                        mask_i = np.flatnonzero(variant_mask)
+                    else:
+                        raise ValueError(f"Unexpected variant_mask shape: {variant_mask.shape}")
+
+                    data_i_masked = np.take(data_i, mask_i, axis=1)
+                else:
+                    data_i_masked = data_i
+
+                data_masked_list.append(data_i_masked)
+                features_per_var_list.append(data_i_masked.shape[1])
+                logger.info(f"Variable {i} features after masking: {data_i_masked.shape[1]}")
+
+            # Flatten concatenated data
+            data = np.concatenate(data_masked_list, axis=1)  # (n_samples, total_features)
+
+            # Free up memory
+            del data_i, data_i_masked, data_masked_list
+        else:
+            # No masking: all variables have same number of features
+            data = data_reshaped.reshape(n_samples, -1)
+            features_per_var_list = [data_reshaped.shape[2]] * n_vars
+
+        # Compute full covariance matrix (before regularization)
+        logger.info("Computing covariance matrix...")
+        cov['matrix'] = scaling_factor * (data.T @ data) / denom
+
+        # Free up memory
+        del data, data_reshaped
+
+        # Apply regularization BEFORE computing correlation to guarantee matrix consistency
+        if regularization_factor > 0:
+            if regularization_type == 'per_variable':
+                logger.info("Applying per-variable regularization to covariance matrix...")
+
+                # Loop over variables with their specific feature counts
+                start_idx = 0
+                for i, features_per_var in enumerate(features_per_var_list):
+                    end_idx = start_idx + features_per_var
+
+                    # Extract diagonal for this variable's block
+                    var_diag = np.diag(cov['matrix'])[start_idx:end_idx]
+                    var_mean_diag = float(np.mean(var_diag))
+
+                    logger.info(
+                        f"Applying regularization for variable {i} (features={features_per_var}, mean_diag={var_mean_diag:.6e})...")
+
+                    # Add regularization to the diagonal block of this variable
+                    cov['matrix'][
+                        start_idx:end_idx, start_idx:end_idx] += regularization_factor * var_mean_diag * np.eye(
+                        features_per_var, dtype=cov['matrix'].dtype)
+                    start_idx = end_idx
+
+            elif regularization_type == 'global':
+                logger.info("Applying global regularization to covariance matrix...")
+                cov['matrix'] += regularization_factor * float(np.mean(np.diag(cov['matrix']))) * np.eye(
+                    cov['matrix'].shape[0], dtype=cov['matrix'].dtype)
+
+            elif regularization_type == 'correlation_based':
+                logger.info("Applying correlation-based regularization to covariance matrix...")
+                # Ensure symmetry before reconstruction
+                cov['matrix'] = 0.5 * (cov['matrix'] + cov['matrix'].T)
+                std = np.sqrt(np.maximum(np.diag(cov['matrix']), 1e-12))
+                cov['correlation'] = cov['matrix'] / (std[:, None] @ std[None, :])
+                cov['correlation'] = 0.5 * (cov['correlation'] + cov['correlation'].T)  # Ensure symmetry
+                # Regularize correlation
+                cov['correlation'] = (1. - regularization_factor) * cov['correlation'] + regularization_factor * np.eye(
+                    cov['correlation'].shape[0], dtype=cov['correlation'].dtype)
+                # Reconstruct covariance from regularized correlation
+                cov['matrix'] = (std[:, None] @ std[None, :]) * cov['correlation']
+
+        # Compute correlation matrix AFTER regularization (if requested and not already derived)
+        if hasattr(output, 'correlation') and 'correlation' not in cov:
+            logger.info("Computing correlation matrix from regularized covariance matrix...")
+            std = np.sqrt(np.maximum(np.diag(cov['matrix']), 1e-12))
+            cov['correlation'] = cov['matrix'] / (std[:, None] @ std[None, :])
+
+    # Compute diagonal
+    if hasattr(output, 'diagonal'):
+        logger.info("Computing diagonal of the covariance matrix...")
+        cov['diagonal'] = np.diag(np.diag(cov['matrix']))
+    if hasattr(output, 'diagonal_inverse'):
+        logger.info("Computing diagonal inverse of the covariance matrix...")
+        cov['diagonal_inverse'] = np.diag(1.0 / np.maximum(np.diag(cov['matrix']), 1e-12))
+    # Compute Cholesky decomposition
+    if hasattr(output, 'matrix_cholesky'):
+        logger.info("Computing Cholesky decomposition of the covariance matrix...")
+        cov['matrix_cholesky'] = np.linalg.cholesky(cov['matrix'])
+    # Compute matrix inverse
+    if hasattr(output, 'matrix_inverse'):
+        logger.info("Computing the inverse of the covariance matrix...")
+        cov['matrix_inverse'] = np.linalg.inv(cov['matrix'])
+    # Compute matrix pseudo-inverse
+    if hasattr(output, 'matrix_pseudo_inverse'):
+        logger.info("Computing the pseudo-inverse of the covariance matrix...")
+        rcond = OmegaConf.select(output.matrix_pseudo_inverse, 'params.rcond', default=1.e-3)
+        cov['matrix_pseudo_inverse'] = np.linalg.pinv(cov['matrix'], rcond=rcond)
+    # Compute Cholesky decomposition
+    if hasattr(output, 'correlation_cholesky') and 'correlation' in cov:
+        logger.info("Computing Cholesky decomposition of the correlation matrix...")
+        cov['correlation_cholesky'] = np.linalg.cholesky(cov['correlation'])
+    # Compute inverse of the correlation matrix
+    if hasattr(output, 'correlation_inverse') and 'correlation' in cov:
+        logger.info("Computing the inverse of the correlation matrix...")
+        cov['correlation_inverse'] = np.linalg.inv(cov['correlation'])
+    # Compute pseudo inverse of the correlation matrix
+    if hasattr(output, 'correlation_pseudo_inverse') and 'correlation' in cov:
+        logger.info("Computing the pseudo-inverse of the correlation matrix...")
+        rcond = OmegaConf.select(output.correlation_pseudo_inverse, 'params.rcond', default=1.e-3)
+        cov['correlation_pseudo_inverse'] = np.linalg.pinv(cov['correlation'], rcond=rcond)
+
+    # Loop over keys
+    for key in list(cov.keys()):
+        # Save to file
+        if hasattr(output, key):
+            if hasattr(output[key], 'save'):
+                logger.info(f"Saving {key} matrix...")
+                save_func = instantiate(output[key].save)
+                save_func(cov[key])
+            # Plot covariance matrix if requested
+            if plot_flag and key in ['matrix', 'matrix_cholesky', 'matrix_inverse', 'matrix_pseudo_inverse',
+                                     'correlation', 'correlation_inverse', 'correlation_pseudo_inverse', 'diagonal',
+                                     'diagonal_inverse']:
+                logger.info(f"Plotting {key} matrix...")
+                fig, get_axes = flexible_gridspec(cell_widths=[4.0], cell_heights=[4.0],
+                                                  lefts=[1.00], rights=[1.00], bottoms=[1.00], tops=[1.00])
+                ax = get_axes(0, 0)
+                plot_map(ax, cov[key], title=f"Covariance matrix: {key}", plt_origin='upper', cb_label=r'Values')
+                save_plot(fig, filename=os.path.splitext(output[key].path)[0] + '.png')
+
+    return
+
+
+
+def pressure_only_matrix2(input: DictConfig, output: DictConfig, scaling_factor: float = 1.0,
+                         regularization_factor: float = 1.0, regularization_type: str = 'per_variable',
+                         plot_flag: bool = True, recenter: bool = False,
+                         univariate: bool = False, mean_type: str = 'spatiotemporal',
+                         apply_transform: bool = False) -> None:
+    """ Compute climatological covariance matrix of a given dataset.
+
+        Parameters
+        ----------
+        input: DictConfig. Main hydra configuration file containing all model hyperparameters.
+        output: DictConfig. Output configuration.
+        scaling_factor: float. Scaling factor for covariance matrix.
+        regularization_factor: float. Regularization factor for covariance matrix.
+        regularization_type: str. Type of regularization to apply.
+            Options:
+            - 'per_variable': Apply regularization per-variable block (recommended, current default)
+            - 'global': Apply global regularization to entire matrix using global mean diagonal
+            - 'correlation_based': Regularize via correlation matrix, then reconstruct covariance
+        plot_flag: bool. If True, plot the covariance matrix.
+        recenter: bool. If True, recenter by removing the mean.
+        univariate: bool. If True, compute univariate covariance matrix.
+        mean_type: str. Type of mean to compute ('spatiotemporal' or 'temporal').
+        apply_transform: bool. If True, apply normalization transform to the data before computing covariance.
+
+        Returns
+        -------
+        None.
+    """
+
+    # Begin by loading the data and normalizing it
+    logger.info("Loading data...")
+    data = load_variable(input.data, apply_transform=apply_transform)
+
+    # Build sample mask
+    mask = np.ones(data.shape[0], dtype=bool)
+    # Spatial mask: Consider only data within the specified latitude and longitude bounds
+    if hasattr(input, 'spatial_mask') and input.spatial_mask is not None:
+        logger.info("Applying spatial mask...")
+        mask &= instantiate(input.spatial_mask)
+    # Temporal mask: Consider only data within the specified time bounds
+    if hasattr(input, 'temporal_mask') and input.temporal_mask is not None:
+        logger.info("Applying temporal mask...")
+        mask &= instantiate(input.temporal_mask)
+    # Apply mask to data
+    data = data[mask]
+
+    # Dimensions
+    data_shape = data.shape
+    n_samples, n_vars = data_shape[0], data_shape[1]
+    # Denominator (computation of the mean)
+    denom = float(n_samples - 1)
+
+    # Apply recentering
+    if recenter:
+        logger.info("Recentering data around the mean...")
+        # Compute spatiotemporal mean
+        if mean_type == 'spatiotemporal':
+            mu = np.mean(data, axis=0)
+            # Compute anomalies (truth - mean)
+            data -= mu
+        # Compute temporal mean (but maintain coordinate dependency)
+        elif mean_type == 'temporal':
+            # Read coordinates
+            if hasattr(input, 'lat') and hasattr(input, 'lon'):
+                # Read coordinates
+                lat = load_variable(input.lat)
+                lon = load_variable(input.lon)
+                # Apply mask to coordinates
+                lat = lat[mask]
+                lon = lon[mask]
+
+                # For clearsky-only or cloud-only datasets, the available coordinates points.
+                # In other words, two consecutive timesteps may not have the same (lat, lon) pairs.
+                # To compute the temporal mean at every available (lat, lon) point,
+                # Identify unique coordinate pairs and their mapping
+                # coords shape: (n_samples, 2)
+                coords = np.column_stack((lat, lon))
+
+                # unique_coords: the actual list of physical locations available
+                # inverse_indices: an array of shape (n_samples,) containing the location ID (0 to N-1) for every sample
+                unique_coords, inverse_indices = np.unique(coords, axis=0, return_inverse=True)
+                n_unique_coords = len(unique_coords)
+
+                # To be completely safe against whether data is currently 2D or 3D,
+                # we flatten the feature/level dimensions temporarily
+                data = data.reshape(n_samples, -1)
+                n_features = data.shape[1]
+
+                # Allocate a destination array for the sums of each unique coordinate
+                group_sums = np.zeros((n_unique_coords, n_features), dtype=data.dtype)
+
+                # np.add.at performs unbuffered in-place addition for repeating indices
+                np.add.at(group_sums, inverse_indices, data)
+
+                # Count how many times each unique coordinate appears across all timesteps
+                group_counts = np.bincount(inverse_indices)[:, None].astype(data.dtype)  # Shape: (n_unique_coords, 1)
+
+                # Compute the local temporal mean for each unique coordinate
+                group_means = group_sums / group_counts  # Shape: (n_unique_coords, n_features)
+
+                # Save mean and unique coordinates for prior_from_mean function
+                if hasattr(output, 'mu') and hasattr(output.mu, 'save'):
+                    logger.info("Saving climatological mean to file...")
+                    # Reshape means back to original dimensions (excluding batch axis)
+                    inverse_transform_fn = (
+                        Compose(transformations=input.data.get('transformations', None), inverse_transform=True)
+                        if apply_transform and input.data.get('transformations') is not None
+                        else identity
+                    )
+                    mu_to_save = inverse_transform_fn(group_means.reshape(n_unique_coords, *data_shape[1:]))
+                    save_func_mean = instantiate(output.mu.save)
+                    save_func_mean(mu_to_save)
+
+                if hasattr(output, 'unique_coords') and hasattr(output.unique_coords, 'save'):
+                    logger.info("Saving unique coordinates to file...")
+                    save_func_coords = instantiate(output.unique_coords.save)
+                    save_func_coords(unique_coords)
+
+                # Compute anomalies (truth - climatological mean)
+                data -= group_means[inverse_indices]  # Shape: (n_samples, n_features)
+                # Broadcast the means back out to match the original sample layout
+                data = data.reshape(data_shape)
+                # Denominator (computation of the mean)
+                denom = float(n_samples - n_unique_coords)
+            else:
+                mu = np.mean(data)
+                # Compute anomalies (truth - mean)
+                data -= mu
+        else:
+            raise ValueError("mean_type not supported.")
+
+    # Guard against invalid degrees of freedom (e.g. n_samples <= n_groups)
+    if denom <= 0:
+        raise ValueError(
+            f"Insufficient degrees of freedom for covariance computation: denominator is {denom:.1f}. "
+            f"Ensure total samples ({n_samples}) exceed group count."
+        )
+
+    # Variant filter (prior only)
+    if hasattr(input, 'variant_mask') and input.variant_mask is not None:
+        # Load filter
+        variant_mask = instantiate(input.variant_mask.load)
+        if n_vars != variant_mask.shape[0]:
+            variant_mask = np.take(variant_mask, [0], axis=0)
+    else:
+        variant_mask = None
+
+    # Covariance matrix initialization
+    cov = {}
+
+    # Validate regularization_type
+    valid_reg_types = ['per_variable', 'global', 'correlation_based']
+    if regularization_type not in valid_reg_types:
+        raise ValueError(f"regularization_type must be one of {valid_reg_types}, got '{regularization_type}'")
+
+    # Univariate matrix computation steps
+    if univariate:
+        # Check dimensions
+        if data.ndim <= 2:
+            # raise ValueError("Univariate covariance matrix computation requires data with more than 2 dimensions.")
+            data = data[..., None]  # Add a singleton dimension for levels if not present
+        # Initialize empty lists for matrices
+        m_cov = []
+        m_corr = []
+        # Loop over variables
+        for i in range(n_vars):
+            # Compute sub-matrix
+            data_i = data[:, i]
+            # Apply variant mask
+            if variant_mask is not None:
+                logger.info(f"Applying variant mask for variable {i}...")
+                # Remove constant pressure levels from the data
+                data_i = np.take(data_i, np.flatnonzero(variant_mask[i]), axis=1)
+            # Compute covariance block
+            logger.info(f"Computing univariate covariance matrix for variable {i}...")
+            sub_cov = scaling_factor * (data_i.T @ data_i) / denom
+
+            # Apply per-variable regularization directly to sub_cov BEFORE computing correlation
+            if regularization_factor > 0 and regularization_type == 'per_variable':
+                var_mean_diag = float(np.mean(np.diag(sub_cov)))
+                logger.info(f"Applying per-variable regularization for variable {i} (mean_diag={var_mean_diag:.6e})...")
+                sub_cov = sub_cov + regularization_factor * var_mean_diag * np.eye(sub_cov.shape[0],
+                                                                                   dtype=sub_cov.dtype)
+
+            # Compute correlation block from regularized sub_cov (with zero-variance safety)
+            if hasattr(output, 'correlation'):
+                std_i = np.sqrt(np.maximum(np.diag(sub_cov), 1e-12))
+                sub_corr = sub_cov / (std_i[:, None] @ std_i[None, :])
+                m_corr.append(sub_corr)
+
+            m_cov.append(sub_cov)
+
+        # Assemble into block-diagonal matrices
+        del data_i, data
+        cov['matrix'] = block_diag(*m_cov)
+        if hasattr(output, 'correlation'):
+            cov['correlation'] = block_diag(*m_corr)
+
+        # Apply global regularization to assembled matrix if requested
+        if regularization_factor > 0 and regularization_type == 'global':
+            logger.info("Applying global regularization to univariate covariance matrix...")
+            cov['matrix'] += regularization_factor * float(np.mean(np.diag(cov['matrix']))) * np.eye(
+                cov['matrix'].shape[0], dtype=cov['matrix'].dtype)
+            # Recompute block correlation matrix after global regularization
+            if hasattr(output, 'correlation'):
+                std = np.sqrt(np.maximum(np.diag(cov['matrix']), 1e-12))
+                cov['correlation'] = cov['matrix'] / (std[:, None] @ std[None, :])
+
+        # Apply correlation-based regularization if requested
+        elif regularization_factor > 0 and regularization_type == 'correlation_based':
+            logger.info("Applying correlation-based regularization to univariate covariance matrix...")
+            # Recompute from correlation to ensure consistency
+            cov['matrix'] = 0.5 * (cov['matrix'] + cov['matrix'].T)  # Ensure symmetry
+            std = np.sqrt(np.maximum(np.diag(cov['matrix']), 1e-12))
+            cov['correlation'] = cov['matrix'] / (std[:, None] @ std[None, :])
+            cov['correlation'] = 0.5 * (cov['correlation'] + cov['correlation'].T)  # Ensure symmetry
+            # Regularize correlation
+            cov['correlation'] = (1. - regularization_factor) * cov['correlation'] + regularization_factor * np.eye(
+                cov['correlation'].shape[0], dtype=cov['correlation'].dtype)
+            # Reconstruct covariance from regularized correlation
+            cov['matrix'] = (std[:, None] @ std[None, :]) * cov['correlation']
+
+    # Multivariate matrix computation steps
+    else:
+        # Keep track of variable boundaries for per-variable regularization
+        # Reshape to (n_samples, n_vars, -1) to preserve variable dimension
+        data_reshaped = data.reshape(n_samples, n_vars, -1)  # (n_samples, n_vars, total_features_per_var)
+
+        # Apply variant mask BEFORE flattening to track per-variable feature counts
+        if variant_mask is not None:
+            logger.info("Applying pressure mask...")
+            # variant_mask shape: (n_vars, n_features_per_var) or similar
+            # Need to apply per-variable masking
+            data_masked_list = []
+            features_per_var_list = []  # Track features per variable AFTER masking
+
+            for i in range(n_vars):
+                data_i = data_reshaped[:, i, :]  # (n_samples, n_features)
+
+                # Apply variable-specific mask if available
+                if isinstance(variant_mask, np.ndarray):
+                    if variant_mask.ndim == 2:
+                        # variant_mask shape: (n_vars, n_features_per_var)
+                        mask_i = np.flatnonzero(variant_mask[i])
+                    elif variant_mask.ndim == 1:
+                        # variant_mask shape: (n_features_total,) - single mask for all
+                        mask_i = np.flatnonzero(variant_mask)
+                    else:
+                        raise ValueError(f"Unexpected variant_mask shape: {variant_mask.shape}")
+
+                    data_i_masked = np.take(data_i, mask_i, axis=1)
+                else:
+                    data_i_masked = data_i
+
+                data_masked_list.append(data_i_masked)
+                features_per_var_list.append(data_i_masked.shape[1])
+                logger.info(f"Variable {i} features after masking: {data_i_masked.shape[1]}")
+
+            # Flatten concatenated data
+            data = np.concatenate(data_masked_list, axis=1)  # (n_samples, total_features)
+
+            # Free up memory
+            del data_i, data_i_masked, data_masked_list
+        else:
+            # No masking: all variables have same number of features
+            data = data_reshaped.reshape(n_samples, -1)
+            features_per_var_list = [data_reshaped.shape[2]] * n_vars
+
+        # Compute full covariance matrix (before regularization)
+        logger.info("Computing covariance matrix...")
+        cov['matrix'] = scaling_factor * (data.T @ data) / denom
+
+        # Free up memory
+        del data, data_reshaped
+
+        # Apply regularization BEFORE computing correlation to guarantee matrix consistency
+        if regularization_factor > 0:
+            if regularization_type == 'per_variable':
+                logger.info("Applying per-variable regularization to covariance matrix...")
+
+                # Loop over variables with their specific feature counts
+                start_idx = 0
+                for i, features_per_var in enumerate(features_per_var_list):
+                    end_idx = start_idx + features_per_var
+
+                    # Extract diagonal for this variable's block
+                    var_diag = np.diag(cov['matrix'])[start_idx:end_idx]
+                    var_mean_diag = float(np.mean(var_diag))
+
+                    logger.info(
+                        f"Applying regularization for variable {i} (features={features_per_var}, mean_diag={var_mean_diag:.6e})...")
+
+                    # Add regularization to the diagonal block of this variable
+                    cov['matrix'][
+                        start_idx:end_idx, start_idx:end_idx] += regularization_factor * var_mean_diag * np.eye(
+                        features_per_var, dtype=cov['matrix'].dtype)
+                    start_idx = end_idx
+
+            elif regularization_type == 'global':
+                logger.info("Applying global regularization to covariance matrix...")
+                cov['matrix'] += regularization_factor * float(np.mean(np.diag(cov['matrix']))) * np.eye(
+                    cov['matrix'].shape[0], dtype=cov['matrix'].dtype)
+
+            elif regularization_type == 'correlation_based':
+                logger.info("Applying correlation-based regularization to covariance matrix...")
+                # Ensure symmetry before reconstruction
+                cov['matrix'] = 0.5 * (cov['matrix'] + cov['matrix'].T)
+                std = np.sqrt(np.maximum(np.diag(cov['matrix']), 1e-12))
+                cov['correlation'] = cov['matrix'] / (std[:, None] @ std[None, :])
+                cov['correlation'] = 0.5 * (cov['correlation'] + cov['correlation'].T)  # Ensure symmetry
+                # Regularize correlation
+                cov['correlation'] = (1. - regularization_factor) * cov['correlation'] + regularization_factor * np.eye(
+                    cov['correlation'].shape[0], dtype=cov['correlation'].dtype)
+                # Reconstruct covariance from regularized correlation
+                cov['matrix'] = (std[:, None] @ std[None, :]) * cov['correlation']
+
+        # Compute correlation matrix AFTER regularization (if requested and not already derived)
+        if hasattr(output, 'correlation') and 'correlation' not in cov:
+            logger.info("Computing correlation matrix from regularized covariance matrix...")
+            std = np.sqrt(np.maximum(np.diag(cov['matrix']), 1e-12))
+            cov['correlation'] = cov['matrix'] / (std[:, None] @ std[None, :])
+
+    # 1. Retrieve the rcond truncation threshold from output config if specified
+    rcond = 1.e-3
+    if hasattr(output, 'matrix_pseudo_inverse'):
+        rcond = OmegaConf.select(output.matrix_pseudo_inverse, 'params.rcond', default=1.e-3)
+
+    # 2. Spectral decomposition of cov['matrix']
+    if any(hasattr(output, key) for key in
+           ['matrix_cholesky', 'matrix_inverse', 'matrix_pseudo_inverse', 'diagonal', 'diagonal_inverse']):
+        logger.info("Performing spectral decomposition on covariance matrix...")
+
+        # Enforce exact symmetry
+        cov['matrix'] = 0.5 * (cov['matrix'] + cov['matrix'].T)
+        eigvals, eigvecs = np.linalg.eigh(cov['matrix'])
+
+        # Sort in descending order
+        idx = np.argsort(eigvals)[::-1]
+        eigvals = eigvals[idx]
+        eigvecs = eigvecs[:, idx]
+
+        # Determine cutoff threshold and active subspace rank
+        max_eig = eigvals[0]
+        cutoff = rcond * max_eig
+        mask = eigvals > cutoff
+        k = int(np.sum(mask))
+
+        logger.info(
+            f"Covariance subspace truncation: keeping top {k}/{len(eigvals)} modes (rcond={rcond:.1e}, cutoff={cutoff:.2e})")
+
+        # Active components
+        eigvals_k = eigvals[:k]
+        eigvecs_k = eigvecs[:, :k]
+
+        # Reconstruct regularized rank-k covariance matrix
+        cov['matrix'] = (eigvecs_k * eigvals_k) @ eigvecs_k.T
+
+        # Compute pseudo-inverse / inverse (identical in active range space)
+        inv_eigvals = 1.0 / eigvals_k
+        B_pinv = (eigvecs_k * inv_eigvals) @ eigvecs_k.T
+
+        if hasattr(output, 'matrix_pseudo_inverse'):
+            cov['matrix_pseudo_inverse'] = B_pinv
+
+        if hasattr(output, 'matrix_inverse'):
+            # Set matrix_inverse to pinv to avoid amplifying nullspace noise
+            cov['matrix_inverse'] = B_pinv
+
+        if hasattr(output, 'matrix_cholesky'):
+            # Low-rank square root L of shape (N, k) such that B = L @ L.T
+            # Guarantees all generated perturbations lie in the range space of B+
+            cov['matrix_cholesky'] = eigvecs_k * np.sqrt(eigvals_k)
+
+        if hasattr(output, 'diagonal'):
+            cov['diagonal'] = np.diag(np.diag(cov['matrix']))
+
+        if hasattr(output, 'diagonal_inverse'):
+            diag_vals = np.diag(cov['matrix'])
+            cov['diagonal_inverse'] = np.diag(np.where(diag_vals > 0, 1.0 / diag_vals, 0.0))
+
+    # 3. Spectral decomposition of cov['correlation'] (if requested)
+    if 'correlation' in cov and any(hasattr(output, key) for key in
+                                    ['correlation_cholesky', 'correlation_inverse', 'correlation_pseudo_inverse']):
+        logger.info("Performing spectral decomposition on correlation matrix...")
+
+        rcond_corr = 1.e-3
+        if hasattr(output, 'correlation_pseudo_inverse'):
+            rcond_corr = OmegaConf.select(output.correlation_pseudo_inverse, 'params.rcond', default=1.e-3)
+
+        cov['correlation'] = 0.5 * (cov['correlation'] + cov['correlation'].T)
+        c_eigvals, c_eigvecs = np.linalg.eigh(cov['correlation'])
+
+        c_idx = np.argsort(c_eigvals)[::-1]
+        c_eigvals = c_eigvals[c_idx]
+        c_eigvecs = c_eigvecs[:, c_idx]
+
+        c_max_eig = c_eigvals[0]
+        c_cutoff = rcond_corr * c_max_eig
+        c_mask = c_eigvals > c_cutoff
+        c_k = int(np.sum(c_mask))
+
+        logger.info(
+            f"Correlation subspace truncation: keeping top {c_k}/{len(c_eigvals)} modes (rcond={rcond_corr:.1e})")
+
+        c_eigvals_k = c_eigvals[:c_k]
+        c_eigvecs_k = c_eigvecs[:, :c_k]
+
+        cov['correlation'] = (c_eigvecs_k * c_eigvals_k) @ c_eigvecs_k.T
+
+        c_inv_eigvals = 1.0 / c_eigvals_k
+        C_pinv = (c_eigvecs_k * c_inv_eigvals) @ c_eigvecs_k.T
+
+        if hasattr(output, 'correlation_pseudo_inverse'):
+            cov['correlation_pseudo_inverse'] = C_pinv
+
+        if hasattr(output, 'correlation_inverse'):
+            cov['correlation_inverse'] = C_pinv
+
+        if hasattr(output, 'correlation_cholesky'):
+            cov['correlation_cholesky'] = c_eigvecs_k * np.sqrt(c_eigvals_k)
+
+    # Loop over keys
+    for key in list(cov.keys()):
+        # Save to file
+        if hasattr(output, key):
+            if hasattr(output[key], 'save'):
+                logger.info(f"Saving {key} matrix...")
+                save_func = instantiate(output[key].save)
+                save_func(cov[key])
+            # Plot covariance matrix if requested
+            if plot_flag and key in ['matrix', 'matrix_cholesky', 'matrix_inverse', 'matrix_pseudo_inverse',
+                                     'correlation', 'correlation_inverse', 'correlation_pseudo_inverse', 'diagonal',
+                                     'diagonal_inverse']:
                 logger.info(f"Plotting {key} matrix...")
                 fig, get_axes = flexible_gridspec(cell_widths=[4.0], cell_heights=[4.0],
                                                   lefts=[1.00], rights=[1.00], bottoms=[1.00], tops=[1.00])

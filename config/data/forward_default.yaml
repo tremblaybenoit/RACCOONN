@@ -1,5 +1,7 @@
 defaults:
   - synthetic/default@stage
+  - synthetic/bt_forward@stage
+  - synthetic/bt_forward_stdev@stage
   - synthetic/default@source
 
 # dtype

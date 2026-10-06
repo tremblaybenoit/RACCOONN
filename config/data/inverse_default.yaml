@@ -4,6 +4,8 @@ defaults:
   - synthetic/invariant_mask@stage
   - synthetic/prof_inverse@stage
   - synthetic/prof_prior@stage
+  - synthetic/bt_forward@stage
+  - synthetic/bt_forward_stdev@stage
   - synthetic/bt_inverse@stage
   - synthetic/bt_inverse_stdev@stage
   # - synthetic/lat_slant@stage
@@ -12,6 +14,8 @@ defaults:
   # - synthetic/y_slant@stage
   # - synthetic/z_slant@stage
   - synthetic/default@source
+  - synthetic/bt_forward@source
+  - synthetic/bt_forward_stdev@source
   - synthetic/bt_forward_err@source
   - synthetic/variant_mask@source
   - synthetic/invariant_mask@source

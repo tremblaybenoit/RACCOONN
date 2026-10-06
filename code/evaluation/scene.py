@@ -52,6 +52,7 @@ def main(config: DictConfig) -> None:
         lon_scan = lon[indices]
         mask_scan = mask[indices]
         # logger.info(f"Plotting spatial distribution of clouds for scan {i}...")
+        breakpoint()
         fig = fig_geostationnary(lon_scan, lat_scan, mask_scan, 0, 1, title=f'Spatial distribution of clouds for scan {i}',
                                  cb_cmap=cmap, cb_ticks=2, cb_ticklabels=['Clear', 'Cloud'], markersize=1.)
         save_plot(fig, os.path.join(save_dir, f'scan_{i:02d}.png'))

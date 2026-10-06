@@ -4,30 +4,36 @@ title: DAG
 flowchart TB
 	id0[predict]
 	id1[recast]
-	id2[statistics]
-	id3[train]
-	id4[covariance_B]
-	id5[covariance_R]
-	id6[test]
-	style id0 fill:#C6D957,stroke-width:2px,color:#333333
-	style id1 fill:#7CD957,stroke-width:2px,color:#333333
-	style id2 fill:#57D97C,stroke-width:2px,color:#333333
-	style id3 fill:#57A1D9,stroke-width:2px,color:#333333
-	style id4 fill:#D95757,stroke-width:2px,color:#333333
-	style id5 fill:#D9A157,stroke-width:2px,color:#333333
-	style id6 fill:#57D9C6,stroke-width:2px,color:#333333
-	id2 --> id0
-	id6 --> id0
+	id2[source_data]
+	id3[statistics]
+	id4[train]
+	id5[covariance_B]
+	id6[covariance_R]
+	id7[test]
+	style id0 fill:#D9D957,stroke-width:2px,color:#333333
+	style id1 fill:#98D957,stroke-width:2px,color:#333333
+	style id2 fill:#57D957,stroke-width:2px,color:#333333
+	style id3 fill:#57D998,stroke-width:2px,color:#333333
+	style id4 fill:#5798D9,stroke-width:2px,color:#333333
+	style id5 fill:#D95757,stroke-width:2px,color:#333333
+	style id6 fill:#D99857,stroke-width:2px,color:#333333
+	style id7 fill:#57D9D9,stroke-width:2px,color:#333333
+	id4 --> id0
 	id3 --> id0
 	id1 --> id0
+	id7 --> id0
+	id2 --> id1
 	id2 --> id3
-	id5 --> id3
-	id4 --> id3
-	id1 --> id3
-	id2 --> id4
+	id3 --> id4
+	id6 --> id4
+	id5 --> id4
+	id1 --> id4
+	id3 --> id5
 	id2 --> id5
-	id4 --> id6
-	id2 --> id6
 	id3 --> id6
-	id5 --> id6
-	id1 --> id6
+	id2 --> id6
+	id6 --> id7
+	id1 --> id7
+	id4 --> id7
+	id3 --> id7
+	id5 --> id7

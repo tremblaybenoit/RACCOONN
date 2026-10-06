@@ -6,6 +6,9 @@ import sys
 # CONFIGURATION
 #########################################################################################################
 
+# Detect if we're in drawing/DAG mode (--dag, --rulegraph, --filegraph, etc.)
+is_drawing = any(flag in sys.argv for flag in ['--dag', '--rulegraph', '--filegraph'])
+
 # Hydra/Snakemake config
 config_path = config.get("-config-path", "../config")
 config_name = config.get("-config-name", "default")
@@ -27,6 +30,21 @@ config_model = config_hydra["model"]
 #########################################################################################################
 # RULES
 #########################################################################################################
+
+# Source data rule (only created when drawing)
+if is_drawing:
+    config_data_source = config_data.get('source', None)
+    if config_data_source:
+        rule:
+            name: "source_data"
+            params:
+                # Hydra configuration
+                config_name = config_name,
+                experiment = config_experiment
+            output:
+                # Output results
+                data_filenames = get_filenames(config_data_source, exclude_keys={'transformations', 'load'})
+
 
 # Preprocessing rules (dynamic)
 if config_preprocessing:
