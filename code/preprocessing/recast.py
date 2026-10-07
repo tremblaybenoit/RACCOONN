@@ -224,7 +224,8 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
 
             # Remove samples with null profiles
             log_keep = input.mask.get('log_mask', False)
-            if log_keep:
+            ln_keep = input.mask.get('ln_mask', False)
+            if log_keep or ln_keep:
                 logger.info(f"Removing samples with null profiles...")
                 # Load profiles
                 if 'prof' not in data_stage:
@@ -241,8 +242,12 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
                         mask &= ~(min_prof == 0)
                     # Convert second and third profile types to log10
                     logger.info("Converting second and third profile types to log10...")
-                    data_stage['prof'][:, 1, :] = np.log10(data_stage['prof'][:, 1, :])
-                    data_stage['prof'][:, 2, :] = np.log10(data_stage['prof'][:, 2, :])
+                    if log_keep:
+                        data_stage['prof'][:, 1, :] = np.log10(data_stage['prof'][:, 1, :])
+                        data_stage['prof'][:, 2, :] = np.log10(data_stage['prof'][:, 2, :])
+                    else:
+                        data_stage['prof'][:, 1, :] = np.log(data_stage['prof'][:, 1, :])
+                        data_stage['prof'][:, 2, :] = np.log(data_stage['prof'][:, 2, :])
 
         # Shuffle or maintain distribution
         if hasattr(input, 'split') and input.split is not None:
@@ -279,6 +284,8 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
                     logger.info(f"Loading variable '{variable}'")
                     data_stage[variable] = load_variable(config_stage.variables[variable])
                 # Save function
+                if not hasattr(config_variable, 'save'):
+                    continue
                 save_fn = instantiate(config_variable.save)
                 # Create directory if needed
                 if hasattr(config_variable, 'path'):
