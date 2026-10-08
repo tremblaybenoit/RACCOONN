@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.linalg import block_diag
 from scipy.stats import truncnorm
+from scipy.optimize import minimize_scalar
 import hydra
 import torch
 from omegaconf import DictConfig, OmegaConf
@@ -71,6 +72,84 @@ def prior_from_bounded_perturbations(input: DictConfig, output: DictConfig | Non
     inverse_transform_fn = (
         Compose(transformations=input.prof.get('transformations', None), inverse_transform=True)
         if apply_transform and input.prof.get('transformations') is not None
+        else identity
+    )
+
+    x_dims = x_true_transformed.shape
+    x_true_flat = x_true_transformed.reshape(x_dims[0], -1)
+
+    # Load physical bounds
+    x_stats = instantiate(input.stats)
+    x_min_physical, x_max_physical = x_stats['min'], x_stats['max']
+    del x_stats
+
+    rng = np.random.default_rng(seed)
+
+    # Optional variant mask setup
+    variant_mask = None
+    if input.get('variant_mask', None) is not None:
+        variant_mask = instantiate(input.variant_mask.load)
+        if x_dims[1] != variant_mask.shape[0]:
+            variant_mask = np.take(variant_mask, [0], axis=0)
+
+    # Single-pass perturbation generation (avoiding while-loop rejection bottlenecks)
+    n_samples = x_dims[0]
+    p = rng.normal(0, 1, size=(cov_cholesky.shape[1], n_samples))
+    # p = truncnorm.rvs(-1, 1, size=(cov_cholesky.shape[1], n_samples), random_state=rng)
+    dx_transformed = (cov_cholesky @ p).T
+
+    x_prior_transformed = x_true_flat.copy()
+    if variant_mask is not None:
+        x_prior_transformed[:, np.flatnonzero(variant_mask)] += dx_transformed
+    else:
+        x_prior_transformed += dx_transformed
+
+    # Reshape and map back to physical space
+    x_prior_transformed = x_prior_transformed.reshape(n_samples, x_dims[1], x_dims[2])
+    x_prior_physical = inverse_transform_fn(x_prior_transformed)
+
+    # Apply safe boundary enforcement (clipping) instead of rejection sampling loops
+    # to maintain unbiased bulk statistics and prevent infinite hanging.
+    # Count samples with any out-of-bounds values using vectorized operations
+    nval = ((x_prior_physical < x_min_physical) | (x_prior_physical > x_max_physical)).any(axis=(1, 2)).sum()
+    logger.info(f"Number of samples outside physical bounds: {nval} out of {n_samples}")
+    # x_prior_physical = np.clip(x_prior_physical, x_min_physical, x_max_physical)
+
+    # Save to file
+    if output is not None and hasattr(output, 'save'):
+        logger.info(f"Saving validated prior to {output.path}...")
+        save_func = instantiate(output.save)
+        save_func(x_prior_physical)
+        return None
+    else:
+        return x_prior_physical
+
+
+def perturbations_from_covariance(input: DictConfig, output: DictConfig | None = None,
+                                  seed: int | None = None, apply_transform: bool = False) -> np.ndarray | None:
+    """ Compute the prior from the model error covariance matrix and perturbations.
+
+        Parameters
+        ----------
+        input: DictConfig. Main hydra configuration file containing all model hyperparameters.
+        output: DictConfig. Output configuration.
+        seed: int. Seed to ensure reproducibility.
+        apply_transform: bool. If True, apply normalization transform to the data before computing covariance.
+
+
+        Returns
+        -------
+        None.
+    """
+
+    # Load Cholesky matrix (L)
+    cov_cholesky = instantiate(input.cholesky.load)
+
+    # Load true state and dimensions
+    x_true_transformed = load_variable(input.data, apply_transform=apply_transform)
+    inverse_transform_fn = (
+        Compose(transformations=input.data.get('transformations', None), inverse_transform=True)
+        if apply_transform and input.data.get('transformations') is not None
         else identity
     )
 
@@ -2237,15 +2316,128 @@ def persistent_matrix(
     return
 
 
-def fit_crtm_B_parameters_from_data(
-        data: np.ndarray,
+def diagnose_covariance_matrix(
+        B_joint: np.ndarray,
         pressure_hpa: np.ndarray,
-        univariate: bool = False,
-        use_log10: bool = False
+        variable_names: list[str] = ['T', 'log_q', 'log_O3'],
+        fitted_params: dict = None
 ) -> dict:
     """
-    Extracts empirical sigmas, length scales (L_p), and cross-correlations (rho)
-    from profile data, then generates a calibrated Gaspari-Cohn B matrix.
+    Performs numerical diagnostics on a joint covariance matrix B to identify
+    the exact cause of positive-definiteness failure (LinAlgError).
+    """
+    n_vars = len(variable_names)
+    n_levels = len(pressure_hpa)
+
+    print("\n" + "=" * 70)
+    print(" COVARIANCE MATRIX NUMERICAL DIAGNOSTICS")
+    print("=" * 70)
+
+    # --- 1. Check Symmetry ---
+    sym_err = np.max(np.abs(B_joint - B_joint.T))
+    print(f"\n[1] Symmetry Check:")
+    print(f"    Max asymmetry |B - B^T|: {sym_err:.2e}")
+    if sym_err > 1e-12:
+        print("    --> WARNING: Matrix is asymmetric due to floating-point roundoff.")
+
+    # --- 2. Diagonal Variance Statistics per Variable Block ---
+    diag_B = np.diag(B_joint)
+    print(f"\n[2] Diagonal Variance Range per Variable:")
+
+    for i, var in enumerate(variable_names):
+        start_idx = i * n_levels
+        end_idx = (i + 1) * n_levels
+        var_diag = diag_B[start_idx:end_idx]
+
+        min_v, max_v = np.min(var_diag), np.max(var_diag)
+        ratio = max_v / (min_v + 1e-30)
+        min_p = pressure_hpa[np.argmin(var_diag)]
+
+        print(f"    - {var:6s}: Min = {min_v:.2e} (at p={min_p:.3f} hPa) | Max = {max_v:.2e} | Ratio = {ratio:.2e}")
+        if min_v < 1e-14:
+            print(f"      --> CRITICAL: {var} variance is near zero or unfloored (< 1e-14)!")
+
+    # Overall Dynamic Range
+    overall_ratio = np.max(diag_B) / (np.min(diag_B) + 1e-30)
+    print(f"    - Overall Variance Dynamic Range: {overall_ratio:.2e}")
+    if overall_ratio > 1e12:
+        print(
+            "      --> CRITICAL: Dynamic range exceeds 1e12! Combined with correlation, this causes float64 underflow.")
+
+    # --- 3. Eigendecomposition & Condition Numbers ---
+    print(f"\n[3] Spectral Eigendecomposition:")
+
+    # Full Joint Spectrum
+    eigvals_full = np.linalg.eigvalsh(0.5 * (B_joint + B_joint.T))
+    min_eig_full, max_eig_full = eigvals_full[0], eigvals_full[-1]
+    neg_eigs_full = np.sum(eigvals_full <= 0)
+    cond_full = max_eig_full / max(min_eig_full, 1e-30)
+
+    print(f"    - Full Joint Matrix B ({B_joint.shape[0]}x{B_joint.shape[1]}):")
+    print(f"      * Max Eigenvalue: {max_eig_full:.2e}")
+    print(f"      * Min Eigenvalue: {min_eig_full:.2e}")
+    print(f"      * Condition Num:  {cond_full:.2e}")
+    print(f"      * Non-positive Eigencount: {neg_eigs_full} / {len(eigvals_full)}")
+
+    # Per-Block Correlation Spectrum (to isolate which variable drives ill-conditioning)
+    print(f"\n[4] Per-Variable Block Spectra (Isolating the ill-conditioned variable):")
+    for i, var in enumerate(variable_names):
+        start_idx = i * n_levels
+        end_idx = (i + 1) * n_levels
+        B_sub = B_joint[start_idx:end_idx, start_idx:end_idx]
+
+        # Convert sub-block to correlation
+        std_sub = np.sqrt(np.maximum(np.diag(B_sub), 1e-15))
+        C_sub = B_sub / (std_sub[:, None] @ std_sub[None, :])
+
+        sub_eigs = np.linalg.eigvalsh(0.5 * (C_sub + C_sub.T))
+        min_e, max_e = sub_eigs[0], sub_eigs[-1]
+        cond_sub = max_e / max(min_e, 1e-30)
+
+        print(
+            f"    - Block [{var}]: Min Eig = {min_e:.2e} | Condition Num = {cond_sub:.2e} | Neg Eigs = {np.sum(sub_eigs <= 0)}")
+        if min_e <= 0:
+            print(f"      --> CRITICAL: Variable [{var}] correlation block is rank-deficient!")
+
+    # --- 5. Grid Sampling Ratio vs Length Scale ---
+    if fitted_params is not None:
+        print(f"\n[5] Grid Resolution vs Fitted Length Scale L_p:")
+        log_p = np.log10(pressure_hpa) if fitted_params.get('use_log10', False) else np.log(pressure_hpa)
+        min_delta_p = np.min(np.abs(np.diff(log_p)))
+
+        for var in ['T', 'q', 'o3']:
+            L_key = f'L_p_{var}'
+            if L_key in fitted_params:
+                L_val = fitted_params[L_key]
+                ratio = min_delta_p / L_val
+                print(
+                    f"    - {var}: Min grid step = {min_delta_p:.4f} | L_p = {L_val:.4f} | Ratio (step/L_p) = {ratio:.4f}")
+                if ratio < 0.01:
+                    print(
+                        f"      --> WARNING: Grid step is < 1% of L_p! Adjacent correlation approaches 0.99999999, driving rank deficiency.")
+
+    print("=" * 70 + "\n")
+
+    return {
+        'min_eig': min_eig_full,
+        'max_eig': max_eig_full,
+        'condition_number': cond_full,
+        'num_negative_eigs': neg_eigs_full,
+        'variance_dynamic_range': overall_ratio
+    }
+
+
+def gasparicohn_pressure_matrix_subspace(
+        data: np.ndarray,
+        pressure_hpa: np.ndarray,
+        univariate: bool = True,
+        use_log10: bool = False,
+        rcond: float = 1e-5,
+        min_sigma_floor: float = 1e-4
+) -> dict:
+    """
+    Data-calibrated Gaspari-Cohn covariance matrix generator using Low-Rank
+    Subspace Factorization (Solution 2) to eliminate null grid modes.
 
     Parameters
     ----------
@@ -2254,110 +2446,308 @@ def fit_crtm_B_parameters_from_data(
         containing [T (K), log_q (-), log_O3 (-)].
     pressure_hpa : np.ndarray
         Pressure levels in hPa of length n_levels.
+    univariate : bool
+        If True, builds block-diagonal correlation matrix.
+    use_log10 : bool
+        If True, scales computations for log10 space.
+    rcond : float
+        Relative eigenvalue cutoff threshold. Modes with lambda_i < rcond * lambda_max
+        are truncated as numerical grid noise.
+    min_sigma_floor : float
+        Floor for empirical standard deviations.
+
+    Returns
+    -------
+    dict
+        Dictionary containing 'L_k' factor (N x k), rank-k pseudo-inverse,
+        eigenvectors V_k, active eigenvalues, and subspace transformation metadata.
     """
     n_levels = len(pressure_hpa)
 
-    # Reshape data to (n_samples, 3, n_levels) if flattened
     if data.ndim == 2:
         data = data.reshape(data.shape[0], 3, n_levels)
 
-    T_data = data[:, 0, :]  # Shape: (n_samples, n_levels)
-    q_data = data[:, 1, :]  # Shape: (n_samples, n_levels)
-    O3_data = data[:, 2, :]  # Shape: (n_samples, n_levels)
+    T_data, q_data, O3_data = data[:, 0, :], data[:, 1, :], data[:, 2, :]
 
-    # Log-pressure distance matrix
     log_scale = (1.0 / np.log(10.0)) if use_log10 else 1.0
     log_p = np.log10(pressure_hpa) if use_log10 else np.log(pressure_hpa)
     log_p_dist = np.abs(log_p[:, None] - log_p[None, :])
 
-    # --- 1. Compute Empirical Standard Deviations sigma(p) ---
-    sigma_T_emp = np.std(T_data, axis=0, ddof=1)
-    sigma_q_emp = np.std(q_data, axis=0, ddof=1)
-    sigma_O3_emp = np.std(O3_data, axis=0, ddof=1)
+    # 1. Empirical Sigmas with Hard Floors
+    sigma_T = np.maximum(np.std(T_data, axis=0, ddof=1), 1e-3)
+    sigma_q = np.maximum(np.std(q_data, axis=0, ddof=1), min_sigma_floor * log_scale)
+    sigma_O3 = np.maximum(np.std(O3_data, axis=0, ddof=1), min_sigma_floor * log_scale)
 
-    # --- 2. Compute Empirical Correlation Matrices ---
-    def get_corr_block(A, B):
-        cov = np.cov(A, B, rowvar=False)
-        std_A = np.std(A, axis=0, ddof=1)
-        std_B = np.std(B, axis=0, ddof=1)
-        # Extract cross-covariance block
-        n = A.shape[1]
-        cov_AB = cov[:n, n:]
-        return cov_AB / np.outer(std_A, std_B)
+    sigma_joint = np.concatenate([sigma_T, sigma_q, sigma_O3])
 
+    # 2. Fit Length Scales L_p
     C_TT_emp = np.corrcoef(T_data, rowvar=False)
     C_qq_emp = np.corrcoef(q_data, rowvar=False)
     C_O3O3_emp = np.corrcoef(O3_data, rowvar=False)
 
-    # --- 3. Fit Gaspari-Cohn Length Scale L_p to Empirical Correlation ---
     def fit_length_scale(C_emp):
         def loss_fn(L_eff):
             C_fit = gaspari_cohn_kernel(log_p_dist / L_eff)
             return np.mean((C_emp - C_fit) ** 2)
 
         res = minimize_scalar(loss_fn, bounds=(0.05, 2.0), method='bounded')
-        return res.x / log_scale  # Convert back to unscaled L_p
+        return res.x / log_scale
 
     L_p_T = fit_length_scale(C_TT_emp)
     L_p_q = fit_length_scale(C_qq_emp)
     L_p_o3 = fit_length_scale(C_O3O3_emp)
 
-    # --- 4. Extract Cross-Variable Correlations rho ---
-    if not univariate:
-        C_Tq_emp = get_corr_block(T_data, q_data)
-        C_TO3_emp = get_corr_block(T_data, O3_data)
-        C_qO3_emp = get_corr_block(q_data, O3_data)
+    # 3. Correlation Blocks
+    C_TT = gaspari_cohn_kernel(log_p_dist / (L_p_T * log_scale))
+    C_qq = gaspari_cohn_kernel(log_p_dist / (L_p_q * log_scale))
+    C_O3O3 = gaspari_cohn_kernel(log_p_dist / (L_p_o3 * log_scale))
 
-        # Average of collocated level cross-correlations (main diagonal)
+    if univariate:
+        C_joint = block_diag(C_TT, C_qq, C_O3O3)
+    else:
+        C_Tq_emp = np.cov(T_data, q_data, rowvar=False)[:n_levels, n_levels:] / np.outer(sigma_T, sigma_q)
+        C_TO3_emp = np.cov(T_data, O3_data, rowvar=False)[:n_levels, n_levels:] / np.outer(sigma_T, sigma_O3)
+        C_qO3_emp = np.cov(q_data, O3_data, rowvar=False)[:n_levels, n_levels:] / np.outer(sigma_q, sigma_O3)
+
         rho_Tq = float(np.mean(np.diag(C_Tq_emp)))
         rho_TO3 = float(np.mean(np.diag(C_TO3_emp)))
         rho_qO3 = float(np.mean(np.diag(C_qO3_emp)))
-    else:
-        rho_Tq, rho_TO3, rho_qO3 = 0.0, 0.0, 0.0
 
-    print(f"--- Fitted Parameters from Data ---")
-    print(f"Length scales (L_p): T={L_p_T:.3f}, q={L_p_q:.3f}, O3={L_p_o3:.3f}")
-    print(f"Cross-correlations: rho_Tq={rho_Tq:.3f}, rho_TO3={rho_TO3:.3f}, rho_qO3={rho_qO3:.3f}")
+        L_Tq = np.sqrt(((L_p_T * log_scale) ** 2 + (L_p_q * log_scale) ** 2) / 2.0)
+        L_TO3 = np.sqrt(((L_p_T * log_scale) ** 2 + (L_p_o3 * log_scale) ** 2) / 2.0)
+        L_qO3 = np.sqrt(((L_p_q * log_scale) ** 2 + (L_p_o3 * log_scale) ** 2) / 2.0)
 
-    # --- 5. Generate Calibrated B Matrix ---
-    cov_dict = generate_crtm_clear_sky_B(
-        pressure_hpa=pressure_hpa,
-        L_p_T=L_p_T,
-        L_p_q=L_p_q,
-        L_p_o3=L_p_o3,
-        rho_Tq=rho_Tq,
-        rho_TO3=rho_TO3,
-        rho_qO3=rho_qO3,
-        univariate=univariate,
-        use_log10=use_log10
-    )
+        C_Tq = rho_Tq * gaspari_cohn_kernel(log_p_dist / L_Tq) if rho_Tq != 0 else np.zeros((n_levels, n_levels))
+        C_TO3 = rho_TO3 * gaspari_cohn_kernel(log_p_dist / L_TO3) if rho_TO3 != 0 else np.zeros((n_levels, n_levels))
+        C_qO3 = rho_qO3 * gaspari_cohn_kernel(log_p_dist / L_qO3) if rho_qO3 != 0 else np.zeros((n_levels, n_levels))
 
-    # Override analytical sigma profiles with exact empirical sigmas
-    n = n_levels
-    sigma_joint = np.concatenate([sigma_T_emp, sigma_q_emp, sigma_O3_emp])
+        C_joint = np.block([
+            [C_TT, C_Tq, C_TO3],
+            [C_Tq.T, C_qq, C_qO3],
+            [C_TO3.T, C_qO3.T, C_O3O3]
+        ])
 
-    # Re-scale matrix using exact empirical sigmas while preserving Gaspari-Cohn correlation structure
-    C_joint = cov_dict['matrix'] / np.outer(
-        np.concatenate([cov_dict['sigma_profiles']['T'], cov_dict['sigma_profiles']['log_q'],
-                        cov_dict['sigma_profiles']['log_O3']]),
-        np.concatenate([cov_dict['sigma_profiles']['T'], cov_dict['sigma_profiles']['log_q'],
-                        cov_dict['sigma_profiles']['log_O3']])
-    )
+    # 4. Construct Full Covariance Matrix B
+    B_full = np.outer(sigma_joint, sigma_joint) * C_joint
+    B_full = 0.5 * (B_full + B_full.T)
 
-    B_calibrated = np.outer(sigma_joint, sigma_joint) * C_joint
+    # 5. Eigendecomposition and Subspace Truncation
+    eigvals, eigvecs = np.linalg.eigh(B_full)
 
-    # Recompute Cholesky and Inverse for calibrated matrix
-    B_calibrated = 0.5 * (B_calibrated + B_calibrated.T) + 1e-8 * np.diag(np.diag(B_calibrated))
+    # Sort eigenvalues/vectors descending
+    sort_idx = np.argsort(eigvals)[::-1]
+    eigvals = eigvals[sort_idx]
+    eigvecs = eigvecs[:, sort_idx]
+
+    # Mask active modes above threshold
+    max_eig = eigvals[0]
+    cutoff = rcond * max_eig
+    active_mask = eigvals > cutoff
+    k = int(np.sum(active_mask))
+
+    logger.info(
+        f"Subspace Truncation: Kept {k}/{len(eigvals)} active physical modes (truncated {len(eigvals) - k} null grid modes).")
+
+    eigvals_k = eigvals[:k]
+    V_k = eigvecs[:, :k]  # Shape: (N, k)
+
+    # 6. Compute Subspace Square-Root Factor L_k and Pseudo-Inverse B_k^+
+    # L_k has shape (N, k) such that B_k = L_k @ L_k.T
+    L_k = V_k * np.sqrt(eigvals_k)  # Shape: (N, k)
+
+    # Reconstructed rank-k covariance (N x N)
+    B_subspace = (V_k * eigvals_k) @ V_k.T
+
+    # Subspace Precision Matrix B_k^+ (N x N)
+    B_inv_subspace = (V_k * (1.0 / eigvals_k)) @ V_k.T
 
     return {
-        'matrix': B_calibrated,
-        'matrix_cholesky': np.linalg.cholesky(B_calibrated),
-        'matrix_inverse': np.linalg.inv(B_calibrated),
+        'matrix_full': B_full,
+        'matrix_subspace': B_subspace,
+        'matrix_inverse': B_inv_subspace,
+        'L_k': L_k,  # Rectangular square-root factor (N x k)
+        'V_k': V_k,  # Subspace Eigenvectors (N x k)
+        'eigenvalues_k': eigvals_k,  # Active Eigenvalues (k,)
+        'n_active_modes': k,
+        'n_total_modes': len(eigvals),
         'fitted_params': {
             'L_p_T': L_p_T, 'L_p_q': L_p_q, 'L_p_o3': L_p_o3,
-            'rho_Tq': rho_Tq, 'rho_TO3': rho_TO3, 'rho_qO3': rho_qO3,
-            'sigma_T': sigma_T_emp, 'sigma_q': sigma_q_emp, 'sigma_O3': sigma_O3_emp
+            'sigma_T': sigma_T, 'sigma_q': sigma_q, 'sigma_O3': sigma_O3
         }
+    }
+
+
+class ControlVariableTransform:
+    """
+    Helper class implementing the v-control variable transformation (v-transform)
+    for 1D-Var optimization and ensemble prior sampling.
+
+        x = x_b + L_k @ v
+        v = Lambda_k^(-1/2) @ V_k^T @ (x - x_b)
+    """
+
+    def __init__(self, L_k: np.ndarray, V_k: np.ndarray, eigenvalues_k: np.ndarray):
+        """
+        Parameters
+        ----------
+        L_k : np.ndarray
+            Rectangular square-root factor of shape (N, k).
+        V_k : np.ndarray
+            Subspace eigenvectors of shape (N, k).
+        eigenvalues_k : np.ndarray
+            Active eigenvalues of shape (k,).
+        """
+        self.L_k = L_k  # (N, k)
+        self.V_k = V_k  # (N, k)
+        self.eigvals_k = eigenvalues_k  # (k,)
+        self.inv_sqrt_eigvals = 1.0 / np.sqrt(eigenvalues_k)  # (k,)
+        self.N, self.k = L_k.shape
+
+    def control_to_state(self, v: np.ndarray, x_b: np.ndarray) -> np.ndarray:
+        """
+        Maps control vector v (k,) to state vector x (N,).
+
+        x = x_b + L_k @ v
+        """
+        return x_b + self.L_k @ v
+
+    def state_to_control(self, x: np.ndarray, x_b: np.ndarray) -> np.ndarray:
+        """
+        Maps state vector perturbation (x - x_b) back to control vector v (k,).
+
+        v = diag(1 / sqrt(lambda_k)) @ V_k^T @ (x - x_b)
+        """
+        dx = x - x_b
+        return self.inv_sqrt_eigvals * (self.V_k.T @ dx)
+
+    def compute_J_b(self, v: np.ndarray) -> float:
+        """
+        Computes background cost penalty J_b in control space.
+
+        J_b(v) = 0.5 * ||v||_2^2
+        """
+        return 0.5 * float(np.sum(v ** 2))
+
+    def sample_prior_ensemble(self, x_b: np.ndarray, n_samples: int = 100) -> np.ndarray:
+        """
+        Draws n_samples physical perturbations from the exact subspace prior:
+
+        dx ~ N(0, B_k) === L_k @ z,  z ~ N(0, I_k)
+        """
+        z = np.random.randn(self.k, n_samples)
+        dx = self.L_k @ z  # (N, n_samples)
+        return x_b[:, None] + dx
+
+
+def fit_crtm_B_parameters_from_data(
+        data: np.ndarray,
+        pressure_hpa: np.ndarray,
+        univariate: bool = True,
+        use_log10: bool = False,
+        rel_ridge_tol: float = 1e-6,
+        min_sigma_floor: float = 1e-4
+) -> dict:
+    """
+    Data-calibrated Gaspari-Cohn covariance matrix generator using an Adaptive
+    Spectral Ridge to guarantee full-rank positive-definiteness across oversampled grids.
+    """
+    n_levels = len(pressure_hpa)
+
+    # Reshape flattened input (n_samples, 3 * n_levels) -> (n_samples, 3, n_levels)
+    if data.ndim == 2:
+        data = data.reshape(data.shape[0], 3, n_levels)
+
+    T_data, q_data, O3_data = data[:, 0, :], data[:, 1, :], data[:, 2, :]
+
+    log_scale = (1.0 / np.log(10.0)) if use_log10 else 1.0
+    log_p = np.log10(pressure_hpa) if use_log10 else np.log(pressure_hpa)
+    log_p_dist = np.abs(log_p[:, None] - log_p[None, :])
+
+    # 1. Compute Empirical Sigmas and Apply Hard Floors
+    sigma_T = np.maximum(np.std(T_data, axis=0, ddof=1), 1e-3)
+    sigma_q = np.maximum(np.std(q_data, axis=0, ddof=1), min_sigma_floor * log_scale)
+    sigma_O3 = np.maximum(np.std(O3_data, axis=0, ddof=1), min_sigma_floor * log_scale)
+    sigma_joint = np.concatenate([sigma_T, sigma_q, sigma_O3])
+
+    # 2. Fit Gaspari-Cohn Length Scales L_p from Empirical Correlations
+    C_TT_emp = np.corrcoef(T_data, rowvar=False)
+    C_qq_emp = np.corrcoef(q_data, rowvar=False)
+    C_O3O3_emp = np.corrcoef(O3_data, rowvar=False)
+
+    def fit_length_scale(C_emp):
+        def loss_fn(L_eff):
+            C_fit = gaspari_cohn_kernel(log_p_dist / L_eff)
+            return np.mean((C_emp - C_fit) ** 2)
+
+        res = minimize_scalar(loss_fn, bounds=(0.05, 2.0), method='bounded')
+        return res.x / log_scale
+
+    L_p_T = fit_length_scale(C_TT_emp)
+    L_p_q = fit_length_scale(C_qq_emp)
+    L_p_o3 = fit_length_scale(C_O3O3_emp)
+
+    logger.info(f"Fitted length scales (L_p): T={L_p_T:.3f}, q={L_p_q:.3f}, O3={L_p_o3:.3f}")
+
+    # 3. Build Correlation Blocks
+    C_TT = gaspari_cohn_kernel(log_p_dist / (L_p_T * log_scale))
+    C_qq = gaspari_cohn_kernel(log_p_dist / (L_p_q * log_scale))
+    C_O3O3 = gaspari_cohn_kernel(log_p_dist / (L_p_o3 * log_scale))
+
+    if univariate:
+        C_joint = block_diag(C_TT, C_qq, C_O3O3)
+    else:
+        C_Tq_emp = np.cov(T_data, q_data, rowvar=False)[:n_levels, n_levels:] / np.outer(sigma_T, sigma_q)
+        C_TO3_emp = np.cov(T_data, O3_data, rowvar=False)[:n_levels, n_levels:] / np.outer(sigma_T, sigma_O3)
+        C_qO3_emp = np.cov(q_data, O3_data, rowvar=False)[:n_levels, n_levels:] / np.outer(sigma_q, sigma_O3)
+
+        rho_Tq = float(np.mean(np.diag(C_Tq_emp)))
+        rho_TO3 = float(np.mean(np.diag(C_TO3_emp)))
+        rho_qO3 = float(np.mean(np.diag(C_qO3_emp)))
+
+        L_Tq = np.sqrt(((L_p_T * log_scale) ** 2 + (L_p_q * log_scale) ** 2) / 2.0)
+        L_TO3 = np.sqrt(((L_p_T * log_scale) ** 2 + (L_p_o3 * log_scale) ** 2) / 2.0)
+        L_qO3 = np.sqrt(((L_p_q * log_scale) ** 2 + (L_p_o3 * log_scale) ** 2) / 2.0)
+
+        C_Tq = rho_Tq * gaspari_cohn_kernel(log_p_dist / L_Tq) if rho_Tq != 0 else np.zeros((n_levels, n_levels))
+        C_TO3 = rho_TO3 * gaspari_cohn_kernel(log_p_dist / L_TO3) if rho_TO3 != 0 else np.zeros((n_levels, n_levels))
+        C_qO3 = rho_qO3 * gaspari_cohn_kernel(log_p_dist / L_qO3) if rho_qO3 != 0 else np.zeros((n_levels, n_levels))
+
+        C_joint = np.block([
+            [C_TT, C_Tq, C_TO3],
+            [C_Tq.T, C_qq, C_qO3],
+            [C_TO3.T, C_qO3.T, C_O3O3]
+        ])
+
+    # 4. Construct Full Unregularized Covariance Matrix B
+    C_joint = 0.5 * (C_joint + C_joint.T)
+
+    # 4. Inspect Correlation Spectrum directly (No recomputation needed)
+    eigvals_C = np.linalg.eigvalsh(C_joint)
+    min_eig_C, max_eig_C = eigvals_C[0], eigvals_C[-1]
+
+    # Calculate scale-free ridge shift alpha matching C_joint precision
+    alpha = C_joint.dtype.type(0.0)
+    if min_eig_C <= 0 or (max_eig_C / max(min_eig_C, 1e-30)) > (1.0 / rel_ridge_tol):
+        alpha_val = np.abs(min_eig_C) + (rel_ridge_tol * max_eig_C)
+        alpha = C_joint.dtype.type(alpha_val)
+        logger.info(f"Applying correlation-space ridge: alpha = {float(alpha):.4e}")
+
+    # 5. Construct Regularized Covariance Matrix B
+    # Apply (1 + alpha) scaling directly to diagonal entries during assembly
+    C_joint_regularized = C_joint + alpha * np.eye(C_joint.shape[0], dtype=C_joint.dtype)
+
+    sigma_joint = np.concatenate([sigma_T, sigma_q, sigma_O3])
+    B = np.outer(sigma_joint, sigma_joint) * C_joint_regularized
+    B = 0.5 * (B + B.T)
+
+    # 6. Compute Cholesky Factor and Inverse
+    L = np.linalg.cholesky(B)
+    B_inv = np.linalg.inv(B)
+
+    return {
+        'matrix': B,
+        'matrix_cholesky': L,
+        'matrix_inverse': B_inv
     }
 
 
@@ -2372,18 +2762,32 @@ def gaspari_cohn_kernel(r: np.ndarray) -> np.ndarray:
         -------
         np.ndarray. Gaspari-Cohn correlation values for the input distances.
     """
+    r = np.abs(r)
     C = np.zeros_like(r)
 
-    m1 = (r >= 0) & (r <= 1)
-    r1 = r[m1]
-    C[m1] = 1.0 - 5.0 * r1 ** 2 + 4.0 * r1 ** 3 + (5.0 / 8.0) * r1 ** 4 - (5.0 / 8.0) * r1 ** 5
+    m1 = r <= 1.0
+    x = r[m1]
+    C[m1] = (
+        1
+        - (5/3)*x**2
+        + (5/8)*x**3
+        + 0.5*x**4
+        - 0.25*x**5
+    )
 
-    m2 = (r > 1) & (r <= 2)
-    r2 = r[m2]
-    C[m2] = (8.0 / 3.0) * r2 ** -1 - 8.0 + 5.0 * r2 - (5.0 / 3.0) * r2 ** 2 - (5.0 / 2.0) * r2 ** 3 + (
-                1.0 / 2.0) * r2 ** 4 + (1.0 / 12.0) * r2 ** 5 - (1.0 / 2.0) * r2 ** -1 * (1.0 - r2 ** 5)
+    m2 = (r > 1.0) & (r <= 2.0)
+    x = r[m2]
+    C[m2] = (
+        4
+        - 5*x
+        + (5/3)*x**2
+        + (5/8)*x**3
+        - 0.5*x**4
+        + (1/12)*x**5
+        - 2/(3*x)
+    )
 
-    return np.maximum(C, 0.0)
+    return C
 
 
 def generate_crtm_clear_sky_B(
@@ -2539,6 +2943,50 @@ def gaspari_pressure_matrix(input: DictConfig, output: DictConfig, plot_flag: bo
     logger.info("Loading data...")
     pressure = load_variable(input.pressure)
     cov = generate_crtm_clear_sky_B(pressure, use_log10=True, univariate=univariate)
+    std = np.sqrt(np.maximum(np.diag(cov['matrix']), 1e-12))
+    cov['correlation'] = cov['matrix'] / (std[:, None] @ std[None, :])
+    cov['correlation'] = 0.5 * (cov['correlation'] + cov['correlation'].T)  # Ensure symmetry
+
+    # Loop over keys
+    for key in list(cov.keys()):
+        # Save to file
+        if hasattr(output, key):
+            if hasattr(output[key], 'save'):
+                logger.info(f"Saving {key} matrix...")
+                save_func = instantiate(output[key].save)
+                save_func(cov[key])
+            # Plot covariance matrix if requested
+            if plot_flag and key in ['matrix', 'matrix_cholesky', 'matrix_inverse', 'correlation']:
+                logger.info(f"Plotting {key} matrix...")
+                fig, get_axes = flexible_gridspec(cell_widths=[4.0], cell_heights=[4.0],
+                                                  lefts=[1.00], rights=[1.00], bottoms=[1.00], tops=[1.00])
+                ax = get_axes(0, 0)
+                plot_map(ax, cov[key], title=f"Covariance matrix: {key}", plt_origin='upper', cb_label=r'Values')
+                save_plot(fig, filename=os.path.splitext(output[key].path)[0] + '.png')
+
+    return
+
+
+def gasparicohn_pressure_matrix(input: DictConfig, output: DictConfig, plot_flag: bool = True, univariate: bool = True, **kwargs) -> None:
+    """ Compute climatological covariance matrix of a given dataset.
+
+        Parameters
+        ----------
+        input: DictConfig. Main hydra configuration file containing all model hyperparameters.
+        output: DictConfig. Output configuration.
+        plot_flag: bool. If True, plot the covariance matrix.
+        **kwargs: Additional keyword arguments.
+
+        Returns
+        -------
+        None.
+    """
+
+    # Begin by loading the data and normalizing it
+    logger.info("Loading data...")
+    pressure = load_variable(input.pressure)
+    data = load_variable(input.data)
+    cov = fit_crtm_B_parameters_from_data(data, pressure, use_log10=True, univariate=univariate)
     std = np.sqrt(np.maximum(np.diag(cov['matrix']), 1e-12))
     cov['correlation'] = cov['matrix'] / (std[:, None] @ std[None, :])
     cov['correlation'] = 0.5 * (cov['correlation'] + cov['correlation'].T)  # Ensure symmetry

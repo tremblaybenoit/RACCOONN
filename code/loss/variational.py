@@ -1,7 +1,46 @@
 import torch
 import numpy as np
-from typing import Callable
-from code.loss.basic import mse
+from code.loss.basic import mse, l2
+
+
+class Control(torch.nn.Module):
+    """ Control variable loss module."""
+    def __init__(self) -> None:
+        """ Initialize the L2 module.
+
+        Returns
+        -------
+        None.
+        """
+
+        # Class inheritance
+        super().__init__()
+
+    def to(self, device):
+        """ Move the module to a specified device.
+
+        Parameters
+        ----------
+        device: torch.device. Device to move the module to.
+        """
+
+        # Class inheritance
+        super().to(device)
+        return self
+
+    def __call__(self, pred: torch.Tensor, target: torch.Tensor | None = None) -> torch.Tensor:
+        """ Compute the L2 loss between predicted and target tensors.
+
+        Parameters
+        ----------
+        pred: torch.Tensor. Predicted tensor.
+        target: torch.Tensor | None. True values.
+
+        Returns
+        -------
+        torch.Tensor. L2 loss over the batch.
+        """
+        return l2(pred)
 
 
 def quadratic_form(pred: torch.Tensor, target: torch.Tensor, matrix: torch.Tensor) -> torch.Tensor:
