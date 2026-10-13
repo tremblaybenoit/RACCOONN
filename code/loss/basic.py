@@ -12,7 +12,7 @@ def l2(pred: torch.Tensor) -> torch.Tensor:
     -------
     torch.Tensor. L2 loss over the batch.
     """
-    return pred ** 2
+    return torch.sum(pred ** 2, dim=-1)
 
 
 class L2(torch.nn.Module):

@@ -225,36 +225,51 @@ class DynamicQuadraticForm(torch.nn.Module):
 
 
 class CholeskyForm(torch.nn.Module):
-    """
-    Stable Mahalanobis Loss: 0.5 * || L^-1 (pred - target) ||^2
-    """
-
+    """ Cholesky form loss module."""
     def __init__(self, matrix: np.ndarray) -> None:
+        """ Initialize the CholeskyForm module.
+
+        Parameters
+        ----------
+        matrix: np.ndarray. Matrix to compute the quadratic form with.
+
+        Returns
+        -------
+        None.
+        """
+
         # Class inheritance
         super().__init__()
-
-        # Ensure L is stored as a buffer (device management)
-        self.register_buffer('matrix', torch.from_numpy(matrix).float())
+        # Store covariance matrix
+        self.matrix = torch.from_numpy(matrix)
 
     def to(self, device):
+        """ Move the module to a specified device.
+
+        Parameters
+        ----------
+        device: torch.device. Device to move the module to.
+        """
+
         # Class inheritance
         super().to(device)
+
         self.matrix = self.matrix.to(device)
         return self
 
     def __call__(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        # 1. Flatten to [Batch, N, 1]
-        # order: (samples, vars, levels) -> (samples, vars * levels, 1)
-        diff = (pred - target).view(pred.shape[0], -1, 1)
+        """ Compute the Cholesky form of the difference between predicted and target tensors.
 
-        # 2. Solve L @ w = diff for w
-        # w = L^-1 @ diff. This is the 'whitened' residual.
-        # Since L is lower triangular, this is a very fast/stable back-substitution.
-        # whitened_diff = torch.linalg.solve_triangular(
-        #     self.matrix, diff, upper=False
-        # )
-        whitened_diff = torch.matmul(self.matrix, diff)
+        Parameters
+        ----------
+        pred: torch.Tensor. Predicted tensor.
+        target: torch.Tensor. True values.
 
-        # 3. Return 0.5 * sum(w^2) per batch
-        # Result is [Batch]
-        return 0.5 * torch.pow(whitened_diff, 2).sum(dim=1).squeeze()
+        Returns
+        -------
+        torch.Tensor. Cholesky form of the difference between predicted and target tensors.
+        """
+        d = (pred-target).reshape(pred.shape[0], -1)
+        z = torch.linalg.solve_triangular(self.matrix, d.unsqueeze(-1), upper=False).squeeze(-1)
+
+        return l2(z)

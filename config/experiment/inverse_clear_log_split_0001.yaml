@@ -62,21 +62,17 @@ preprocessing:
     # B matrix
     B:
       # Function
-      _target_: code.preprocessing.covariance.gaspari_pressure_matrix
-      # What the method needs as input
-      input:
-        # Variables to consider for the covariance estimation
-        pressure: ${data.stage.all.variables.pressure}
+      _target_: code.preprocessing.covariance.pressure_only_matrix64
       # Univariate or multivariate
       univariate: true
       # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
-      # scaling_factor: 1.0
+      scaling_factor: 1.0
       # Re-centering
-      # recenter: true
-      # mean_type: 'spatiotemporal'
+      recenter: true
+      mean_type: 'spatiotemporal'
       # Regularization parameter to ensure numerical stability
-      # regularization_type: 'correlation_based'
-      # regularization_factor: 0.05
+      regularization_type: 'correlation_based'
+      regularization_factor: 0.05
     # R matrix
     R:
       # Function
@@ -106,7 +102,8 @@ loss:
       weight: 1.0
       instance:
         function:
-          matrix: ${preprocessing.covariance.B.output.matrix_inverse.load}
+          _target_: code.loss.variational.CholeskyForm
+          matrix: ${preprocessing.covariance.B.output.matrix_cholesky.load}
         target_keys: 'prof_prior'
 
 # Model configuration
