@@ -15,8 +15,10 @@ defaults:
   # - synthetic/z_slant@stage
   - synthetic/default@source
   - synthetic/bt_forward@source
+  - synthetic/bt_forward_perturbed@source
   - synthetic/bt_forward_stdev@source
-  - synthetic/bt_forward_err@source
+  - synthetic/bt_forward_crtm_err@source
+  - synthetic/bt_forward_obs_err@source
   - synthetic/variant_mask@source
   - synthetic/invariant_mask@source
   # - synthetic/lat_slant@source

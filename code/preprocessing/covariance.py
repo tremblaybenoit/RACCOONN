@@ -191,7 +191,6 @@ def perturbations_from_covariance(input: DictConfig, output: DictConfig | None =
     # Count samples with any out-of-bounds values using vectorized operations
     nval = ((x_prior_physical < x_min_physical) | (x_prior_physical > x_max_physical)).any(axis=(1, 2)).sum()
     logger.info(f"Number of samples outside physical bounds: {nval} out of {n_samples}")
-    # x_prior_physical = np.clip(x_prior_physical, x_min_physical, x_max_physical)
 
     # Save to file
     if output is not None and hasattr(output, 'save'):

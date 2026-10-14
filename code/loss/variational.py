@@ -80,7 +80,7 @@ class QuadraticForm(torch.nn.Module):
         # Class inheritance
         super().__init__()
         # Store covariance matrix
-        self.matrix = torch.from_numpy(matrix)
+        self.matrix = torch.from_numpy(matrix.astype(np.float32))
 
     def to(self, device):
         """ Move the module to a specified device.
