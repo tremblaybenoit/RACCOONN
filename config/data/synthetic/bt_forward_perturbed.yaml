@@ -1,0 +1,145 @@
+# Format:
+#   -- all: common configuration for all stages (train/valid/test/predict)
+#   -- train/valid/test: stage-specific configuration, inheriting from all and overriding as
+
+# Stage-specific settings (e.g., file splits, wavelengths, variables). Predict stage can simply reference test stage if identical.
+
+# Training set
+train:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    bt_forward_perturbed:
+      # Dataset class
+      _target_: code.loader.dataset.EagerDataset
+      _recursive_: false
+      # Channels
+      type: ${..bt_crtm.type}
+      # Number of variables
+      n: ${..bt_crtm.n}
+      # Loading function
+      load:
+        _target_: code.preprocessing.covariance.perturbations_from_covariance
+        _recursive_: false
+        # What the method needs as input
+        input:
+          # Atmospheric profiles
+          data: ${....bt_forward}
+          # Cholesky matrix
+          cholesky: ${preprocessing.covariance.R.output.matrix_cholesky}
+          # Statistics for lower/upper bounds
+          stats:
+            _target_: code.preprocessing.statistics.read_statistics_var
+            load: ${preprocessing.statistics.output.load}
+            key: 'bt_crtm'
+            dtype: ${data.dtype}
+        # Parameters
+        seed: 75
+        apply_transform: ${preprocessing.covariance.R.apply_transform}
+      # Transformations to apply
+      transformations: ${..bt_crtm.transformations}
+# Validation set
+valid:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    bt_forward_perturbed:
+      # Dataset class
+      _target_: ${....train.variables.bt_forward_perturbed._target_}
+      _recursive_: false
+      # Type of the atmospheric profiles
+      type: ${....train.variables.bt_forward_perturbed.type}
+      # Number of variables
+      n: ${....train.variables.bt_forward_perturbed.n}
+      # Loading function
+      load:
+        _target_: ${.....train.variables.bt_forward_perturbed.load._target_}
+        _recursive_: false
+        # What the method needs as input
+        input:
+          # Atmospheric profiles
+          data: ${....bt_forward}
+          # Cholesky matrix
+          cholesky: ${......train.variables.bt_forward_perturbed.load.input.cholesky}
+          # Statistics for lower/upper bounds
+          stats: ${......train.variables.bt_forward_perturbed.load.input.stats}
+        # Parameters
+        seed: 48
+        apply_transform: ${.....train.variables.bt_forward_perturbed.load.apply_transform}
+      # Transformations to apply
+      transformations: ${....train.variables.bt_forward_perturbed.transformations}
+# Test set
+test:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    bt_forward_perturbed:
+      # Dataset class
+      _target_: ${....train.variables.bt_forward_perturbed._target_}
+      _recursive_: false
+      # Type of the atmospheric profiles
+      type: ${....train.variables.bt_forward_perturbed.type}
+      # Number of variables
+      n: ${....train.variables.bt_forward_perturbed.n}
+      # Loading function
+      load:
+        _target_: ${.....train.variables.bt_forward_perturbed.load._target_}
+        _recursive_: false
+        # What the method needs as input
+        input:
+          # Atmospheric profiles
+          data: ${....bt_forward}
+          # Cholesky matrix
+          cholesky: ${......train.variables.bt_forward_perturbed.load.input.cholesky}
+          # Statistics for lower/upper bounds
+          stats: ${......train.variables.bt_forward_perturbed.load.input.stats}
+        # Parameters
+        seed: 15
+        apply_transform: ${.....train.variables.bt_forward_perturbed.load.apply_transform}
+      # Transformations to apply
+      transformations: ${....train.variables.bt_forward_perturbed.transformations}
+# Predict set
+predict:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    bt_forward_perturbed:
+      # Dataset class
+      _target_: ${....train.variables.bt_forward_perturbed._target_}
+      _recursive_: false
+      # Type of the atmospheric profiles
+      type: ${....train.variables.bt_forward_perturbed.type}
+      # Number of variables
+      n: ${....train.variables.bt_forward_perturbed.n}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......valid.variables.bt_forward_perturbed.load}
+            - ${.......test.variables.bt_forward_perturbed.load}
+          - 0
+      # Transformations to apply
+      transformations: ${....train.variables.bt_forward_perturbed.transformations}
+# All data (complete dataset)
+all:
+  # Variable-specific configuration, keyed by variable name for potential multi-variable support.
+  variables:
+    # Atmospheric profiles
+    bt_forward_perturbed:
+      # Dataset class
+      _target_: ${....train.variables.bt_forward_perturbed._target_}
+      _recursive_: false
+      # Type of the atmospheric profiles
+      type: ${....train.variables.bt_forward_perturbed.type}
+      # Number of variables
+      n: ${....train.variables.bt_forward_perturbed.n}
+      # Loading function
+      load:
+        _target_: numpy.concatenate
+        _args_:
+          - - ${.......train.variables.bt_forward_perturbed.load}
+            - ${.......valid.variables.bt_forward_perturbed.load}
+            - ${.......test.variables.bt_forward_perturbed.load}
+          - 0
+      # Transformations to apply
+      transformations: ${....train.variables.bt_forward_perturbed.transformations}
