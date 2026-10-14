@@ -27,7 +27,7 @@ train:
         input:
           # Error components
           x: ${....bt_forward}
-          x_true: ${....bt_crtm}
+          x_true: ${....bt_obs}
         # Parameters
         apply_transform: false
       # Transformations to apply
@@ -55,7 +55,7 @@ valid:
         input:
           # Error components
           x: ${....bt_forward}
-          x_true: ${....bt_crtm}
+          x_true: ${....bt_obs}
         # Parameters
         apply_transform: false
       # Transformations to apply
@@ -83,7 +83,7 @@ test:
         input:
           # Error components
           x: ${....bt_forward}
-          x_true: ${....bt_crtm}
+          x_true: ${....bt_obs}
         # Parameters
         apply_transform: false
       # Transformations to apply
@@ -111,7 +111,7 @@ predict:
         input:
           # Error components
           x: ${....bt_forward}
-          x_true: ${....bt_crtm}
+          x_true: ${....bt_obs}
         # Parameters
         apply_transform: false
       # Transformations to apply
@@ -137,7 +137,7 @@ all:
         input:
           # Error components
           x: ${....bt_forward}
-          x_true: ${....bt_crtm}
+          x_true: ${....bt_obs}
         # Parameters
         apply_transform: false
       # Transformations to apply
