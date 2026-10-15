@@ -1,7 +1,8 @@
 # Configuration to load multiple preprocessing methods
 defaults:
   - recast          # First: recast raw data to desired format/precision/filtering
-  # - slant           # Then: compute slant coordinates
+  # - slant         # Then: compute slant coordinates
+  # - forward       # Then: forward model the radiances
   - statistics      # Then: compute statistics
   - mask            # Then: compute masks
   - covariance      # Finally: compute covariance

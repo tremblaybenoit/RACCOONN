@@ -3,7 +3,7 @@ defaults:
   - synthetic/variant_mask@stage
   - synthetic/invariant_mask@stage
   - synthetic/prof_inverse@stage
-  - synthetic/prof_prior@stage
+  - synthetic/prof_perturbed@stage
   - synthetic/bt_forward@stage
   - synthetic/bt_forward_stdev@stage
   - synthetic/bt_inverse@stage

@@ -1,0 +1,71 @@
+# Compute brightness temperatures
+forward:
+  # Function
+  _target_: code.preprocessing.forward.compute_bt
+  _recursive_: false  # Do not instantiate nested objects
+  # What the method needs as input
+  input:
+    # Forward model
+    forward_model: ${model.forward_model}
+    # Stage splitting
+    stage:
+      # Training set
+      train:
+        # Variables
+        variables:
+          # Meta data
+          meta: ${data.stage.train.variables.meta}
+          # Atmospheric profiles
+          prof: ${data.stage.train.variables.prof}
+          # Surface data
+          surf: ${data.stage.train.variables.surf}
+      # Validation set
+      valid:
+        # Variables
+        variables:
+          # Meta data
+          meta: ${data.stage.valid.variables.meta}
+          # Atmospheric profiles
+          prof: ${data.stage.valid.variables.prof}
+          # Surface data
+          surf: ${data.stage.valid.variables.surf}
+      # Test set
+      test:
+        # Variables
+        variables:
+          # Meta data
+          meta: ${data.stage.test.variables.meta}
+          # Atmospheric profiles
+          prof: ${data.stage.test.variables.prof}
+          # Surface data
+          surf: ${data.stage.test.variables.surf}
+  # What the method produces as output
+  output:
+    # Precision
+    dtype: ${data.dtype}
+    # Stage splitting
+    stage:
+      # Training set
+      train:
+        # Variables
+        variables:
+          # Brightness temperatures (expected value)
+          bt_forward: ${data.stage.train.variables.bt_forward}
+          # Brightness temperatures (standard deviation)
+          bt_forward_stdev: ${data.stage.train.variables.bt_forward_stdev}
+      # Validation set
+      valid:
+        # Variables
+        variables:
+          # Brightness temperatures (expected value)
+          bt_forward: ${data.stage.valid.variables.bt_forward}
+          # Brightness temperatures (standard deviation)
+          bt_forward_stdev: ${data.stage.valid.variables.bt_forward_stdev}
+      # Test set
+      test:
+        # Variables
+        variables:
+          # Brightness temperatures (expected value)
+          bt_forward: ${data.stage.test.variables.bt_forward}
+          # Brightness temperatures (standard deviation)
+          bt_forward_stdev: ${data.stage.test.variables.bt_forward_stdev}
