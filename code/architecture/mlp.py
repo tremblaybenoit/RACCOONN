@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
 from typing import Callable
-from omegaconf import DictConfig, ListConfig, OmegaConf
+from omegaconf import DictConfig, ListConfig
 from utilities.instantiators import instantiate
+from code.architecture.encoding import IdentityPositionalEncoding
 from code.architecture.wrapper import Residual
 
 
@@ -52,17 +53,20 @@ def init_weights_siren_hidden(layer: nn.Linear) -> None:
     """
     Initialize hidden layers of SIREN network (Sine activation).
 
-    Weights and biases sampled from U(-sqrt(c), sqrt(c)), where c = 1 / input_features.
-    This is the recommended initialization for hidden layers of SIREN networks.
+    Weights and biases sampled from U(-sqrt(6/n), sqrt(6/n)), where n = input_features,
+    as specified in Sitzmann et al. (2020), Supplementary. With ω₀ scaling the bound
+    is divided by ω₀; here ω₀ = 1 so the formula reduces to sqrt(6 / n).
 
     Parameters
     ----------
     layer : nn.Linear
         Linear layer to initialize.
+    w0 : float, default=1.0
+        Frequency multiplier ω₀ used to scale the bound (bound /= w0).
     """
     with torch.no_grad():
         in_features = layer.weight.shape[1]
-        bound = (1.0 / in_features) ** 0.5
+        bound = (6.0 / in_features) ** 0.5
         nn.init.uniform_(layer.weight, -bound, bound)
         if layer.bias is not None:
             nn.init.uniform_(layer.bias, -bound, bound)
@@ -122,7 +126,18 @@ def init_weights_default(layer: nn.Linear) -> None:
     init_weights_xavier(layer, gain=1.0)
 
 
-def get_init_func(activation: DictConfig | nn.Module | None) -> Callable:
+def is_siren_activation(activation: DictConfig | nn.Module | None) -> bool:
+    """Return True if activation is a Sine/LearnableSine (SIREN) type."""
+    if activation is None:
+        return False
+    if isinstance(activation, DictConfig):
+        target = activation._target_ if hasattr(activation, '_target_') else ''
+    else:
+        target = activation.__class__.__name__
+    return 'sine' in str(target).lower()
+
+
+def get_init_func(activation: DictConfig | nn.Module | None, first_layer: bool = False) -> Callable:
     """
     Auto-select weight initialization function based on activation type.
 
@@ -131,7 +146,8 @@ def get_init_func(activation: DictConfig | nn.Module | None) -> Callable:
     that adapts to different activation types without manual configuration.
 
     Activation-to-Initialization Mapping:
-    - Sine / LearnableSine: Uniform initialization (SIREN networks)
+    - Sine / LearnableSine (first layer): U(-1, 1)  (SIREN input-layer contract)
+    - Sine / LearnableSine (hidden):      U(-√(6/n), √(6/n))  (Sitzmann et al., 2020)
     - ReLU / Leaky ReLU: He initialization (Kaiming)
     - Swish / SiLU: He initialization (similar to ReLU)
     - GELU / Tanh / Sigmoid: Xavier initialization (Glorot)
@@ -145,6 +161,9 @@ def get_init_func(activation: DictConfig | nn.Module | None) -> Callable:
         - DictConfig with '_target_' pointing to an activation class
         - nn.Module instance of an activation
         - None (defaults to Xavier initialization)
+    first_layer : bool, default=False
+        If True and the activation is a Sine type, returns init_weights_siren_first
+        (U(-1, 1)) instead of the hidden-layer variant.
 
     Returns
     -------
@@ -152,7 +171,6 @@ def get_init_func(activation: DictConfig | nn.Module | None) -> Callable:
         Weight initialization function appropriate for the given activation.
     """
     if activation is None:
-        # Default to Xavier initialization for None
         return init_weights_xavier
 
     # Extract target string from DictConfig or nn.Module
@@ -162,36 +180,25 @@ def get_init_func(activation: DictConfig | nn.Module | None) -> Callable:
         else:
             return init_weights_default
     else:
-        # Get class name from module instance
         target = activation.__class__.__name__
 
-    # Normalize target to lowercase for case-insensitive matching
     target_str = str(target).lower()
 
-    # Map activation name to appropriate initialization function
     if 'sine' in target_str:
-        # SIREN networks use uniform initialization
-        return init_weights_siren_hidden
+        return init_weights_siren_first if first_layer else init_weights_siren_hidden
     elif 'relu' in target_str or 'leaky' in target_str:
-        # ReLU-like activations use He initialization
         return init_weights_he
     elif 'swish' in target_str or 'silu' in target_str:
-        # Swish is similar to ReLU, use He initialization
         return init_weights_he
     elif 'gelu' in target_str:
-        # GELU uses Xavier initialization
         return init_weights_xavier
     elif 'tanh' in target_str:
-        # Tanh uses Xavier initialization
         return init_weights_xavier
     elif 'sigmoid' in target_str:
-        # Sigmoid uses Xavier initialization
         return init_weights_xavier
     elif 'scale' in target_str or 'snake' in target_str:
-        # Scale and Snake use Xavier initialization
         return init_weights_xavier
     else:
-        # Default to Xavier for unknown activations
         return init_weights_xavier
 
 
@@ -217,6 +224,7 @@ class MLPBlock(nn.Module):
         dropout_rate: float = 0.0,
         residual: bool = False,
         init_func: DictConfig | nn.Module | None = None,
+        first_layer: bool = False,
     ) -> None:
         """
         Initialize a single MLP block.
@@ -242,6 +250,10 @@ class MLPBlock(nn.Module):
             Weight initialization function for the linear layer.
             If None, auto-selected based on activation function.
             If DictConfig, instantiated automatically.
+        first_layer : bool, default=False
+            If True and using a SIREN activation, applies the first-layer SIREN
+            initialization U(-1, 1) instead of the hidden-layer variant. Has no
+            effect for non-SIREN activations or when init_func is provided.
         """
 
         # Class inheritance
@@ -283,20 +295,24 @@ class MLPBlock(nn.Module):
             else:
                 init_func(linear)
         else:
-            # Auto-select initialization based on activation function
-            auto_init = get_init_func(activation)
+            # Auto-select initialization based on activation function and layer position
+            auto_init = get_init_func(activation, first_layer=first_layer)
             auto_init(linear)
 
-        # Build Block Sequence
+        # Build Block Sequence — same operation order for both paths:
+        #   Linear -> Norm -> Activation -> Dropout
+        # For the residual path this sits inside F(x), giving out = x + F(x).
+        # Activation is therefore inside the transformation, not after the add,
+        # which preserves near-identity at initialisation (F(x) ≈ 0 → out ≈ x).
         if residual:
-            # Residual path: linear -> norm -> dropout
-            # Activation applied after residual addition
-            block = nn.Sequential(linear, norm, drop)
-            # Projection handles dimension mismatch in skip connection
-            projection = nn.Linear(in_features, out_features, bias=False) if in_features != out_features else None
-            self.model = nn.Sequential(Residual(block, projection=projection), act)
+            block = nn.Sequential(linear, norm, act, drop)
+            if in_features != out_features:
+                projection = nn.Linear(in_features, out_features, bias=False)
+                auto_init(projection)
+            else:
+                projection = None
+            self.model = Residual(block, projection=projection)
         else:
-            # Standard path: linear -> norm -> activation -> dropout
             self.model = nn.Sequential(linear, norm, act, drop)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -413,6 +429,7 @@ class MLPBlocks(nn.Module):
                     dropout_rate=final_drop if is_final else dropout_rate,
                     residual=residual,
                     init_func=init_func,
+                    first_layer=(i == 0),
                 )
             )
             current_in = current_out
@@ -732,7 +749,7 @@ class HomogeneousPredictionHeads(nn.Module):
             return tuple(outputs)
 
 
-class MLPModular(nn.Module):
+class MLPModular0(nn.Module):
     """
     Modular MLP with fully configurable components.
 
@@ -900,15 +917,24 @@ class MLPModular(nn.Module):
 
         # Output Layer
         if output_layer is not None:
-            # Set in_features in config BEFORE instantiation (important for nested layers)
-            if isinstance(output_layer, DictConfig) and hasattr(output_layer, 'in_features'):
-                output_layer.in_features = output_in_dim
-
-            self.output_layer = instantiate(output_layer) if isinstance(output_layer, DictConfig) else output_layer
-
-            # Fallback: also try to set on instantiated layer (for modules that support it)
-            if hasattr(self.output_layer, 'in_features') and isinstance(output_layer, DictConfig) is False:
-                self.output_layer.in_features = output_in_dim
+            # Patch in_features BEFORE instantiation.
+            # For layers with a top-level in_features (e.g. PredictionHead, MLPBlocks):
+            #   mutate the DictConfig directly.
+            # For HomogeneousPredictionHeads / HeterogeneousPredictionHeads, which nest
+            #   in_features under 'head', Hydra may deep-copy the config before resolving
+            #   interpolations, making DictConfig mutation unreliable. Instead, pass
+            #   in_features as a kwarg override to instantiate() — the class accepts it
+            #   and propagates it to each head internally.
+            if isinstance(output_layer, DictConfig):
+                if hasattr(output_layer, 'in_features'):
+                    output_layer.in_features = output_in_dim
+                    self.output_layer = instantiate(output_layer)
+                elif hasattr(output_layer, 'head'):
+                    self.output_layer = instantiate(output_layer, in_features=output_in_dim)
+                else:
+                    self.output_layer = instantiate(output_layer)
+            else:
+                self.output_layer = output_layer
         else:
             self.output_layer = nn.Identity()
 
@@ -977,3 +1003,407 @@ class MLPModular(nn.Module):
 
         # Output Layer
         return self.output_layer(x_out)
+
+
+class MLPModular(nn.Module):
+    """
+    Modular MLP with fully configurable components.
+
+    A flexible architecture where all components (positional encoding, input layer,
+    hidden layers, output layer) are specified via configuration. Supports skip
+    connections, encoding injection, and flexible component combinations.
+
+    This design enables easy experimentation with different architectural choices
+    without changing code - all configuration is done via YAML/DictConfig.
+    """
+
+    def __init__(
+        self,
+        pre_process: DictConfig | nn.Module | None = None,
+        positional_encoding: DictConfig | nn.Module | None = None,
+        input_layer: DictConfig | nn.Module | None = None,
+        hidden_layer: DictConfig | nn.Module | None = None,
+        output_layer: DictConfig | nn.Module | None = None,
+        input_skip_hidden: bool = False,
+        input_skip_output: bool = False,
+        enc_skip_hidden: bool = False,
+        enc_skip_output: bool = False,
+    ) -> None:
+        """
+        Initialize MLPModular with configurable components.
+
+        Parameters
+        ----------
+        pre_process : DictConfig or nn.Module or None, default=None
+            Optional preprocessing layer applied to raw input before positional encoding.
+            If None, input is passed directly to positional encoding.
+        positional_encoding : DictConfig or nn.Module or None, default=None
+            Optional positional/coordinate encoding. If None, nn.Identity() is used
+            and d_encoding is set to None (enc_skip_* flags must both be False, and
+            input_layer.in_features must be set explicitly).
+        input_layer : DictConfig or nn.Module or None, default=None
+            Input projection layer (e.g. MLPBlock or MLPBlocks).
+        hidden_layer : DictConfig or nn.Module or None, default=None
+            Hidden layer(s) for feature extraction (e.g. MLPBlocks).
+        output_layer : DictConfig or nn.Module or None, default=None
+            Output layer for predictions (e.g. PredictionHead, HomogeneousPredictionHeads).
+        input_skip_hidden : bool, default=False
+            Wrap hidden_layer in a macro residual connection:
+            ``x_hidden = hidden_layer(x_input) + projection(x_input)``.
+            Distinct from internal per-block residuals inside MLPBlocks.
+        input_skip_output : bool, default=False
+            Concatenate input_layer output to output_layer input (long skip):
+            ``x_out = cat([x_hidden, x_input])``.
+        enc_skip_hidden : bool, default=False
+            Concatenate positional encoding to hidden_layer input (NeRF-style):
+            ``x_hidden = hidden_layer(cat([x_input, x_enc]))``.
+            Requires positional_encoding to be provided.
+        enc_skip_output : bool, default=False
+            Concatenate positional encoding to output_layer input:
+            ``x_out = cat([x_out, x_enc])``.
+            Requires positional_encoding to be provided.
+        """
+
+        # Class inheritance
+        super().__init__()
+
+        # Preprocessing Layer (applied first to raw input)
+        if isinstance(pre_process, DictConfig):
+            self.pre_process = instantiate(pre_process)
+        elif isinstance(pre_process, nn.Module):
+            self.pre_process = pre_process
+        else:
+            self.pre_process = nn.Identity()
+
+        # Positional Encoding
+        self.d_encoding = 0
+        if isinstance(positional_encoding, DictConfig):
+            self.positional_encoding = instantiate(positional_encoding)
+            self.d_encoding = int(self.positional_encoding.d_output)
+        elif isinstance(positional_encoding, nn.Module):
+            self.positional_encoding = positional_encoding
+            self.d_encoding = int(getattr(positional_encoding, 'd_output', 1))
+        else:
+            # No encoding: identity pass-through. d_encoding is unknown until
+            # the first forward call, so encoding-dependent features are disabled.
+            self.positional_encoding = nn.Identity()
+
+        # Guard: enc_skip_* require a concrete d_encoding
+        if (enc_skip_hidden or enc_skip_output) and self.d_encoding == 0:
+            raise ValueError(
+                "enc_skip_hidden and enc_skip_output require a positional_encoding "
+                "with a d_output attribute. Provide a positional_encoding config or "
+                "set both enc_skip flags to False."
+            )
+
+        # Store skip flags
+        self.enc_skip_hidden = enc_skip_hidden
+        self.enc_skip_output = enc_skip_output
+        self.input_skip_hidden = input_skip_hidden
+        self.input_skip_output = input_skip_output
+
+        # Input Layer
+        if isinstance(input_layer, DictConfig):
+            if self.d_encoding != 0:
+                input_layer.in_features = self.d_encoding
+            elif hasattr(input_layer, 'in_features') and input_layer.in_features is None:
+                raise ValueError(
+                    "input_layer.in_features is None but no positional_encoding was provided "
+                    "to infer it from. Set input_layer.in_features explicitly."
+                )
+            self.input_layer = instantiate(input_layer)
+        elif isinstance(input_layer, nn.Module):
+            self.input_layer = input_layer
+        else:
+            self.input_layer = nn.Identity()
+
+        # Determine input_layer output dimension for subsequent layers
+        if hasattr(self.input_layer, 'out_features'):
+            input_out_dim = int(self.input_layer.out_features)
+        elif hasattr(self.input_layer, 'model') and hasattr(self.input_layer.model, 'out_features'):
+            input_out_dim = int(self.input_layer.model[-1].out_features)
+        elif isinstance(self.input_layer, nn.Identity):
+            input_out_dim = self.d_encoding
+        else:
+            # Try to infer from config
+            if isinstance(input_layer, DictConfig) and hasattr(input_layer, 'out_features'):
+                input_out_dim = int(input_layer.out_features)
+            else:
+                raise ValueError("Unable to determine output dimension of input_layer.")
+
+        # Hidden Layer
+        if hidden_layer is not None:
+            # Patch in_features BEFORE instantiation, same pattern as input/output layers
+            if enc_skip_hidden and isinstance(hidden_layer, DictConfig) and hasattr(hidden_layer, 'in_features'):
+                hidden_layer.in_features = input_out_dim + self.d_encoding
+
+            self.hidden_layer = instantiate(hidden_layer)
+
+            # Optionally wrap with residual connection
+            if input_skip_hidden:
+                # Determine output dimension of hidden layer
+                if hasattr(self.hidden_layer, 'out_features'):
+                    hidden_out_dim = int(self.hidden_layer.out_features)
+                elif isinstance(hidden_layer, DictConfig) and hasattr(hidden_layer, 'out_features'):
+                    hidden_out_dim = int(hidden_layer.out_features)
+                else:
+                    hidden_out_dim = int(self.hidden_layer.in_features)
+
+                # Add residual wrapper with optional projection for dimension mismatch
+                layer_in_dim = input_out_dim + self.d_encoding if enc_skip_hidden else input_out_dim
+                if layer_in_dim != hidden_out_dim:
+                    projection = nn.Linear(layer_in_dim, hidden_out_dim, bias=False)
+                else:
+                    projection = None
+                self.hidden_layer = Residual(self.hidden_layer, projection=projection)
+                current_dim = hidden_out_dim
+            else:
+                # Get output dimension without residual wrapper
+                if hasattr(self.hidden_layer, 'out_features'):
+                    current_dim = self.hidden_layer.out_features
+                elif isinstance(hidden_layer, DictConfig) and hasattr(hidden_layer, 'out_features'):
+                    current_dim = hidden_layer.out_features
+                else:
+                    current_dim = input_out_dim
+        # Nothing; identity layer
+        else:
+            self.hidden_layer = nn.Identity()
+            current_dim = input_out_dim
+
+        # Output Layer Input Dimension
+        if input_skip_output:
+            output_in_dim = current_dim + input_out_dim
+        else:
+            output_in_dim = current_dim
+
+        if enc_skip_output:
+            output_in_dim += self.d_encoding
+
+        # Output Layer
+        if output_layer is not None:
+            # Set in_features in config BEFORE instantiation (important for nested layers)
+            if isinstance(output_layer, DictConfig):
+                if hasattr(output_layer, 'in_features'):
+                    output_layer.in_features = output_in_dim
+                elif hasattr(output_layer, 'head'):
+                    output_layer.head.in_features = output_in_dim
+                elif hasattr(output_layer, 'heads'):
+                    for head_cfg in output_layer.heads:
+                        if hasattr(head_cfg, 'in_features'):
+                            head_cfg.in_features = output_in_dim
+
+            self.output_layer = instantiate(output_layer) if isinstance(output_layer, DictConfig) else output_layer
+
+        else:
+            self.output_layer = nn.Identity()
+
+        # Store dimensions for forward pass
+        self.input_out_dim = input_out_dim
+        self.hidden_out_dim = current_dim
+
+    def forward(self, x: torch.Tensor | dict) -> torch.Tensor | tuple[torch.Tensor, ...]:
+        """
+        Forward pass through the modular MLP.
+
+        Data flow:
+        1. Preprocessing layer (if configured)
+        2. Positional encoding (if configured)
+        3. Input layer projection
+        4. Hidden layer with optional encoding injection
+        5. Output layer with optional skip connections and encoding injection
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor.
+
+        Returns
+        -------
+        torch.Tensor | tuple[torch.Tensor, ...]
+            Output from output_layer. Can be either a single tensor or a tuple of tensors
+            if the output_layer returns multiple outputs.
+        """
+
+        # Preprocessing Layer
+        x = self.pre_process(x)
+
+        # Concatenate input
+        if isinstance(x, dict):
+            x = [
+                x.reshape(x.size(0), -1) if x.dim() > 2 else x
+                for x in x.values()
+            ]
+            x = torch.cat(x, dim=-1)
+
+        # Positional Encoding
+        x_enc = self.positional_encoding(x)
+
+        # Input Layer
+        x_input = self.input_layer(x_enc)
+
+        # Hidden Layer
+        if self.enc_skip_hidden:
+            x_hidden = self.hidden_layer(torch.cat([x_input, x_enc], dim=-1))
+        else:
+            x_hidden = self.hidden_layer(x_input)
+
+        # Prepare Output Layer Input
+        if self.input_skip_output:
+            x_out = torch.cat([x_hidden, x_input], dim=-1)
+        else:
+            x_out = x_hidden
+
+        # Optionally inject encoding at output
+        if self.enc_skip_output:
+            x_out = torch.cat([x_out, x_enc], dim=-1)
+
+        # Output Layer
+        return self.output_layer(x_out)
+
+
+class MLPModulars(nn.Module):
+    """
+    Parallel MLPs with a shared positional encoding (Cerberus-style).
+
+    A single positional encoding maps raw coordinates to encoded features,
+    which are then passed to N independent MLPModular sub-networks in parallel.
+    Each sub-network produces its own output; results are concatenated along
+    the feature dimension.
+
+    Designed for multi-variable neural fields where variables share the same
+    coordinate space but benefit from independent representations (e.g. separate
+    networks for temperature, humidity, and ozone), with inter-variable coupling
+    enforced through the loss rather than through shared weights.
+
+    Data flow::
+
+        x -> pre_process -> positional_encoding -> x_enc  (shared)
+                 |-- MLPModular_0(x_enc) -> y_0
+                 |-- MLPModular_1(x_enc) -> y_1
+                 `-- MLPModular_{N-1}(x_enc) -> y_{N-1}
+                              cat(dim=-1) -> y  (B, N * out_features_per_model)
+
+    Notes
+    -----
+    Sub-models receive ``x_enc`` directly as a tensor, so their own
+    ``positional_encoding`` should be ``null`` in the sub-model config.
+    If a sub-model specifies its own positional encoding it will be applied
+    on top of the shared one, which is almost certainly unintended.
+
+    ``input_layer.in_features`` in the sub-model config should be ``null``;
+    ``MLPModulars`` patches it to ``d_encoding`` before instantiation so that
+    ``MLPModular`` does not overwrite it with zero (which it would, because the
+    sub-model has no positional encoding and therefore ``d_encoding=0``).
+    """
+
+    def __init__(
+        self,
+        n_models: int | DictConfig,
+        model: DictConfig,
+        pre_process: DictConfig | nn.Module | None = None,
+        positional_encoding: DictConfig | nn.Module | None = None,
+        out_concat: bool = True,
+    ) -> None:
+        """
+        Initialize MLPModulars.
+
+        Parameters
+        ----------
+        n_models : int
+            Number of parallel sub-networks to instantiate.
+            Typically equals the number of output variables.
+        model : DictConfig
+            Configuration for each sub-network. Must have ``_target_`` pointing
+            to ``MLPModular`` (or a compatible class). Each call to
+            ``instantiate(model)`` produces an independent module with fresh
+            weights. Set ``positional_encoding: null`` and
+            ``input_layer.in_features: null`` in the sub-model config.
+        pre_process : DictConfig or nn.Module or None, default=None
+            Shared preprocessing applied before positional encoding.
+        positional_encoding : DictConfig or nn.Module or None, default=None
+            Shared positional encoding. Its ``d_output`` attribute is used to
+            patch ``input_layer.in_features`` in each sub-model.
+        out_concat : bool, default=True
+            If True, concatenates sub-model outputs along the last dimension.
+            If False, returns a tuple of tensors.
+        """
+
+        super().__init__()
+
+        # Shared preprocessing
+        if isinstance(pre_process, DictConfig):
+            self.pre_process = instantiate(pre_process)
+        elif isinstance(pre_process, nn.Module):
+            self.pre_process = pre_process
+        else:
+            self.pre_process = nn.Identity()
+
+        # Shared positional encoding
+        if isinstance(positional_encoding, DictConfig):
+            self.positional_encoding = instantiate(positional_encoding)
+            self.d_encoding = self.positional_encoding.d_output
+        elif isinstance(positional_encoding, nn.Module):
+            self.positional_encoding = positional_encoding
+            self.d_encoding = getattr(positional_encoding, 'd_output', 1)
+        else:
+            self.positional_encoding = nn.Identity()
+            self.d_encoding = 0
+
+        if isinstance(n_models, DictConfig):
+            n_models = instantiate(n_models)
+
+        self.out_concat = out_concat
+
+        if not isinstance(model, DictConfig):
+            raise TypeError(f"model must be a DictConfig, got {type(model)}")
+
+        # Patch input_layer.in_features to d_encoding before any instantiation.
+        # MLPModular only overwrites in_features when it is None, so setting it
+        # here prevents the sub-model from clobbering it with its own d_encoding=0
+        # (which it would compute because its positional_encoding is null).
+        if (
+            hasattr(model, 'input_layer')
+            and model.input_layer is not None
+            and hasattr(model.input_layer, 'in_features')
+            and model.input_layer.in_features is None
+        ):
+            model.input_layer.in_features = self.d_encoding
+
+        # Each instantiate() call produces an independent module with fresh weights
+        self.models = nn.ModuleList([instantiate(model) for _ in range(n_models)])
+
+    def forward(self, x: torch.Tensor | dict) -> torch.Tensor | tuple[torch.Tensor, ...]:
+        """
+        Forward pass: shared encoding then parallel sub-networks.
+
+        Parameters
+        ----------
+        x : torch.Tensor or dict
+            Raw input coordinates. If a dict, tensors are concatenated along
+            the feature dimension before encoding.
+
+        Returns
+        -------
+        torch.Tensor or tuple[torch.Tensor, ...]
+            If ``out_concat=True``: concatenated outputs, shape
+            ``(batch, N * out_features_per_model)``.
+            If ``out_concat=False``: tuple of per-model tensors.
+        """
+
+        # Shared preprocessing
+        x = self.pre_process(x)
+        if isinstance(x, dict):
+            x = torch.cat(
+                [v.reshape(v.size(0), -1) if v.dim() > 2 else v for v in x.values()],
+                dim=-1,
+            )
+
+        # Shared positional encoding
+        x_enc = self.positional_encoding(x)
+
+        # Parallel sub-networks — each receives the same x_enc
+        outputs = [model(x_enc) for model in self.models]
+
+        if self.out_concat:
+            return torch.cat(outputs, dim=-1)
+        return tuple(outputs)

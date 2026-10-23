@@ -168,6 +168,15 @@ class InverseModel(ForwardModel):
             Dictionary with 'output' key containing post-processed predictions in physical space.
         """
 
+        # Enable requires_grad on floating-point input coordinates before the forward
+        # pass so autograd can trace the gradient path for Sobolev regularization.
+        # Guards in the Sobolev classes return zero if requires_grad is False,
+        # so this is a no-op overhead-wise when no Sobolev term is in the loss.
+        if training_flag:
+            for v in batch['input'].values():
+                if torch.is_floating_point(v):
+                    v.requires_grad_(True)
+
         # Inversion of atmospheric profiles
         output_dict = {'output': self.forward(batch['input'], training_flag=training_flag)}
         # Forward-modeled observations (requires batch['context'])
@@ -438,6 +447,12 @@ class InverseModelW(ForwardModel):
         dict
             Dictionary with 'output' key containing post-processed predictions in physical space.
         """
+
+        # Enable requires_grad on input coordinates for Sobolev regularization
+        if training_flag:
+            for v in batch['input'].values():
+                if torch.is_floating_point(v):
+                    v.requires_grad_(True)
 
         # Inversion of atmospheric profiles
         output_dict = {'output': self.forward(batch['input'], training_flag=training_flag, prior=batch['target']['prof_prior'])}

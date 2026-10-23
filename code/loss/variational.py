@@ -273,3 +273,69 @@ class CholeskyForm(torch.nn.Module):
         z = torch.linalg.solve_triangular(self.matrix, d.unsqueeze(-1), upper=False).squeeze(-1)
 
         return l2(z)
+
+
+class BatchKroneckerCholeskyForm(torch.nn.Module):
+    """
+    Batch-wide variational loss using a Kronecker-factored covariance:
+    B_batch = C_spatial (M x M) x B_vertical (N_feat x N_feat)
+    Solved efficiently via triangular backsubstitution without full matrix inversion.
+    """
+
+    def __init__(self, vertical_cholesky: np.ndarray, spatial_length_scale: float = 1.0) -> None:
+        super().__init__()
+        # Store vertical Cholesky factor L_v (shape: [N_feat, N_feat])
+        self.register_buffer("L_v", torch.from_numpy(vertical_cholesky.astype(np.float32)))
+        self.spatial_length_scale = spatial_length_scale
+
+    def to(self, device):
+        super().to(device)
+        return self
+
+    def __call__(self, pred: torch.Tensor, target: torch.Tensor, lat: torch.Tensor, lon: torch.Tensor) -> torch.Tensor:
+        """
+        Parameters
+        ----------
+        pred: torch.Tensor, shape (M, n_vars, n_levels) or (M, N_feat)
+        target: torch.Tensor, shape same as pred
+        lat: torch.Tensor, shape (M,) - latitudes of batch profiles
+        lon: torch.Tensor, shape (M,) - longitudes of batch profiles
+        """
+        M = pred.shape[0]
+        d = (pred - target).reshape(M, -1)  # Shape: (M, N_feat)
+        N_feat = d.shape[1]
+
+        # 1. Build dynamic spatial correlation matrix C_spatial for the current batch (M x M)
+        # Using a simple Gaussian distance kernel based on batch (lat, lon) coordinates
+        lat_rad = torch.deg2rad(lat)
+        lon_rad = torch.deg2rad(lon)
+
+        # Approximate great-circle distance or Euclidean distance on batch coordinates
+        lat_diff = lat_rad.unsqueeze(1) - lat_rad.unsqueeze(0)
+        lon_diff = lon_rad.unsqueeze(1) - lon_rad.unsqueeze(0)
+        dist_sq = lat_diff ** 2 + lon_diff ** 2
+
+        C_spatial = torch.exp(-0.5 * dist_sq / (self.spatial_length_scale ** 2))
+
+        # Add a tiny ridge for positive-definiteness on C_spatial
+        C_spatial = C_spatial + 1e-5 * torch.eye(M, device=pred.device, dtype=pred.dtype)
+
+        # 2. Compute Cholesky factor of spatial matrix: L_s (shape: [M, M])
+        L_s = torch.linalg.cholesky(C_spatial)
+
+        # 3. Apply Kronecker Cholesky solve efficiently using matrix multiplications:
+        # Instead of building the (M*N_feat x M*N_feat) matrix, we solve:
+        # L_s^{-1} * d * (L_v^{-1})^T
+        # Step A: Solve spatial system (L_s X = d) across batch dimension
+        # d shape: (M, N_feat). torch.linalg.solve_triangular handles batched RHS if needed,
+        # or we solve system for the (M, M) factor:
+        X = torch.linalg.solve_triangular(L_s, d, upper=False)  # Shape: (M, N_feat)
+
+        # Step B: Solve vertical system across feature dimension
+        # X = L_v^{-T} X^T -> equivalent to solving L_v Z = X^T for each spatial point
+        # L_v is lower triangular, so L_v Z = X^T means X = Z^T L_v^T -> X^T = L_v Z -> Z = L_v^{-1} X^T
+        Z_T = torch.linalg.solve_triangular(self.L_v, X.T, upper=False)  # Shape: (N_feat, M)
+        Z = Z_T.T  # Shape: (M, N_feat)
+
+        # 4. Total squared Mahalanobis distance
+        return torch.sum(Z ** 2) / M

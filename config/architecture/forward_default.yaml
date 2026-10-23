@@ -74,7 +74,7 @@ output_layer:
         inverse_transform: true
 
 # Skip connections
-hidden_skip: false
-output_skip: false
-inject_encoding_hidden: false
-inject_encoding_output: false
+input_skip_hidden: false
+input_skip_output: false
+enc_skip_hidden: false
+enc_skip_output: false

@@ -212,6 +212,79 @@ class LossTerm(torch.nn.Module):
         return self
 
 
+class SobolevLossTerm(nn.Module):
+    """
+    Loss term for Sobolev regularization.
+
+    Differs from LossTerm in that the loss function receives (pred, coords)
+    where coords is batch['input'] — the raw input coordinate tensors.  The
+    coordinate tensors must have requires_grad=True in the training loop for
+    gradients to flow.
+    """
+
+    def __init__(
+        self,
+        function: DictConfig | nn.Module,
+        output_keys: str | list[str],
+    ) -> None:
+        """
+        Parameters
+        ----------
+        function : DictConfig | nn.Module
+            Sobolev regularization function (e.g. SobolevVerticalRegularization).
+            Must accept (pred, coords) where coords is a dict of coordinate tensors.
+        output_keys : str | list[str]
+            Key(s) to extract from model outputs as the prediction tensor.
+        """
+        super().__init__()
+
+        if isinstance(function, DictConfig):
+            self.loss_term = instantiate(function)
+        elif isinstance(function, nn.Module):
+            self.loss_term = function
+        else:
+            raise TypeError(f"function must be DictConfig or nn.Module, got {type(function)}")
+
+        self.output_keys = instantiate(output_keys)
+
+    def forward(
+        self,
+        outputs: Dict[str, torch.Tensor],
+        batch: Dict[str, Any],
+    ) -> torch.Tensor:
+        """
+        Compute Sobolev penalty.
+
+        Parameters
+        ----------
+        outputs : dict[str, torch.Tensor]
+            Model outputs. output_keys are extracted as the prediction.
+        batch : dict
+            Full batch dict. batch['input'] is passed as the coords dict.
+
+        Returns
+        -------
+        torch.Tensor
+            Scalar penalty, or zero if gradient tracking is disabled (e.g.
+            during Lightning's no_grad validation loop).
+        """
+        # Sobolev requires a live computation graph (forward pass must have been
+        # run with grad enabled). Lightning wraps validation_step in no_grad(),
+        # so the graph doesn't exist there — return zero rather than error.
+        if not torch.is_grad_enabled():
+            first = next(iter(outputs.values()))
+            return torch.tensor(0.0, device=first.device)
+
+        pred = extract_values(outputs, self.output_keys)
+        coords = batch['input']
+        return self.loss_term(pred, coords)
+
+    def to(self, device):
+        super().to(device)
+        self.loss_term = self.loss_term.to(device)
+        return self
+
+
 class LossTerms(torch.nn.Module):
     """
     Combines multiple LossTerm instances into a single loss with weighted sum.

@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig
 from utilities.instantiators import instantiate
 
 
@@ -229,7 +229,7 @@ class HarmonicEncoding(nn.Module):
     def __init__(
         self,
         d_input: int | DictConfig,
-        num_freqs: int | DictConfig = 10,
+        num_freqs: int | list[int] | DictConfig | ListConfig = 8,
         freq_mode: str = "linear",
         include_input: bool = True,
     ) -> None:
@@ -240,8 +240,12 @@ class HarmonicEncoding(nn.Module):
         ----------
         d_input : int
             Input dimension (number of coordinates).
-        num_freqs : int
-            Number of harmonic frequencies per dimension. Default 10.
+        num_freqs : int or list[int]
+            Number of harmonic frequencies. If an int, the same number of frequencies
+            is used for every input dimension. If a list of length d_input, each entry
+            specifies the number of frequencies for the corresponding dimension, allowing
+            per-variable frequency resolution (e.g. finer sampling for log-pressure than
+            for lat/lon).
         freq_mode : str
             How to generate frequencies:
             - "linear": k = 1, 2, ..., num_freqs (equal spacing)
@@ -263,32 +267,43 @@ class HarmonicEncoding(nn.Module):
             d_input = instantiate(d_input)
         if isinstance(num_freqs, DictConfig):
             num_freqs = instantiate(num_freqs)
+        elif isinstance(num_freqs, ListConfig):
+            num_freqs = list(num_freqs)
 
         self.d_input = d_input
-        self.num_freqs = num_freqs
         self.freq_mode = freq_mode
         self.include_input = include_input
 
-        # Generate frequency bases
-        if freq_mode == "linear":
-            # k = 1, 2, ..., num_freqs
-            freqs = torch.arange(1, num_freqs + 1, dtype=torch.float32)
-        elif freq_mode == "exponential":
-            # k = 2^0, 2^1, ..., 2^(num_freqs-1)
-            freqs = 2.0 ** torch.arange(0, num_freqs, dtype=torch.float32)
-        elif freq_mode == "log":
-            # k = log-spaced from 1 to 2π
-            freqs = torch.logspace(0, torch.log10(torch.tensor(2 * torch.pi)), num_freqs)
+        # Normalise num_freqs to a per-dimension list
+        if isinstance(num_freqs, int):
+            num_freqs_list = [num_freqs] * d_input
         else:
-            raise ValueError(f"Unknown freq_mode: {freq_mode}")
+            if len(num_freqs) != d_input:
+                raise ValueError(
+                    f"num_freqs list length ({len(num_freqs)}) must match d_input ({d_input})."
+                )
+            num_freqs_list = [int(nf) for nf in num_freqs]
+        self.num_freqs: list[int] = num_freqs_list
 
-        self.register_buffer("freqs", freqs)
+        # Register one frequency buffer per input dimension
+        for i, nf in enumerate(num_freqs_list):
+            self.register_buffer(f"freqs_{i}", self._make_freqs(nf, freq_mode))
 
-        # Output dimension
-        # Each input dimension gets: sin + cos for each frequency = 2 * num_freqs
-        self.d_output = d_input * (2 * num_freqs)
+        # Output dimension: sum of 2*nf per dim, plus raw coords if requested
+        self.d_output = sum(2 * nf for nf in num_freqs_list)
         if include_input:
             self.d_output += d_input
+
+    @staticmethod
+    def _make_freqs(num_freqs: int, freq_mode: str) -> torch.Tensor:
+        if freq_mode == "linear":
+            return torch.arange(1, num_freqs + 1, dtype=torch.float32)
+        elif freq_mode == "exponential":
+            return 2.0 ** torch.arange(0, num_freqs, dtype=torch.float32)
+        elif freq_mode == "log":
+            return torch.logspace(0, torch.log10(torch.tensor(2 * torch.pi)), num_freqs)
+        else:
+            raise ValueError(f"Unknown freq_mode: {freq_mode}")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -305,27 +320,17 @@ class HarmonicEncoding(nn.Module):
             Encoded tensor of shape (batch_size, d_output).
         """
 
-        # Compute harmonics: (B, d_input, 1) * (1, 1, num_freqs) -> (B, d_input, num_freqs)
-        x_expanded = x.unsqueeze(-1)  # (B, d_input, 1)
-        freqs_expanded = self.freqs.view(1, 1, -1)  # (1, 1, num_freqs)
+        out_parts = []
 
-        # x * freqs * π: (B, d_input, num_freqs)
-        harmonics = x_expanded * freqs_expanded * torch.pi
-
-        # Compute sin and cos: each (B, d_input, num_freqs)
-        sin_harmonics = torch.sin(harmonics)
-        cos_harmonics = torch.cos(harmonics)
-
-        # Flatten: (B, d_input * num_freqs)
-        sin_flat = sin_harmonics.reshape(x.shape[0], -1)
-        cos_flat = cos_harmonics.reshape(x.shape[0], -1)
-
-        # Concatenate sin and cos
-        out_parts = [sin_flat, cos_flat]
-
-        # Optionally include original input
         if self.include_input:
-            out_parts.insert(0, x)
+            out_parts.append(x)
+
+        for i, nf in enumerate(self.num_freqs):
+            freqs_i = getattr(self, f"freqs_{i}")       # (nf,)
+            # (B, 1) * (1, nf) * π → (B, nf)
+            harmonics = x[:, i:i + 1] * freqs_i.unsqueeze(0) * torch.pi
+            out_parts.append(torch.sin(harmonics))
+            out_parts.append(torch.cos(harmonics))
 
         return torch.cat(out_parts, dim=-1)
 

@@ -1223,7 +1223,6 @@ def pressure_only_matrix64(input: DictConfig, output: DictConfig, scaling_factor
                         else identity
                     )
                     mu_to_save = inverse_transform_fn(group_means.reshape(n_unique_coords, *data_shape[1:])).astype(np.float32)
-                    data_to_save = inverse_transform_fn(data).astype(np.float32)
                     save_func_mean = instantiate(output.mu.save)
                     save_func_mean(mu_to_save)
 
@@ -1234,27 +1233,41 @@ def pressure_only_matrix64(input: DictConfig, output: DictConfig, scaling_factor
 
                 # Compute anomalies (truth - climatological mean)
                 data -= group_means[inverse_indices]  # Shape: (n_samples, n_features)
-                # Broadcast the means back out to match the original sample layout
-                data = data.reshape(data_shape)
                 # Denominator (computation of the mean)
                 denom = float(n_samples - n_unique_coords)
-
                 if hasattr(output, 'sigma') and hasattr(output.sigma, 'save'):
+                    logger.info("Saving climatological sigma to file...")
+
                     # 1. Allocate array for local variances per unique coordinate
                     local_variances = np.zeros((n_unique_coords, n_features), dtype=data.dtype)
                     local_sq_sums = np.zeros((n_unique_coords, n_features), dtype=data.dtype)
 
                     # 2. Accumulate squared anomalies per unique coordinate using unbuffered addition
-                    np.add.at(local_sq_sums, inverse_indices, inverse_transform_fn(data) ** 2)
+                    #inverse_transform_fn = (
+                    #    Compose(transformations=input.data.get('transformations', None), inverse_transform=True)
+                    #    if apply_transform and input.data.get('transformations') is not None
+                    #    else identity
+                    # )
+                    # np.add.at(local_sq_sums, inverse_indices, inverse_transform_fn(data) ** 2)
+                    np.add.at(local_sq_sums, inverse_indices, data)
+                    # Reshape means back to original dimensions (excluding batch axis)
+                    inverse_transform_fn = (
+                        Compose(transformations=input.data.get('transformations', None), inverse_transform=True)
+                        if apply_transform and input.data.get('transformations') is not None
+                        else identity
+                    )
+                    local_sq_sums = inverse_transform_fn(local_sq_sums.reshape(n_unique_coords, *data_shape[1:])).astype(np.float32)**2
 
                     # 3. Compute local variance (N_k - 1 degrees of freedom per coordinate)
                     denom_k = np.maximum(group_counts - 1.0, 1.0)
-                    local_variances = local_sq_sums / denom_k
+                    local_variances = local_sq_sums / denom_k[..., np.newaxis]  # Shape: (n_unique_coords, n_features)
 
                     logger.info("Saving climatological sigma to file...")
-                    sigma_to_save = np.sqrt(local_variances).reshape(n_unique_coords, *data_shape[1:]).astype(np.float32)
+                    sigma_to_save = np.sqrt(local_variances)
                     save_func_sigma = instantiate(output.sigma.save)
                     save_func_sigma(sigma_to_save)
+                # Broadcast the means back out to match the original sample layout
+                data = data.reshape(data_shape)
 
             else:
                 mu = np.mean(data)

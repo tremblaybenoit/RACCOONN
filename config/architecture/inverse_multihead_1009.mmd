@@ -1,0 +1,87 @@
+%%{ init: { "flowchart": { "curve": "linear" } } }%%
+flowchart TD
+
+    IN["Input coordinates\n(B x L, 4)\nlat · lon · scans · pressure_log"]
+
+    subgraph PE ["HarmonicEncoding"]
+        PE_SIN["sin · cos  x  8 exp-spaced freqs  x  4 dims"]
+        PE_CAT["cat  raw coords  +  sin/cos\n4 to x_enc (68)"]
+        PE_SIN --> PE_CAT
+    end
+
+    subgraph IL ["MLPBlock   68 to 128   no residual"]
+        IL_LIN["Linear  68 to 128"]
+        IL_DRP["Dropout  p=0.1"]
+        IL_ACT["Swish  to x_input (128)"]
+        IL_LIN --> IL_DRP --> IL_ACT
+    end
+
+    subgraph HL ["MLPBlocks n=1   128 to 128   true residual"]
+        HLa((" "))
+        HL_LIN["Linear  128 to 128"]
+        HL_DRP["Dropout  p=0.1"]
+        HL_IDN["Identity  — true skip"]
+        HL_ADD(("plus"))
+        HL_ACT["Swish  to x_hidden (128)"]
+        HLa --> HL_LIN
+        HLa --> HL_IDN
+        HL_LIN --> HL_DRP --> HL_ADD
+        HL_IDN --> HL_ADD
+        HL_ADD --> HL_ACT
+    end
+
+    CAT(["cat  x_hidden and x_enc\n128 + 68 = 196"])
+
+    subgraph HH ["PredictionHead x3   T · q · O3"]
+        subgraph B0 ["Block 0   196 to 32   no residual"]
+            B0_LIN["Linear  196 to 32"]
+            B0_DRP["Dropout  p=0.1"]
+            B0_ACT["Swish  to (32)"]
+            B0_LIN --> B0_DRP --> B0_ACT
+        end
+        subgraph B1 ["Block 1 final   32 to 1   no residual"]
+            B1_LIN["Linear  32 to 1"]
+            B1_DRP["Dropout  p=0.0"]
+            B1_ACT["Sigmoid  to (1)"]
+            B1_LIN --> B1_DRP --> B1_ACT
+        end
+        B0_ACT --> B1_LIN
+    end
+
+    RS["Reshape\n(B x L, 3)  to  (B, 3, L)\nL = 127 pressure levels"]
+
+    IN --> PE_SIN
+    PE_CAT -->|"x_enc (68)"| IL_LIN
+    IL_ACT -->|"x_input (128)"| HLa
+    HL_ACT -->|"x_hidden (128)"| CAT
+    PE_CAT -.->|"enc_skip_output (68)"| CAT
+    CAT -->|"(196)"| B0_LIN
+    B1_ACT --> RS
+
+    style IN   fill:#eceff1,stroke:#607d8b,color:#000
+    style PE   fill:#e3f2fd,stroke:#1565c0,color:#000
+    style IL   fill:#fff3e0,stroke:#e65100,color:#000
+    style HL   fill:#e8f5e9,stroke:#2e7d32,color:#000
+    style HH   fill:#fce4ec,stroke:#c62828,color:#000
+    style B0   fill:#fce4ec,stroke:#e57373,color:#000
+    style B1   fill:#fce4ec,stroke:#e57373,color:#000
+    style RS   fill:#eceff1,stroke:#607d8b,color:#000
+
+    style PE_SIN fill:#bbdefb,stroke:#1565c0,color:#000
+    style PE_CAT fill:#90caf9,stroke:#1565c0,color:#000
+    style IL_LIN fill:#ffe0b2,stroke:#e65100,color:#000
+    style IL_DRP fill:#ffcc80,stroke:#e65100,color:#000
+    style IL_ACT fill:#ffb74d,stroke:#e65100,color:#000
+    style HLa   fill:#a5d6a7,stroke:#2e7d32,color:#000
+    style HL_LIN fill:#c8e6c9,stroke:#2e7d32,color:#000
+    style HL_DRP fill:#a5d6a7,stroke:#2e7d32,color:#000
+    style HL_IDN fill:#69f0ae,stroke:#00c853,color:#000
+    style HL_ADD fill:#b9f6ca,stroke:#2e7d32,color:#000
+    style HL_ACT fill:#66bb6a,stroke:#2e7d32,color:#fff
+    style CAT   fill:#e1bee7,stroke:#6a1b9a,color:#000
+    style B0_LIN fill:#f8bbd0,stroke:#c62828,color:#000
+    style B0_DRP fill:#f48fb1,stroke:#c62828,color:#000
+    style B0_ACT fill:#f06292,stroke:#c62828,color:#fff
+    style B1_LIN fill:#f8bbd0,stroke:#c62828,color:#000
+    style B1_DRP fill:#f48fb1,stroke:#c62828,color:#000
+    style B1_ACT fill:#e91e63,stroke:#c62828,color:#fff
