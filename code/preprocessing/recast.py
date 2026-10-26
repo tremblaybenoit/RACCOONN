@@ -18,6 +18,7 @@ def reshuffle_synthetic(data: dict,
                         tolerance: float = 0.75,
                         n_neighbors: int = 9,
                         dist_neighbors: float = 2.,
+                        edge: bool = True,
                         ) -> dict:
     """ Reshuffle already-masked data into train/valid/test splits using spatial boundaries.
 
@@ -86,6 +87,12 @@ def reshuffle_synthetic(data: dict,
 
         # Identify hull and remaining points for this scan
         coords_scan = np.flatnonzero(scan_mask)
+        # If edge detection is disabled, treat all points as interior
+        if not edge:
+            logger.info(f"Edge detection disabled for scan {scan}. Treating all points as interior.")
+            has_edge[:] = False
+        else:
+            logger.info(f"Edge detection enabled for scan {scan}. Identified {np.sum(has_edge)} edge points.")
         # Hull: boundary points or isolated points (kept in training)
         coords_hull = coords_scan[has_edge | ~has_neighbor]
         # Remaining: interior points with neighbors (split by ratios)
@@ -313,7 +320,8 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
         ratio = input.split.get('ratio', {'train': 0.6, 'valid': 0.2, 'test': 0.2})
         seed = input.split.get('seed', 0)
         tolerance = input.split.get('tolerance', 0.75)
-        split_coords = reshuffle_synthetic(data_all, ratio=ratio, seed=seed, tolerance=tolerance)
+        edge = input.split.get('edge', True)
+        split_coords = reshuffle_synthetic(data_all, ratio=ratio, seed=seed, tolerance=tolerance, edge=edge)
 
         # Save each split stage directly from data['all'] using indices
         for stage, coords in split_coords.items():
@@ -325,6 +333,9 @@ def recast_synthetic(input: DictConfig, output: DictConfig) -> None:
                         # Create parent directory
                         if hasattr(config_variable, 'path'):
                             os.makedirs(os.path.dirname(config_variable.path), exist_ok=True)
+                        # Save function
+                        if not hasattr(config_variable, 'save'):
+                            continue
                         # Save function
                         save_fn = instantiate(config_variable.save)
                         # Pressure is constant, skip masking, otherwise mask

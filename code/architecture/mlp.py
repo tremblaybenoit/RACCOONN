@@ -66,7 +66,7 @@ def init_weights_siren_hidden(layer: nn.Linear) -> None:
     """
     with torch.no_grad():
         in_features = layer.weight.shape[1]
-        bound = (6.0 / in_features) ** 0.5
+        bound = (1.0 / in_features) ** 0.5
         nn.init.uniform_(layer.weight, -bound, bound)
         if layer.bias is not None:
             nn.init.uniform_(layer.bias, -bound, bound)
@@ -185,7 +185,7 @@ def get_init_func(activation: DictConfig | nn.Module | None, first_layer: bool =
     target_str = str(target).lower()
 
     if 'sine' in target_str:
-        return init_weights_siren_first if first_layer else init_weights_siren_hidden
+        return init_weights_siren_hidden
     elif 'relu' in target_str or 'leaky' in target_str:
         return init_weights_he
     elif 'swish' in target_str or 'silu' in target_str:
