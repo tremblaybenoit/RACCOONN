@@ -69,7 +69,7 @@ output_layer:
     b: 0.0
 
 # Skip connections
-input_skip_hidden: true
+input_skip_hidden: false
 input_skip_output: false
 enc_skip_hidden: false
-enc_skip_output: false
+enc_skip_output: true

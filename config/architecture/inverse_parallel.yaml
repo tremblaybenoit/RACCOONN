@@ -1,0 +1,75 @@
+_target_: code.architecture.mlp.MLPModulars
+_recursive_: false
+
+# Shared positional encoding (applied once, fed to all sub-networks)
+positional_encoding:
+  _target_: code.architecture.encoding.HarmonicEncoding
+  d_input: 4  # [lat, lon, scans, pressure_log]
+  num_freqs: 8
+  freq_mode: "exponential"
+  include_input: true  # d_output = 4 + 4*2*8 = 68
+
+# One sub-network per profile variable (T, q, O3)
+n_models: ${data.stage.train.variables.prof_inverse.n}
+
+# Sub-network architecture (homogeneous — all variables share this template)
+# Each instantiation produces independent weights.
+model:
+  _target_: code.architecture.mlp.MLPModular
+  _recursive_: false
+
+  # No positional encoding: x_enc from MLPModulars is passed in directly
+  positional_encoding:
+    _target_: code.architecture.encoding.IdentityPositionalEncoding
+    d_input: 51  # [lat, lon, scans, pressure_log]
+
+  # Input projection: in_features patched to d_encoding (68) by MLPModulars
+  input_layer:
+    _target_: code.architecture.mlp.MLPBlock
+    _recursive_: false
+    in_features: null  # set to d_encoding by MLPModulars
+    out_features: 64
+    activation:
+      _target_: code.architecture.activation.Swish
+    norm_type: none
+    dropout_rate: 0.0
+    residual: false
+
+  # Per-variable hidden layers
+  hidden_layer:
+    _target_: code.architecture.mlp.MLPBlocks
+    _recursive_: false
+    in_features: 64
+    out_features: 64
+    hidden_features: 64
+    n_blocks: 2
+    activation:
+      _target_: code.architecture.activation.Swish
+    norm_type: none
+    dropout_rate: 0.0
+    residual: true
+
+  # Per-variable output head: one scalar per pressure level
+  output_layer:
+    _target_: code.architecture.mlp.PredictionHead
+    _recursive_: false
+    in_features: 64
+    hidden_features: 64
+    out_features: 1
+    n_blocks: 1
+    activation:
+      _target_: code.architecture.activation.Swish
+    final_activation:
+      _target_: torch.nn.Sigmoid
+    norm_type: none
+    final_norm_type: none
+    dropout_rate: 0.0
+    final_dropout_rate: 0.0
+    residual: true
+
+  input_skip_hidden: false
+  input_skip_output: false
+  enc_skip_hidden: false
+  enc_skip_output: true
+
+out_concat: true

@@ -19,7 +19,7 @@ input_layer:
     _target_: code.architecture.activation.Swish
   norm_type: none
   dropout_rate: 0.1
-  residual: true
+  residual: false
 
 # Hidden layers
 hidden_layer:
@@ -56,10 +56,10 @@ output_layer:
     final_norm_type: none
     dropout_rate: 0.1
     final_dropout_rate: 0.
-    residual: true
+    residual: false
 
 # Skip connections
-input_skip_hidden: true
+input_skip_hidden: false
 input_skip_output: false
 enc_skip_hidden: false
-enc_skip_output: false
+enc_skip_output: true
