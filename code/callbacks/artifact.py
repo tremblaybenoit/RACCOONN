@@ -866,6 +866,7 @@ class InverseLogger(ArtifactLogger):
                         y=self.pressure_levels,
                         y_label='Pressure (hPa)',
                         x_label='RMSE value',
+                        x_range=[0, None],
                         title=[f"RMSE: {label}" for label in prof_labels]
                     )
                 )

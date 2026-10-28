@@ -42,9 +42,9 @@ class IdentityPositionalEncoding(nn.Module):
 
 
 class RescaledPositionalEncoding(IdentityPositionalEncoding):
-    """ Identity Positional Encoding. This is a simple positional encoding that does not change the input."""
+    """ Rescaled Positional Encoding. This scales the input to the range [-1, 1]."""
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """ Forward pass through the Identity Positional Encoding.
+        """ Forward pass through the Rescaled Positional Encoding.
 
         Parameters
         ----------
@@ -321,198 +321,18 @@ class HarmonicEncoding(nn.Module):
         """
 
         out_parts = []
-
+        x_scaled = x * 2.0 - 1.0
         if self.include_input:
-            out_parts.append(x)
+            out_parts.append(x_scaled)
 
         for i, nf in enumerate(self.num_freqs):
             freqs_i = getattr(self, f"freqs_{i}")       # (nf,)
             # (B, 1) * (1, nf) * π → (B, nf)
-            harmonics = x[:, i:i + 1] * freqs_i.unsqueeze(0) * torch.pi
+            harmonics = x_scaled[:, i:i + 1] * freqs_i.unsqueeze(0) * torch.pi
             out_parts.append(torch.sin(harmonics))
             out_parts.append(torch.cos(harmonics))
 
         return torch.cat(out_parts, dim=-1)
-
-
-class BSplinePressureEncoding(nn.Module):
-    """
-    B-Spline Basis Pressure Encoding for CONTINUOUS normalized pressure.
-
-    Represents continuous normalized pressure [0, 1] using smooth B-spline basis functions.
-    The model learns coefficients for each basis function, allowing smooth
-    and parameter-efficient pressure encoding.
-
-    Advantages:
-    - Parameter-efficient: n_basis × embedding_dim parameters (e.g., 10 × 16 = 160)
-    - Smooth representation across entire normalized pressure range [0, 1]
-    - Natural interpolation between pressure values
-    - Works with any continuous pressure value in [0, 1]
-
-    Uses cubic B-splines (order=3).
-
-    Example:
-    --------
-    x = torch.tensor([[0.5, 0.7, 0.2, 0.42],  # pressure_normalized = 0.42
-                      [0.6, 0.8, 0.3, 0.78]]) # pressure_normalized = 0.78
-    encoding = BSplinePressureEncoding(n_levels=127, n_basis=10, embedding_dim=16, d_input=4)
-    output = encoding(x)  # shape: (2, 3 + 16) = (2, 19)
-    """
-
-    def __init__(
-        self,
-        n_levels: int | DictConfig = 127,
-        n_basis: int | DictConfig = 10,
-        embedding_dim: int | DictConfig = 16,
-        order: int = 3,
-        d_input: int | DictConfig | None = None,
-    ) -> None:
-        """
-        Initialize BSplinePressureEncoding.
-
-        Parameters
-        ----------
-        n_levels : int
-            Reference number of discrete pressure levels (used for documentation).
-            Default 127 (WRF pressure levels).
-        n_basis : int
-            Number of B-spline basis functions. Default 10.
-            Fewer basis functions = smoother representation, fewer parameters.
-            Typical range: 8-16 for smooth 127-level representation.
-        embedding_dim : int
-            Output embedding dimension after B-spline projection. Default 16.
-        order : int
-            Spline order (3 = cubic). Default 3. Must be ≥ 1.
-        d_input : int or None
-            Total input dimension. Used to compute output size.
-
-        Returns
-        -------
-        None.
-        """
-
-        # Class inheritance
-        super().__init__()
-
-        # Resolve config types
-        if isinstance(n_levels, DictConfig):
-            n_levels = instantiate(n_levels)
-        if isinstance(n_basis, DictConfig):
-            n_basis = instantiate(n_basis)
-        if isinstance(embedding_dim, DictConfig):
-            embedding_dim = instantiate(embedding_dim)
-        if isinstance(d_input, DictConfig):
-            d_input = instantiate(d_input)
-
-        self.n_levels = n_levels
-        self.n_basis = n_basis
-        self.embedding_dim = embedding_dim
-        self.order = order
-
-        # Create knot vector for B-spline on [0, 1]
-        # For scipy.interpolate.BSpline: len(knots) must equal n_basis + order + 1
-        # Clamped knots: (order+1) zeros, interior knots, (order+1) ones
-        n_interior = n_basis - order - 1
-        if n_interior < 0:
-            raise ValueError(
-                f"n_basis ({n_basis}) must be > order ({order}) for valid B-spline. "
-                f"Typically n_basis ≥ order + 2. Try n_basis ≥ {order + 2}."
-            )
-
-        interior_knots = torch.linspace(0, 1, n_interior + 2, dtype=torch.float32)
-        knots = torch.cat([
-            torch.zeros(order + 1),
-            interior_knots[1:-1],
-            torch.ones(order + 1)
-        ])
-        # Verify knot vector length
-        expected_len = n_basis + order + 1
-        if len(knots) != expected_len:
-            raise ValueError(
-                f"Knot vector length mismatch: got {len(knots)}, expected {expected_len}. "
-                f"(n_basis={n_basis}, order={order})"
-            )
-        self.register_buffer("knots", knots)
-
-        # Learnable coefficients for each basis function: (n_basis, embedding_dim)
-        self.spline_coefs = nn.Parameter(torch.randn(n_basis, embedding_dim) * 0.01)
-
-        # Build basis evaluator
-        self._build_basis_evaluator()
-
-        # Output dimension
-        if d_input is not None:
-            # Replace pressure (1 dim) with embedding_dim
-            self.d_output = d_input - 1 + embedding_dim
-        else:
-            self.d_output = embedding_dim
-
-    def _build_basis_evaluator(self) -> None:
-        """Build B-spline basis function evaluators."""
-        try:
-            from scipy.interpolate import BSpline
-        except ImportError:
-            raise ImportError("scipy required for B-spline encoding. Install with: pip install scipy")
-
-        self._basis_funcs = []
-
-        for i in range(self.n_basis):
-            # Create unit basis vector (1 at position i, 0 elsewhere)
-            coefs = np.zeros(self.n_basis, dtype=np.float32)
-            coefs[i] = 1.0
-
-            # Create B-spline basis function
-            basis_func = BSpline(
-                self.knots.cpu().numpy(),
-                coefs,
-                self.order,
-                extrapolate=False
-            )
-            self._basis_funcs.append(basis_func)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass: replace continuous normalized pressure with B-spline embedding.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Input tensor of shape (batch_size, d_input).
-            Assumes last column is continuous normalized pressure ∈ [0, 1].
-
-        Returns
-        -------
-        torch.Tensor
-            Output tensor of shape (batch_size, d_output) where normalized pressure
-            is replaced with its B-spline embedding.
-        """
-
-        # Separate pressure (last column) from other coordinates
-        other_coords = x[:, :-1]  # (B, d_input-1)
-        pressure_norm = x[:, -1]  # (B,) continuous values in [0, 1]
-
-        # Clamp to valid range [0, 1]
-        pressure_norm = torch.clamp(pressure_norm, 0.0, 1.0)
-
-        # Evaluate B-spline basis functions at continuous pressure values
-        # Shape: (B, n_basis)
-        batch_size = pressure_norm.shape[0]
-        basis_vals_list = []
-
-        for i, basis_func in enumerate(self._basis_funcs):
-            # Evaluate basis function at each batch element's pressure value
-            basis_vals = basis_func(pressure_norm.cpu().detach().numpy())  # (B,)
-            # Replace NaN with 0 for numerical stability
-            basis_vals = np.nan_to_num(basis_vals, nan=0.0)
-            basis_vals_list.append(torch.tensor(basis_vals, dtype=torch.float32, device=x.device))
-
-        basis_vals = torch.stack(basis_vals_list, dim=1)  # (B, n_basis)
-
-        # Compute B-spline embedding: (B, n_basis) @ (n_basis, embedding_dim) = (B, embedding_dim)
-        pressure_embedding = torch.matmul(basis_vals, self.spline_coefs)
-
-        # Concatenate other coordinates with pressure embedding
-        return torch.cat([other_coords, pressure_embedding], dim=-1)
 
 
 class HybridPositionalEncoding(nn.Module):
@@ -677,4 +497,148 @@ class HybridPositionalEncoding(nn.Module):
             out_parts.append(encoded_i)
 
         # Concatenate all encoded parts
+        return torch.cat(out_parts, dim=-1)
+
+
+class HybridSpatialPressureEncoding(nn.Module):
+    """
+    Hybrid Positional Encoding for Atmospheric Fields:
+    - Harmonic (Fourier) encoding for spatial coordinates (lat, lon -> indices 0 and 1).
+    - Chebyshev polynomial basis expansion for vertical coordinate (log_pressure -> index 2).
+    """
+
+    def __init__(
+            self,
+            d_input: int | DictConfig = 3,
+            num_freqs: int | list[int] | DictConfig | ListConfig = 8,
+            freq_mode: str = "linear",
+            include_input: bool = True,
+            max_degree: int | DictConfig = 10,
+    ) -> None:
+        """
+        Initialize HybridSpatialPressureEncoding.
+
+        Parameters
+        ----------
+        d_input : int
+            Input dimension (expected to be 3: [lat, lon, log_pressure]).
+        num_freqs : int or list[int]
+            Number of harmonic frequencies for lat and lon.
+        freq_mode : str
+            How to generate harmonic frequencies: "linear", "exponential", or "log".
+        include_input : bool
+            If True, include original input coordinates in output. Default True.
+        max_degree : int
+            Maximum polynomial degree for the Chebyshev expansion on log_pressure.
+
+        Returns
+        -------
+        None.
+        """
+
+        # Class inheritance
+        super().__init__()
+
+        # Resolve config types
+        if isinstance(d_input, DictConfig):
+            d_input = instantiate(d_input)
+        if isinstance(num_freqs, DictConfig):
+            num_freqs = instantiate(num_freqs)
+        elif isinstance(num_freqs, ListConfig):
+            num_freqs = list(num_freqs)
+        if isinstance(max_degree, DictConfig):
+            max_degree = instantiate(max_degree)
+
+        self.d_input = d_input
+        self.freq_mode = freq_mode
+        self.include_input = include_input
+        self.max_degree = max_degree
+
+        if d_input != 3:
+            raise ValueError(
+                f"HybridSpatialPressureEncoding expects d_input=3 [lat, lon, log_pressure], got {d_input}.")
+
+        # Harmonic frequencies configuration for spatial dims (lat, lon -> 2 dimensions)
+        spatial_dims = 2
+        if isinstance(num_freqs, int):
+            self.num_freqs_list = [num_freqs] * spatial_dims
+        else:
+            if len(num_freqs) != spatial_dims:
+                raise ValueError(
+                    f"num_freqs list length ({len(num_freqs)}) must match spatial dimensions ({spatial_dims}).")
+            self.num_freqs_list = [int(nf) for nf in num_freqs]
+
+        # Register one frequency buffer per spatial input dimension
+        for i, nf in enumerate(self.num_freqs_list):
+            self.register_buffer(f"freqs_{i}", self._make_freqs(nf, freq_mode))
+
+        # Calculate total output dimension:
+        # 1. Original raw inputs (if included)
+        self.d_output = d_input if include_input else 0
+        # 2. Harmonic outputs for lat & lon: sum of 2*nf per spatial dimension
+        self.d_output += sum(2 * nf for nf in self.num_freqs_list)
+        # 3. Chebyshev polynomial outputs for log_pressure: max_degree
+        self.d_output += max_degree
+
+    @staticmethod
+    def _make_freqs(num_freqs: int, freq_mode: str) -> torch.Tensor:
+        if freq_mode == "linear":
+            return torch.arange(1, num_freqs + 1, dtype=torch.float32)
+        elif freq_mode == "exponential":
+            return 2.0 ** torch.arange(0, num_freqs, dtype=torch.float32)
+        elif freq_mode == "log":
+            return torch.logspace(0, torch.log10(torch.tensor(2.0 * torch.pi)), num_freqs)
+        else:
+            raise ValueError(f"Unknown freq_mode: {freq_mode}")
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass: encode lat/lon harmonically and log_pressure via Chebyshev polynomials,
+        appending uniformly rescaled [-1, 1] raw inputs if requested.
+        """
+        out_parts = []
+
+        # 1. Rescale all raw inputs from [0, 1] to [-1, 1] for uniform network scaling
+        if self.include_input:
+            x_scaled = x * 2.0 - 1.0
+            out_parts.append(x_scaled)
+        else:
+            # We still need the scaled version for the Chebyshev expansion below
+            x_scaled = x * 2.0 - 1.0
+
+        # 2. Harmonic Encoding for Lat (index 0) and Lon (index 1)
+        # (Harmonic functions operate smoothly on bounded coordinates)
+        for i in range(2):
+            nf = self.num_freqs_list[i]
+            freqs_i = getattr(self, f"freqs_{i}")  # (nf,)
+            # Using the original or scaled coordinate for frequencies (typically original [0, 1] or [-1, 1] scaled)
+            harmonics = x[:, i:i + 1] * freqs_i.unsqueeze(0) * torch.pi
+            out_parts.append(torch.sin(harmonics))
+            out_parts.append(torch.cos(harmonics))
+
+        # 3. Chebyshev Polynomial Expansion for log_pressure (index 2)
+        # Using x_scaled[:, 2:3] which is already mapped to [-1, 1]
+        p_scaled = x_scaled[:, 2:3]  # (B, 1)
+
+        if self.max_degree > 0:
+            cheby_parts = []
+
+            # T_1(x) = x
+            t_prev = p_scaled
+            cheby_parts.append(t_prev)
+
+            if self.max_degree >= 2:
+                # T_2(x) = 2x^2 - 1
+                t_curr = 2.0 * p_scaled * p_scaled - 1.0
+                cheby_parts.append(t_curr)
+
+                # Higher degrees via stable recurrence: T_n(x) = 2x * T_{n-1}(x) - T_{n-2}(x)
+                for _ in range(3, self.max_degree + 1):
+                    t_next = 2.0 * p_scaled * t_curr - t_prev
+                    cheby_parts.append(t_next)
+                    t_prev = t_curr
+                    t_curr = t_next
+
+            out_parts.append(torch.cat(cheby_parts, dim=-1))
+
         return torch.cat(out_parts, dim=-1)

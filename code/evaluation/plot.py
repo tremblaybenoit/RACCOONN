@@ -494,6 +494,14 @@ def plot_vertical_profiles(ax, data, err=None, font_size=13, title='Mean vertica
                       data_mean + data_std]), symmetric=False)
         x_range = (0.95* x_range[0] if x_range[0] >= 0 else 1.05 * x_range[0],
                    1.05 * x_range[1] if x_range[1] >= 0 else 0.95 * x_range[1])
+    else:
+        x_min = x_range[0] if x_range[0] is not None else compute_min_max(
+            np.stack([data_mean - data_std if np.min(data_mean) < 0 else np.clip(data_mean - data_std, 0, None),
+                      data_mean + data_std]), symmetric=False)[0]
+        x_max = x_range[1] if x_range[1] is not None else compute_min_max(
+            np.stack([data_mean - data_std if np.min(data_mean) < 0 else np.clip(data_mean - data_std, 0, None),
+                      data_mean + data_std]), symmetric=False)[1]
+        x_range = (x_min, x_max)
     if y_range is None:
         y_range = compute_min_max(heights, symmetric=False)
 
