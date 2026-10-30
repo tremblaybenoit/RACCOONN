@@ -3,4 +3,5 @@ defaults:
   - forward_logger
   - loss_logger
   - early_stopping
+  - progress
   - _self_

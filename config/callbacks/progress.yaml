@@ -1,0 +1,3 @@
+# Track the loss function per stage (training, validation, testing)
+progress:
+  _target_: code.callbacks.progress.ProgressBar

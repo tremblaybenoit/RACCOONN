@@ -4,4 +4,5 @@ defaults:
   - loss_logger
   - inverse_logger
   - early_stopping
+  - progress
   - _self_

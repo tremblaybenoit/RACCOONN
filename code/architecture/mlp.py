@@ -427,7 +427,7 @@ class MLPBlocks(nn.Module):
                     activation=final_act if is_final else activation,
                     norm_type=final_norm if is_final else norm_type,
                     dropout_rate=final_drop if is_final else dropout_rate,
-                    residual=residual,
+                    residual=residual if not is_final else False,
                     init_func=init_func,
                     first_layer=(i == 0),
                 )
