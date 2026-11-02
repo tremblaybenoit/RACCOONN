@@ -210,9 +210,6 @@ def get_init_func(activation: DictConfig | nn.Module | None, first_layer: bool =
 class MLPBlock(nn.Module):
     """
     Single MLP block with normalization, dropout, activation, and optional residual connection.
-
-    A flexible building block combining: Linear -> Normalization -> Activation -> Dropout.
-    Supports residual connections with automatic projection for dimension mismatches.
     """
 
     def __init__(
@@ -335,10 +332,6 @@ class MLPBlock(nn.Module):
 class MLPBlocks(nn.Module):
     """
     Sequence of stacked MLP blocks with configurable depth.
-
-    Projects from in_features to out_features through multiple MLPBlock layers.
-    Supports different activation and normalization for intermediate and final blocks.
-    Enables residual connections across all blocks.
     """
 
     def __init__(
@@ -354,6 +347,7 @@ class MLPBlocks(nn.Module):
         dropout_rate: float = 0.0,
         final_dropout_rate: float | None = None,
         residual: bool = False,
+        final_residual: bool = False,
         init_func: DictConfig | nn.Module | None = None,
     ) -> None:
         """
@@ -412,6 +406,7 @@ class MLPBlocks(nn.Module):
         final_act = final_activation if final_activation is not None else activation
         final_norm = final_norm_type if final_norm_type is not None else norm_type
         final_drop = final_dropout_rate if final_dropout_rate is not None else dropout_rate
+        final_residual = final_residual if final_residual is not None else residual
 
         blocks = []
         current_in = in_features
@@ -427,7 +422,7 @@ class MLPBlocks(nn.Module):
                     activation=final_act if is_final else activation,
                     norm_type=final_norm if is_final else norm_type,
                     dropout_rate=final_drop if is_final else dropout_rate,
-                    residual=residual if not is_final else False,
+                    residual=residual if not is_final else final_residual,
                     init_func=init_func,
                     first_layer=(i == 0),
                 )
@@ -455,12 +450,6 @@ class MLPBlocks(nn.Module):
 class PredictionHead(MLPBlocks):
     """
     Single prediction head for outputting predictions.
-
-    Inherits from MLPBlocks and adds optional post-processing capability.
-    Supports arbitrary depth (n_blocks >= 1) with configurable final activation.
-
-    Post-processing is applied after all MLP layers to transform outputs
-    (e.g., denormalization, coordinate transformations, etc.).
     """
 
     def __init__(
@@ -476,6 +465,7 @@ class PredictionHead(MLPBlocks):
         dropout_rate: float = 0.0,
         final_dropout_rate: float | None = None,
         residual: bool = False,
+        final_residual: bool = False,
         init_func: DictConfig | nn.Module | None = None,
         post_process: DictConfig | Callable | None = None,
     ) -> None:
@@ -508,6 +498,8 @@ class PredictionHead(MLPBlocks):
             Final block dropout probability. Falls back to dropout_rate if None.
         residual : bool, default=False
             Whether to use residual connections within each block.
+        final_residual : bool, default=False
+            Whether to use residual connections within the final block.
         init_func : DictConfig | Callable or None, default=None
             Weight initialization function for all blocks.
             If None, auto-selected based on activation per block.
@@ -529,6 +521,7 @@ class PredictionHead(MLPBlocks):
             dropout_rate=dropout_rate,
             final_dropout_rate=final_dropout_rate,
             residual=residual,
+            final_residual=final_residual,
             init_func=init_func,
         )
 
@@ -570,15 +563,6 @@ class PredictionHead(MLPBlocks):
 class HeterogeneousPredictionHeads(nn.Module):
     """
     Multiple prediction heads with heterogeneous (per-head) configurations.
-
-    Each head can have different architectures, activations, layers, dropout rates, etc.
-
-    Can be initialized in two ways:
-    1. Via `heads` (ListConfig of DictConfigs) - configs are instantiated into heads
-    2. Via `heads` (pre-constructed nn.ModuleList) - heads are used directly
-
-    This design allows both declarative config-driven initialization and programmatic
-    construction. Outputs from all heads can be either concatenated or returned as a tuple.
     """
 
     def __init__(
@@ -670,13 +654,6 @@ class HomogeneousPredictionHeads(nn.Module):
     """
     Multiple prediction heads with identical architectures.
 
-    Creates n_heads identical prediction head modules from a single head configuration.
-    Useful for multitask learning where all heads share the same architecture but have
-    independent weights.
-
-    Each head configuration is instantiated n times via `instantiate()` to ensure every
-    head is a distinct module with independent weights (no parameter sharing).
-
     Outputs from all heads can be either concatenated or returned as a tuple.
     """
 
@@ -695,12 +672,8 @@ class HomogeneousPredictionHeads(nn.Module):
             Number of prediction heads to create. Each head is instantiated independently.
         head : DictConfig
             Head configuration with `_target_`.
-            Note: Must be DictConfig to ensure each head gets independent weights.
-            If you need to use a pre-constructed module, use HeterogeneousPredictionHeads
-            with pre-constructed heads passed as nn.ModuleList.
         out_concat : bool, default=True
             If True, concatenates outputs from all heads along the feature dimension.
-            If False, returns outputs as a tuple of tensors.
         """
 
         # Class inheritance
@@ -740,7 +713,6 @@ class HomogeneousPredictionHeads(nn.Module):
         -------
         torch.Tensor | tuple[torch.Tensor, ...]
             If out_concat=True: Concatenated output from all heads, shape (..., out_features_total).
-            If out_concat=False: Tuple of tensors, one per head.
         """
         outputs = [head(x) for head in self.heads]
         if self.out_concat:
@@ -749,272 +721,9 @@ class HomogeneousPredictionHeads(nn.Module):
             return tuple(outputs)
 
 
-class MLPModular0(nn.Module):
-    """
-    Modular MLP with fully configurable components.
-
-    A flexible architecture where all components (positional encoding, input layer,
-    hidden layers, output layer) are specified via configuration. Supports skip
-    connections, encoding injection, and flexible component combinations.
-
-    This design enables easy experimentation with different architectural choices
-    without changing code - all configuration is done via YAML/DictConfig.
-    """
-
-    def __init__(
-        self,
-        pre_process: DictConfig | nn.Module | None = None,
-        positional_encoding: DictConfig | nn.Module | None = None,
-        input_layer: DictConfig | nn.Module | None = None,
-        hidden_layer: DictConfig | nn.Module | None = None,
-        output_layer: DictConfig | nn.Module | None = None,
-        hidden_skip: bool = False,
-        output_skip: bool = False,
-        inject_encoding_hidden: bool = False,
-        inject_encoding_output: bool = False,
-    ) -> None:
-        """
-        Initialize MLPModular with configurable components.
-
-        Parameters
-        ----------
-        pre_process : DictConfig or nn.Module or None, default=None
-            Optional preprocessing layer applied to raw input before positional encoding.
-            Can be used for normalization, transformations, or other input preprocessing.
-            If None, input is passed directly to positional encoding.
-        positional_encoding : DictConfig or nn.Module or None, default=None
-            Optional positional/coordinate encoding to prepend to input.
-            If None, input is used as-is (no encoding).
-        input_layer : DictConfig or nn.Module or None, default=None
-            Input projection layer. Can be:
-            - MLPBlock: single block
-            - MLPBlocks: multiple blocks for multi-layer input
-            - Any nn.Module for custom input processing
-        hidden_layer : DictConfig or nn.Module or None, default=None
-            Hidden layer(s) for feature extraction. Can be:
-            - MLPBlock: single block (use hidden_skip=True for residual)
-            - MLPBlocks: multiple blocks (control depth via n_blocks parameter)
-            - Any nn.Module for custom hidden processing
-        output_layer : DictConfig or nn.Module or None, default=None
-            Output layer for predictions. Can be:
-            - PredictionHead: single prediction head
-            - PredictionHeads: multiple heads for multitask learning
-            - nn.Linear: simple linear layer
-            - Any nn.Module for custom output
-        hidden_skip : bool, default=False
-            Whether to wrap hidden_layer with residual connection.
-            Only applicable when hidden_layer is a single MLPBlock.
-            MLPBlocks already has internal residuals if residual=True.
-        output_skip : bool, default=False
-            Whether to concatenate input_layer output to output_layer input.
-            Useful for skip connections across the entire network.
-        inject_encoding_hidden : bool, default=False
-            Whether to concatenate positional encoding to hidden_layer input.
-            Allows encoding information to flow at multiple points in the network.
-        inject_encoding_output : bool, default=False
-            Whether to concatenate positional encoding to output_layer input.
-            Allows encoding information to directly influence output predictions.
-        """
-
-        # Class inheritance
-        super().__init__()
-
-        # Preprocessing Layer (applied first to raw input)
-        if isinstance(pre_process, DictConfig):
-            self.pre_process = instantiate(pre_process)
-        elif isinstance(pre_process, nn.Module):
-            self.pre_process = pre_process
-        else:
-            self.pre_process = nn.Identity()
-
-        # Positional Encoding
-        if isinstance(positional_encoding, DictConfig):
-            self.positional_encoding = instantiate(positional_encoding)
-            self.d_encoding = self.positional_encoding.d_output
-        elif isinstance(positional_encoding, nn.Module):
-            self.positional_encoding = positional_encoding
-            self.d_encoding = getattr(positional_encoding, 'd_output', 1)
-        else:
-            self.positional_encoding = nn.Identity()
-            self.d_encoding = 0
-
-        # Store injection flags for forward pass
-        self.inject_encoding_hidden = inject_encoding_hidden
-        self.inject_encoding_output = inject_encoding_output
-
-        # Input Layer
-        if isinstance(input_layer, DictConfig):
-            # Adjust in_features to account for positional encoding
-            if hasattr(input_layer, 'in_features') and input_layer.in_features is None:
-                input_layer.in_features = self.d_encoding
-            self.input_layer = instantiate(input_layer)
-        elif isinstance(input_layer, nn.Module):
-            self.input_layer = input_layer
-        else:
-            self.input_layer = nn.Identity()
-
-        # Determine input_layer output dimension for subsequent layers
-        if hasattr(self.input_layer, 'out_features'):
-            input_out_dim = int(self.input_layer.out_features)
-        elif hasattr(self.input_layer, 'model') and hasattr(self.input_layer.model, 'out_features'):
-            input_out_dim = int(self.input_layer.model[-1].out_features)
-        else:
-            # Try to infer from config
-            if isinstance(input_layer, DictConfig) and hasattr(input_layer, 'out_features'):
-                input_out_dim = int(input_layer.out_features)
-            else:
-                raise ValueError("Unable to determine output dimension of input_layer.")
-
-        # Hidden Layer
-        if hidden_layer is not None:
-            self.hidden_layer = instantiate(hidden_layer)
-
-            # Update in_features if encoding injection is enabled
-            if inject_encoding_hidden and hasattr(self.hidden_layer, 'in_features'):
-                self.hidden_layer.in_features = input_out_dim + self.d_encoding
-
-            # Optionally wrap with residual connection
-            if hidden_skip:
-                # Determine output dimension of hidden layer
-                if hasattr(self.hidden_layer, 'out_features'):
-                    hidden_out_dim = int(self.hidden_layer.out_features)
-                elif isinstance(hidden_layer, DictConfig) and hasattr(hidden_layer, 'out_features'):
-                    hidden_out_dim = int(hidden_layer.out_features)
-                else:
-                    hidden_out_dim = int(self.hidden_layer.in_features)
-
-                # Add residual wrapper with optional projection for dimension mismatch
-                layer_in_dim = input_out_dim + self.d_encoding if inject_encoding_hidden else input_out_dim
-                if layer_in_dim != hidden_out_dim:
-                    projection = nn.Linear(layer_in_dim, hidden_out_dim, bias=False)
-                else:
-                    projection = None
-                self.hidden_layer = Residual(self.hidden_layer, projection=projection)
-                current_dim = hidden_out_dim
-            else:
-                # Get output dimension without residual wrapper
-                if hasattr(self.hidden_layer, 'out_features'):
-                    current_dim = self.hidden_layer.out_features
-                elif isinstance(hidden_layer, DictConfig) and hasattr(hidden_layer, 'out_features'):
-                    current_dim = hidden_layer.out_features
-                else:
-                    current_dim = input_out_dim
-        # Nothing; identity layer
-        else:
-            self.hidden_layer = nn.Identity()
-            current_dim = input_out_dim
-
-        # Output Layer Input Dimension
-        if output_skip:
-            # Concatenate hidden output with input output
-            output_in_dim = current_dim + input_out_dim
-        else:
-            output_in_dim = current_dim
-
-        # Add encoding dimension if injection is enabled
-        if inject_encoding_output:
-            output_in_dim += self.d_encoding
-
-        # Output Layer
-        if output_layer is not None:
-            # Patch in_features BEFORE instantiation.
-            # For layers with a top-level in_features (e.g. PredictionHead, MLPBlocks):
-            #   mutate the DictConfig directly.
-            # For HomogeneousPredictionHeads / HeterogeneousPredictionHeads, which nest
-            #   in_features under 'head', Hydra may deep-copy the config before resolving
-            #   interpolations, making DictConfig mutation unreliable. Instead, pass
-            #   in_features as a kwarg override to instantiate() — the class accepts it
-            #   and propagates it to each head internally.
-            if isinstance(output_layer, DictConfig):
-                if hasattr(output_layer, 'in_features'):
-                    output_layer.in_features = output_in_dim
-                    self.output_layer = instantiate(output_layer)
-                elif hasattr(output_layer, 'head'):
-                    self.output_layer = instantiate(output_layer, in_features=output_in_dim)
-                else:
-                    self.output_layer = instantiate(output_layer)
-            else:
-                self.output_layer = output_layer
-        else:
-            self.output_layer = nn.Identity()
-
-        # Store dimensions for forward pass
-        self.input_out_dim = input_out_dim
-        self.hidden_out_dim = current_dim
-        self.output_skip = output_skip
-
-    def forward(self, x: torch.Tensor | dict) -> torch.Tensor | tuple[torch.Tensor, ...]:
-        """
-        Forward pass through the modular MLP.
-
-        Data flow:
-        1. Preprocessing layer (if configured)
-        2. Positional encoding (if configured)
-        3. Input layer projection
-        4. Hidden layer with optional encoding injection
-        5. Output layer with optional skip connections and encoding injection
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Input tensor.
-
-        Returns
-        -------
-        torch.Tensor | tuple[torch.Tensor, ...]
-            Output from output_layer. Can be either a single tensor or a tuple of tensors
-            if the output_layer returns multiple outputs.
-        """
-
-        # Preprocessing Layer
-        x = self.pre_process(x)
-
-        # Concatenate input
-        if isinstance(x, dict):
-            x = [
-                x.reshape(x.size(0), -1) if x.dim() > 2 else x
-                for x in x.values()
-            ]
-            x = torch.cat(x, dim=-1)
-
-        # Positional Encoding
-        x_enc = self.positional_encoding(x)
-
-        # Input Layer
-        x_input = self.input_layer(x_enc)
-
-        # Hidden Layer
-        if self.inject_encoding_hidden:
-            # Concatenate encoding to hidden layer input
-            x_hidden = self.hidden_layer(torch.cat([x_input, x_enc], dim=-1))
-        else:
-            x_hidden = self.hidden_layer(x_input)
-
-        # Prepare Output Layer Input
-        if self.output_skip:
-            # Concatenate hidden layer output with input layer output
-            x_out = torch.cat([x_hidden, x_input], dim=-1)
-        else:
-            x_out = x_hidden
-
-        # Optionally inject encoding at output
-        if self.inject_encoding_output:
-            x_out = torch.cat([x_out, x_enc], dim=-1)
-
-        # Output Layer
-        return self.output_layer(x_out)
-
-
 class MLPModular(nn.Module):
     """
     Modular MLP with fully configurable components.
-
-    A flexible architecture where all components (positional encoding, input layer,
-    hidden layers, output layer) are specified via configuration. Supports skip
-    connections, encoding injection, and flexible component combinations.
-
-    This design enables easy experimentation with different architectural choices
-    without changing code - all configuration is done via YAML/DictConfig.
     """
 
     def __init__(
@@ -1205,13 +914,6 @@ class MLPModular(nn.Module):
         """
         Forward pass through the modular MLP.
 
-        Data flow:
-        1. Preprocessing layer (if configured)
-        2. Positional encoding (if configured)
-        3. Input layer projection
-        4. Hidden layer with optional encoding injection
-        5. Output layer with optional skip connections and encoding injection
-
         Parameters
         ----------
         x : torch.Tensor
@@ -1221,7 +923,6 @@ class MLPModular(nn.Module):
         -------
         torch.Tensor | tuple[torch.Tensor, ...]
             Output from output_layer. Can be either a single tensor or a tuple of tensors
-            if the output_layer returns multiple outputs.
         """
 
         # Preprocessing Layer

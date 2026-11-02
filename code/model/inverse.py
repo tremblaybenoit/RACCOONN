@@ -86,7 +86,7 @@ class InverseModel(ForwardModel):
         else:
             self.forward_model = None
 
-    def forward(self, input_dict: dict, training_flag: bool = False) -> dict:
+    def forward(self, input_dict: dict, stage: str = "predict") -> dict:
         """ Perform forward pass with coordinate expansion.
 
         Expands input variables across pressure levels before passing to architecture.
@@ -99,8 +99,8 @@ class InverseModel(ForwardModel):
             Dictionary of input variables. May contain:
             - Variables with shape (Batch, ) which get expanded to (Batch, n_levels, 1)
             - Variables with shape (Batch, n_levels) which get reshaped to (Batch, n_levels, 1)
-        training_flag : bool, optional
-            Flag indicating whether the model is in training mode. Default is False.
+        stage : str, optional
+            Current operation: "train", "valid", "test", or "predict". Default is "predict".
 
         Returns
         -------
@@ -109,7 +109,7 @@ class InverseModel(ForwardModel):
         """
 
         # Apply pre-processing to transform inputs to model space
-        if not training_flag and self.pre_process is not None:
+        if not stage in ('train', 'valid', 'test') and self.pre_process is not None:
             input_dict = self.pre_process(input_dict)
 
         # Get n_levels from architecture if available, otherwise assume 1
@@ -146,7 +146,7 @@ class InverseModel(ForwardModel):
 
         return output_dict
 
-    def _infer(self, batch: dict, training_flag: bool = False) -> dict:
+    def _infer(self, batch: dict, stage: str = "predict") -> dict:
         """ Build output structure for inverse model with post-processing.
 
         Performs profile inversion and optionally applies forward model
@@ -159,8 +159,8 @@ class InverseModel(ForwardModel):
         ----------
         batch : dict
             Full batch containing 'input', 'context', and other batch data.
-        training_flag : bool, optional
-            Flag indicating whether the model is in training mode. Default is False.
+        stage : str, optional
+            Current operation: "train", "valid", "test", or "predict". Default is "predict".
 
         Returns
         -------
@@ -172,13 +172,13 @@ class InverseModel(ForwardModel):
         # pass so autograd can trace the gradient path for Sobolev regularization.
         # Guards in the Sobolev classes return zero if requires_grad is False,
         # so this is a no-op overhead-wise when no Sobolev term is in the loss.
-        if training_flag:
+        if stage in ('train', 'valid', 'test'):
             for v in batch['input'].values():
                 if torch.is_floating_point(v):
                     v.requires_grad_(True)
 
         # Inversion of atmospheric profiles
-        output_dict = {'output': self.forward(batch['input'], training_flag=training_flag)}
+        output_dict = {'output': self.forward(batch['input'], stage=stage)}
         # Forward-modeled observations (requires batch['context'])
         # Use 'prof_inverse' which contains the post-processed profiles (physical space)
         if self.forward_model is not None and 'context' in batch:
@@ -210,7 +210,7 @@ class InverseModelT(InverseModel):
     - Coordinate expansion: expands spatial/atmospheric inputs across pressure levels.
     """
 
-    def forward(self, input_dict: dict, training_flag: bool = False) -> dict:
+    def forward(self, input_dict: dict, stage: str = "predict") -> dict:
         """ Perform forward pass with coordinate expansion.
 
         Expands input variables across pressure levels before passing to architecture.
@@ -223,8 +223,8 @@ class InverseModelT(InverseModel):
             Dictionary of input variables. May contain:
             - Variables with shape (Batch, ) which get expanded to (Batch, n_levels, 1)
             - Variables with shape (Batch, n_levels) which get reshaped to (Batch, n_levels, 1)
-        training_flag : bool, optional
-            Flag indicating whether the model is in training mode. Default is False.
+        stage : str, optional
+            Current operation: "train", "valid", "test", or "predict". Default is "predict".
 
         Returns
         -------
@@ -233,7 +233,7 @@ class InverseModelT(InverseModel):
         """
 
         # Apply pre-processing to transform inputs to model space
-        if not training_flag and self.pre_process is not None:
+        if not stage in ('train', 'valid', 'test') and self.pre_process is not None:
             input_dict = self.pre_process(input_dict)
 
         # Get n_levels from architecture if available, otherwise assume 1
@@ -260,6 +260,205 @@ class InverseModelT(InverseModel):
 
         # Reshape back to (Batch, n_prof, n_levels)
         # Assuming output shape is (Batch * n_levels, n_prof)
+        batch_size = list(input_dict.values())[0].shape[0]
+        n_prof = output_dict['prof_inverse_transformed'].shape[-1] if output_dict['prof_inverse_transformed'].ndim > 1 else 1
+        output_dict['prof_inverse_transformed'] = output_dict['prof_inverse_transformed'].view(batch_size, n_levels, n_prof).transpose(1, 2)
+
+        # Apply post-processing to transform outputs to physical space
+        output_dict['prof_inverse'] = output_dict['prof_inverse_transformed'].clone()
+        if self.post_process is not None:
+            output_dict = self.post_process(output_dict)
+
+        return output_dict
+
+
+class InverseModelJ(InverseModel):
+    """
+    Inverse model for atmospheric retrievals with coordinate jittering.
+
+    Inherits from InverseModel and adds random Gaussian noise (jitter) to specified
+    coordinate/input variables during training to improve spatial/vertical generalization
+    in sparse data regimes.
+    """
+
+    def __init__(
+        self,
+        ckpt_path: str | DictConfig,
+        architecture: DictConfig,
+        optimizer: DictConfig | None = None,
+        scheduler: DictConfig | None = None,
+        loss: DictConfig | Callable | None = None,
+        pre_process: DictConfig | None = None,
+        post_process: DictConfig | None = None,
+        forward_model: DictConfig | ForwardModel | None = None,
+        jitter_std: float = 1e-3,
+        jitter_keys: list[str] | str = ['lat', 'lon'],
+    ) -> None:
+        """
+        Initialize InverseModelJ.
+
+        Parameters
+        ----------
+        jitter_std : float
+            Standard deviation of the Gaussian noise added to coordinates during training.
+        jitter_keys : list[str] or str
+            Dictionary keys in `input_dict` to apply jitter to. If 'all', applies to
+            all floating-point input tensors.
+        """
+        super().__init__(
+            ckpt_path=ckpt_path,
+            architecture=architecture,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            loss=loss,
+            pre_process=pre_process,
+            post_process=post_process,
+            forward_model=forward_model,
+        )
+        self.jitter_std = jitter_std
+        self.jitter_keys = jitter_keys
+
+    def forward(self, input_dict: dict, stage: str = "predict") -> dict:
+        """
+        Perform forward pass with coordinate expansion and optional training jitter.
+
+        Jitter is only applied when `stage` is "train", "valid", or "test" and `jitter_std > 0`.
+        Validation and test passes (`stage` is "predict") remain completely pristine.
+        """
+
+        # Apply pre-processing to transform inputs to model space (if not training)
+        if not stage in ('train', 'valid', 'test') and self.pre_process is not None:
+            input_dict = self.pre_process(input_dict)
+
+        # Get n_levels from architecture if available, otherwise assume 1
+        n_levels = input_dict['pressure_log'].shape[-1] if 'pressure_log' in input_dict else list(input_dict.values())[0].shape[-1]
+
+        # Vectorized expansion with optional jitter during training
+        tensors = []
+        for k, v in input_dict.items():
+            # Apply jitter only during training to floating-point coordinate tensors
+            if stage == "train" and self.jitter_std > 0 and torch.is_floating_point(v):
+                should_jitter = (
+                    self.jitter_keys == 'all' or
+                    (isinstance(self.jitter_keys, (list, tuple)) and k in self.jitter_keys)
+                )
+                if should_jitter:
+                    # Add zero-mean Gaussian noise scaled by jitter_std
+                    v = v + torch.randn_like(v) * self.jitter_std
+
+            if v.ndim == 1:
+                # For (Batch, ) → (Batch, n_levels, 1)
+                tensors.append(v[:, None, None].expand(-1, n_levels, 1))
+            elif v.ndim == 2:
+                # For (Batch, n_levels) → (Batch, n_levels, 1)
+                tensors.append(v.unsqueeze(-1))
+            else:
+                # Already (Batch, n_levels, ...) or other shape
+                tensors.append(v)
+
+        # Concatenate: (Batch, n_levels, num_features) → (Batch * n_levels, num_features)
+        inputs = torch.cat(tensors, dim=-1).view(-1, len(tensors))
+
+        # Inference through architecture
+        output_dict = {'prof_inverse': self.architecture(inputs)}
+
+        # Reshape back to (Batch, n_prof, n_levels)
+        batch_size = list(input_dict.values())[0].shape[0]
+        n_prof = output_dict['prof_inverse'].shape[-1] if output_dict['prof_inverse'].ndim > 1 else 1
+        output_dict['prof_inverse'] = output_dict['prof_inverse'].view(batch_size, n_levels, n_prof).transpose(1, 2)
+
+        # Apply post-processing to transform outputs to physical space
+        if self.post_process is not None:
+            output_dict = self.post_process(output_dict)
+
+        return output_dict
+
+
+class InverseModelTJ(InverseModelT):
+    """
+    Inverse model with transformed outputs (InverseModelT)
+    plus training-time coordinate jittering for improved generalization.
+    """
+
+    def __init__(
+        self,
+        ckpt_path: str | DictConfig,
+        architecture: DictConfig,
+        optimizer: DictConfig | None = None,
+        scheduler: DictConfig | None = None,
+        loss: DictConfig | Callable | None = None,
+        pre_process: DictConfig | None = None,
+        post_process: DictConfig | None = None,
+        forward_model: DictConfig | ForwardModel | None = None,
+        jitter_std: float = 1e-3,
+        jitter_keys: list[str] | str = ['lat', 'lon'],
+    ) -> None:
+        """
+        Initialize InverseModelTJ.
+
+        Parameters
+        ----------
+        jitter_std : float
+            Standard deviation of the Gaussian noise added to coordinates during training.
+        jitter_keys : list[str] or str
+            Dictionary keys in `input_dict` to apply jitter to. If 'all', applies to
+            all floating-point input tensors.
+        """
+        super().__init__(
+            ckpt_path=ckpt_path,
+            architecture=architecture,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            loss=loss,
+            pre_process=pre_process,
+            post_process=post_process,
+            forward_model=forward_model,
+        )
+        self.jitter_std = jitter_std
+        self.jitter_keys = jitter_keys
+
+    def forward(self, input_dict: dict, stage: str = "predict") -> dict:
+        """
+        Perform forward pass with coordinate expansion, optional training jitter,
+        and transformed output handling.
+        """
+
+        # Apply pre-processing to transform inputs to model space (matching InverseModelT logic)
+        if not stage in ('train', 'valid', 'test') and self.pre_process is not None:
+            input_dict = self.pre_process(input_dict)
+
+        # Get n_levels from architecture if available, otherwise assume 1
+        n_levels = input_dict['pressure_log'].shape[-1] if 'pressure_log' in input_dict else list(input_dict.values())[0].shape[-1]
+
+        # Vectorized expansion with optional jitter during training
+        tensors = []
+        for k, v in input_dict.items():
+            # Apply jitter only during training to floating-point coordinate tensors
+            if stage == "train" and self.jitter_std > 0 and torch.is_floating_point(v):
+                should_jitter = (
+                    self.jitter_keys == 'all' or
+                    (isinstance(self.jitter_keys, (list, tuple)) and k in self.jitter_keys)
+                )
+                if should_jitter:
+                    v = v + torch.randn_like(v) * self.jitter_std
+
+            if v.ndim == 1:
+                # For (Batch, ) → (Batch, n_levels, 1)
+                tensors.append(v[:, None, None].expand(-1, n_levels, 1))
+            elif v.ndim == 2:
+                # For (Batch, n_levels) → (Batch, n_levels, 1)
+                tensors.append(v.unsqueeze(-1))
+            else:
+                # Already (Batch, n_levels, ...) or other shape
+                tensors.append(v)
+
+        # Concatenate: (Batch, n_levels, num_features) → (Batch * n_levels, num_features)
+        inputs = torch.cat(tensors, dim=-1).view(-1, len(tensors))
+
+        # Inference through architecture
+        output_dict = {'prof_inverse_transformed': self.architecture(inputs)}
+
+        # Reshape back to (Batch, n_prof, n_levels)
         batch_size = list(input_dict.values())[0].shape[0]
         n_prof = output_dict['prof_inverse_transformed'].shape[-1] if output_dict['prof_inverse_transformed'].ndim > 1 else 1
         output_dict['prof_inverse_transformed'] = output_dict['prof_inverse_transformed'].view(batch_size, n_levels, n_prof).transpose(1, 2)
@@ -354,7 +553,7 @@ class InverseModelW(ForwardModel):
         else:
             self.forward_model = None
 
-    def forward(self, input_dict: dict, training_flag: bool = False, prior: torch.Tensor = None) -> dict:
+    def forward(self, input_dict: dict, stage: str = "predict", prior: torch.Tensor = None) -> dict:
         """ Perform forward pass with coordinate expansion.
 
         Expands input variables across pressure levels before passing to architecture.
@@ -367,8 +566,8 @@ class InverseModelW(ForwardModel):
             Dictionary of input variables. May contain:
             - Variables with shape (Batch, ) which get expanded to (Batch, n_levels, 1)
             - Variables with shape (Batch, n_levels) which get reshaped to (Batch, n_levels, 1)
-        training_flag : bool, optional
-            Flag indicating whether the model is in training mode. Default is False.
+        stage : str, optional
+            Current operation: "train", "valid", "test", or "predict". Default is "predict".
         prior : torch.Tensor, optional
             Optional prior tensor to be added to the output before post-processing.
 
@@ -379,7 +578,7 @@ class InverseModelW(ForwardModel):
         """
 
         # Apply pre-processing to transform inputs to model space
-        if not training_flag and self.pre_process is not None:
+        if not stage in ('train', 'valid', 'test') and self.pre_process is not None:
             input_dict = self.pre_process(input_dict)
 
         # Get n_levels from architecture if available, otherwise assume 1
@@ -426,7 +625,7 @@ class InverseModelW(ForwardModel):
 
         return output_dict
 
-    def _infer(self, batch: dict, training_flag: bool = False) -> dict:
+    def _infer(self, batch: dict, stage: str = "predict") -> dict:
         """ Build output structure for inverse model with post-processing.
 
         Performs profile inversion and optionally applies forward model
@@ -439,8 +638,8 @@ class InverseModelW(ForwardModel):
         ----------
         batch : dict
             Full batch containing 'input', 'context', and other batch data.
-        training_flag : bool, optional
-            Flag indicating whether the model is in training mode. Default is False.
+        stage : str, optional
+            Current operation: "train", "valid", "test", or "predict". Default is "predict".
 
         Returns
         -------
@@ -449,13 +648,13 @@ class InverseModelW(ForwardModel):
         """
 
         # Enable requires_grad on input coordinates for Sobolev regularization
-        if training_flag:
+        if stage == "train":
             for v in batch['input'].values():
                 if torch.is_floating_point(v):
                     v.requires_grad_(True)
 
         # Inversion of atmospheric profiles
-        output_dict = {'output': self.forward(batch['input'], training_flag=training_flag, prior=batch['target']['prof_prior'])}
+        output_dict = {'output': self.forward(batch['input'], stage=stage, prior=batch['target']['prof_prior'])}
         output_dict['output']['prof_inverse'] = F.relu(output_dict['output']['prof_inverse'])
 
         # Forward-modeled observations (requires batch['context'])
@@ -463,13 +662,13 @@ class InverseModelW(ForwardModel):
         if self.forward_model is not None and 'context' in batch:
             if all(k in batch['context'] for k in ['surf', 'meta']):
                 # Forward model is frozen (no weight updates), but gradients flow through
-                # Call .forward() directly with training_flag=False to bypass stage routing
+                # Call .forward() directly with stage="predict" to bypass stage routing
                 forward_model_output = self.forward_model.forward(
                     {
                         'prof': output_dict['output']['prof_inverse'],
                         'meta': batch['context']['meta'],
                         'surf': batch['context']['surf'],
-                    }
+                    },
                 )
                 # Switch keys ('bt_forward' → 'bt_inverse') for clarity in output
                 if 'bt_forward' in forward_model_output:

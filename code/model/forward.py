@@ -95,7 +95,7 @@ class ForwardModel(LightningModule):
         # Store hyperparameters
         self.save_hyperparameters(ignore=['optimizer', 'scheduler', 'loss', 'post_process'])
 
-    def forward(self, input_dict: dict, training_flag: bool = False) -> dict:
+    def forward(self, input_dict: dict, stage: str = "predict") -> dict:
         """ Perform forward pass through architecture.
 
         Converts input dict to tensor and executes raw neural network prediction.
@@ -107,8 +107,8 @@ class ForwardModel(LightningModule):
         ----------
         input_dict : dict
             Dictionary of input variables. Each value should be a tensor.
-        training_flag : bool, optional
-            Flag indicating whether the model is in training mode. Default is False.
+        stage : str, optional
+            Current operation: "train", "valid", "test", or "predict". Default is "predict".
 
         Returns
         -------
@@ -117,7 +117,7 @@ class ForwardModel(LightningModule):
         """
 
         # Apply pre-processing to transform inputs to model space
-        if not training_flag and self.pre_process is not None:
+        if not stage in ('train', 'valid', 'test') and self.pre_process is not None:
             input_dict = self.pre_process(input_dict)
 
         # Reshape all tensors to 2D (batch, features) before concatenation
@@ -144,7 +144,7 @@ class ForwardModel(LightningModule):
 
         return output_dict
 
-    def _infer(self, batch: dict, training_flag: bool = False) -> dict:
+    def _infer(self, batch: dict, stage: str = "predict") -> dict:
         """Build output structure from batch with post-processing applied.
 
         Template method for customizing output structure. Receives full batch
@@ -159,8 +159,8 @@ class ForwardModel(LightningModule):
         ----------
         batch : dict
             Full batch dictionary containing 'input', 'target', 'context', etc.
-        training_flag : bool, optional
-            Flag indicating whether the model is in training mode. Default is False.
+        stage : str, optional
+            Current operation: "train", "valid", "test", or "predict". Default is "train".
 
         Returns
         -------
@@ -169,7 +169,7 @@ class ForwardModel(LightningModule):
         """
 
         # Forward pass
-        return {'output': self.forward(batch['input'], training_flag=training_flag)}
+        return {'output': self.forward(batch['input'], stage=stage)}
 
     def base_step(self, batch: dict, batch_nb: int, stage: str) -> torch.Tensor | dict:
         """Perform training/validation/test step.
@@ -191,10 +191,9 @@ class ForwardModel(LightningModule):
 
         # Build structured output (customization point for subclasses via _infer())
         # _infer() includes post-processing to physical space
-        training_flag = (stage in ('train', 'valid', 'test'))
-        step = self._infer(batch, training_flag=training_flag)
+        step = self._infer(batch, stage=stage)
         # Stage-dependent operation: Loss
-        if training_flag and self.loss is not None:
+        if stage in ('train', 'valid', 'test') and self.loss is not None:
             # Compute loss on post-processed outputs in physical space
             loss = self.loss(step['output'], batch)
             # If dictionary with multiple terms

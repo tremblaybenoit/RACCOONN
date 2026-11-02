@@ -18,7 +18,7 @@ input_layer:
   activation:
     _target_: code.architecture.activation.Swish
   norm_type: none
-  dropout_rate: 0.1
+  dropout_rate: 0.
   residual: false
 
 # Hidden layers
@@ -32,8 +32,8 @@ hidden_layer:
   activation:
     _target_: code.architecture.activation.Swish
   norm_type: none
-  dropout_rate: 0.1
-  residual: true
+  dropout_rate: 0.
+  residual: false
 
 # Output layer
 output_layer:
@@ -54,7 +54,7 @@ output_layer:
       _target_: torch.nn.Sigmoid
     norm_type: none
     final_norm_type: none
-    dropout_rate: 0.1
+    dropout_rate: 0.
     final_dropout_rate: 0.
     residual: false
 

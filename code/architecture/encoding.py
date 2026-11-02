@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from omegaconf import DictConfig, ListConfig
 from utilities.instantiators import instantiate
+from typing import Union, List
 
 
 class IdentityPositionalEncoding(nn.Module):
@@ -231,7 +232,7 @@ class HarmonicEncoding(nn.Module):
         d_input: int | DictConfig,
         num_freqs: int | list[int] | DictConfig | ListConfig = 8,
         freq_mode: str = "linear",
-        include_input: bool = True,
+        include_input: bool | list[bool] | DictConfig | ListConfig = True,
     ) -> None:
         """
         Initialize HarmonicEncoding.
@@ -262,19 +263,22 @@ class HarmonicEncoding(nn.Module):
         # Class inheritance
         super().__init__()
 
-        # Resolve config types
+        # Resolve config types if using OmegaConf
         if isinstance(d_input, DictConfig):
             d_input = instantiate(d_input)
         if isinstance(num_freqs, DictConfig):
             num_freqs = instantiate(num_freqs)
         elif isinstance(num_freqs, ListConfig):
             num_freqs = list(num_freqs)
+        if isinstance(include_input, DictConfig):
+            include_input = instantiate(include_input)
+        elif isinstance(include_input, ListConfig):
+            include_input = list(include_input)
 
         self.d_input = d_input
         self.freq_mode = freq_mode
-        self.include_input = include_input
 
-        # Normalise num_freqs to a per-dimension list
+        # 1. Normalize num_freqs to a per-dimension list
         if isinstance(num_freqs, int):
             num_freqs_list = [num_freqs] * d_input
         else:
@@ -285,14 +289,27 @@ class HarmonicEncoding(nn.Module):
             num_freqs_list = [int(nf) for nf in num_freqs]
         self.num_freqs: list[int] = num_freqs_list
 
-        # Register one frequency buffer per input dimension
-        for i, nf in enumerate(num_freqs_list):
-            self.register_buffer(f"freqs_{i}", self._make_freqs(nf, freq_mode))
+        # 2. Normalize include_input to a per-dimension boolean list
+        if isinstance(include_input, bool):
+            include_input_list = [include_input] * d_input
+        else:
+            if len(include_input) != d_input:
+                raise ValueError(
+                    f"include_input list length ({len(include_input)}) must match d_input ({d_input})."
+                )
+            include_input_list = [bool(val) for val in include_input]
+        self.include_input: list[bool] = include_input_list
 
-        # Output dimension: sum of 2*nf per dim, plus raw coords if requested
-        self.d_output = sum(2 * nf for nf in num_freqs_list)
-        if include_input:
-            self.d_output += d_input
+        # Register frequency buffers for dimensions where num_freqs > 0
+        for i, nf in enumerate(num_freqs_list):
+            if nf > 0:
+                self.register_buffer(f"freqs_{i}", self._make_freqs(nf, freq_mode))
+
+        # Calculate exact output dimension per coordinate (raw input + 2 * num_freqs for sin/cos)
+        self.d_output = sum(
+            (1 if self.include_input[i] else 0) + (2 * nf)
+            for i, nf in enumerate(num_freqs_list)
+        )
 
     @staticmethod
     def _make_freqs(num_freqs: int, freq_mode: str) -> torch.Tensor:
@@ -321,182 +338,21 @@ class HarmonicEncoding(nn.Module):
         """
 
         out_parts = []
+        # Rescale inputs uniformly from [0, 1] to [-1, 1]
         x_scaled = x * 2.0 - 1.0
-        if self.include_input:
-            out_parts.append(x_scaled)
 
         for i, nf in enumerate(self.num_freqs):
-            freqs_i = getattr(self, f"freqs_{i}")       # (nf,)
-            # (B, 1) * (1, nf) * π → (B, nf)
-            harmonics = x_scaled[:, i:i + 1] * freqs_i.unsqueeze(0) * torch.pi
-            out_parts.append(torch.sin(harmonics))
-            out_parts.append(torch.cos(harmonics))
+            # Include raw scaled input for this coordinate if enabled
+            if self.include_input[i]:
+                out_parts.append(x_scaled[:, i:i + 1])
 
-        return torch.cat(out_parts, dim=-1)
+            # Include harmonic frequencies if greater than 0
+            if nf > 0:
+                freqs_i = getattr(self, f"freqs_{i}")  # (nf,)
+                harmonics = x_scaled[:, i:i + 1] * freqs_i.unsqueeze(0) * torch.pi
+                out_parts.append(torch.sin(harmonics))
+                out_parts.append(torch.cos(harmonics))
 
-
-class HybridPositionalEncoding(nn.Module):
-    """
-    Hybrid positional encoding with different strategies per dimension group.
-
-    Allows applying different encodings to different input dimensions. For example:
-    - HarmonicEncoding for lat/lon/scans (continuous spatial coordinates)
-    - BSplinePressureEncoding for normalized pressure (continuous [0, 1])
-    - GaussianEncoding for other continuous variables
-
-    Useful for multi-modal inputs where different dimensions have different properties.
-
-    ⚠️  All inputs to HybridPositionalEncoding must be continuous and normalized [0, 1].
-
-    Example (min-max normalized inputs):
-    -----------------------------------
-    x = torch.tensor([
-        [0.5, 0.7, 0.2, 0.42],  # [lat_norm, lon_norm, scans_norm, pressure_norm]
-        [0.6, 0.8, 0.3, 0.78]
-    ])
-
-    Config:
-    -------
-    positional_encoding:
-      _target_: code.architecture.encoding.HybridPositionalEncoding
-      d_input: 4
-      d_split: [3, 1]  # First 3 dims to spatial, last 1 to pressure
-      encodings:
-        spatial:
-          _target_: code.architecture.encoding.HarmonicEncoding
-          d_input: 3
-          num_freqs: 8
-          freq_mode: linear
-          include_input: true
-        pressure:
-          _target_: code.architecture.encoding.BSplinePressureEncoding
-          n_levels: 127
-          n_basis: 10
-          embedding_dim: 16
-          d_input: 1
-    """
-
-    def __init__(
-        self,
-        encodings: DictConfig | dict,
-        d_input: int | DictConfig,
-        d_split: list | DictConfig | None = None,
-    ) -> None:
-        """
-        Initialize HybridPositionalEncoding.
-
-        Parameters
-        ----------
-        encodings : DictConfig or dict
-            Dictionary mapping names to encoding configs. Each encoding should have:
-            - _target_: path to encoding class
-            - d_input: input dimension for this encoding
-            - Other encoding-specific parameters
-
-        d_input : int
-            Total input dimension (must match all inputs to forward()).
-        d_split : list or None
-            How to split input dimensions across encodings. Length = len(encodings).
-            Example: [3, 1] means first 3 dims go to first encoding, next 1 to second.
-            Sum of d_split must equal d_input.
-            If None, will try to infer from encoding d_input parameters.
-
-        Returns
-        -------
-        None.
-        """
-
-        # Class inheritance
-        super().__init__()
-
-        # Resolve config types
-        if isinstance(d_input, DictConfig):
-            d_input = instantiate(d_input)
-        # NOTE: Do NOT convert encodings DictConfig to dict - keep it as DictConfig
-        # so that instantiate() can properly handle nested _target_ configs
-        if isinstance(encodings, dict) and not isinstance(encodings, DictConfig):
-            # If it's a regular dict, convert values to DictConfig for compatibility
-            encodings = DictConfig(encodings)
-
-        self.d_input = d_input
-        self.encoding_names = list(encodings.keys())
-
-        # Parse d_split
-        if d_split is not None:
-            if isinstance(d_split, DictConfig):
-                d_split = instantiate(d_split)
-            self.d_split = d_split
-        else:
-            # Try to infer from encoding configs
-            self.d_split = []
-            for name in self.encoding_names:
-                enc_cfg = encodings[name]
-                if isinstance(enc_cfg, DictConfig) and "d_input" in enc_cfg:
-                    self.d_split.append(int(instantiate(enc_cfg.d_input)))
-                else:
-                    raise ValueError(
-                        f"Cannot infer d_input for encoding '{name}'. "
-                        f"Provide d_split explicitly or ensure each encoding has d_input parameter."
-                    )
-
-        # Validate split
-        if sum(self.d_split) != d_input:
-            raise ValueError(
-                f"d_split {self.d_split} sums to {sum(self.d_split)}, "
-                f"but d_input is {d_input}. They must match."
-            )
-
-        # Instantiate encodings
-        self.encodings = nn.ModuleDict()
-        for name, enc_cfg in encodings.items():
-            if isinstance(enc_cfg, DictConfig):
-                # DictConfig with _target_ - instantiate it
-                self.encodings[name] = instantiate(enc_cfg)
-            elif isinstance(enc_cfg, nn.Module):
-                # Already instantiated module - use directly
-                self.encodings[name] = enc_cfg
-            else:
-                raise TypeError(
-                    f"Encoding '{name}' must be a DictConfig or nn.Module, got {type(enc_cfg)}"
-                )
-
-        # Compute cumulative split for indexing
-        self.d_cumsum = [0] + list(np.cumsum(self.d_split))
-
-        # Compute total output dimension
-        self.d_output = sum(
-            enc.d_output if hasattr(enc, "d_output") else self.d_split[i]
-            for i, enc in enumerate(self.encodings.values())
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass: apply each encoding to its corresponding input dimensions.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Input tensor of shape (batch_size, d_input).
-
-        Returns
-        -------
-        torch.Tensor
-            Encoded tensor of shape (batch_size, d_output).
-        """
-
-        # Split input according to d_split
-        out_parts = []
-        for i, (name, encoding) in enumerate(self.encodings.items()):
-            # Extract the portion of input for this encoding
-            start_idx = self.d_cumsum[i]
-            end_idx = self.d_cumsum[i + 1]
-            x_i = x[:, start_idx:end_idx]
-
-            # Apply encoding
-            encoded_i = encoding(x_i)
-            out_parts.append(encoded_i)
-
-        # Concatenate all encoded parts
         return torch.cat(out_parts, dim=-1)
 
 
@@ -512,7 +368,7 @@ class HybridSpatialPressureEncoding(nn.Module):
             d_input: int | DictConfig = 3,
             num_freqs: int | list[int] | DictConfig | ListConfig = 8,
             freq_mode: str = "linear",
-            include_input: bool = True,
+            include_input: bool | list[bool] | DictConfig | ListConfig = True,
             max_degree: int | DictConfig = 10,
     ) -> None:
         """
@@ -546,39 +402,62 @@ class HybridSpatialPressureEncoding(nn.Module):
             num_freqs = instantiate(num_freqs)
         elif isinstance(num_freqs, ListConfig):
             num_freqs = list(num_freqs)
+        if isinstance(include_input, DictConfig):
+            include_input = instantiate(include_input)
+        elif isinstance(include_input, ListConfig):
+            include_input = list(include_input)
         if isinstance(max_degree, DictConfig):
             max_degree = instantiate(max_degree)
 
         self.d_input = d_input
         self.freq_mode = freq_mode
-        self.include_input = include_input
         self.max_degree = max_degree
 
         if d_input != 3:
             raise ValueError(
-                f"HybridSpatialPressureEncoding expects d_input=3 [lat, lon, log_pressure], got {d_input}.")
+                f"HybridSpatialPressureEncoding expects d_input=3 [lat, lon, log_pressure], got {d_input}."
+            )
 
-        # Harmonic frequencies configuration for spatial dims (lat, lon -> 2 dimensions)
+        # 1. Normalize include_input to a per-dimension list of length 3
+        if isinstance(include_input, bool):
+            include_input_list = [include_input] * d_input
+        else:
+            if len(include_input) != d_input:
+                raise ValueError(
+                    f"include_input list length ({len(include_input)}) must match d_input ({d_input})."
+                )
+            include_input_list = [bool(val) for val in include_input]
+        self.include_input_list: list[bool] = include_input_list
+
+        # 2. Harmonic frequencies configuration for spatial dims (lat, lon -> 2 dimensions)
         spatial_dims = 2
         if isinstance(num_freqs, int):
             self.num_freqs_list = [num_freqs] * spatial_dims
         else:
             if len(num_freqs) != spatial_dims:
                 raise ValueError(
-                    f"num_freqs list length ({len(num_freqs)}) must match spatial dimensions ({spatial_dims}).")
+                    f"num_freqs list length ({len(num_freqs)}) must match spatial dimensions ({spatial_dims})."
+                )
             self.num_freqs_list = [int(nf) for nf in num_freqs]
 
-        # Register one frequency buffer per spatial input dimension
+        # Register one frequency buffer per spatial input dimension (if nf > 0)
         for i, nf in enumerate(self.num_freqs_list):
-            self.register_buffer(f"freqs_{i}", self._make_freqs(nf, freq_mode))
+            if nf > 0:
+                self.register_buffer(f"freqs_{i}", self._make_freqs(nf, freq_mode))
 
-        # Calculate total output dimension:
-        # 1. Original raw inputs (if included)
-        self.d_output = d_input if include_input else 0
-        # 2. Harmonic outputs for lat & lon: sum of 2*nf per spatial dimension
-        self.d_output += sum(2 * nf for nf in self.num_freqs_list)
-        # 3. Chebyshev polynomial outputs for log_pressure: max_degree
-        self.d_output += max_degree
+        # 3. Calculate total output dimension dynamically:
+        self.d_output = 0
+        # Raw inputs included per flag
+        for i, inc in enumerate(self.include_input_list):
+            if inc:
+                self.d_output += 1
+        # Harmonic outputs for lat & lon
+        for nf in self.num_freqs_list:
+            if nf > 0:
+                self.d_output += 2 * nf
+        # Chebyshev polynomial outputs for log_pressure
+        if self.max_degree > 0:
+            self.d_output += max_degree
 
     @staticmethod
     def _make_freqs(num_freqs: int, freq_mode: str) -> torch.Tensor:
@@ -598,26 +477,24 @@ class HybridSpatialPressureEncoding(nn.Module):
         """
         out_parts = []
 
-        # 1. Rescale all raw inputs from [0, 1] to [-1, 1] for uniform network scaling
-        if self.include_input:
-            x_scaled = x * 2.0 - 1.0
-            out_parts.append(x_scaled)
-        else:
-            # We still need the scaled version for the Chebyshev expansion below
-            x_scaled = x * 2.0 - 1.0
+        # Scale all raw inputs from [0, 1] to [-1, 1] for uniform network scaling
+        x_scaled = x * 2.0 - 1.0
+
+        # 1. Append raw inputs according to per-variable inclusion flags
+        for i in range(self.d_input):
+            if self.include_input_list[i]:
+                out_parts.append(x_scaled[:, i:i + 1])
 
         # 2. Harmonic Encoding for Lat (index 0) and Lon (index 1)
-        # (Harmonic functions operate smoothly on bounded coordinates)
         for i in range(2):
             nf = self.num_freqs_list[i]
-            freqs_i = getattr(self, f"freqs_{i}")  # (nf,)
-            # Using the original or scaled coordinate for frequencies (typically original [0, 1] or [-1, 1] scaled)
-            harmonics = x[:, i:i + 1] * freqs_i.unsqueeze(0) * torch.pi
-            out_parts.append(torch.sin(harmonics))
-            out_parts.append(torch.cos(harmonics))
+            if nf > 0:
+                freqs_i = getattr(self, f"freqs_{i}")  # (nf,)
+                harmonics = x[:, i:i + 1] * freqs_i.unsqueeze(0) * torch.pi
+                out_parts.append(torch.sin(harmonics))
+                out_parts.append(torch.cos(harmonics))
 
         # 3. Chebyshev Polynomial Expansion for log_pressure (index 2)
-        # Using x_scaled[:, 2:3] which is already mapped to [-1, 1]
         p_scaled = x_scaled[:, 2:3]  # (B, 1)
 
         if self.max_degree > 0:
@@ -640,5 +517,272 @@ class HybridSpatialPressureEncoding(nn.Module):
                     t_curr = t_next
 
             out_parts.append(torch.cat(cheby_parts, dim=-1))
+
+        return torch.cat(out_parts, dim=-1)
+
+
+class HarmonicSpatialGaussianPressureEncoding(nn.Module):
+    """
+    Hybrid Encoding: Harmonic (Fourier) for spatial dims (lat, lon),
+    and Gaussian Fourier Features for vertical coordinate (log_pressure).
+    """
+
+    def __init__(
+        self,
+        d_input: int | DictConfig = 3,
+        spatial_num_freqs: int | list[int] | DictConfig | ListConfig = 8,
+        spatial_freq_mode: str = "linear",
+        pressure_num_freqs: int = 16,
+        pressure_sigma: float = 1.0,
+        include_input: Union[bool, List[bool], DictConfig, ListConfig] = True,
+    ) -> None:
+        super().__init__()
+
+        if isinstance(d_input, DictConfig):
+            d_input = instantiate(d_input)
+        if isinstance(spatial_num_freqs, DictConfig):
+            spatial_num_freqs = instantiate(spatial_num_freqs)
+        elif isinstance(spatial_num_freqs, ListConfig):
+            spatial_num_freqs = list(spatial_num_freqs)
+        if isinstance(include_input, DictConfig):
+            include_input = instantiate(include_input)
+        elif isinstance(include_input, ListConfig):
+            include_input = list(include_input)
+
+        self.d_input = d_input
+        if d_input != 3:
+            raise ValueError(f"Hybrid encodings expect d_input=3 [lat, lon, log_pressure], got {d_input}.")
+
+        # Normalize include_input to list of length 3
+        if isinstance(include_input, bool):
+            self.include_input = [include_input] * d_input
+        else:
+            self.include_input = [bool(v) for v in include_input]
+
+        # 1. Harmonic frequencies for spatial dims (lat, lon -> 2 dimensions)
+        spatial_dims = 2
+        if isinstance(spatial_num_freqs, int):
+            self.spatial_num_freqs_list = [spatial_num_freqs] * spatial_dims
+        else:
+            if len(spatial_num_freqs) != spatial_dims:
+                raise ValueError(f"spatial_num_freqs length must match spatial dimensions ({spatial_dims}).")
+            self.spatial_num_freqs_list = [int(nf) for nf in spatial_num_freqs]
+
+        for i, nf in enumerate(self.spatial_num_freqs_list):
+            if nf > 0:
+                self.register_buffer(f"spatial_freqs_{i}", self._make_harmonic_freqs(nf, spatial_freq_mode))
+
+        # 2. Gaussian random frequencies for log_pressure (index 2)
+        pressure_freqs = torch.randn(pressure_num_freqs, 1) * pressure_sigma
+        self.register_buffer("pressure_frequencies", pressure_freqs)
+
+        # Output dimension calculation
+        raw_count = sum(1 for inc in self.include_input if inc)
+        spatial_encoded = sum(2 * nf for nf in self.spatial_num_freqs_list if nf > 0)
+        pressure_encoded = 2 * pressure_num_freqs if pressure_num_freqs > 0 else 0
+        self.d_output = raw_count + spatial_encoded + pressure_encoded
+
+    @staticmethod
+    def _make_harmonic_freqs(num_freqs: int, freq_mode: str) -> torch.Tensor:
+        if freq_mode == "linear":
+            return torch.arange(1, num_freqs + 1, dtype=torch.float32)
+        elif freq_mode == "exponential":
+            return 2.0 ** torch.arange(0, num_freqs, dtype=torch.float32)
+        elif freq_mode == "log":
+            return torch.logspace(0, torch.log10(torch.tensor(2.0 * torch.pi)), num_freqs)
+        else:
+            raise ValueError(f"Unknown freq_mode: {freq_mode}")
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out_parts = []
+        x_scaled = x * 2.0 - 1.0  # Scale to [-1, 1]
+
+        # Append raw inputs per flag
+        for i, inc in enumerate(self.include_input):
+            if inc:
+                out_parts.append(x_scaled[:, i:i + 1])
+
+        # 1. Harmonic Encoding for Lat (index 0) and Lon (index 1)
+        for i in range(2):
+            nf = self.spatial_num_freqs_list[i]
+            if nf > 0:
+                freqs_i = getattr(self, f"spatial_freqs_{i}")
+                harmonics = x_scaled[:, i:i + 1] * freqs_i.unsqueeze(0) * torch.pi
+                out_parts.append(torch.sin(harmonics))
+                out_parts.append(torch.cos(harmonics))
+
+        # 2. Gaussian Fourier Features for log_pressure (index 2)
+        if len(self.pressure_frequencies) > 0:
+            p_coord = x_scaled[:, 2:3]  # (B, 1)
+            p_proj = p_coord.unsqueeze(1) * self.pressure_frequencies.unsqueeze(0) * (2.0 * torch.pi)
+            p_proj_flat = p_proj.reshape(x.shape[0], -1)
+            out_parts.append(torch.sin(p_proj_flat))
+            out_parts.append(torch.cos(p_proj_flat))
+
+        return torch.cat(out_parts, dim=-1)
+
+
+class HarmonicSpatialWaveletPressureEncoding(nn.Module):
+    """
+    Hybrid Encoding: Harmonic (Fourier) for spatial dims (lat, lon),
+    and Morlet Wavelets for vertical coordinate (log_pressure).
+    """
+
+    def __init__(
+        self,
+        d_input: int | DictConfig = 3,
+        spatial_num_freqs: int | list[int] | DictConfig | ListConfig = 8,
+        spatial_freq_mode: str = "linear",
+        pressure_num_scales: int = 12,
+        include_input: Union[bool, List[bool], DictConfig, ListConfig] = True,
+    ) -> None:
+        super().__init__()
+
+        if isinstance(d_input, DictConfig):
+            d_input = instantiate(d_input)
+        if isinstance(spatial_num_freqs, DictConfig):
+            spatial_num_freqs = instantiate(spatial_num_freqs)
+        elif isinstance(spatial_num_freqs, ListConfig):
+            spatial_num_freqs = list(spatial_num_freqs)
+        if isinstance(include_input, DictConfig):
+            include_input = instantiate(include_input)
+        elif isinstance(include_input, ListConfig):
+            include_input = list(include_input)
+
+        self.d_input = d_input
+        if d_input != 3:
+            raise ValueError(f"Hybrid encodings expect d_input=3 [lat, lon, log_pressure], got {d_input}.")
+
+        if isinstance(include_input, bool):
+            self.include_input = [include_input] * d_input
+        else:
+            self.include_input = [bool(v) for v in include_input]
+
+        # 1. Harmonic spatial frequencies
+        spatial_dims = 2
+        if isinstance(spatial_num_freqs, int):
+            self.spatial_num_freqs_list = [spatial_num_freqs] * spatial_dims
+        else:
+            self.spatial_num_freqs_list = [int(nf) for nf in spatial_num_freqs]
+
+        for i, nf in enumerate(self.spatial_num_freqs_list):
+            if nf > 0:
+                self.register_buffer(f"spatial_freqs_{i}", HarmonicSpatialGaussianPressureEncoding._make_harmonic_freqs(nf, spatial_freq_mode))
+
+        # 2. Morlet Wavelet scales for log_pressure
+        scales = torch.logspace(-0.5, 0.5, pressure_num_scales)
+        self.register_buffer("pressure_scales", scales)
+
+        raw_count = sum(1 for inc in self.include_input if inc)
+        spatial_encoded = sum(2 * nf for nf in self.spatial_num_freqs_list if nf > 0)
+        pressure_encoded = 2 * pressure_num_scales  # envelope*cos, envelope*sin per scale
+        self.d_output = raw_count + spatial_encoded + pressure_encoded
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out_parts = []
+        x_scaled = x * 2.0 - 1.0
+
+        for i, inc in enumerate(self.include_input):
+            if inc:
+                out_parts.append(x_scaled[:, i:i + 1])
+
+        # 1. Harmonic Encoding for lat, lon (indices 0 and 1)
+        for i in range(2):
+            nf = self.spatial_num_freqs_list[i]
+            if nf > 0:
+                freqs_i = getattr(self, f"spatial_freqs_{i}")
+                harmonics = x_scaled[:, i:i + 1] * freqs_i.unsqueeze(0) * torch.pi
+                out_parts.append(torch.sin(harmonics))
+                out_parts.append(torch.cos(harmonics))
+
+        # 2. Morlet Wavelet for log_pressure (index 2)
+        p_coord = x_scaled[:, 2:3]  # (B, 1)
+        scaled_p = p_coord / self.pressure_scales.unsqueeze(0)  # (B, pressure_num_scales)
+        envelope = torch.exp(-0.5 * (scaled_p ** 2))
+        out_parts.append(envelope * torch.cos(5.0 * scaled_p))
+        out_parts.append(envelope * torch.sin(5.0 * scaled_p))
+
+        return torch.cat(out_parts, dim=-1)
+
+
+class HarmonicSpatialTentPressureEncoding(nn.Module):
+    """
+    Hybrid Encoding: Harmonic (Fourier) for spatial dims (lat, lon),
+    and Triangular Tent Functions for vertical coordinate (log_pressure).
+    """
+
+    def __init__(
+        self,
+        d_input: int | DictConfig = 3,
+        spatial_num_freqs: int | list[int] | DictConfig | ListConfig = 8,
+        spatial_freq_mode: str = "linear",
+        pressure_num_centers: int = 16,
+        include_input: Union[bool, List[bool], DictConfig, ListConfig] = True,
+    ) -> None:
+        super().__init__()
+
+        if isinstance(d_input, DictConfig):
+            d_input = instantiate(d_input)
+        if isinstance(spatial_num_freqs, DictConfig):
+            spatial_num_freqs = instantiate(spatial_num_freqs)
+        elif isinstance(spatial_num_freqs, ListConfig):
+            spatial_num_freqs = list(spatial_num_freqs)
+        if isinstance(include_input, DictConfig):
+            include_input = instantiate(include_input)
+        elif isinstance(include_input, ListConfig):
+            include_input = list(include_input)
+
+        self.d_input = d_input
+        if d_input != 3:
+            raise ValueError(f"Hybrid encodings expect d_input=3 [lat, lon, log_pressure], got {d_input}.")
+
+        if isinstance(include_input, bool):
+            self.include_input = [include_input] * d_input
+        else:
+            self.include_input = [bool(v) for v in include_input]
+
+        # 1. Harmonic spatial frequencies
+        spatial_dims = 2
+        if isinstance(spatial_num_freqs, int):
+            self.spatial_num_freqs_list = [spatial_num_freqs] * spatial_dims
+        else:
+            self.spatial_num_freqs_list = [int(nf) for nf in spatial_num_freqs]
+
+        for i, nf in enumerate(self.spatial_num_freqs_list):
+            if nf > 0:
+                self.register_buffer(f"spatial_freqs_{i}", HarmonicSpatialGaussianPressureEncoding._make_harmonic_freqs(nf, spatial_freq_mode))
+
+        # 2. Tent function centers for log_pressure
+        centers = torch.linspace(-1.0, 1.0, pressure_num_centers)
+        self.register_buffer("pressure_centers", centers)
+        self.pressure_width = 2.0 / max(1, (pressure_num_centers - 1))
+
+        raw_count = sum(1 for inc in self.include_input if inc)
+        spatial_encoded = sum(2 * nf for nf in self.spatial_num_freqs_list if nf > 0)
+        pressure_encoded = pressure_num_centers
+        self.d_output = raw_count + spatial_encoded + pressure_encoded
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out_parts = []
+        x_scaled = x * 2.0 - 1.0
+
+        for i, inc in enumerate(self.include_input):
+            if inc:
+                out_parts.append(x_scaled[:, i:i + 1])
+
+        # 1. Harmonic Encoding for lat, lon (indices 0 and 1)
+        for i in range(2):
+            nf = self.spatial_num_freqs_list[i]
+            if nf > 0:
+                freqs_i = getattr(self, f"spatial_freqs_{i}")
+                harmonics = x_scaled[:, i:i + 1] * freqs_i.unsqueeze(0) * torch.pi
+                out_parts.append(torch.sin(harmonics))
+                out_parts.append(torch.cos(harmonics))
+
+        # 2. Triangular Tents for log_pressure (index 2)
+        p_coord = x_scaled[:, 2:3]  # (B, 1)
+        dist = torch.abs(p_coord - self.pressure_centers.unsqueeze(0))
+        tents = torch.clamp(1.0 - (dist / self.pressure_width), min=0.0)
+        out_parts.append(tents)
 
         return torch.cat(out_parts, dim=-1)

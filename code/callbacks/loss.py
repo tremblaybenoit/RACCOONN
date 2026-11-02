@@ -57,7 +57,7 @@ class LossLogger(Callback):
         pl_module.log(
             'train_grad_norm',
             grad_norm,
-            on_step=True,
+            on_step=False,
             on_epoch=True,
             prog_bar=False,
             logger=True
@@ -175,6 +175,7 @@ class LossLogger(Callback):
                 f'{stage}_loss',
                 value,
                 on_epoch=True,
+                on_step=False,
                 prog_bar=True,
                 logger=True
             )
