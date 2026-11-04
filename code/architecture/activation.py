@@ -295,3 +295,35 @@ class Snake(nn.Module):
         """
         return x + (1.0 / self.a) * torch.sin(self.a * x) ** 2
 
+
+class Clip(nn.Module):
+    """Clip activation function."""
+
+    def __init__(self, min_value: float = 0.0, max_value: float = 1.0) -> None:
+        """Initialize Clip activation function.
+
+        Parameters
+        ----------
+        min_value : float. Lower bound for clipping.
+        max_value : float. Upper bound for clipping.
+
+        Returns
+        -------
+        None.
+        """
+        super().__init__()
+        self.min_value = min_value
+        self.max_value = max_value
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass for Clip activation function.
+
+        Parameters
+        ----------
+        x : torch.Tensor. Input tensor.
+
+        Returns
+        -------
+        torch.Tensor. Output tensor after clipping to [min_value, max_value].
+        """
+        return torch.clamp(x, min=self.min_value, max=self.max_value)
