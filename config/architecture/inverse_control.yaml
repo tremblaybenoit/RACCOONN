@@ -4,10 +4,10 @@ _recursive_: false
 # Positional encoding
 positional_encoding:
   _target_: code.architecture.encoding.HarmonicEncoding
-  d_input: 4  # [lat, lon, scans, pressure_log]
-  num_freqs: 8  # 8 sine/cosine pairs per dimension
+  d_input: 3  # [lat, lon, log_pressure]
+  num_freqs: [8, 8, 16]  # 8 sine/cosine pairs per dimension
   freq_mode: "exponential"  # Capture fine pressure variations
-  include_input: true  # Keep original coordinates too
+  include_input: [false, false, true]  # Keep original coordinates too
 
 # Input layer
 input_layer:
@@ -16,10 +16,10 @@ input_layer:
   in_features: null  # Set by positional encoding output
   out_features: 128
   activation:
-    _target_: code.architecture.activation.Swish
+    _target_: torch.nn.SiLU
   norm_type: none
-  dropout_rate: 0.1
-  residual: true
+  dropout_rate: 0.
+  residual: false
   init_func:
     _target_: code.architecture.mlp.init_weights_uniform
     _partial_: true
@@ -30,15 +30,15 @@ input_layer:
 hidden_layer:
   _target_: code.architecture.mlp.MLPBlocks
   _recursive_: false
-  in_features: ${.hidden_features}
+  in_features: 128
   out_features: ${.hidden_features}
   hidden_features: 128
   n_blocks: 2
   activation:
-    _target_: code.architecture.activation.Swish
+    _target_: torch.nn.SiLU
   norm_type: none
-  dropout_rate: 0.1
-  residual: true
+  dropout_rate: 0.
+  residual: false
   init_func:
     _target_: code.architecture.mlp.init_weights_uniform
     _partial_: true
@@ -54,12 +54,12 @@ output_layer:
   out_features: ${data.stage.train.variables.prof_inverse.n}
   n_blocks: 1
   activation:
-    _target_: code.architecture.activation.Swish
+    _target_: torch.nn.SiLU
   final_activation:
     _target_: torch.nn.Identity
   norm_type: none
   final_norm_type: none
-  dropout_rate: 0.1
+  dropout_rate: 0.
   final_dropout_rate: 0.
   residual: false
   init_func:
@@ -72,4 +72,4 @@ output_layer:
 input_skip_hidden: false
 input_skip_output: false
 enc_skip_hidden: false
-enc_skip_output: true
+enc_skip_output: false

@@ -16,7 +16,7 @@ statistics:
   # What the method produces as output (pickle file)
   output:
     # Path to statistics file
-    path: code/data/statistics/synthetic.pkl
+    path: ${paths.data_dir}/statistics/statistics.pkl
     # Saving function
     save:
       _target_: code.data.io.save_pkl

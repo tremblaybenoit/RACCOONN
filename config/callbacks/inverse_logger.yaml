@@ -1,7 +1,7 @@
 inverse_logger:
   _target_: code.callbacks.artifact.InverseLogger
-  save_every_n_epochs: 100
-  save_on_improvement: true
+  save_every_n_epochs: 50
+  save_on_improvement: false
   monitor: valid_loss
   monitor_mode: min
 

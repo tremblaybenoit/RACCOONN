@@ -306,7 +306,11 @@ class LossLogger(Callback):
 
         # Log L2 norm of model parameters
         with torch.no_grad():
-            l2_norm = sum(p.pow(2).sum() for p in pl_module.parameters()).sqrt().item()
+            l2_norm = sum(
+                p.pow(2).sum()
+                for p in pl_module.parameters()
+                if p.requires_grad
+            ).sqrt().item()
         pl_module.log(
             'train_l2_norm',
             l2_norm,

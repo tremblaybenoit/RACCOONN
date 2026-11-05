@@ -4,10 +4,10 @@ _recursive_: false
 # Positional encoding
 positional_encoding:
   _target_: code.architecture.encoding.HarmonicEncoding
-  d_input: 4  # [lat, lon, scans, pressure_log]
-  num_freqs: 8  # 8 sine/cosine pairs per dimension
+  d_input: 3  # [lat, lon, log_pressure]
+  num_freqs: [8, 8, 16]  # 8 sine/cosine pairs per dimension
   freq_mode: "exponential"  # Capture fine pressure variations
-  include_input: true  # Keep original coordinates too
+  include_input: [false, false, true]  # Keep original coordinates too
 
 # Input layer
 input_layer:

@@ -38,7 +38,7 @@ covariance:
       # Covariance matrix
       matrix:
         # File path to save/load the covariance matrix
-        path: code/data/statistics/B_matrix.npy
+        path: ${paths.data_dir}/statistics/B_matrix.npy
         # Save function
         save:
           _target_: numpy.save
@@ -53,7 +53,7 @@ covariance:
       # Cholesky decomposition of the covariance matrix
       matrix_cholesky:
         # File path to save/load the Cholesky decomposition of the covariance matrix
-        path: code/data/statistics/B_matrix_cholesky.npy
+        path: ${paths.data_dir}/statistics/B_matrix_cholesky.npy
         # Save function
         save:
           _target_: numpy.save
@@ -68,7 +68,7 @@ covariance:
       # Inverse of the covariance matrix
       matrix_inverse:
         # File path to save/load the inverse of the covariance matrix
-        path: code/data/statistics/B_matrix_inverse.npy
+        path: ${paths.data_dir}/statistics/B_matrix_inverse.npy
         # Save function
         save:
           _target_: numpy.save
@@ -87,7 +87,7 @@ covariance:
           # Condition number threshold for the pseudo-inverse (e.g., to handle near-singular matrices)
           rcond: 1e-3
         # File path to save/load the pseudo-inverse of the covariance matrix
-        path: code/data/statistics/B_matrix_pseudo_inverse.npy
+        path: ${paths.data_dir}/statistics/B_matrix_pseudo_inverse.npy
         # Save function
         save:
           _target_: numpy.save
@@ -102,7 +102,7 @@ covariance:
       # Correlation matrix
       correlation:
         # File path to save/load the correlation matrix
-        path: code/data/statistics/B_correlation.npy
+        path: ${paths.data_dir}/statistics/B_correlation.npy
         # Save function
         save:
           _target_: numpy.save
@@ -117,7 +117,7 @@ covariance:
       # Inverse of the correlation matrix
       correlation_inverse:
         # File path to save/load the inverse of the correlation matrix
-        path: code/data/statistics/B_correlation_inverse.npy
+        path: ${paths.data_dir}/statistics/B_correlation_inverse.npy
         # Save function
         save:
           _target_: numpy.save
@@ -164,7 +164,7 @@ covariance:
       # Covariance matrix
       matrix:
         # File path to save/load the covariance matrix
-        path: code/data/statistics/R_matrix.npy
+        path: ${paths.data_dir}/statistics/R_matrix.npy
         # Save function
         save:
           _target_: numpy.save
@@ -179,7 +179,7 @@ covariance:
       # Cholesky decomposition of the covariance matrix
       matrix_cholesky:
         # File path to save/load the Cholesky decomposition of the covariance matrix
-        path: code/data/statistics/R_matrix_cholesky.npy
+        path: ${paths.data_dir}/statistics/R_matrix_cholesky.npy
         # Save function
         save:
           _target_: numpy.save
@@ -194,7 +194,7 @@ covariance:
       # Inverse of the covariance matrix
       matrix_inverse:
         # File path to save/load the inverse of the covariance matrix
-        path: code/data/statistics/R_matrix_inverse.npy
+        path: ${paths.data_dir}/statistics/R_matrix_inverse.npy
         # Save function
         save:
           _target_: numpy.save
@@ -209,7 +209,7 @@ covariance:
       # Correlation matrix
       correlation:
         # File path to save/load the correlation matrix
-        path: code/data/statistics/R_correlation.npy
+        path: ${paths.data_dir}/statistics/R_correlation.npy
         # Save function
         save:
           _target_: numpy.save

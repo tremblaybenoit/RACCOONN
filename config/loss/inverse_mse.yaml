@@ -25,6 +25,28 @@ config:
       target_keys: 'prof_prior'
       # context_keys: 'variant_mask'
 
+  # Sobolev regularization: horizontal smoothness (lat, lon)
+  sobolev_horizontal:
+    weight: 0.0
+    instance:
+      _target_: code.loss.wrapper.SobolevLossTerm
+      function:
+        _target_: code.loss.regularization.SobolevHorizontalRegularization
+        input_keys: ['lat', 'lon']
+        order: 1
+      output_keys: 'prof_inverse'
+
+  # Sobolev regularization: vertical smoothness (pressure_log)
+  sobolev_vertical:
+    weight: 0.0
+    instance:
+      _target_: code.loss.wrapper.SobolevLossTerm
+      function:
+        _target_: code.loss.regularization.SobolevVerticalRegularization
+        input_key: 'pressure_log'
+        order: 1
+      output_keys: 'prof_inverse'
+
   # Boundary conditions: fixed profile levels (no masking)
   # bcs:
   #   weight: 1.0

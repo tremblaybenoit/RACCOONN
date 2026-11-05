@@ -16,50 +16,60 @@ input_layer:
   in_features: null  # Set by positional encoding output
   out_features: 128
   activation:
-    _target_: code.architecture.activation.Swish
-  norm_type: none
+    _target_: torch.nn.SiLU
+  norm_type: layer
   dropout_rate: 0.
   residual: false
+  init_func:
+    _target_: code.architecture.mlp.init_weights_uniform
+    _partial_: true
+    a: 0.0
+    b: 0.0
 
 # Hidden layers
 hidden_layer:
   _target_: code.architecture.mlp.MLPBlocks
   _recursive_: false
-  in_features: 128
+  in_features: ${.hidden_features}
   out_features: ${.hidden_features}
   hidden_features: 128
-  n_blocks: 1
+  n_blocks: 4
   activation:
-    _target_: code.architecture.activation.Swish
-  norm_type: none
+    _target_: torch.nn.SiLU
+  norm_type: layer
   dropout_rate: 0.
-  residual: false
+  residual: true
+  init_func:
+    _target_: code.architecture.mlp.init_weights_uniform
+    _partial_: true
+    a: 0.0
+    b: 0.0
 
 # Output layer
 output_layer:
-  _target_: code.architecture.mlp.HomogeneousPredictionHeads
+  _target_: code.architecture.mlp.PredictionHead
   _recursive_: false
-  n_heads: ${data.stage.train.variables.prof_inverse.n}
-  out_concat: true
-  head:
-    _target_: code.architecture.mlp.PredictionHead
-    _recursive_: false
-    in_features: ${...hidden_layer.out_features}
-    hidden_features: 32
-    out_features: 1
-    n_blocks: 2
-    activation:
-      _target_: code.architecture.activation.Swish
-    final_activation:
-      _target_: torch.nn.Sigmoid
-    norm_type: none
-    final_norm_type: none
-    dropout_rate: 0.
-    final_dropout_rate: 0.
-    residual: false
+  in_features: ${..hidden_layer.out_features}
+  hidden_features: ${.in_features}
+  out_features: ${data.stage.train.variables.prof_inverse.n}
+  n_blocks: 1
+  activation:
+    _target_: torch.nn.SiLU
+  final_activation:
+    _target_: torch.nn.Identity
+  norm_type: layer
+  final_norm_type: none
+  dropout_rate: 0.
+  final_dropout_rate: 0.
+  residual: false
+  init_func:
+    _target_: code.architecture.mlp.init_weights_uniform
+    _partial_: true
+    a: 0.0
+    b: 0.0
 
 # Skip connections
 input_skip_hidden: false
 input_skip_output: false
 enc_skip_hidden: false
-enc_skip_output: false
+enc_skip_output: true
