@@ -1,5 +1,6 @@
 import numpy as np
 import pickle
+import sqlite3
 import torch
 from omegaconf import DictConfig, ListConfig
 from utilities.tensors import to_tensor
@@ -118,6 +119,65 @@ def load_torch(path: str) -> dict | torch.Tensor:
     """
 
     return torch.load(path)
+
+
+def load_sqlite(path: str, table: str, query: str | None = None) -> dict | list:
+    """ Load data from a SQLite database file.
+
+        Parameters
+        ----------
+        path: str. The file path to the SQLite database file.
+        table: str. The table name to load data from.
+        query: str, optional. A custom SQL query to execute. If provided, 'table' is ignored.
+               Defaults to None (loads all rows from the specified table).
+
+        Returns
+        -------
+        data: dict or list. If query returns a single row, returns dict with column names as keys.
+              If query returns multiple rows or uses SELECT *, returns list of dicts.
+    """
+
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    try:
+        if query is not None:
+            cursor.execute(query)
+        else:
+            cursor.execute(f"SELECT * FROM {table}")
+
+        rows = cursor.fetchall()
+        
+        if len(rows) == 1:
+            return dict(rows[0])
+        else:
+            return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def list_sqlite_tables(path: str) -> list:
+    """ List all table names in a SQLite database file.
+
+        Parameters
+        ----------
+        path: str. The file path to the SQLite database file.
+
+        Returns
+        -------
+        tables: list. List of table names in the database.
+    """
+
+    conn = sqlite3.connect(path)
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = [row[0] for row in cursor.fetchall()]
+        return tables
+    finally:
+        conn.close()
 
 
 def save_npy(path: str, data: np.ndarray, dtype: str | None = None) -> None:

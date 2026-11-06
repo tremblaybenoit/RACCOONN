@@ -21,14 +21,13 @@ defaults:
 # This allows you to overwrite only specified parameters
 
 # Task name. Note that it determines the output directory path
-task_name: "clear_log_split"  # Experiment
+task_name: "clearsky_patch_static"  # Experiment
 
 # Run id (unique identifier for the run)
 paths:
   task_dir: "../inverse_outputs"
-  run_id: "0002"
-  data_dir: ../synthetic_${data.dtype}_clear_log_split
-  # checkpoint_dir: "code/model/checkpoints/checkpoint"
+  run_id: "default"
+  data_dir: "../sources/JCSDA/clearsky/patch_static"
 
 # Preprocessing
 preprocessing:
@@ -43,7 +42,7 @@ preprocessing:
           lat_min: -15.0
           lat_max: 2.0
           lon_min: -70.0
-          lon_max: -30.0
+          lon_max: -53.0
         # Temporal domain:
         temporal_window:
           scans_min: 170.0
@@ -51,44 +50,43 @@ preprocessing:
         # Cloud/clear sky
         cloud_mask: false
         clear_mask: true
+      # Split
+      split:
+        edge: false
   # Statistics of the dataset
   statistics:
     # What the method produces as output (pickle file)
     output:
       # Path to statistics file
-      path: code/data/statistics/synthetic_clear_log.pkl
+      path: ${paths.data_dir}/../global/statistics/statistics.pkl
   # Covariance
   covariance:
     # B matrix
     B:
       # Function
-      _target_: code.preprocessing.covariance.gasparicohn_pressure_matrix
-      # What the method needs as input
-      input:
-        data: ${data.stage.all.variables.prof}
-        # Variables to consider for the covariance estimation
-        pressure: ${data.stage.all.variables.pressure}
-      # Univariate or multivariate
-      univariate: true
-      # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
-      # scaling_factor: 1.0
-      # Re-centering
-      # recenter: true
-      # mean_type: 'spatiotemporal'
-      # Regularization parameter to ensure numerical stability
-      # regularization_type: 'correlation_based'
-      # regularization_factor: 0.05
-    # R matrix
-    R:
-      # Function
-      _target_: code.preprocessing.covariance.climatological_matrix
+      _target_: code.preprocessing.covariance.pressure_only_matrix64
       # Univariate or multivariate
       univariate: true
       # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
       scaling_factor: 1.0
       # Re-centering
       recenter: true
-      mean_type: 'spatiotemporal'
+      mean_type: 'temporal'
+      apply_transform: true
+      # Regularization parameter to ensure numerical stability
+      regularization_type: 'correlation_based'
+      regularization_factor: 0.01
+    # R matrix
+    R:
+      # Function
+      _target_: code.preprocessing.covariance.pressure_only_matrix64
+      # Univariate or multivariate
+      univariate: false
+      # Scaling factor to apply to the covariance matrix (e.g., to account for model errors)
+      scaling_factor: 1.0
+      # Re-centering
+      recenter: true
+      mean_type: 'temporal'
       # Regularization parameter to ensure numerical stability
       regularization_type: 'correlation_based'
       regularization_factor: 0.01
@@ -98,35 +96,50 @@ loss:
   config:
     # Observation loss term: forward-modeled radiance vs. observations
     bt_crtm:
-      weight: 1.0
+      weight: 0.0
       instance:
         function:
-          matrix: ${preprocessing.covariance.R.output.matrix_inverse.load}
+          _target_: code.loss.variational.CholeskyForm
+          matrix: ${preprocessing.covariance.R.output.matrix_cholesky.load}
     # Model constraint: inverted profile vs. prior with pressure mask
     prof:
       weight: 1.0
       instance:
-        function:
-          matrix: ${preprocessing.covariance.B.output.matrix_inverse.load}
-        target_keys: 'prof_prior'
+        #function:
+        #  _target_: code.loss.variational.CholeskyForm
+        #  matrix: ${preprocessing.covariance.B.output.matrix_cholesky.load}
+        output_keys: 'prof_inverse_transformed'
+        target_keys: 'prof'
+
+    # Sobolev regularization: horizontal smoothness (lat, lon)
+    #sobolev_horizontal:
+    #  weight: 0.00000
+    #  instance:
+    #    output_keys: 'prof_inverse_transformed'
+
+    # Sobolev regularization: vertical smoothness (pressure_log)
+    #sobolev_vertical:
+    #  weight: 0.00000
+    #  instance:
+    #    output_keys: 'prof_inverse_transformed'
 
 # Model configuration
 model:
-  _target_: code.model.inverse.InverseModel
   # Forward model - reference external config
   forward_model:
-    path: code/model/checkpoint/forward/default_log/model.yaml
+    path: ../forward_outputs/forward_clear/checkpoints/default/model.yaml
 
 # Data configuration
 data:
   # Precision
   dtype: 'float32'
+  select_input: ['lat', 'lon', 'pressure_log']
   # Source data
   source:
     # Training set
     train:
       # Path to the training data
-      dir: ../synthetic_float32_clear_log/Train2
+      dir: ${paths.data_dir}/../global/Train2
       # Variables
       variables:
         # Atmospheric profiles
@@ -155,11 +168,11 @@ data:
     # Validation set
     valid:
       # Path to the validation data
-      dir: ../synthetic_float32_clear_log/Val2
+      dir: ${paths.data_dir}/../global/Val2
     # Test set
     test:
       # Path to the test data
-      dir: ../synthetic_float32_clear_log/Test2
+      dir: ${paths.data_dir}/../global/Test2
     # Prediction set
     predict:
       # Variables
@@ -167,7 +180,7 @@ data:
         # Radiances
         bt_forward:
           # Path to the prediction data
-          path: '../forward_outputs/forward_clear_log/runs/default/bt_forward_predict.npy'
+          path: '../forward_outputs/forward_clear/runs/default/bt_forward_predict.npy'
 
   # Split ratios for training, validation, and test sets
   stage:
@@ -204,7 +217,7 @@ data:
                 load: ${preprocessing.statistics.output.load}
                 key: 'prof'
                 dtype: ${data.dtype}
-              axis: null
+              axis: 1
         # Radiances
         bt_crtm:
           # Channels
@@ -237,11 +250,20 @@ data:
           # Transformations
           transformations: ${data.stage.train.variables.prof_inverse.transformations}
 
+# Architecture configuration
+architecture:
+  # Positional encoding
+  positional_encoding:
+    # _target_: code.architecture.encoding.HarmonicEncoding
+    d_input: 3
+    #num_freqs: [4, 4, 8]
+    #freq_mode: "exponential"  # Capture fine pressure variations
+
 # Logger configuration
 logger:
   # MLflow logger
   ports:
-    mlflow: 5022
+    mlflow: 5086
 
 # Trainer configuration
 trainer:

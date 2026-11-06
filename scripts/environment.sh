@@ -29,7 +29,7 @@ conda install -y \
     hydra-core hydra-colorlog \
     sphinx sphinx_rtd_theme \
     tensorboard wandb \
-    cartopy
+    cartopy optuna
 
 echo "🧬 Installing Snakemake from Bioconda..."
 conda install -y snakemake -c bioconda
