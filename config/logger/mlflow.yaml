@@ -1,6 +1,6 @@
 mlflow:
   _target_: lightning.pytorch.loggers.mlflow.MLFlowLogger  # Lightning logger
-  save_dir: ${paths.log_dir}/mlflow # Default directory where to save logs
+  save_dir: ${paths.log_dir}/mlflow  # Shared MLflow directory for all experiments
   experiment_name: ${task_name}  # Name of the experiment
   run_name: ${paths.run_id}  # Name of the run
   tags:

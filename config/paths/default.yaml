@@ -13,13 +13,13 @@ data_dir: "../../GOES_ML-main/Data"
 task_dir: "../inverse_outputs"
 
 # Path to logging directory
-log_dir: ${hydra:runtime.output_dir}/logs
+log_dir: ${paths.task_dir}/logs
 
 # Path to checkpoints
-checkpoint_dir: ${hydra:runtime.output_dir}/checkpoints/${paths.run_id}
+checkpoint_dir: ${paths.task_dir}/checkpoints/${task_name}/${paths.run_id}
 
 # Path to runs (inferences)
-run_dir: ${hydra:runtime.output_dir}/runs/${paths.run_id}
+run_dir: ${paths.task_dir}/runs/${task_name}/${paths.run_id}
 
 # path to output directory, created dynamically by hydra
 # path generation pattern is specified in `configs/hydra/forward_default.yaml`

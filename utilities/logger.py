@@ -123,6 +123,7 @@ class TrainerLogger:
         """Configure logger(s) for offline mode and UI access if specified in the config.
 
         Sets up environment variables for wandb offline mode and MLflow tracking URI.
+        Automatically sets MLflow experiment name if configured.
         Optionally starts the logger UI(s) if configured.
 
         Returns
@@ -145,16 +146,26 @@ class TrainerLogger:
         if "mlflow" in self.config:
             # Convert path for WSL compatibility
             safe_path = self._fix_path(self.config.mlflow.save_dir)
-            logger.info(f"Setting mlflow tracking URI to: file://{safe_path}")
+            db_path = f"{safe_path}.db"
+            logger.info(f"Setting mlflow tracking URI to: sqlite:///{db_path}")
 
             # Ensure the directory exists before MLflow touches it
             os.makedirs(safe_path, exist_ok=True)
 
-            # Note: file:// protocol usually takes two slashes + the absolute path
+            # Use SQLite backend for tracking URI
             if sys.platform.startswith("linux"):
-                os.environ["MLFLOW_TRACKING_URI"] = safe_path
+                os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{db_path}"
             else:
-                os.environ["MLFLOW_TRACKING_URI"] = f"file:///{safe_path}"
+                os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{db_path}"
+            
+            # Set experiment name if provided
+            if hasattr(self.config.mlflow, "experiment_name") and self.config.mlflow.experiment_name:
+                try:
+                    import mlflow
+                    mlflow.set_experiment(self.config.mlflow.experiment_name)
+                    logger.info(f"Set MLflow experiment to: {self.config.mlflow.experiment_name}")
+                except ImportError:
+                    logger.warning("MLflow not installed; skipping experiment setup")
 
     def ui(self, show: bool=False) -> None:
         """ Access logger UI via terminal commands.
@@ -186,16 +197,23 @@ class TrainerLogger:
         if "mlflow" in self.config:
             # Select port
             port = getattr(self.config.ports, "mlflow", 5000)
-            # Command for terminal
+            
+            # Convert path for WSL compatibility
             safe_path = self._fix_path(self.config.mlflow.save_dir)
-            command = f"mlflow ui --backend-store-uri file:///{safe_path} --port {port}"
-            # Start the mlflow UI
-            logger.info("Starting mlflow UI...")
+            db_path = f"{safe_path}.db"
+            
+            # Ensure the directory exists
+            os.makedirs(safe_path, exist_ok=True)
+            
+            # Command for terminal - points to shared MLflow backend for all experiments
+            command = f"mlflow server --backend-store-uri sqlite:///{db_path} --default-artifact-root file:///{safe_path} --host localhost --port {port}"
+            # Start the mlflow server
+            logger.info(f"Starting mlflow server (backend: {db_path})...")
             subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            # Open UI in the browser
+            # Open server in the browser
             if show:
-                logger.info("Opening mlflow UI in browser...")
-                _open_url_wsl_fallback(f"http://127.0.0.1:{port}")
+                logger.info("Opening mlflow server in browser...")
+                _open_url_wsl_fallback(f"http://localhost:{port}")
 
         # Tensorboard
         if "tensorboard" in self.config:
