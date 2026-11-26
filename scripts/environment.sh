@@ -3,8 +3,8 @@
 # Exit immediately if a command exits with a non-zero status
 set -e
 
-echo "🚀 Creating conda environment 'RACCOONN' with Python 3.10..."
-conda create -n RACCOONN python=3.10 -y
+echo "🚀 Creating conda environment 'RACCOONN' with Python 3.11..."
+conda create -n RACCOONN python=3.11 -y
 
 # Activate the environment
 # Note: In a shell script, 'conda activate' requires initializing conda first
@@ -12,9 +12,6 @@ conda create -n RACCOONN python=3.10 -y
 CONDA_BASE=$(conda info --base)
 source "$CONDA_BASE/etc/profile.d/conda.sh"
 conda activate RACCOONN
-
-echo "⚙️ Updating Conda base installation..."
-conda update -n base -c defaults conda -y
 
 echo "🔧 Configuring Conda channels..."
 conda config --env --add channels conda-forge
@@ -26,7 +23,7 @@ echo "📦 Installing data science and core dependencies via Conda..."
 # Grouping these allows Conda to resolve all dependencies safely upfront
 conda install -y \
     netcdf4 hdf4 pyhdf hdf5 h5py h5netcdf sqlite \
-    hydra-core hydra-colorlog \
+    ipykernel hydra-core hydra-colorlog \
     sphinx sphinx_rtd_theme \
     tensorboard wandb \
     cartopy optuna

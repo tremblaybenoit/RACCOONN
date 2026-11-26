@@ -11,4 +11,4 @@ mlflow:
 ports:
   mlflow: 5000  # Port for the MLflow server
 offline: True  # Whether to log offline
-ui: True  # Whether to open the UI after logging
+ui: False  # Whether to open the UI after logging

@@ -167,12 +167,13 @@ class TrainerLogger:
                 except ImportError:
                     logger.warning("MLflow not installed; skipping experiment setup")
 
-    def ui(self, show: bool=False) -> None:
+    def ui(self, show: bool=False, block: bool=False) -> None:
         """ Access logger UI via terminal commands.
 
         Parameters
         ----------
         show: bool. If True, open the UI in the browser.
+        block: bool. If True, run the command in a blocking shell; otherwise, run in a non-blocking subprocess.
 
         Returns
         -------
@@ -197,6 +198,8 @@ class TrainerLogger:
         if "mlflow" in self.config:
             # Select port
             port = getattr(self.config.ports, "mlflow", 5000)
+            # Select host
+            host = getattr(self.config, "host", "localhost")
             
             # Convert path for WSL compatibility
             safe_path = self._fix_path(self.config.mlflow.save_dir)
@@ -206,14 +209,22 @@ class TrainerLogger:
             os.makedirs(safe_path, exist_ok=True)
             
             # Command for terminal - points to shared MLflow backend for all experiments
-            command = f"mlflow server --backend-store-uri sqlite:///{db_path} --default-artifact-root file:///{safe_path} --host localhost --port {port}"
+            command = f"mlflow server --backend-store-uri sqlite:///{db_path} --default-artifact-root file:///{safe_path} --host {host} --port {port}"
             # Start the mlflow server
             logger.info(f"Starting mlflow server (backend: {db_path})...")
-            subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            process = subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             # Open server in the browser
             if show:
-                logger.info("Opening mlflow server in browser...")
-                _open_url_wsl_fallback(f"http://localhost:{port}")
+                logger.info(f"Opening mlflow server in browser: http://{host}:{port}...")
+                _open_url_wsl_fallback(f"http://{host}:{port}")
+            # Check whether to block terminal or not
+            if block:
+                logger.info("Server running. Press Ctrl+C to stop...")
+                try:
+                    process.wait()
+                except KeyboardInterrupt:
+                    logger.info("Stopping MLflow server.")
+                    process.terminate()
 
         # Tensorboard
         if "tensorboard" in self.config:
@@ -221,12 +232,12 @@ class TrainerLogger:
             port = getattr(self.config.ports, "tensorboard", 6006)
             # Command for terminal
             command = f"tensorboard --logdir {self.config.tensorboard.save_dir} --port {port}"
-            # Start the tensorboard UI
-            logger.info("Starting tensorboard UI...")
+            # Start the Tensorboard UI
+            logger.info("Starting Tensorboard UI...")
             subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             # Open UI in the browser
             if show:
-                logger.info("Opening tensorboard UI in browser...")
+                logger.info("Opening Tensorboard UI in browser...")
                 webbrowser.open(f"http://127.0.0.1:{port}")
 
 
@@ -244,8 +255,8 @@ def main(config: DictConfig) -> None:
     """
 
     # Call UI
-    trainer_logger = TrainerLogger(config)
-    trainer_logger.ui(show=True)
+    trainer_logger = TrainerLogger(config.logger)
+    trainer_logger.ui(show=True, block=True)
 
 
 if __name__ == '__main__':
